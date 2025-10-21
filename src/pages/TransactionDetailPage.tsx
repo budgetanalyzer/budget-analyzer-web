@@ -1,0 +1,203 @@
+// src/pages/TransactionDetailPage.tsx
+import { useParams, useNavigate, Link } from 'react-router';
+import { motion } from 'framer-motion';
+import { useTransaction } from '@/hooks/useTransactions';
+import { ErrorBanner } from '@/components/ErrorBanner';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import {
+  ArrowLeft,
+  Calendar,
+  DollarSign,
+  Building2,
+  CreditCard,
+  FileText,
+  Clock,
+} from 'lucide-react';
+import { format } from 'date-fns';
+
+export function TransactionDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const transactionId = Number(id);
+
+  const { data: transaction, isLoading, error, refetch } = useTransaction(transactionId);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <LoadingSpinner size="lg" text="Loading transaction details..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <div className="w-full max-w-md">
+            <ErrorBanner error={error} onRetry={() => refetch()} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!transaction) {
+    return null;
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6"
+    >
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Transactions
+        </Button>
+        <Link to="/">
+          <Button variant="outline">View All</Button>
+        </Link>
+      </div>
+
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Transaction Details</h1>
+        <p className="text-muted-foreground">Transaction #{transaction.id}</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Transaction Information</CardTitle>
+              <CardDescription>Core transaction details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-start gap-3">
+                <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Amount</p>
+                  <p
+                    className={`text-2xl font-bold ${
+                      transaction.type === 'CREDIT'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-foreground'
+                    }`}
+                  >
+                    {formatCurrency(transaction.amount, transaction.currencyIsoCode)}
+                  </p>
+                </div>
+                <Badge variant={transaction.type === 'CREDIT' ? 'success' : 'secondary'}>
+                  {transaction.type}
+                </Badge>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Description</p>
+                  <p className="text-base">{transaction.description}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Transaction Date</p>
+                  <p className="text-base">{formatDate(transaction.date)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Account Information</CardTitle>
+              <CardDescription>Bank and account details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-start gap-3">
+                <Building2 className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Bank Name</p>
+                  <p className="text-base">{transaction.bankName}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <CreditCard className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Account ID</p>
+                  <p className="text-base font-mono">{transaction.accountId}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Currency</p>
+                  <p className="text-base">{transaction.currencyIsoCode}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle>Metadata</CardTitle>
+            <CardDescription>System timestamps and tracking information</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-start gap-3">
+              <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                <p className="text-base">
+                  {format(new Date(transaction.createdAt), 'PPpp')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
+                <p className="text-base">
+                  {format(new Date(transaction.updatedAt), 'PPpp')}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
+  );
+}
