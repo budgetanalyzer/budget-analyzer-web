@@ -20,7 +20,7 @@ apiClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor for error handling
@@ -33,7 +33,7 @@ apiClient.interceptors.response.use(
       throw new ApiError(
         error.response.status,
         apiErrorResponse,
-        apiErrorResponse.detail || apiErrorResponse.title
+        apiErrorResponse.detail || apiErrorResponse.title,
       );
     } else if (error.request) {
       // Request made but no response received
@@ -56,5 +56,5 @@ apiClient.interceptors.response.use(
         timestamp: new Date().toISOString(),
       });
     }
-  }
+  },
 );

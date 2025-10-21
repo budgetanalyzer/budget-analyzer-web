@@ -19,7 +19,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public response: ApiErrorResponse,
-    message?: string
+    message?: string,
   ) {
     super(message || response.title);
     this.name = 'ApiError';

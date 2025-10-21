@@ -180,9 +180,7 @@ export function TransactionDetailPage() {
               <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-muted-foreground">Created At</p>
-                <p className="text-base">
-                  {format(new Date(transaction.createdAt), 'PPpp')}
-                </p>
+                <p className="text-base">{format(new Date(transaction.createdAt), 'PPpp')}</p>
               </div>
             </div>
 
@@ -190,9 +188,7 @@ export function TransactionDetailPage() {
               <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
-                <p className="text-base">
-                  {format(new Date(transaction.updatedAt), 'PPpp')}
-                </p>
+                <p className="text-base">{format(new Date(transaction.updatedAt), 'PPpp')}</p>
               </div>
             </div>
           </CardContent>

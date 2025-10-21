@@ -60,9 +60,7 @@ export function TransactionsPage() {
     >
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
-        <p className="text-muted-foreground">
-          View and manage your financial transactions
-        </p>
+        <p className="text-muted-foreground">View and manage your financial transactions</p>
       </div>
 
       {stats && (
@@ -155,9 +153,7 @@ export function TransactionsPage() {
         <Card>
           <CardHeader>
             <CardTitle>All Transactions</CardTitle>
-            <CardDescription>
-              A complete list of all your financial transactions
-            </CardDescription>
+            <CardDescription>A complete list of all your financial transactions</CardDescription>
           </CardHeader>
           <CardContent>
             {transactions && <TransactionTable transactions={transactions} />}

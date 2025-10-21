@@ -36,6 +36,5 @@ const uiSlice = createSlice({
   },
 });
 
-export const { toggleTheme, setTheme, setSelectedTransactionId, setSearchQuery } =
-  uiSlice.actions;
+export const { toggleTheme, setTheme, setSelectedTransactionId, setSearchQuery } = uiSlice.actions;
 export default uiSlice.reducer;

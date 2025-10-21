@@ -11,10 +11,10 @@ interface ErrorBannerProps {
 
 export function ErrorBanner({ error, onRetry }: ErrorBannerProps) {
   const isApiError = error instanceof ApiError;
-  
+
   const getErrorIcon = () => {
     if (!isApiError) return <AlertCircle className="h-5 w-5 text-destructive" />;
-    
+
     switch (error.status) {
       case 404:
         return <AlertCircle className="h-5 w-5 text-yellow-500" />;

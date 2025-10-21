@@ -11,7 +11,14 @@ import {
   flexRender,
 } from '@tanstack/react-table';
 import { Transaction } from '@/types/transaction';
-import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/Table';
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableCell,
+} from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
@@ -115,7 +122,7 @@ export function TransactionTable({ transactions }: TransactionTableProps) {
         },
       },
     ],
-    []
+    [],
   );
 
   const table = useReactTable({
@@ -202,7 +209,7 @@ export function TransactionTable({ transactions }: TransactionTableProps) {
           to{' '}
           {Math.min(
             (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-            transactions.length
+            transactions.length,
           )}{' '}
           of {transactions.length} transactions
         </div>

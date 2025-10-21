@@ -19,8 +19,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               variant === 'destructive',
             'border border-input bg-background hover:bg-accent hover:text-accent-foreground':
               variant === 'outline',
-            'bg-secondary text-secondary-foreground hover:bg-secondary/80':
-              variant === 'secondary',
+            'bg-secondary text-secondary-foreground hover:bg-secondary/80': variant === 'secondary',
             'hover:bg-accent hover:text-accent-foreground': variant === 'ghost',
             'text-primary underline-offset-4 hover:underline': variant === 'link',
           },
@@ -30,13 +29,13 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             'h-11 rounded-md px-8': size === 'lg',
             'h-10 w-10': size === 'icon',
           },
-          className
+          className,
         )}
         ref={ref}
         {...props}
       />
     );
-  }
+  },
 );
 
 Button.displayName = 'Button';

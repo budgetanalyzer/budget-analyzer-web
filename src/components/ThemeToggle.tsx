@@ -15,11 +15,7 @@ export function ThemeToggle() {
       onClick={() => dispatch(toggleTheme())}
       aria-label="Toggle theme"
     >
-      {theme === 'light' ? (
-        <Moon className="h-5 w-5" />
-      ) : (
-        <Sun className="h-5 w-5" />
-      )}
+      {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
     </Button>
   );
 }

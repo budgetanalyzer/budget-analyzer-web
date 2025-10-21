@@ -14,20 +14,24 @@ describe('Button', () => {
   it('handles click events', () => {
     const handleClick = vi.fn();
     render(<Button onClick={handleClick}>Click me</Button>);
-    
+
     const button = screen.getByRole('button', { name: /click me/i });
     fireEvent.click(button);
-    
+
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
   it('can be disabled', () => {
     const handleClick = vi.fn();
-    render(<Button onClick={handleClick} disabled>Click me</Button>);
-    
+    render(
+      <Button onClick={handleClick} disabled>
+        Click me
+      </Button>,
+    );
+
     const button = screen.getByRole('button', { name: /click me/i });
     fireEvent.click(button);
-    
+
     expect(handleClick).not.toHaveBeenCalled();
     expect(button).toBeDisabled();
   });
