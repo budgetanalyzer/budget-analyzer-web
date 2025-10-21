@@ -1,5 +1,5 @@
 // src/components/TransactionRow.tsx
-import { TableRow, TableCell } from '@/components/ui/Table';
+import { TableCell } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
 import { Transaction } from '@/types/transaction';
 import { formatCurrency, formatDate } from '@/lib/utils';
