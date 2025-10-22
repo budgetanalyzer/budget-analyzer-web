@@ -5,6 +5,7 @@ import { TransactionTable } from '@/components/TransactionTable';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { StatCard } from '@/components/StatCard';
+import { ImportButton } from '@/components/ImportButton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DollarSign, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -15,6 +16,10 @@ export function TransactionsPage() {
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const [globalFilter, setGlobalFilter] = useState('');
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const [importMessage, setImportMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
   // Calculate stats from FILTERED transactions (provided by the table)
   const stats = useMemo(() => {
@@ -116,10 +121,42 @@ export function TransactionsPage() {
       >
         <Card>
           <CardHeader>
-            <CardTitle>All Transactions</CardTitle>
-            <CardDescription>A complete list of all your financial transactions</CardDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle>All Transactions</CardTitle>
+                <CardDescription>
+                  A complete list of all your financial transactions
+                </CardDescription>
+              </div>
+              <ImportButton
+                onSuccess={(count) => {
+                  setImportMessage({
+                    type: 'success',
+                    text: `Successfully imported ${count} transaction(s)`,
+                  });
+                  setTimeout(() => setImportMessage(null), 5000);
+                }}
+                onError={(error) => {
+                  setImportMessage({
+                    type: 'error',
+                    text: error.message || 'Failed to import transactions',
+                  });
+                }}
+              />
+            </div>
           </CardHeader>
           <CardContent>
+            {importMessage && (
+              <div
+                className={`mb-4 rounded-md px-4 py-3 text-sm ${
+                  importMessage.type === 'success'
+                    ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+                    : 'bg-destructive/15 text-destructive'
+                }`}
+              >
+                {importMessage.text}
+              </div>
+            )}
             {transactions && (
               <TransactionTable
                 transactions={transactions}
