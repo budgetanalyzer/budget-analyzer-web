@@ -1,5 +1,5 @@
 // src/components/TransactionTable.tsx
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -29,11 +29,18 @@ import { motion } from 'framer-motion';
 
 interface TransactionTableProps {
   transactions: Transaction[];
+  globalFilter?: string;
+  onGlobalFilterChange?: (value: string) => void;
+  onFilteredRowsChange?: (filteredTransactions: Transaction[]) => void;
 }
 
-export function TransactionTable({ transactions }: TransactionTableProps) {
+export function TransactionTable({
+  transactions,
+  globalFilter = '',
+  onGlobalFilterChange,
+  onFilteredRowsChange,
+}: TransactionTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
   const navigate = useNavigate();
 
   const columns = useMemo<ColumnDef<Transaction>[]>(
@@ -133,7 +140,7 @@ export function TransactionTable({ transactions }: TransactionTableProps) {
       globalFilter,
     },
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
+    onGlobalFilterChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -145,6 +152,14 @@ export function TransactionTable({ transactions }: TransactionTableProps) {
     },
   });
 
+  // Notify parent of filtered rows whenever they change
+  useEffect(() => {
+    if (onFilteredRowsChange) {
+      const filteredRows = table.getFilteredRowModel().rows.map((row) => row.original);
+      onFilteredRowsChange(filteredRows);
+    }
+  }, [table, onFilteredRowsChange, globalFilter, transactions]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -153,7 +168,7 @@ export function TransactionTable({ transactions }: TransactionTableProps) {
           <Input
             placeholder="Search transactions..."
             value={globalFilter ?? ''}
-            onChange={(e) => setGlobalFilter(e.target.value)}
+            onChange={(e) => onGlobalFilterChange?.(e.target.value)}
             className="pl-9"
           />
         </div>
