@@ -132,8 +132,8 @@ server {
 
 ### Build and run
 ```bash
-docker build -t budget-analyzer-client .
-docker run -p 8080:80 budget-analyzer-client
+docker build -t budget-analyzer-web .
+docker run -p 8080:80 budget-analyzer-web
 ```
 
 ## Performance Checklist

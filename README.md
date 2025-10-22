@@ -41,8 +41,8 @@ A modern, fully-featured React application for managing and analyzing financial 
 
 1. **Clone or create the project directory:**
 ```bash
-mkdir budget-analyzer-client
-cd budget-analyzer-client
+mkdir budget-analyzer-web
+cd budget-analyzer-web
 ```
 
 2. **Copy all the generated files to the project directory**
@@ -61,7 +61,7 @@ cp .env.example .env
 
 Edit `.env` to configure your API endpoint:
 ```env
-VITE_API_BASE_URL=http://localhost:8080/budget-analyzer
+VITE_API_BASE_URL=http://localhost:8080/budget-analyzer-api
 VITE_USE_MOCK_DATA=true
 ```
 

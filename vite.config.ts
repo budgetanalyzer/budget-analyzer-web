@@ -14,7 +14,7 @@ export default defineConfig({
     proxy: {
       // Proxy API requests during development
       '/api': {
-        target: 'http://localhost:8080/budget-analyzer',
+        target: 'http://localhost:8080/budget-analyzer-api',
         changeOrigin: true,
         secure: false,
         // optional: rewrite "/api" prefix if backend doesn’t expect it

@@ -18,7 +18,7 @@ Next Steps:
 3. Configure environment:
    - Copy .env.example to .env if needed
    - Edit .env with your settings:
-     VITE_API_BASE_URL=http://localhost:8080/budget-analyzer
+     VITE_API_BASE_URL=http://localhost:8080/budget-analyzer-api
      VITE_USE_MOCK_DATA=true
 
 4. Start development server:

@@ -67,7 +67,7 @@ Toggle via environment variable `VITE_USE_MOCK_DATA`:
 - Base URL configured via `VITE_API_BASE_URL` env var
 
 **Development Proxy:**
-Vite dev server proxies `/api` → `http://localhost:8080/budget-analyzer` (see `vite.config.ts:14-23`)
+Vite dev server proxies `/api` → `http://localhost:8080/budget-analyzer-api` (see `vite.config.ts:14-23`)
 
 ### Path Aliases
 
