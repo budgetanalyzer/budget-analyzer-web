@@ -36,6 +36,21 @@ A comprehensive guide to React's `useEffect` hook, including:
 
 ---
 
+### 🔄 [React Hooks Lifecycle Mental Model](./react-hooks-lifecycle-mental-model.md)
+A guide for transitioning from class components to hooks, including:
+- Explanation of `useState` and `useEffect`
+- Mental model shift from lifecycle methods to synchronization
+- Mapping lifecycle methods to `useEffect` patterns
+- Multiple practical examples
+- How React Query simplifies common patterns
+
+**Read this if you're wondering:**
+- How do I replicate `componentDidMount` with hooks?
+- What's the difference between lifecycle thinking and synchronization thinking?
+- Why don't I see many `useEffect` calls in this codebase?
+
+---
+
 ### 🧪 [Testing Guide](./testing-guide.md)
 Complete testing setup and best practices, including:
 - Testing stack (Vitest, React Testing Library, MSW)
@@ -64,7 +79,11 @@ Complete testing setup and best practices, including:
    - Master one of React's most important hooks
    - Learn how parent/child components sync
 
-3. **Finally:** [Testing Guide](./testing-guide.md)
+3. **Coming from class components?** [React Hooks Lifecycle Mental Model](./react-hooks-lifecycle-mental-model.md)
+   - Understand the mental shift from lifecycle methods to hooks
+   - Map `componentDidMount`/`componentDidUpdate` to `useEffect`
+
+4. **Finally:** [Testing Guide](./testing-guide.md)
    - Learn how to write and run tests
    - Understand the MSW setup
 
@@ -75,6 +94,7 @@ Complete testing setup and best practices, including:
 | Where are transactions stored? | [State Architecture](./state-architecture.md#1-react-query---server-state-where-transactions-live) |
 | How does filtering update stats? | [State Architecture](./state-architecture.md#user-types-in-search-box) |
 | What is useEffect? | [useEffect Guide](./useEffect-guide.md#what-is-useeffect) |
+| How do I replicate componentDidMount? | [React Hooks Lifecycle](./react-hooks-lifecycle-mental-model.md#1-componentdidmount-run-once-on-mount) |
 | How do I test components? | [Testing Guide](./testing-guide.md#example-1-simple-component-test) |
 | How does MSW work? | [Testing Guide](./testing-guide.md#msw-mock-service-worker) |
 | When should I use Redux? | [State Architecture](./state-architecture.md#2-redux---ui-state-only) |
@@ -183,6 +203,7 @@ When you make significant code changes:
 |-------|--------------|--------|
 | State Architecture | 2025-10-22 | ✅ Complete |
 | useEffect Guide | 2025-10-22 | ✅ Complete |
+| React Hooks Lifecycle Mental Model | 2025-10-22 | ✅ Complete |
 | Testing Guide | 2025-10-22 | ✅ Complete |
 
 ---
