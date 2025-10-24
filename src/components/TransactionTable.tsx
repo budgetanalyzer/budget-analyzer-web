@@ -45,6 +45,8 @@ import {
   MoreVertical,
   Pencil,
   Trash2,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
@@ -64,7 +66,7 @@ export function TransactionTable({
   onGlobalFilterChange,
   onFilteredRowsChange,
 }: TransactionTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const navigate = useNavigate();
@@ -72,22 +74,6 @@ export function TransactionTable({
 
   const columns = useMemo<ColumnDef<Transaction>[]>(
     () => [
-      {
-        accessorKey: 'id',
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-              className="hover:bg-transparent"
-            >
-              ID
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          );
-        },
-        cell: ({ row }) => <div className="font-medium">{row.getValue('id')}</div>,
-      },
       {
         accessorKey: 'date',
         header: ({ column }) => {
@@ -103,6 +89,11 @@ export function TransactionTable({
           );
         },
         cell: ({ row }) => formatDate(row.getValue('date')),
+        sortingFn: (rowA, rowB) => {
+          const dateA = new Date(rowA.getValue('date') as string);
+          const dateB = new Date(rowB.getValue('date') as string);
+          return dateA.getTime() - dateB.getTime();
+        },
       },
       {
         accessorKey: 'description',
@@ -322,6 +313,15 @@ export function TransactionTable({
           <Button
             variant="outline"
             size="sm"
+            onClick={() => table.setPageIndex(0)}
+            disabled={!table.getCanPreviousPage()}
+          >
+            <ChevronsLeft className="h-4 w-4" />
+            First
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
           >
@@ -336,6 +336,15 @@ export function TransactionTable({
           >
             Next
             <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+            disabled={!table.getCanNextPage()}
+          >
+            Last
+            <ChevronsRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
