@@ -52,12 +52,18 @@ import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { useDeleteTransaction } from '@/hooks/useTransactions';
 import { toast } from 'sonner';
+import { DateRangeFilter } from './DateRangeFilter';
 
 interface TransactionTableProps {
   transactions: Transaction[];
   globalFilter?: string;
   onGlobalFilterChange?: (value: string) => void;
   onFilteredRowsChange?: (filteredTransactions: Transaction[]) => void;
+  dateFilter?: {
+    from: string | null;
+    to: string | null;
+  };
+  onDateFilterChange?: (from: string | null, to: string | null) => void;
 }
 
 export function TransactionTable({
@@ -65,12 +71,35 @@ export function TransactionTable({
   globalFilter = '',
   onGlobalFilterChange,
   onFilteredRowsChange,
+  dateFilter,
+  onDateFilterChange,
 }: TransactionTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const navigate = useNavigate();
   const { mutate: deleteTransaction, isPending: isDeleting } = useDeleteTransaction();
+
+  // Apply date filtering to transactions
+  const filteredByDate = useMemo(() => {
+    if (!dateFilter?.from && !dateFilter?.to) {
+      return transactions;
+    }
+
+    return transactions.filter((transaction) => {
+      const transactionDate = new Date(transaction.date);
+      const fromDate = dateFilter.from ? new Date(dateFilter.from) : null;
+      const toDate = dateFilter.to ? new Date(dateFilter.to) : null;
+
+      if (fromDate && transactionDate < fromDate) {
+        return false;
+      }
+      if (toDate && transactionDate > toDate) {
+        return false;
+      }
+      return true;
+    });
+  }, [transactions, dateFilter]);
 
   const columns = useMemo<ColumnDef<Transaction>[]>(
     () => [
@@ -198,7 +227,7 @@ export function TransactionTable({
   );
 
   const table = useReactTable({
-    data: transactions,
+    data: filteredByDate,
     columns,
     state: {
       sorting,
@@ -223,7 +252,7 @@ export function TransactionTable({
       const filteredRows = table.getFilteredRowModel().rows.map((row) => row.original);
       onFilteredRowsChange(filteredRows);
     }
-  }, [table, onFilteredRowsChange, globalFilter, transactions]);
+  }, [table, onFilteredRowsChange, globalFilter, filteredByDate]);
 
   const handleDelete = () => {
     if (!transactionToDelete) return;
@@ -253,6 +282,13 @@ export function TransactionTable({
             className="pl-9"
           />
         </div>
+        {onDateFilterChange && (
+          <DateRangeFilter
+            from={dateFilter?.from || null}
+            to={dateFilter?.to || null}
+            onChange={onDateFilterChange}
+          />
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -305,9 +341,9 @@ export function TransactionTable({
           to{' '}
           {Math.min(
             (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-            transactions.length,
+            table.getFilteredRowModel().rows.length,
           )}{' '}
-          of {transactions.length} transactions
+          of {table.getFilteredRowModel().rows.length} transactions
         </div>
         <div className="flex items-center gap-2">
           <Button

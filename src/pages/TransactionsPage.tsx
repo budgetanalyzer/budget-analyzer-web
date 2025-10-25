@@ -7,10 +7,11 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { StatCard } from '@/components/StatCard';
 import { ImportButton } from '@/components/ImportButton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { DollarSign, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Calendar, DollarSign, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
+import { differenceInDays, parseISO } from 'date-fns';
 
 export function TransactionsPage() {
   const { data: transactions, isLoading, error, refetch } = useTransactions();
@@ -20,6 +21,14 @@ export function TransactionsPage() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
+  const [dateFilter, setDateFilter] = useState<{ from: string | null; to: string | null }>({
+    from: null,
+    to: null,
+  });
+
+  const handleDateFilterChange = (from: string | null, to: string | null) => {
+    setDateFilter({ from, to });
+  };
 
   // Calculate stats from FILTERED transactions (provided by the table)
   const stats = useMemo(() => {
@@ -42,6 +51,36 @@ export function TransactionsPage() {
       netBalance,
     };
   }, [filteredTransactions]);
+
+  // Calculate monthly averages based on date range of filtered transactions
+  const monthlyAverages = useMemo(() => {
+    if (!filteredTransactions.length || filteredTransactions.length < 2) return null;
+
+    // Sort transactions by date to get first and last
+    const sortedByDate = [...filteredTransactions].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+
+    const firstDate = parseISO(sortedByDate[0].date);
+    const lastDate = parseISO(sortedByDate[sortedByDate.length - 1].date);
+    const totalDays = differenceInDays(lastDate, firstDate);
+
+    // If all transactions are on the same day, return null
+    if (totalDays === 0) return null;
+
+    // Calculate months (assuming 30 days per month for average)
+    const months = totalDays / 30;
+
+    if (!stats) return null;
+
+    return {
+      avgTransactionsPerMonth: stats.totalTransactions / months,
+      avgCreditsPerMonth: stats.totalCredits / months,
+      avgDebitsPerMonth: stats.totalDebits / months,
+      avgNetBalancePerMonth: stats.netBalance / months,
+      dateRange: `${totalDays} days`,
+    };
+  }, [filteredTransactions, stats]);
 
   if (isLoading) {
     return (
@@ -74,44 +113,87 @@ export function TransactionsPage() {
       </div>
 
       {stats && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Total Transactions"
-            value={stats.totalTransactions}
-            description="All time"
-            icon={Wallet}
-            delay={0.1}
-          />
-          <StatCard
-            title="Total Credits"
-            value={formatCurrency(stats.totalCredits)}
-            description="Income received"
-            icon={TrendingUp}
-            iconClassName="text-green-600"
-            valueClassName="text-green-600 dark:text-green-400"
-            delay={0.2}
-          />
-          <StatCard
-            title="Total Debits"
-            value={formatCurrency(stats.totalDebits)}
-            description="Expenses paid"
-            icon={TrendingDown}
-            iconClassName="text-red-600"
-            delay={0.3}
-          />
-          <StatCard
-            title="Net Balance"
-            value={formatCurrency(stats.netBalance)}
-            description="Current period"
-            icon={DollarSign}
-            valueClassName={
-              stats.netBalance >= 0
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
-            }
-            delay={0.4}
-          />
-        </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              title="Total Transactions"
+              value={stats.totalTransactions}
+              description="All time"
+              icon={Wallet}
+              delay={0.1}
+            />
+            <StatCard
+              title="Total Credits"
+              value={formatCurrency(stats.totalCredits)}
+              description="Income received"
+              icon={TrendingUp}
+              iconClassName="text-green-600"
+              valueClassName="text-green-600 dark:text-green-400"
+              delay={0.2}
+            />
+            <StatCard
+              title="Total Debits"
+              value={formatCurrency(stats.totalDebits)}
+              description="Expenses paid"
+              icon={TrendingDown}
+              iconClassName="text-red-600"
+              delay={0.3}
+            />
+            <StatCard
+              title="Net Balance"
+              value={formatCurrency(stats.netBalance)}
+              description="Current period"
+              icon={DollarSign}
+              valueClassName={
+                stats.netBalance >= 0
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-red-600 dark:text-red-400'
+              }
+              delay={0.4}
+            />
+          </div>
+
+          {monthlyAverages && (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                title="Avg Transactions/Month"
+                value={monthlyAverages.avgTransactionsPerMonth.toFixed(1)}
+                description={`Based on ${monthlyAverages.dateRange}`}
+                icon={Calendar}
+                delay={0.5}
+              />
+              <StatCard
+                title="Avg Credits/Month"
+                value={formatCurrency(monthlyAverages.avgCreditsPerMonth)}
+                description="Average monthly income"
+                icon={TrendingUp}
+                iconClassName="text-green-600"
+                valueClassName="text-green-600 dark:text-green-400"
+                delay={0.6}
+              />
+              <StatCard
+                title="Avg Debits/Month"
+                value={formatCurrency(monthlyAverages.avgDebitsPerMonth)}
+                description="Average monthly expenses"
+                icon={TrendingDown}
+                iconClassName="text-red-600"
+                delay={0.7}
+              />
+              <StatCard
+                title="Avg Net Balance/Month"
+                value={formatCurrency(monthlyAverages.avgNetBalancePerMonth)}
+                description="Average monthly balance"
+                icon={DollarSign}
+                valueClassName={
+                  monthlyAverages.avgNetBalancePerMonth >= 0
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                }
+                delay={0.8}
+              />
+            </div>
+          )}
+        </>
       )}
 
       <motion.div
@@ -163,6 +245,8 @@ export function TransactionsPage() {
                 globalFilter={globalFilter}
                 onGlobalFilterChange={setGlobalFilter}
                 onFilteredRowsChange={setFilteredTransactions}
+                dateFilter={dateFilter}
+                onDateFilterChange={handleDateFilterChange}
               />
             )}
           </CardContent>
