@@ -90,6 +90,47 @@ Configured in:
 
 ### Component Architecture
 
+**CRITICAL - Separation of Concerns**: Components are ONLY for presentation and UI logic. Never put async/await, API calls, or business logic directly in components.
+
+**Correct patterns:**
+- ✅ Use React Query hooks (`useQuery`, `useMutation`) in custom hooks (e.g., `src/hooks/useTransactions.ts`)
+- ✅ Call mutations using the `mutate` function with callbacks: `mutate(data, { onSuccess, onError })`
+- ✅ Keep components synchronous and declarative
+- ✅ Use `isPending`, `isLoading`, `isError` states from hooks for UI feedback
+
+**Anti-patterns to AVOID:**
+- ❌ `async` functions in components
+- ❌ `await` in component code
+- ❌ Direct API calls in components (e.g., `await apiClient.post()`)
+- ❌ `mutateAsync` with try/catch blocks in components
+- ❌ Complex business logic in components
+
+**Example of correct pattern:**
+```typescript
+// ✅ CORRECT - Component uses mutation with callbacks
+const { mutate: deleteItem, isPending } = useDeleteItem();
+
+const handleDelete = () => {
+  deleteItem(id, {
+    onSuccess: () => toast.success('Deleted'),
+    onError: (error) => toast.error(error.message),
+  });
+};
+```
+
+**Example of anti-pattern:**
+```typescript
+// ❌ WRONG - async/await in component
+const handleDelete = async () => {
+  try {
+    await deleteItem.mutateAsync(id);
+    toast.success('Deleted');
+  } catch (error) {
+    toast.error(error.message);
+  }
+};
+```
+
 **Shadcn/UI Pattern**: Components in `src/components/ui/` are copy-pasted primitives (not npm packages). They are fully owned and customizable. Built with Tailwind CSS using the `cn()` utility from `src/lib/utils.ts` for conditional class merging.
 
 **Table Implementation**: Uses TanStack Table (v8) in headless mode. See `src/components/TransactionTable.tsx` for column definitions, sorting, filtering, and pagination.
