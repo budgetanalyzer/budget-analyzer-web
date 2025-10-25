@@ -4,13 +4,11 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 interface UiState {
   theme: 'light' | 'dark';
   selectedTransactionId: number | null;
-  searchQuery: string;
 }
 
 const initialState: UiState = {
   theme: (localStorage.getItem('theme') as 'light' | 'dark') || 'light',
   selectedTransactionId: null,
-  searchQuery: '',
 };
 
 const uiSlice = createSlice({
@@ -30,11 +28,8 @@ const uiSlice = createSlice({
     setSelectedTransactionId: (state, action: PayloadAction<number | null>) => {
       state.selectedTransactionId = action.payload;
     },
-    setSearchQuery: (state, action: PayloadAction<string>) => {
-      state.searchQuery = action.payload;
-    },
   },
 });
 
-export const { toggleTheme, setTheme, setSelectedTransactionId, setSearchQuery } = uiSlice.actions;
+export const { toggleTheme, setTheme, setSelectedTransactionId } = uiSlice.actions;
 export default uiSlice.reducer;
