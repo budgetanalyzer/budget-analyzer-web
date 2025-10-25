@@ -63,9 +63,12 @@ export const useDeleteTransaction = () => {
       }
       return transactionApi.deleteTransaction(id);
     },
-    onSuccess: () => {
-      // Invalidate and refetch transactions list
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    onSuccess: (_data, deletedId) => {
+      // Optimistically update cache by removing the deleted transaction
+      queryClient.setQueryData<Transaction[]>(['transactions'], (oldData) => {
+        if (!oldData) return oldData;
+        return oldData.filter((transaction) => transaction.id !== deletedId);
+      });
     },
   });
 };
