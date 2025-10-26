@@ -2,6 +2,7 @@
 import { Outlet, Link } from 'react-router';
 import { Wallet } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { CurrencySelector } from '@/components/CurrencySelector';
 
 export function Layout() {
   return (
@@ -12,7 +13,10 @@ export function Layout() {
             <Wallet className="h-6 w-6 text-primary" />
             <span className="text-xl">Budget Analyzer</span>
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <CurrencySelector />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <main className="container mx-auto px-4 py-8">

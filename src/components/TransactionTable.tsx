@@ -37,6 +37,7 @@ import {
   DialogTitle,
 } from '@/components/ui/Dialog';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { convertCurrency } from '@/lib/currency';
 import {
   ArrowUpDown,
   ChevronLeft,
@@ -64,6 +65,8 @@ interface TransactionTableProps {
     to: string | null;
   };
   onDateFilterChange?: (from: string | null, to: string | null) => void;
+  displayCurrency: string;
+  exchangeRatesMap: Map<string, number>;
 }
 
 export function TransactionTable({
@@ -73,6 +76,8 @@ export function TransactionTable({
   onFilteredRowsChange,
   dateFilter,
   onDateFilterChange,
+  displayCurrency,
+  exchangeRatesMap,
 }: TransactionTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -162,15 +167,36 @@ export function TransactionTable({
         },
         cell: ({ row }) => {
           const amount = row.getValue('amount') as number;
-          const currency = row.original.currencyIsoCode;
+          const sourceCurrency = row.original.currencyIsoCode;
+          const transactionDate = row.original.date;
           const isCredit = row.original.type === 'CREDIT';
+
+          // Convert amount to display currency
+          const convertedAmount = convertCurrency(
+            amount,
+            transactionDate,
+            sourceCurrency,
+            displayCurrency,
+            exchangeRatesMap,
+          );
+
+          // Show badge if currency was converted
+          const needsConversion = sourceCurrency !== displayCurrency;
+
           return (
-            <div
-              className={`text-right font-semibold ${
-                isCredit ? 'text-green-600 dark:text-green-400' : 'text-foreground'
-              }`}
-            >
-              {formatCurrency(amount, currency)}
+            <div className="flex items-center justify-end gap-2">
+              <div
+                className={`text-right font-semibold ${
+                  isCredit ? 'text-green-600 dark:text-green-400' : 'text-foreground'
+                }`}
+              >
+                {formatCurrency(convertedAmount, displayCurrency)}
+              </div>
+              {needsConversion && (
+                <Badge variant="outline" className="text-xs">
+                  {sourceCurrency}
+                </Badge>
+              )}
             </div>
           );
         },
@@ -223,7 +249,7 @@ export function TransactionTable({
         },
       },
     ],
-    [],
+    [displayCurrency, exchangeRatesMap],
   );
 
   const table = useReactTable({

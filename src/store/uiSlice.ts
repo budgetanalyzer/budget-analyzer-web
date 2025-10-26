@@ -4,11 +4,13 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 interface UiState {
   theme: 'light' | 'dark';
   selectedTransactionId: number | null;
+  displayCurrency: string;
 }
 
 const initialState: UiState = {
   theme: (localStorage.getItem('theme') as 'light' | 'dark') || 'light',
   selectedTransactionId: null,
+  displayCurrency: localStorage.getItem('displayCurrency') || 'USD',
 };
 
 const uiSlice = createSlice({
@@ -28,8 +30,13 @@ const uiSlice = createSlice({
     setSelectedTransactionId: (state, action: PayloadAction<number | null>) => {
       state.selectedTransactionId = action.payload;
     },
+    setDisplayCurrency: (state, action: PayloadAction<string>) => {
+      state.displayCurrency = action.payload;
+      localStorage.setItem('displayCurrency', action.payload);
+    },
   },
 });
 
-export const { toggleTheme, setTheme, setSelectedTransactionId } = uiSlice.actions;
+export const { toggleTheme, setTheme, setSelectedTransactionId, setDisplayCurrency } =
+  uiSlice.actions;
 export default uiSlice.reducer;

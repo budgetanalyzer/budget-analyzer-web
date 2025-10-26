@@ -1,6 +1,7 @@
 // src/pages/TransactionsPage.tsx
 import { motion } from 'framer-motion';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { TransactionTable } from '@/components/TransactionTable';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -12,9 +13,15 @@ import { useMemo, useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
 import { differenceInDays, parseISO } from 'date-fns';
+import { useAppSelector } from '@/store/hooks';
+import { convertCurrency } from '@/lib/currency';
 
 export function TransactionsPage() {
   const { data: transactions, isLoading, error, refetch } = useTransactions();
+  const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
+
+  // Fetch exchange rates and build map for currency conversion
+  const { exchangeRatesMap } = useExchangeRatesMap();
   const [globalFilter, setGlobalFilter] = useState('');
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [importMessage, setImportMessage] = useState<{
@@ -31,16 +38,35 @@ export function TransactionsPage() {
   };
 
   // Calculate stats from FILTERED transactions (provided by the table)
+  // Convert all amounts to display currency before calculating totals
   const stats = useMemo(() => {
     if (!filteredTransactions.length) return null;
 
     const totalCredits = filteredTransactions
       .filter((t) => t.type === 'CREDIT')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => {
+        const convertedAmount = convertCurrency(
+          t.amount,
+          t.date,
+          t.currencyIsoCode,
+          displayCurrency,
+          exchangeRatesMap,
+        );
+        return sum + convertedAmount;
+      }, 0);
 
     const totalDebits = filteredTransactions
       .filter((t) => t.type === 'DEBIT')
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      .reduce((sum, t) => {
+        const convertedAmount = convertCurrency(
+          Math.abs(t.amount),
+          t.date,
+          t.currencyIsoCode,
+          displayCurrency,
+          exchangeRatesMap,
+        );
+        return sum + convertedAmount;
+      }, 0);
 
     const netBalance = totalCredits - totalDebits;
 
@@ -50,7 +76,7 @@ export function TransactionsPage() {
       totalDebits,
       netBalance,
     };
-  }, [filteredTransactions]);
+  }, [filteredTransactions, displayCurrency, exchangeRatesMap]);
 
   // Calculate monthly averages based on date range of filtered transactions
   const monthlyAverages = useMemo(() => {
@@ -124,7 +150,7 @@ export function TransactionsPage() {
             />
             <StatCard
               title="Total Credits"
-              value={formatCurrency(stats.totalCredits)}
+              value={formatCurrency(stats.totalCredits, displayCurrency)}
               description="Income received"
               icon={TrendingUp}
               iconClassName="text-green-600"
@@ -133,7 +159,7 @@ export function TransactionsPage() {
             />
             <StatCard
               title="Total Debits"
-              value={formatCurrency(stats.totalDebits)}
+              value={formatCurrency(stats.totalDebits, displayCurrency)}
               description="Expenses paid"
               icon={TrendingDown}
               iconClassName="text-red-600"
@@ -141,7 +167,7 @@ export function TransactionsPage() {
             />
             <StatCard
               title="Net Balance"
-              value={formatCurrency(stats.netBalance)}
+              value={formatCurrency(stats.netBalance, displayCurrency)}
               description="Current period"
               icon={DollarSign}
               valueClassName={
@@ -164,7 +190,7 @@ export function TransactionsPage() {
               />
               <StatCard
                 title="Avg Credits/Month"
-                value={formatCurrency(monthlyAverages.avgCreditsPerMonth)}
+                value={formatCurrency(monthlyAverages.avgCreditsPerMonth, displayCurrency)}
                 description="Average monthly income"
                 icon={TrendingUp}
                 iconClassName="text-green-600"
@@ -173,7 +199,7 @@ export function TransactionsPage() {
               />
               <StatCard
                 title="Avg Debits/Month"
-                value={formatCurrency(monthlyAverages.avgDebitsPerMonth)}
+                value={formatCurrency(monthlyAverages.avgDebitsPerMonth, displayCurrency)}
                 description="Average monthly expenses"
                 icon={TrendingDown}
                 iconClassName="text-red-600"
@@ -181,7 +207,7 @@ export function TransactionsPage() {
               />
               <StatCard
                 title="Avg Net Balance/Month"
-                value={formatCurrency(monthlyAverages.avgNetBalancePerMonth)}
+                value={formatCurrency(monthlyAverages.avgNetBalancePerMonth, displayCurrency)}
                 description="Average monthly balance"
                 icon={DollarSign}
                 valueClassName={
@@ -247,6 +273,8 @@ export function TransactionsPage() {
                 onFilteredRowsChange={setFilteredTransactions}
                 dateFilter={dateFilter}
                 onDateFilterChange={handleDateFilterChange}
+                displayCurrency={displayCurrency}
+                exchangeRatesMap={exchangeRatesMap}
               />
             )}
           </CardContent>

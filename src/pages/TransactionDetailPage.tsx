@@ -2,6 +2,7 @@
 import { useParams, useNavigate, Link } from 'react-router';
 import { motion } from 'framer-motion';
 import { useTransaction } from '@/hooks/useTransactions';
+import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -16,15 +17,55 @@ import {
   CreditCard,
   FileText,
   Clock,
+  ArrowRightLeft,
+  Info,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useAppSelector } from '@/store/hooks';
+import { convertCurrency } from '@/lib/currency';
+import { useMemo } from 'react';
 
 export function TransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const transactionId = Number(id);
+  const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
 
   const { data: transaction, isLoading, error, refetch } = useTransaction(transactionId);
+
+  // Fetch exchange rates and build map for currency conversion
+  const { exchangeRatesMap } = useExchangeRatesMap();
+
+  // Calculate conversion info
+  const conversionInfo = useMemo(() => {
+    if (!transaction) return null;
+
+    const sourceCurrency = transaction.currencyIsoCode;
+    const needsConversion = sourceCurrency !== displayCurrency;
+
+    if (!needsConversion) {
+      return { needsConversion: false as const };
+    }
+
+    const convertedAmount = convertCurrency(
+      transaction.amount,
+      transaction.date,
+      sourceCurrency,
+      displayCurrency,
+      exchangeRatesMap,
+    );
+
+    // Get the exchange rate used
+    const rate = exchangeRatesMap.get(transaction.date);
+
+    return {
+      needsConversion: true as const,
+      convertedAmount,
+      rate,
+      sourceCurrency,
+      targetCurrency: displayCurrency,
+    };
+  }, [transaction, displayCurrency, exchangeRatesMap]);
 
   if (isLoading) {
     return (
@@ -165,10 +206,82 @@ export function TransactionDetailPage() {
         </motion.div>
       </div>
 
+      {/* Currency Conversion Card - Only show if conversion is needed */}
+      {conversionInfo?.needsConversion && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5 text-primary" />
+                <CardTitle>Currency Conversion</CardTitle>
+              </div>
+              <CardDescription>
+                Converted to {conversionInfo.targetCurrency} using the FRED daily spot rate
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-start gap-3">
+                <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Original Transaction</p>
+                  <p className="text-xl font-semibold">
+                    {formatCurrency(transaction.amount, conversionInfo.sourceCurrency)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <ArrowRightLeft className="h-5 w-5 text-primary mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Converted Amount ({conversionInfo.targetCurrency})
+                  </p>
+                  <p
+                    className={`text-2xl font-bold ${
+                      transaction.type === 'CREDIT'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-foreground'
+                    }`}
+                  >
+                    {formatCurrency(conversionInfo.convertedAmount, conversionInfo.targetCurrency)}
+                  </p>
+                </div>
+              </div>
+
+              {conversionInfo.rate && (
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Exchange Rate</p>
+                    <p className="text-base">
+                      1{' '}
+                      {conversionInfo.sourceCurrency === 'USD'
+                        ? 'USD'
+                        : conversionInfo.targetCurrency}{' '}
+                      = {conversionInfo.rate.toFixed(4)}{' '}
+                      {conversionInfo.sourceCurrency === 'USD'
+                        ? conversionInfo.targetCurrency
+                        : 'USD'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      FRED daily spot rate for {formatDate(transaction.date)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
+        transition={{ duration: 0.5, delay: conversionInfo?.needsConversion ? 0.4 : 0.3 }}
       >
         <Card>
           <CardHeader>

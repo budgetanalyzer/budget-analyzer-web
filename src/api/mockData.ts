@@ -1,5 +1,59 @@
 // src/api/mockData.ts
 import { Transaction } from '@/types/transaction';
+import { CurrencyCode, ExchangeRateResponse, Currency } from '@/types/currency';
+
+export const mockCurrencies: CurrencyCode[] = ['USD', 'THB'];
+
+const mockUSD: Currency = {
+  currencyCode: 'USD',
+  displayName: 'US Dollar',
+  symbol: '$',
+  defaultFractionDigits: 2,
+  numericCode: 840,
+  numericCodeAsString: '840',
+};
+
+const mockTHB: Currency = {
+  currencyCode: 'THB',
+  displayName: 'Thai Baht',
+  symbol: '฿',
+  defaultFractionDigits: 2,
+  numericCode: 764,
+  numericCodeAsString: '764',
+};
+
+export const mockExchangeRates: ExchangeRateResponse[] = [
+  {
+    baseCurrency: mockUSD,
+    targetCurrency: mockTHB,
+    date: '2025-10-10',
+    rate: 33.5,
+  },
+  {
+    baseCurrency: mockUSD,
+    targetCurrency: mockTHB,
+    date: '2025-10-11',
+    rate: 33.48,
+  },
+  {
+    baseCurrency: mockUSD,
+    targetCurrency: mockTHB,
+    date: '2025-10-12',
+    rate: 33.52,
+  },
+  {
+    baseCurrency: mockUSD,
+    targetCurrency: mockTHB,
+    date: '2025-10-13',
+    rate: 33.45,
+  },
+  {
+    baseCurrency: mockUSD,
+    targetCurrency: mockTHB,
+    date: '2025-10-14',
+    rate: 33.51,
+  },
+];
 
 export const mockTransactions: Transaction[] = [
   {
