@@ -12,13 +12,14 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   ArrowLeft,
   Calendar,
-  DollarSign,
+  Banknote,
   Building2,
   CreditCard,
   FileText,
   Clock,
   ArrowRightLeft,
   Info,
+  Currency,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAppSelector } from '@/store/hooks';
@@ -130,7 +131,7 @@ export function TransactionDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-start gap-3">
-                <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <Banknote className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-muted-foreground">Amount</p>
                   <p
@@ -195,7 +196,7 @@ export function TransactionDetailPage() {
               </div>
 
               <div className="flex items-start gap-3">
-                <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <Currency className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-muted-foreground">Currency</p>
                   <p className="text-base">{transaction.currencyIsoCode}</p>
@@ -225,7 +226,7 @@ export function TransactionDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-start gap-3">
-                <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <Banknote className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-muted-foreground">Original Transaction</p>
                   <p className="text-xl font-semibold">

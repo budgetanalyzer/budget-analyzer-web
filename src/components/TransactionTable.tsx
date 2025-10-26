@@ -7,7 +7,6 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   ColumnDef,
-  SortingState,
   flexRender,
 } from '@tanstack/react-table';
 import { Transaction } from '@/types/transaction';
@@ -54,32 +53,34 @@ import { motion } from 'framer-motion';
 import { useDeleteTransaction } from '@/hooks/useTransactions';
 import { toast } from 'sonner';
 import { DateRangeFilter } from './DateRangeFilter';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import {
+  setTransactionTableSorting,
+  setTransactionTablePageIndex,
+  setTransactionTableGlobalFilter,
+  setTransactionTableDateFilter,
+} from '@/store/uiSlice';
 
 interface TransactionTableProps {
   transactions: Transaction[];
-  globalFilter?: string;
-  onGlobalFilterChange?: (value: string) => void;
   onFilteredRowsChange?: (filteredTransactions: Transaction[]) => void;
-  dateFilter?: {
-    from: string | null;
-    to: string | null;
-  };
-  onDateFilterChange?: (from: string | null, to: string | null) => void;
   displayCurrency: string;
   exchangeRatesMap: Map<string, number>;
 }
 
 export function TransactionTable({
   transactions,
-  globalFilter = '',
-  onGlobalFilterChange,
   onFilteredRowsChange,
-  dateFilter,
-  onDateFilterChange,
   displayCurrency,
   exchangeRatesMap,
 }: TransactionTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
+  const dispatch = useAppDispatch();
+  const sorting = useAppSelector((state) => state.ui.transactionTable.sorting);
+  const pageIndex = useAppSelector((state) => state.ui.transactionTable.pageIndex);
+  const pageSize = useAppSelector((state) => state.ui.transactionTable.pageSize);
+  const globalFilter = useAppSelector((state) => state.ui.transactionTable.globalFilter);
+  const dateFilter = useAppSelector((state) => state.ui.transactionTable.dateFilter);
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const navigate = useNavigate();
@@ -258,19 +259,30 @@ export function TransactionTable({
     state: {
       sorting,
       globalFilter,
+      pagination: {
+        pageIndex,
+        pageSize,
+      },
     },
-    onSortingChange: setSorting,
-    onGlobalFilterChange,
+    onSortingChange: (updater) => {
+      const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
+      dispatch(setTransactionTableSorting(newSorting));
+    },
+    onGlobalFilterChange: (updater) => {
+      const newFilter = typeof updater === 'function' ? updater(globalFilter) : updater;
+      dispatch(setTransactionTableGlobalFilter(newFilter));
+    },
+    onPaginationChange: (updater) => {
+      const currentPagination = { pageIndex, pageSize };
+      const newPagination = typeof updater === 'function' ? updater(currentPagination) : updater;
+      dispatch(setTransactionTablePageIndex(newPagination.pageIndex));
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    manualPagination: false,
     autoResetPageIndex: false,
-    initialState: {
-      pagination: {
-        pageSize: 10,
-      },
-    },
   });
 
   // Notify parent of filtered rows whenever they change
@@ -305,17 +317,15 @@ export function TransactionTable({
           <Input
             placeholder="Search transactions..."
             value={globalFilter ?? ''}
-            onChange={(e) => onGlobalFilterChange?.(e.target.value)}
+            onChange={(e) => dispatch(setTransactionTableGlobalFilter(e.target.value))}
             className="pl-9"
           />
         </div>
-        {onDateFilterChange && (
-          <DateRangeFilter
-            from={dateFilter?.from || null}
-            to={dateFilter?.to || null}
-            onChange={onDateFilterChange}
-          />
-        )}
+        <DateRangeFilter
+          from={dateFilter?.from || null}
+          to={dateFilter?.to || null}
+          onChange={(from, to) => dispatch(setTransactionTableDateFilter({ from, to }))}
+        />
       </div>
 
       <div className="rounded-md border">

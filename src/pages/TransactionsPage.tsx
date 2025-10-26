@@ -8,7 +8,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { StatCard } from '@/components/StatCard';
 import { ImportButton } from '@/components/ImportButton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Calendar, DollarSign, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Calendar, Scale, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
@@ -22,20 +22,11 @@ export function TransactionsPage() {
 
   // Fetch exchange rates and build map for currency conversion
   const { exchangeRatesMap } = useExchangeRatesMap();
-  const [globalFilter, setGlobalFilter] = useState('');
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [importMessage, setImportMessage] = useState<{
     type: 'success' | 'error';
     text: string;
   } | null>(null);
-  const [dateFilter, setDateFilter] = useState<{ from: string | null; to: string | null }>({
-    from: null,
-    to: null,
-  });
-
-  const handleDateFilterChange = (from: string | null, to: string | null) => {
-    setDateFilter({ from, to });
-  };
 
   // Calculate stats from FILTERED transactions (provided by the table)
   // Convert all amounts to display currency before calculating totals
@@ -169,7 +160,7 @@ export function TransactionsPage() {
               title="Net Balance"
               value={formatCurrency(stats.netBalance, displayCurrency)}
               description="Current period"
-              icon={DollarSign}
+              icon={Scale}
               valueClassName={
                 stats.netBalance >= 0
                   ? 'text-green-600 dark:text-green-400'
@@ -209,7 +200,7 @@ export function TransactionsPage() {
                 title="Avg Net Balance/Month"
                 value={formatCurrency(monthlyAverages.avgNetBalancePerMonth, displayCurrency)}
                 description="Average monthly balance"
-                icon={DollarSign}
+                icon={Scale}
                 valueClassName={
                   monthlyAverages.avgNetBalancePerMonth >= 0
                     ? 'text-green-600 dark:text-green-400'
@@ -268,11 +259,7 @@ export function TransactionsPage() {
             {transactions && (
               <TransactionTable
                 transactions={transactions}
-                globalFilter={globalFilter}
-                onGlobalFilterChange={setGlobalFilter}
                 onFilteredRowsChange={setFilteredTransactions}
-                dateFilter={dateFilter}
-                onDateFilterChange={handleDateFilterChange}
                 displayCurrency={displayCurrency}
                 exchangeRatesMap={exchangeRatesMap}
               />
