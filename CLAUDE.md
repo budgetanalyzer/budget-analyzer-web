@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Interaction Guidelines
+
+**IMPORTANT: Always Ask Before Implementing**
+- When the user asks a question or makes an observation (e.g., "looks good, we need to fix X", "is that appropriate?", "do you have suggestions?"), DO NOT immediately start making code changes
+- First, answer the question, provide suggestions, or discuss the approach
+- Wait for explicit confirmation from the user before writing/editing files
+- Only implement changes when the user explicitly says "do it", "implement that", "make those changes", etc.
+
 ## Project Overview
 
 Budget Analyzer Client is a React 19 application for managing and analyzing financial transactions. Built with TypeScript, Vite, and modern React patterns including React Query for server state and Redux Toolkit for UI state.
