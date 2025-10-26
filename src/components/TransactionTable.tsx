@@ -47,6 +47,7 @@ import {
   Trash2,
   ChevronsLeft,
   ChevronsRight,
+  X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
@@ -309,6 +310,13 @@ export function TransactionTable({
     });
   };
 
+  const hasActiveDateFilters = dateFilter?.from || dateFilter?.to;
+
+  const handleClearAllFilters = () => {
+    dispatch(setTransactionTableGlobalFilter(''));
+    dispatch(setTransactionTableDateFilter({ from: null, to: null }));
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -318,14 +326,35 @@ export function TransactionTable({
             placeholder="Search transactions..."
             value={globalFilter ?? ''}
             onChange={(e) => dispatch(setTransactionTableGlobalFilter(e.target.value))}
-            className="pl-9"
+            className="pl-9 pr-9"
           />
+          {globalFilter && (
+            <button
+              onClick={() => dispatch(setTransactionTableGlobalFilter(''))}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              title="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <DateRangeFilter
           from={dateFilter?.from || null}
           to={dateFilter?.to || null}
           onChange={(from, to) => dispatch(setTransactionTableDateFilter({ from, to }))}
         />
+        {hasActiveDateFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClearAllFilters}
+            className="h-9 px-3"
+            title="Clear all filters"
+          >
+            <X className="mr-1.5 h-4 w-4" />
+            Clear filters
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">

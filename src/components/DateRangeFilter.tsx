@@ -1,7 +1,6 @@
 // src/components/DateRangeFilter.tsx
-import { Calendar, X } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
 
 interface DateRangeFilterProps {
   from: string | null;
@@ -17,12 +16,6 @@ export function DateRangeFilter({ from, to, onChange }: DateRangeFilterProps) {
   const handleToChange = (value: string) => {
     onChange(from, value || null);
   };
-
-  const handleClear = () => {
-    onChange(null, null);
-  };
-
-  const hasActiveFilter = from || to;
 
   return (
     <div className="flex items-center gap-2">
@@ -44,17 +37,6 @@ export function DateRangeFilter({ from, to, onChange }: DateRangeFilterProps) {
         placeholder="To date"
         className="w-[160px]"
       />
-      {hasActiveFilter && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleClear}
-          className="h-9 px-2"
-          title="Clear date filter"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      )}
     </div>
   );
 }
