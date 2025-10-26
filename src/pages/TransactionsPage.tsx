@@ -1,5 +1,5 @@
 // src/pages/TransactionsPage.tsx
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { TransactionTable } from '@/components/TransactionTable';
@@ -7,8 +7,18 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { StatCard } from '@/components/StatCard';
 import { ImportButton } from '@/components/ImportButton';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Calendar, Scale, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import {
+  Calendar,
+  Scale,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+  X,
+  CheckCircle,
+  AlertCircle,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
@@ -145,10 +155,64 @@ export function TransactionsPage() {
       transition={{ duration: 0.5 }}
       className="space-y-6"
     >
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
-        <p className="text-muted-foreground">View and manage your financial transactions</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
+          <p className="text-muted-foreground">View and manage your financial transactions</p>
+        </div>
+        <ImportButton
+          onSuccess={(count) => {
+            setImportMessage({
+              type: 'success',
+              text: `Successfully imported ${count} transaction(s)`,
+            });
+            setTimeout(() => setImportMessage(null), 5000);
+          }}
+          onError={(error) => {
+            setImportMessage({
+              type: 'error',
+              text: error.message || 'Failed to import transactions',
+            });
+          }}
+        />
       </div>
+
+      <AnimatePresence>
+        {importMessage && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <div
+              className={`flex items-center justify-between rounded-lg px-4 py-3 ${
+                importMessage.type === 'success'
+                  ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+                  : 'bg-destructive/15 text-destructive'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {importMessage.type === 'success' ? (
+                  <CheckCircle className="h-5 w-5" />
+                ) : (
+                  <AlertCircle className="h-5 w-5" />
+                )}
+                <span className="font-medium">{importMessage.text}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setImportMessage(null)}
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -236,43 +300,7 @@ export function TransactionsPage() {
         transition={{ duration: 0.5, delay: 0.5 }}
       >
         <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle>All Transactions</CardTitle>
-                <CardDescription>
-                  A complete list of all your financial transactions
-                </CardDescription>
-              </div>
-              <ImportButton
-                onSuccess={(count) => {
-                  setImportMessage({
-                    type: 'success',
-                    text: `Successfully imported ${count} transaction(s)`,
-                  });
-                  setTimeout(() => setImportMessage(null), 5000);
-                }}
-                onError={(error) => {
-                  setImportMessage({
-                    type: 'error',
-                    text: error.message || 'Failed to import transactions',
-                  });
-                }}
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {importMessage && (
-              <div
-                className={`mb-4 rounded-md px-4 py-3 text-sm ${
-                  importMessage.type === 'success'
-                    ? 'bg-green-500/15 text-green-600 dark:text-green-400'
-                    : 'bg-destructive/15 text-destructive'
-                }`}
-              >
-                {importMessage.text}
-              </div>
-            )}
+          <CardContent className="pt-6">
             {transactions && (
               <TransactionTable
                 transactions={transactions}

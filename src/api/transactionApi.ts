@@ -17,14 +17,23 @@ export const transactionApi = {
     await apiClient.delete(`/transactions/${id}`);
   },
 
-  importTransactions: async (files: File[]): Promise<Transaction[]> => {
+  importTransactions: async (
+    files: File[],
+    format: string,
+    accountId?: string,
+  ): Promise<Transaction[]> => {
     const formData = new FormData();
     files.forEach((file) => {
       formData.append('files', file);
     });
 
+    const params = new URLSearchParams({ format });
+    if (accountId) {
+      params.append('accountId', accountId);
+    }
+
     const response = await apiClient.post<Transaction[]>(
-      '/transactions/import?format=capital-one&accountId=checking-12345',
+      `/transactions/import?${params.toString()}`,
       formData,
       {
         headers: {
