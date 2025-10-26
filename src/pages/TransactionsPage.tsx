@@ -31,7 +31,14 @@ export function TransactionsPage() {
   // Calculate stats from FILTERED transactions (provided by the table)
   // Convert all amounts to display currency before calculating totals
   const stats = useMemo(() => {
-    if (!filteredTransactions.length) return null;
+    if (!filteredTransactions.length) {
+      return {
+        totalTransactions: 0,
+        totalCredits: 0,
+        totalDebits: 0,
+        netBalance: 0,
+      };
+    }
 
     const totalCredits = filteredTransactions
       .filter((t) => t.type === 'CREDIT')
@@ -71,7 +78,15 @@ export function TransactionsPage() {
 
   // Calculate monthly averages based on date range of filtered transactions
   const monthlyAverages = useMemo(() => {
-    if (!filteredTransactions.length || filteredTransactions.length < 2) return null;
+    if (!filteredTransactions.length || filteredTransactions.length < 2) {
+      return {
+        avgTransactionsPerMonth: 0,
+        avgCreditsPerMonth: 0,
+        avgDebitsPerMonth: 0,
+        avgNetBalancePerMonth: 0,
+        dateRange: '0 days',
+      };
+    }
 
     // Sort transactions by date to get first and last
     const sortedByDate = [...filteredTransactions].sort(
@@ -82,13 +97,19 @@ export function TransactionsPage() {
     const lastDate = parseISO(sortedByDate[sortedByDate.length - 1].date);
     const totalDays = differenceInDays(lastDate, firstDate);
 
-    // If all transactions are on the same day, return null
-    if (totalDays === 0) return null;
+    // If all transactions are on the same day, return zeros
+    if (totalDays === 0) {
+      return {
+        avgTransactionsPerMonth: 0,
+        avgCreditsPerMonth: 0,
+        avgDebitsPerMonth: 0,
+        avgNetBalancePerMonth: 0,
+        dateRange: '0 days',
+      };
+    }
 
     // Calculate months (assuming 30 days per month for average)
     const months = totalDays / 30;
-
-    if (!stats) return null;
 
     return {
       avgTransactionsPerMonth: stats.totalTransactions / months,
@@ -129,89 +150,85 @@ export function TransactionsPage() {
         <p className="text-muted-foreground">View and manage your financial transactions</p>
       </div>
 
-      {stats && (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              title="Total Transactions"
-              value={stats.totalTransactions}
-              description="All time"
-              icon={Wallet}
-              delay={0.1}
-            />
-            <StatCard
-              title="Total Credits"
-              value={formatCurrency(stats.totalCredits, displayCurrency)}
-              description="Income received"
-              icon={TrendingUp}
-              iconClassName="text-green-600"
-              valueClassName="text-green-600 dark:text-green-400"
-              delay={0.2}
-            />
-            <StatCard
-              title="Total Debits"
-              value={formatCurrency(stats.totalDebits, displayCurrency)}
-              description="Expenses paid"
-              icon={TrendingDown}
-              iconClassName="text-red-600"
-              delay={0.3}
-            />
-            <StatCard
-              title="Net Balance"
-              value={formatCurrency(stats.netBalance, displayCurrency)}
-              description="Current period"
-              icon={Scale}
-              valueClassName={
-                stats.netBalance >= 0
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-red-600 dark:text-red-400'
-              }
-              delay={0.4}
-            />
-          </div>
+      <>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Transactions"
+            value={stats.totalTransactions}
+            description="Filtered results"
+            icon={Wallet}
+            delay={0.1}
+          />
+          <StatCard
+            title="Total Credits"
+            value={formatCurrency(stats.totalCredits, displayCurrency)}
+            description="Income received"
+            icon={TrendingUp}
+            iconClassName="text-green-600"
+            valueClassName="text-green-600 dark:text-green-400"
+            delay={0.2}
+          />
+          <StatCard
+            title="Total Debits"
+            value={formatCurrency(stats.totalDebits, displayCurrency)}
+            description="Expenses paid"
+            icon={TrendingDown}
+            iconClassName="text-red-600"
+            delay={0.3}
+          />
+          <StatCard
+            title="Net Balance"
+            value={formatCurrency(stats.netBalance, displayCurrency)}
+            description="Current period"
+            icon={Scale}
+            valueClassName={
+              stats.netBalance >= 0
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-red-600 dark:text-red-400'
+            }
+            delay={0.4}
+          />
+        </div>
 
-          {monthlyAverages && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <StatCard
-                title="Avg Transactions/Month"
-                value={monthlyAverages.avgTransactionsPerMonth.toFixed(1)}
-                description={`Based on ${monthlyAverages.dateRange}`}
-                icon={Calendar}
-                delay={0.5}
-              />
-              <StatCard
-                title="Avg Credits/Month"
-                value={formatCurrency(monthlyAverages.avgCreditsPerMonth, displayCurrency)}
-                description="Average monthly income"
-                icon={TrendingUp}
-                iconClassName="text-green-600"
-                valueClassName="text-green-600 dark:text-green-400"
-                delay={0.6}
-              />
-              <StatCard
-                title="Avg Debits/Month"
-                value={formatCurrency(monthlyAverages.avgDebitsPerMonth, displayCurrency)}
-                description="Average monthly expenses"
-                icon={TrendingDown}
-                iconClassName="text-red-600"
-                delay={0.7}
-              />
-              <StatCard
-                title="Avg Net Balance/Month"
-                value={formatCurrency(monthlyAverages.avgNetBalancePerMonth, displayCurrency)}
-                description="Average monthly balance"
-                icon={Scale}
-                valueClassName={
-                  monthlyAverages.avgNetBalancePerMonth >= 0
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-red-600 dark:text-red-400'
-                }
-                delay={0.8}
-              />
-            </div>
-          )}
-        </>
-      )}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Avg Transactions/Month"
+            value={monthlyAverages.avgTransactionsPerMonth.toFixed(1)}
+            description={`Based on ${monthlyAverages.dateRange}`}
+            icon={Calendar}
+            delay={0.5}
+          />
+          <StatCard
+            title="Avg Credits/Month"
+            value={formatCurrency(monthlyAverages.avgCreditsPerMonth, displayCurrency)}
+            description="Average monthly income"
+            icon={TrendingUp}
+            iconClassName="text-green-600"
+            valueClassName="text-green-600 dark:text-green-400"
+            delay={0.6}
+          />
+          <StatCard
+            title="Avg Debits/Month"
+            value={formatCurrency(monthlyAverages.avgDebitsPerMonth, displayCurrency)}
+            description="Average monthly expenses"
+            icon={TrendingDown}
+            iconClassName="text-red-600"
+            delay={0.7}
+          />
+          <StatCard
+            title="Avg Net Balance/Month"
+            value={formatCurrency(monthlyAverages.avgNetBalancePerMonth, displayCurrency)}
+            description="Average monthly balance"
+            icon={Scale}
+            valueClassName={
+              monthlyAverages.avgNetBalancePerMonth >= 0
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-red-600 dark:text-red-400'
+            }
+            delay={0.8}
+          />
+        </div>
+      </>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
