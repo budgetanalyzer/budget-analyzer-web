@@ -273,8 +273,8 @@ export function TransactionDetailPage() {
                       <p
                         className={`text-xs mt-1 ${
                           conversionInfo.publishedDate !== transaction.date
-                            ? 'text-amber-600 dark:text-amber-400'
-                            : 'text-muted-foreground'
+                            ? 'text-warning'
+                            : 'text-success'
                         }`}
                       >
                         FRED daily spot rate published on {formatDate(conversionInfo.publishedDate)}

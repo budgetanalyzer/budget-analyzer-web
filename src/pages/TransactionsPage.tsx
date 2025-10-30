@@ -189,7 +189,7 @@ export function TransactionsPage() {
             <div
               className={`flex items-center justify-between rounded-lg px-4 py-3 ${
                 importMessage.type === 'success'
-                  ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+                  ? 'bg-success/15 text-success'
                   : 'bg-destructive/15 text-destructive'
               }`}
             >
