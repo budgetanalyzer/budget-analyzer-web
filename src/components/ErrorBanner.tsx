@@ -17,9 +17,9 @@ export function ErrorBanner({ error, onRetry }: ErrorBannerProps) {
 
     switch (error.status) {
       case 404:
-        return <AlertCircle className="h-5 w-5 text-yellow-500" />;
+        return <AlertCircle className="h-5 w-5 text-warning" />;
       case 503:
-        return <AlertCircle className="h-5 w-5 text-orange-500" />;
+        return <AlertCircle className="h-5 w-5 text-warning" />;
       default:
         return <AlertCircle className="h-5 w-5 text-destructive" />;
     }
