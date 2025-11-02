@@ -160,7 +160,12 @@ export function TransactionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="flex items-start justify-between"
+      >
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
           <p className="text-muted-foreground">View and manage transactions</p>
@@ -204,7 +209,7 @@ export function TransactionsPage() {
             });
           }}
         />
-      </div>
+      </motion.div>
 
       <AnimatePresence>
         {importMessage && (
