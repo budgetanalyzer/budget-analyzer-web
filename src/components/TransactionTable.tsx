@@ -51,6 +51,7 @@ import {
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { motion } from 'framer-motion';
 import { useDeleteTransaction } from '@/hooks/useTransactions';
 import { toast } from 'sonner';
 import { DateRangeFilter } from './DateRangeFilter';
@@ -395,17 +396,20 @@ export function TransactionTable({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
+                <motion.tr
                   key={row.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
                   onClick={() => navigate(`/transactions/${row.original.id}`)}
-                  className="cursor-pointer"
+                  className="cursor-pointer border-b transition-colors data-[state=selected]:bg-muted"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
-                </TableRow>
+                </motion.tr>
               ))
             ) : (
               <TableRow>
