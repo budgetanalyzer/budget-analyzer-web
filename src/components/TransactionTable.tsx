@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,6 +69,7 @@ interface TransactionTableProps {
   onFilteredRowsChange?: (filteredTransactions: Transaction[]) => void;
   displayCurrency: string;
   exchangeRatesMap: Map<string, ExchangeRateResponse>;
+  isExchangeRatesLoading: boolean;
 }
 
 export function TransactionTable({
@@ -75,6 +77,7 @@ export function TransactionTable({
   onFilteredRowsChange,
   displayCurrency,
   exchangeRatesMap,
+  isExchangeRatesLoading,
 }: TransactionTableProps) {
   const dispatch = useAppDispatch();
   const sorting = useAppSelector((state) => state.ui.transactionTable.sorting);
@@ -201,8 +204,22 @@ export function TransactionTable({
           // Show badge if currency was converted
           const needsConversion = sourceCurrency !== displayCurrency;
 
+          // Show skeleton while exchange rates are loading
+          if (isExchangeRatesLoading) {
+            return (
+              <div className="flex items-center justify-end gap-2">
+                <Skeleton className="h-5 w-24" />
+              </div>
+            );
+          }
+
           return (
-            <div className="flex items-center justify-end gap-2">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center justify-end gap-2"
+            >
               <div
                 className={`text-right font-semibold ${
                   isCredit ? 'text-green-600 dark:text-green-400' : 'text-foreground'
@@ -215,7 +232,7 @@ export function TransactionTable({
                   {sourceCurrency}
                 </Badge>
               )}
-            </div>
+            </motion.div>
           );
         },
       },
@@ -267,7 +284,7 @@ export function TransactionTable({
         },
       },
     ],
-    [displayCurrency, exchangeRatesMap],
+    [displayCurrency, exchangeRatesMap, isExchangeRatesLoading],
   );
 
   const table = useReactTable({

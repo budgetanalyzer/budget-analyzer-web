@@ -1,6 +1,7 @@
 // src/components/StatCard.tsx
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +13,7 @@ interface StatCardProps {
   iconClassName?: string;
   valueClassName?: string;
   delay?: number;
+  isLoading?: boolean;
 }
 
 export function StatCard({
@@ -22,6 +24,7 @@ export function StatCard({
   iconClassName = 'text-muted-foreground',
   valueClassName = '',
   delay = 0,
+  isLoading = false,
 }: StatCardProps) {
   return (
     <motion.div
@@ -35,7 +38,18 @@ export function StatCard({
           <Icon className={cn('h-4 w-4', iconClassName)} />
         </CardHeader>
         <CardContent>
-          <div className={cn('text-2xl font-bold', valueClassName)}>{value}</div>
+          {isLoading ? (
+            <Skeleton className="h-8 w-32" />
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+              className={cn('text-2xl font-bold', valueClassName)}
+            >
+              {value}
+            </motion.div>
+          )}
           <p className="text-xs text-muted-foreground">{description}</p>
         </CardContent>
       </Card>

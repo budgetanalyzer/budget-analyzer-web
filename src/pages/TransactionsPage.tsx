@@ -19,7 +19,7 @@ import {
   CheckCircle,
   AlertCircle,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
 import { differenceInDays, parseISO } from 'date-fns';
@@ -31,12 +31,25 @@ export function TransactionsPage() {
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
 
   // Fetch exchange rates and build map for currency conversion
-  const { exchangeRatesMap, earliestExchangeRateDate } = useExchangeRatesMap();
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const {
+    exchangeRatesMap,
+    earliestExchangeRateDate,
+    isLoading: isExchangeRatesLoading,
+  } = useExchangeRatesMap();
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(
+    transactions || [],
+  );
   const [importMessage, setImportMessage] = useState<{
     type: 'success' | 'error' | 'warning';
     text: string;
   } | null>(null);
+
+  // Update filteredTransactions when transactions change (on load or after import)
+  useEffect(() => {
+    if (transactions) {
+      setFilteredTransactions(transactions);
+    }
+  }, [transactions]);
 
   // Memoize the earliest rate text since it only depends on memoized values
   const earliestRateText = useMemo(() => {
@@ -254,7 +267,7 @@ export function TransactionsPage() {
             value={stats.totalTransactions}
             description="Filtered results"
             icon={Wallet}
-            delay={0.1}
+            isLoading={isExchangeRatesLoading}
           />
           <StatCard
             title="Total Credits"
@@ -263,7 +276,7 @@ export function TransactionsPage() {
             icon={TrendingUp}
             iconClassName="text-green-600"
             valueClassName="text-green-600 dark:text-green-400"
-            delay={0.2}
+            isLoading={isExchangeRatesLoading}
           />
           <StatCard
             title="Total Debits"
@@ -271,7 +284,7 @@ export function TransactionsPage() {
             description="Expenses paid"
             icon={TrendingDown}
             iconClassName="text-red-600"
-            delay={0.3}
+            isLoading={isExchangeRatesLoading}
           />
           <StatCard
             title="Net Balance"
@@ -283,7 +296,7 @@ export function TransactionsPage() {
                 ? 'text-green-600 dark:text-green-400'
                 : 'text-red-600 dark:text-red-400'
             }
-            delay={0.4}
+            isLoading={isExchangeRatesLoading}
           />
         </div>
 
@@ -293,7 +306,7 @@ export function TransactionsPage() {
             value={monthlyAverages.avgTransactionsPerMonth.toFixed(1)}
             description={`Based on ${monthlyAverages.dateRange}`}
             icon={Calendar}
-            delay={0.5}
+            isLoading={isExchangeRatesLoading}
           />
           <StatCard
             title="Avg Credits/Month"
@@ -302,7 +315,7 @@ export function TransactionsPage() {
             icon={TrendingUp}
             iconClassName="text-green-600"
             valueClassName="text-green-600 dark:text-green-400"
-            delay={0.6}
+            isLoading={isExchangeRatesLoading}
           />
           <StatCard
             title="Avg Debits/Month"
@@ -310,7 +323,7 @@ export function TransactionsPage() {
             description="Average monthly expenses"
             icon={TrendingDown}
             iconClassName="text-red-600"
-            delay={0.7}
+            isLoading={isExchangeRatesLoading}
           />
           <StatCard
             title="Avg Net Balance/Month"
@@ -322,7 +335,7 @@ export function TransactionsPage() {
                 ? 'text-green-600 dark:text-green-400'
                 : 'text-red-600 dark:text-red-400'
             }
-            delay={0.8}
+            isLoading={isExchangeRatesLoading}
           />
         </div>
       </>
@@ -340,6 +353,7 @@ export function TransactionsPage() {
                 onFilteredRowsChange={setFilteredTransactions}
                 displayCurrency={displayCurrency}
                 exchangeRatesMap={exchangeRatesMap}
+                isExchangeRatesLoading={isExchangeRatesLoading}
               />
             )}
           </CardContent>
