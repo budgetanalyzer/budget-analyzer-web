@@ -16,6 +16,17 @@ export function buildExchangeRateMap(
   return map;
 }
 
+// Cache for earliest/latest dates per ratesMap to avoid repeated calculations
+const dateRangeCache = new WeakMap<
+  Map<string, ExchangeRateResponse>,
+  {
+    earliest: string;
+    latest: string;
+    earliestRate: ExchangeRateResponse;
+    latestRate: ExchangeRateResponse;
+  }
+>();
+
 /**
  * Find the nearest available exchange rate for a given date
  * Falls back to closest available rate if exact date not found.
@@ -35,34 +46,53 @@ export function findNearestExchangeRate(
   date: string,
   ratesMap: Map<string, ExchangeRateResponse>,
 ): ExchangeRateResponse | null {
-  // First try exact match
+  if (ratesMap.size === 0) {
+    return null;
+  }
+
+  // First try exact match (O(1) - the happy path for most transactions)
   const exactMatch = ratesMap.get(date);
   if (exactMatch) {
     return exactMatch;
   }
 
-  // No exact match - find nearest date
-  const allDates = Array.from(ratesMap.keys()).sort();
-  if (allDates.length === 0) {
-    return null;
+  // Get or compute the date range boundaries (cached per ratesMap instance)
+  let dateRange = dateRangeCache.get(ratesMap);
+  if (!dateRange) {
+    console.log(
+      '[findNearestExchangeRate] Computing date range for map with',
+      ratesMap.size,
+      'entries',
+    );
+    const allDates = Array.from(ratesMap.keys()).sort();
+    const earliest = allDates[0];
+    const latest = allDates[allDates.length - 1];
+    dateRange = {
+      earliest,
+      latest,
+      earliestRate: ratesMap.get(earliest)!,
+      latestRate: ratesMap.get(latest)!,
+    };
+    dateRangeCache.set(ratesMap, dateRange);
   }
 
-  const targetDate = new Date(date);
-  const targetTime = targetDate.getTime();
-
-  // Find the closest date by comparing absolute time differences
-  let closestDate = allDates[0];
-  let minDifference = Math.abs(new Date(closestDate).getTime() - targetTime);
-
-  for (const availableDate of allDates) {
-    const difference = Math.abs(new Date(availableDate).getTime() - targetTime);
-    if (difference < minDifference) {
-      minDifference = difference;
-      closestDate = availableDate;
-    }
+  // Transaction before the earliest rate? Use earliest rate
+  if (date < dateRange.earliest) {
+    return dateRange.earliestRate;
   }
 
-  return ratesMap.get(closestDate) || null;
+  // Transaction after the latest rate? Use latest rate
+  if (date > dateRange.latest) {
+    return dateRange.latestRate;
+  }
+
+  // Date is within range but no exact match
+  // This should rarely happen if API returns continuous daily rates
+  // Log a warning and fall back to earliest rate for safety
+  console.warn(
+    `[findNearestExchangeRate] Missing rate for date ${date} within range [${dateRange.earliest}, ${dateRange.latest}]`,
+  );
+  return dateRange.earliestRate;
 }
 
 /**
@@ -93,29 +123,18 @@ export function convertCurrency(
 
   // If no rate found at all, return original amount
   if (!exchangeRateResponse) {
-    console.warn(
-      `No exchange rates available in map for ${date}, ${sourceCurrency} -> ${targetCurrency}`,
-    );
     return amount;
-  }
-
-  // Log if we're using a fallback rate
-  if (exchangeRateResponse.date !== date) {
-    console.info(
-      `Using nearest exchange rate from ${exchangeRateResponse.date} for transaction dated ${date}`,
-    );
   }
 
   const rate = exchangeRateResponse.rate;
 
-  // Apply conversion
-  // Note: Exchange rates are stored as baseCurrency (USD) -> targetCurrency
-  // So we need to handle conversion direction appropriately
+  // Apply conversion based on direction
+  // Note: Exchange rates are stored as baseCurrency (USD) -> targetCurrency (THB)
   if (sourceCurrency === 'USD') {
-    // USD -> targetCurrency (e.g., USD -> THB)
+    // USD -> THB: multiply by rate
     return amount * rate;
   } else {
-    // targetCurrency -> USD (e.g., THB -> USD)
+    // THB -> USD: divide by rate
     return amount / rate;
   }
 }

@@ -65,6 +65,9 @@ export function TransactionsPage() {
   // Convert all amounts to display currency before calculating totals
   // Optimization: Single-pass through transactions instead of 4 passes
   const stats = useMemo(() => {
+    const startTime = performance.now();
+    console.log('[Stats] Starting calculation for', filteredTransactions.length, 'transactions');
+
     if (!filteredTransactions.length) {
       return {
         totalTransactions: 0,
@@ -96,6 +99,9 @@ export function TransactionsPage() {
     );
 
     const netBalance = totalCredits - totalDebits;
+
+    const endTime = performance.now();
+    console.log('[Stats] Calculation took', (endTime - startTime).toFixed(2), 'ms');
 
     return {
       totalTransactions: filteredTransactions.length,
