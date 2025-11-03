@@ -28,9 +28,10 @@ Budget Analyzer Client is a React 19 application for managing and analyzing fina
 - `npm run preview` - Preview production build locally
 
 ### Code Quality
-- `npm run lint` - Run ESLint (uses flat config with TypeScript, React, and Prettier)
-- `npm run lint:fix` - Auto-fix ESLint issues
+- `npm run lint:fix` - Auto-fix ESLint issues (ALWAYS use this instead of `npm run lint`)
 - `npm run format` - Format code with Prettier
+
+**IMPORTANT**: Always use `npm run lint:fix` to automatically fix formatting issues. Never run `npm run lint` first - it wastes time showing errors that can be auto-fixed.
 
 ### Testing
 - `npm test` - Run tests in watch mode with Vitest
