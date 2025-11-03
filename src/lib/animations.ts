@@ -52,14 +52,13 @@ export const fadeInVariants: Variants = {
 };
 
 /**
- * Height expansion with fade (for collapsible panels)
- * Uses overflow: hidden to prevent content from peeking out during animation
- * Both height and opacity animate together for smooth, symmetric transitions
+ * Simple opacity fade for currency conversion card
+ * No height animation to avoid layout shift - space is reserved, content fades in/out
  */
 export const expandVariants: Variants = {
-  initial: { height: 0, opacity: 0, overflow: 'hidden' },
-  animate: { height: 'auto', opacity: 1, overflow: 'visible' },
-  exit: { height: 0, opacity: 0, overflow: 'hidden' },
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
 };
 
 /**
