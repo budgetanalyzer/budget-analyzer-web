@@ -1,6 +1,6 @@
 // src/pages/TransactionDetailPage.tsx
 import { useParams, useNavigate, Link } from 'react-router';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useTransaction } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { ErrorBanner } from '@/components/ErrorBanner';
@@ -121,7 +121,6 @@ export function TransactionDetailPage() {
 
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Transaction Details</h1>
-        <p className="text-muted-foreground">Transaction #{transaction.id}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -214,125 +213,142 @@ export function TransactionDetailPage() {
       </div>
 
       {/* Currency Conversion Card - Only show if conversion is needed */}
-      {conversionInfo?.needsConversion && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <ArrowRightLeft className="h-5 w-5 text-primary" />
-                <CardTitle>Currency Conversion</CardTitle>
-              </div>
-              <CardDescription>
-                Converted to {conversionInfo.targetCurrency} using the FRED daily spot rate
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-start gap-3">
-                <Banknote className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Original Transaction</p>
-                  <p className="text-xl font-semibold">
-                    {formatCurrency(transaction.amount, conversionInfo.sourceCurrency)}
-                  </p>
-                </div>
-              </div>
+      <LayoutGroup>
+        <AnimatePresence initial={false}>
+          {conversionInfo?.needsConversion && (
+            <motion.div
+              key="currency-conversion"
+              layout
+              initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
+              animate={{ height: 'auto', opacity: 1, overflow: 'visible' }}
+              exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+            >
+              <Card className="border-primary/20 bg-primary/5">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <ArrowRightLeft className="h-5 w-5 text-primary" />
+                    <CardTitle>Currency Conversion</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Converted to {conversionInfo.targetCurrency} using the FRED daily spot rate
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <Banknote className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Original Transaction
+                      </p>
+                      <p className="text-xl font-semibold">
+                        {formatCurrency(transaction.amount, conversionInfo.sourceCurrency)}
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="flex items-start gap-3">
-                <ArrowRightLeft className="h-5 w-5 text-primary mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Converted Amount ({conversionInfo.targetCurrency})
-                  </p>
-                  <p
-                    className={`text-2xl font-bold ${
-                      transaction.type === 'CREDIT'
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-foreground'
-                    }`}
-                  >
-                    {formatCurrency(conversionInfo.convertedAmount, conversionInfo.targetCurrency)}
-                  </p>
-                </div>
-              </div>
-
-              {conversionInfo.rate && (
-                <div className="flex items-start gap-3">
-                  <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Exchange Rate</p>
-                    <p className="text-base">
-                      1{' '}
-                      {conversionInfo.sourceCurrency === 'USD'
-                        ? 'USD'
-                        : conversionInfo.targetCurrency}{' '}
-                      = {conversionInfo.rate.toFixed(4)}{' '}
-                      {conversionInfo.sourceCurrency === 'USD'
-                        ? conversionInfo.targetCurrency
-                        : 'USD'}
-                    </p>
-                    {conversionInfo.publishedDate && conversionInfo.rateDate && (
+                  <div className="flex items-start gap-3">
+                    <ArrowRightLeft className="h-5 w-5 text-primary mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Converted Amount ({conversionInfo.targetCurrency})
+                      </p>
                       <p
-                        className={`text-xs mt-1 ${
-                          conversionInfo.usedFallbackRate ? 'text-warning' : 'text-success'
+                        className={`text-2xl font-bold ${
+                          transaction.type === 'CREDIT'
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-foreground'
                         }`}
                       >
-                        {conversionInfo.usedFallbackRate ? (
-                          <>
-                            Rate from {formatDate(conversionInfo.rateDate)} (nearest available)
-                            <span className="block mt-0.5 text-muted-foreground">
-                              FRED daily spot rate published on{' '}
-                              {formatDate(conversionInfo.publishedDate)}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            FRED daily spot rate published on{' '}
-                            {formatDate(conversionInfo.publishedDate)}
-                          </>
+                        {formatCurrency(
+                          conversionInfo.convertedAmount,
+                          conversionInfo.targetCurrency,
                         )}
                       </p>
-                    )}
+                    </div>
                   </div>
+
+                  {conversionInfo.rate && (
+                    <div className="flex items-start gap-3">
+                      <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-muted-foreground">Exchange Rate</p>
+                        <p className="text-base">
+                          1{' '}
+                          {conversionInfo.sourceCurrency === 'USD'
+                            ? 'USD'
+                            : conversionInfo.targetCurrency}{' '}
+                          = {conversionInfo.rate.toFixed(4)}{' '}
+                          {conversionInfo.sourceCurrency === 'USD'
+                            ? conversionInfo.targetCurrency
+                            : 'USD'}
+                        </p>
+                        {conversionInfo.publishedDate && conversionInfo.rateDate && (
+                          <p
+                            className={`text-xs mt-1 ${
+                              conversionInfo.usedFallbackRate ? 'text-warning' : 'text-success'
+                            }`}
+                          >
+                            {conversionInfo.usedFallbackRate ? (
+                              <>
+                                Rate from {formatDate(conversionInfo.rateDate)} (nearest available)
+                                <span className="block mt-0.5 text-muted-foreground">
+                                  FRED daily spot rate published on{' '}
+                                  {formatDate(conversionInfo.publishedDate)}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                FRED daily spot rate published on{' '}
+                                {formatDate(conversionInfo.publishedDate)}
+                              </>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.div
+          layout
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            layout: { duration: 0.3, ease: 'easeInOut' },
+            opacity: { duration: 0.5, delay: conversionInfo?.needsConversion ? 0.4 : 0.3 },
+            y: { duration: 0.5, delay: conversionInfo?.needsConversion ? 0.4 : 0.3 },
+          }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Metadata</CardTitle>
+              <CardDescription>System timestamps and tracking information</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                  <p className="text-base">{format(new Date(transaction.createdAt), 'PPpp')}</p>
                 </div>
-              )}
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
+                  <p className="text-base">{format(new Date(transaction.updatedAt), 'PPpp')}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
-      )}
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: conversionInfo?.needsConversion ? 0.4 : 0.3 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>Metadata</CardTitle>
-            <CardDescription>System timestamps and tracking information</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">Created At</p>
-                <p className="text-base">{format(new Date(transaction.createdAt), 'PPpp')}</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
-                <p className="text-base">{format(new Date(transaction.updatedAt), 'PPpp')}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      </LayoutGroup>
     </motion.div>
   );
 }
