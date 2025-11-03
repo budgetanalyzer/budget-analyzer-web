@@ -14,7 +14,14 @@ export function formatCurrency(amount: number, currencyCode: string = 'USD'): st
 }
 
 export function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('en-US', {
+  // Parse date components manually to avoid timezone issues
+  // Date strings from API are in YYYY-MM-DD format
+  const [year, month, day] = date.split('-').map(Number);
+
+  // Create date in local timezone (months are 0-indexed in Date constructor)
+  const dateObj = new Date(year, month - 1, day);
+
+  return dateObj.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
