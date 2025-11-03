@@ -53,6 +53,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
+import { fadeInVariants, fadeTransition } from '@/lib/animations';
 import { useDeleteTransaction } from '@/hooks/useTransactions';
 import { toast } from 'sonner';
 import { DateRangeFilter } from './DateRangeFilter';
@@ -215,9 +216,10 @@ export function TransactionTable({
 
           return (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
+              variants={fadeInVariants}
+              initial="initial"
+              animate="animate"
+              transition={fadeTransition}
               className="flex items-center justify-end gap-2"
             >
               <div
@@ -415,9 +417,10 @@ export function TransactionTable({
               table.getRowModel().rows.map((row) => (
                 <motion.tr
                   key={row.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
+                  variants={fadeInVariants}
+                  initial="initial"
+                  animate="animate"
+                  transition={fadeTransition}
                   onClick={() => navigate(`/transactions/${row.original.id}`)}
                   className="cursor-pointer border-b transition-colors data-[state=selected]:bg-muted"
                 >

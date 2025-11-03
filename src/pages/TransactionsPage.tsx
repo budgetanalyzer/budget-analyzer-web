@@ -2,6 +2,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
+import { fadeInVariants, fadeVariants, fadeTransition } from '@/lib/animations';
 import { TransactionTable } from '@/components/TransactionTable';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -180,9 +181,10 @@ export function TransactionsPage() {
   return (
     <div className="space-y-6">
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
+        variants={fadeInVariants}
+        initial="initial"
+        animate="animate"
+        transition={fadeTransition}
         className="flex items-start justify-between"
       >
         <div>
@@ -234,10 +236,11 @@ export function TransactionsPage() {
         {importMessage && (
           <motion.div
             key="import-message"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
+            variants={fadeVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={fadeTransition}
             className={`flex items-center justify-between rounded-lg px-4 py-3 ${
               importMessage.type === 'success'
                 ? 'bg-success/15 text-success'
@@ -347,9 +350,10 @@ export function TransactionsPage() {
       </>
 
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.3 }}
+        variants={fadeInVariants}
+        initial="initial"
+        animate="animate"
+        transition={fadeTransition}
       >
         <Card>
           <CardContent className="pt-6">

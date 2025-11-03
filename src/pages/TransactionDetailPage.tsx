@@ -3,6 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useTransaction } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
+import {
+  fadeInVariants,
+  fadeTransition,
+  expandVariants,
+  expandTransition,
+  layoutTransition,
+} from '@/lib/animations';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -104,9 +111,10 @@ export function TransactionDetailPage() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
+      variants={fadeInVariants}
+      initial="initial"
+      animate="animate"
+      transition={fadeTransition}
       className="space-y-6"
     >
       <div className="flex items-center justify-between">
@@ -125,9 +133,10 @@ export function TransactionDetailPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
+          variants={fadeInVariants}
+          initial="initial"
+          animate="animate"
+          transition={fadeTransition}
         >
           <Card>
             <CardHeader>
@@ -174,9 +183,10 @@ export function TransactionDetailPage() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          variants={fadeInVariants}
+          initial="initial"
+          animate="animate"
+          transition={fadeTransition}
         >
           <Card>
             <CardHeader>
@@ -219,10 +229,11 @@ export function TransactionDetailPage() {
             <motion.div
               key="currency-conversion"
               layout
-              initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
-              animate={{ height: 'auto', opacity: 1, overflow: 'visible' }}
-              exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
-              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              variants={expandVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={expandTransition}
             >
               <Card className="border-primary/20 bg-primary/5">
                 <CardHeader>
@@ -316,13 +327,10 @@ export function TransactionDetailPage() {
 
         <motion.div
           layout
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            layout: { duration: 0.3, ease: 'easeInOut' },
-            opacity: { duration: 0.5, delay: conversionInfo?.needsConversion ? 0.4 : 0.3 },
-            y: { duration: 0.5, delay: conversionInfo?.needsConversion ? 0.4 : 0.3 },
-          }}
+          variants={fadeInVariants}
+          initial="initial"
+          animate="animate"
+          transition={{ ...fadeTransition, layout: layoutTransition }}
         >
           <Card>
             <CardHeader>

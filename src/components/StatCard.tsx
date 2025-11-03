@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { fadeInVariants, fadeTransition } from '@/lib/animations';
 
 interface StatCardProps {
   title: string;
@@ -12,7 +13,6 @@ interface StatCardProps {
   icon: LucideIcon;
   iconClassName?: string;
   valueClassName?: string;
-  delay?: number;
   isLoading?: boolean;
 }
 
@@ -23,14 +23,14 @@ export function StatCard({
   icon: Icon,
   iconClassName = 'text-muted-foreground',
   valueClassName = '',
-  delay = 0,
   isLoading = false,
 }: StatCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5, delay }}
+      variants={fadeInVariants}
+      initial="initial"
+      animate="animate"
+      transition={fadeTransition}
     >
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -42,9 +42,10 @@ export function StatCard({
             <Skeleton className="h-8 w-32" />
           ) : (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
+              variants={fadeInVariants}
+              initial="initial"
+              animate="animate"
+              transition={fadeTransition}
               className={cn('text-2xl font-bold', valueClassName)}
             >
               {value}

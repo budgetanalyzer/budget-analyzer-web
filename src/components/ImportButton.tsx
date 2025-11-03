@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/Select';
 import { useImportTransactions } from '@/hooks/useImportTransactions';
 import { motion, AnimatePresence } from 'framer-motion';
+import { collapseHorizontalVariants, collapseTransition } from '@/lib/animations';
 import { Transaction } from '@/types/transaction';
 
 interface ImportButtonProps {
@@ -96,10 +97,11 @@ export function ImportButton({ onSuccess, onError }: ImportButtonProps) {
       <AnimatePresence>
         {isExpanded && (
           <motion.div
-            initial={{ opacity: 0, width: 0 }}
-            animate={{ opacity: 1, width: 'auto' }}
-            exit={{ opacity: 0, width: 0 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
+            variants={collapseHorizontalVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={collapseTransition}
             className="flex items-center gap-2"
           >
             <div className="flex items-center">
