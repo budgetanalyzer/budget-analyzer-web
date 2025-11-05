@@ -18,10 +18,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { useSearchParams } from 'react-router';
-import {
-  setTransactionTableDateFilter,
-  setTransactionTableGlobalFilter,
-} from '@/store/uiSlice';
+import { setTransactionTableDateFilter, setTransactionTableGlobalFilter } from '@/store/uiSlice';
 
 export function TransactionsPage() {
   const { data: transactions, isLoading, error, refetch } = useTransactions();
@@ -66,11 +63,14 @@ export function TransactionsPage() {
   const handleDateFilterChange = useCallback(
     (from: string | null, to: string | null) => {
       const params = new URLSearchParams(searchParams);
-      if (from && to) {
+      if (from) {
         params.set('dateFrom', from);
-        params.set('dateTo', to);
       } else {
         params.delete('dateFrom');
+      }
+      if (to) {
+        params.set('dateTo', to);
+      } else {
         params.delete('dateTo');
       }
       setSearchParams(params, { replace: true });

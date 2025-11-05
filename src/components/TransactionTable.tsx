@@ -1,5 +1,5 @@
 // src/components/TransactionTable.tsx
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -360,15 +360,23 @@ export function TransactionTable({
 
   const hasActiveDateFilters = dateFilter?.from || dateFilter?.to;
 
-  const handleClearAllFilters = () => {
-    dispatch(setTransactionTableGlobalFilter(''));
+  const handleDateChange = useCallback(
+    (from: string | null, to: string | null) => {
+      // Update Redux for internal state
+      dispatch(setTransactionTableDateFilter({ from, to }));
+      // Update URL for bookmarkability (if callback provided)
+      if (onDateFilterChange) {
+        onDateFilterChange(from, to);
+      }
+    },
+    [dispatch, onDateFilterChange],
+  );
+
+  const handleClearDateFilters = () => {
     dispatch(setTransactionTableDateFilter({ from: null, to: null }));
-    // Clear URL params when clearing filters
+    // Clear date filter URL params
     if (onDateFilterChange) {
       onDateFilterChange(null, null);
-    }
-    if (onSearchChange) {
-      onSearchChange('');
     }
   };
 
@@ -396,22 +404,15 @@ export function TransactionTable({
         <DateRangeFilter
           from={dateFilter?.from || null}
           to={dateFilter?.to || null}
-          onChange={(from, to) => {
-            // Update Redux for internal state
-            dispatch(setTransactionTableDateFilter({ from, to }));
-            // Update URL for bookmarkability (if callback provided)
-            if (onDateFilterChange) {
-              onDateFilterChange(from, to);
-            }
-          }}
+          onChange={handleDateChange}
         />
         {hasActiveDateFilters && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleClearAllFilters}
+            onClick={handleClearDateFilters}
             className="h-9 px-3"
-            title="Clear all filters"
+            title="Clear date filters"
           >
             <X className="mr-1.5 h-4 w-4" />
             Clear filters
