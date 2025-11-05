@@ -234,6 +234,47 @@ import { fadeVariants, fadeTransition } from '@/lib/animations';
 </motion.div>
 ```
 
+**Date Handling**:
+
+- **CRITICAL**: [src/lib/dateUtils.ts](src/lib/dateUtils.ts) is the ONLY place in the codebase where date operations are allowed
+- **NEVER** import from `date-fns` outside of `dateUtils.ts`
+- **NEVER** use `new Date()` constructor outside of `dateUtils.ts`
+- **NEVER** perform date parsing, formatting, or manipulation outside of `dateUtils.ts`
+- All date operations must go through the centralized utilities to avoid timezone bugs
+
+**Date Format Types**:
+- **LocalDate (YYYY-MM-DD)**: Transaction dates, date filters - NO timezone info (e.g., `"2025-07-01"`)
+- **ISO 8601 (with timezone)**: Timestamps like createdAt, updatedAt - HAS timezone info (e.g., `"2025-07-01T12:34:56Z"`)
+
+**Correct pattern:**
+
+```typescript
+// ✅ CORRECT - Import from dateUtils
+import { formatLocalDate, parseLocalDate, formatTimestamp } from '@/lib/dateUtils';
+
+// Format a LocalDate (YYYY-MM-DD) for display
+const displayDate = formatLocalDate(transaction.date);
+
+// Format an ISO timestamp for display
+const displayTimestamp = formatTimestamp(transaction.createdAt);
+
+// Parse a LocalDate for comparisons
+const dateObj = parseLocalDate(transaction.date);
+```
+
+**Anti-patterns:**
+
+```typescript
+// ❌ WRONG - Importing date-fns directly
+import { format, parseISO } from 'date-fns';
+
+// ❌ WRONG - Using Date constructor with string
+const date = new Date('2025-07-01'); // Creates UTC date, causes off-by-one day bugs!
+
+// ❌ WRONG - Date manipulation in component
+const formatted = transaction.date.split('-').join('/');
+```
+
 ### UI/UX Principles
 
 **No Tooltips**:
@@ -319,6 +360,6 @@ If a solution requires more than 2 lines of explanation for "why this works", it
 
 **Transaction Type System**: All transaction types are defined in `src/types/transaction.ts`. The API returns standardized error responses with type, message, code, and fieldErrors fields (type defined in `src/types/apiError.ts`).
 
-**Date Handling**: Uses `date-fns` library for all date formatting and manipulation. Import from `date-fns` not `date-fns/*` for tree-shaking.
+**Date Handling**: All date operations are centralized in [src/lib/dateUtils.ts](src/lib/dateUtils.ts). This module is the ONLY place that imports `date-fns` or uses the `Date` constructor. Use functions like `formatLocalDate()`, `parseLocalDate()`, `formatTimestamp()`, etc. Never import `date-fns` directly or manipulate dates outside of `dateUtils.ts`.
 
 **Routing**: React Router v7 with data router pattern. Routes defined in `src/App.tsx`. Use `useNavigate()` for programmatic navigation, `<Link>` for declarative navigation.
