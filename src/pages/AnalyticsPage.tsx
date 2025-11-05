@@ -28,27 +28,41 @@ export function AnalyticsPage() {
   const selectedYear = yearParam ? parseInt(yearParam, 10) : currentYear;
 
   // Process analytics data with memoization
-  const { monthlySpending, earliestYear, latestYear } = useAnalyticsData(
+  const { monthlySpending, earliestYear } = useAnalyticsData(
     transactions,
     displayCurrency,
     exchangeRatesMap,
     selectedYear,
   );
 
-  // Redirect to current year if selected year is out of bounds
+  // Redirect if selected year is out of valid range (before earliest transaction or after current year)
+  // Only run after transactions have loaded to avoid redirecting based on temporary default values
   useEffect(() => {
+    if (isLoading || !transactions) {
+      return;
+    }
+
     if (yearParam && !isNaN(selectedYear)) {
-      if (selectedYear < earliestYear || selectedYear > latestYear) {
+      let redirectYear: number | null = null;
+
+      if (selectedYear < earliestYear) {
+        redirectYear = earliestYear;
+      } else if (selectedYear > currentYear) {
+        redirectYear = currentYear;
+      }
+
+      if (redirectYear !== null) {
         const params = new URLSearchParams(searchParams);
-        params.set('year', currentYear.toString());
+        params.set('year', redirectYear.toString());
         setSearchParams(params, { replace: true });
       }
     }
   }, [
+    isLoading,
+    transactions,
     yearParam,
     selectedYear,
     earliestYear,
-    latestYear,
     currentYear,
     searchParams,
     setSearchParams,
@@ -99,7 +113,7 @@ export function AnalyticsPage() {
         <YearSelector
           selectedYear={selectedYear}
           earliestYear={earliestYear}
-          latestYear={latestYear}
+          latestYear={currentYear}
           onChange={handleYearChange}
         />
       </motion.div>
