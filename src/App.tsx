@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router';
 import { Layout } from '@/components/Layout';
 import { TransactionsPage } from '@/pages/TransactionsPage';
 import { TransactionDetailPage } from '@/pages/TransactionDetailPage';
+import { AnalyticsPage } from '@/pages/AnalyticsPage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Toaster } from 'sonner';
 
@@ -12,6 +13,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<TransactionsPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="transactions/:id" element={<TransactionDetailPage />} />
         </Route>
       </Routes>

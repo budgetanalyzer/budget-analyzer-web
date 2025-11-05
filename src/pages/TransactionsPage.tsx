@@ -13,14 +13,30 @@ import { ImportMessageBanner } from '@/components/ImportMessageBanner';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Calendar, Scale, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { useSearchParams } from 'react-router';
+import { setTransactionTableDateFilter, setTransactionTableGlobalFilter } from '@/store/uiSlice';
 
 export function TransactionsPage() {
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
+  const dispatch = useAppDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Sync URL params to Redux on mount and when URL changes
+  // URL is the source of truth for filters (for bookmarkability)
+  useEffect(() => {
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    const searchQuery = searchParams.get('q');
+
+    // Always sync URL to Redux, even if empty (to clear filters when URL is cleared)
+    dispatch(setTransactionTableDateFilter({ from: dateFrom, to: dateTo }));
+    dispatch(setTransactionTableGlobalFilter(searchQuery || ''));
+  }, [searchParams, dispatch]);
 
   // Fetch exchange rates and build map for currency conversion
   const {
@@ -42,6 +58,39 @@ export function TransactionsPage() {
       setFilteredTransactions(transactions);
     }
   }, [transactions]);
+
+  // Memoized callback for updating URL params when date filter changes
+  const handleDateFilterChange = useCallback(
+    (from: string | null, to: string | null) => {
+      const params = new URLSearchParams(searchParams);
+      if (from) {
+        params.set('dateFrom', from);
+      } else {
+        params.delete('dateFrom');
+      }
+      if (to) {
+        params.set('dateTo', to);
+      } else {
+        params.delete('dateTo');
+      }
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  // Memoized callback for updating URL params when search query changes
+  const handleSearchChange = useCallback(
+    (query: string) => {
+      const params = new URLSearchParams(searchParams);
+      if (query) {
+        params.set('q', query);
+      } else {
+        params.delete('q');
+      }
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
   // Memoize the earliest rate text since it only depends on memoized values
   const earliestRateText = useMemo(() => {
@@ -233,6 +282,8 @@ export function TransactionsPage() {
                 <TransactionTable
                   transactions={transactions}
                   onFilteredRowsChange={setFilteredTransactions}
+                  onDateFilterChange={handleDateFilterChange}
+                  onSearchChange={handleSearchChange}
                   displayCurrency={displayCurrency}
                   exchangeRatesMap={exchangeRatesMap}
                   isExchangeRatesLoading={isExchangeRatesLoading}

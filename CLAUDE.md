@@ -29,6 +29,8 @@ Budget Analyzer Web is a React 19 application for managing and analyzing financi
 - `npm run build` - Type-check with `tsc` then build for production
 - `npm run preview` - Preview production build locally
 
+**IMPORTANT**: NEVER run `npm run dev` automatically. The user will manually start and stop the dev server themselves.
+
 ### Code Quality
 
 - `npm run lint:fix` - Auto-fix ESLint issues (ALWAYS use this instead of `npm run lint`)
@@ -117,6 +119,7 @@ Configured in:
 - ✅ Call mutations using the `mutate` function with callbacks: `mutate(data, { onSuccess, onError })`
 - ✅ Keep components synchronous and declarative
 - ✅ Use `isPending`, `isLoading`, `isError` states from hooks for UI feedback
+- ✅ Memoize callback functions passed to child components using `useCallback`
 
 **Anti-patterns to AVOID:**
 
@@ -125,6 +128,7 @@ Configured in:
 - ❌ Direct API calls in components (e.g., `await apiClient.post()`)
 - ❌ `mutateAsync` with try/catch blocks in components
 - ❌ Complex business logic in components
+- ❌ Inline function definitions in JSX props (use `useCallback` instead)
 
 **Example of correct pattern:**
 
@@ -152,6 +156,41 @@ const handleDelete = async () => {
     toast.error(error.message);
   }
 };
+```
+
+**Performance - Memoizing Callbacks:**
+
+Always use `useCallback` for functions passed as props to child components to prevent unnecessary re-renders:
+
+```typescript
+// ✅ CORRECT - Memoized callback
+const handleDateFilterChange = useCallback(
+  (from: string | null, to: string | null) => {
+    const params = new URLSearchParams();
+    if (from && to) {
+      params.set('dateFrom', from);
+      params.set('dateTo', to);
+    }
+    setSearchParams(params);
+  },
+  [setSearchParams],
+);
+
+<ChildComponent onChange={handleDateFilterChange} />
+```
+
+```typescript
+// ❌ WRONG - Inline function (creates new instance every render)
+<ChildComponent
+  onChange={(from, to) => {
+    const params = new URLSearchParams();
+    if (from && to) {
+      params.set('dateFrom', from);
+      params.set('dateTo', to);
+    }
+    setSearchParams(params);
+  }}
+/>
 ```
 
 **Shadcn/UI Pattern**: Components in `src/components/ui/` are copy-pasted primitives (not npm packages). They are fully owned and customizable. Built with Tailwind CSS using the `cn()` utility from `src/lib/utils.ts` for conditional class merging.
