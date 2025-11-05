@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { fadeInVariants, fadeTransition } from '@/lib/animations';
-import { TrendingDown } from 'lucide-react';
+import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router';
 import { getMonthBounds } from '@/lib/dateUtils';
 
@@ -14,6 +14,7 @@ interface MonthlySpendingCardProps {
   totalSpending: number;
   transactionCount: number;
   currency: string;
+  transactionType: 'debit' | 'credit';
 }
 
 export function MonthlySpendingCard({
@@ -23,9 +24,15 @@ export function MonthlySpendingCard({
   totalSpending,
   transactionCount,
   currency,
+  transactionType,
 }: MonthlySpendingCardProps) {
   // Calculate first and last day of month (handles leap years correctly)
   const { from: firstDay, to: lastDay } = getMonthBounds(year, month);
+
+  const isCredit = transactionType === 'credit';
+  const Icon = isCredit ? TrendingUp : TrendingDown;
+  const iconColorClass = isCredit ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground';
+  const amountColorClass = isCredit ? 'text-green-600 dark:text-green-400' : 'text-foreground';
 
   return (
     <motion.div
@@ -41,12 +48,12 @@ export function MonthlySpendingCard({
               {/* Month Label */}
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-muted-foreground">{monthLabel}</h3>
-                <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                <Icon className={`h-4 w-4 ${iconColorClass}`} />
               </div>
 
               {/* Total Spending */}
               <div className="space-y-1">
-                <p className="text-2xl font-bold text-foreground">
+                <p className={`text-2xl font-bold ${amountColorClass}`}>
                   {formatCurrency(totalSpending, currency)}
                 </p>
                 <p className="text-xs text-muted-foreground">

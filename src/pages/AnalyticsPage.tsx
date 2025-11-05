@@ -9,15 +9,19 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PageHeader } from '@/components/PageHeader';
 import { MonthlySpendingGrid } from '@/components/analytics/MonthlySpendingGrid';
 import { YearSelector } from '@/components/YearSelector';
+import { ViewModeSelector } from '@/components/ViewModeSelector';
+import { TransactionTypeSelector } from '@/components/TransactionTypeSelector';
 import { useAppSelector } from '@/store/hooks';
 import { useSearchParams } from 'react-router';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getCurrentYear } from '@/lib/dateUtils';
 
 export function AnalyticsPage() {
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
+  const [transactionType, setTransactionType] = useState<'debit' | 'credit'>('debit');
 
   // Fetch exchange rates for currency conversion
   const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap();
@@ -33,6 +37,7 @@ export function AnalyticsPage() {
     displayCurrency,
     exchangeRatesMap,
     selectedYear,
+    transactionType,
   );
 
   // Redirect if selected year is out of valid range (before earliest transaction or after current year)
@@ -108,14 +113,22 @@ export function AnalyticsPage() {
         initial="initial"
         animate="animate"
         transition={layoutTransition}
-        className="flex justify-end"
+        className="grid grid-cols-3 items-center gap-4"
       >
-        <YearSelector
-          selectedYear={selectedYear}
-          earliestYear={earliestYear}
-          latestYear={currentYear}
-          onChange={handleYearChange}
-        />
+        <div className="flex justify-start">
+          <ViewModeSelector selectedMode={viewMode} onChange={setViewMode} />
+        </div>
+        <div className="flex justify-center">
+          <TransactionTypeSelector selectedType={transactionType} onChange={setTransactionType} />
+        </div>
+        <div className="flex justify-end">
+          <YearSelector
+            selectedYear={selectedYear}
+            earliestYear={earliestYear}
+            latestYear={currentYear}
+            onChange={handleYearChange}
+          />
+        </div>
       </motion.div>
 
       <AnimatePresence mode="wait">
@@ -127,7 +140,11 @@ export function AnalyticsPage() {
           exit="exit"
           transition={fadeTransition}
         >
-          <MonthlySpendingGrid monthlyData={monthlySpending} currency={displayCurrency} />
+          <MonthlySpendingGrid
+            monthlyData={monthlySpending}
+            currency={displayCurrency}
+            transactionType={transactionType}
+          />
         </motion.div>
       </AnimatePresence>
 

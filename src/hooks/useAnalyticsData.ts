@@ -34,6 +34,7 @@ export function useAnalyticsData(
   displayCurrency: string,
   exchangeRatesMap: Map<string, ExchangeRateResponse>,
   selectedYear: number,
+  transactionType: 'debit' | 'credit' = 'debit',
 ): AnalyticsData {
   // Calculate earliest and latest years from transactions
   const { earliestYear, latestYear } = useMemo(() => {
@@ -89,8 +90,9 @@ export function useAnalyticsData(
         return;
       }
 
-      // Only count debits (spending)
-      if (transaction.type !== 'DEBIT') {
+      // Filter by transaction type
+      const expectedType = transactionType === 'debit' ? 'DEBIT' : 'CREDIT';
+      if (transaction.type !== expectedType) {
         return;
       }
 
@@ -126,7 +128,7 @@ export function useAnalyticsData(
         transactionCount: data.count,
       };
     });
-  }, [transactions, selectedYear, displayCurrency, exchangeRatesMap]);
+  }, [transactions, selectedYear, displayCurrency, exchangeRatesMap, transactionType]);
 
   return {
     monthlySpending,
