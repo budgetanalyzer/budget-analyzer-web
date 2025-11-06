@@ -129,6 +129,9 @@ Configured in:
 - ❌ `mutateAsync` with try/catch blocks in components
 - ❌ Complex business logic in components
 - ❌ Inline function definitions in JSX props (use `useCallback` instead)
+- ❌ IIFEs (Immediately Invoked Function Expressions) in JSX
+- ❌ Multi-line logic or calculations directly in JSX expressions
+- ❌ Complex inline handlers (more than 1-2 lines) - extract to custom hooks or separate components
 
 **Example of correct pattern:**
 
@@ -156,6 +159,39 @@ const handleDelete = async () => {
     toast.error(error.message);
   }
 };
+```
+
+**Avoiding Complex Logic in JSX:**
+
+Never use IIFEs or multi-line logic directly in JSX. Extract to components, hooks, or utilities:
+
+```typescript
+// ❌ WRONG - IIFE with complex logic in JSX
+<span>
+  {(() => {
+    const convertedAmount = convertCurrency(amount, date, currency, displayCurrency, ratesMap);
+    const needsOriginal = currency !== displayCurrency;
+    return (
+      <>
+        {formatCurrency(convertedAmount, displayCurrency)}
+        {needsOriginal && <span>({formatCurrency(amount, currency)})</span>}
+      </>
+    );
+  })()}
+</span>
+
+// ✅ CORRECT - Extract to a component
+<TransactionAmount
+  amount={amount}
+  date={date}
+  currency={currency}
+  displayCurrency={displayCurrency}
+  ratesMap={ratesMap}
+/>
+
+// ✅ ALSO CORRECT - Extract to a utility function
+const formattedAmount = formatTransactionAmount(amount, date, currency, displayCurrency, ratesMap);
+<span>{formattedAmount.primary} {formattedAmount.original && `(${formattedAmount.original})`}</span>
 ```
 
 **Performance - Memoizing Callbacks:**
