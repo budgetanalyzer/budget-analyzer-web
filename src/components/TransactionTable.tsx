@@ -29,17 +29,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/Dialog';
-import { formatCurrency } from '@/lib/currency';
-import { convertCurrency } from '@/lib/currency';
 import { TransactionAmountBadge } from '@/components/TransactionAmountBadge';
+import { DeleteTransactionModal } from '@/components/DeleteTransactionModal';
 import { formatLocalDate, isDateInRange, compareDates } from '@/lib/dateUtils';
 import {
   ArrowUpDown,
@@ -56,8 +47,6 @@ import {
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { fadeInVariants, fadeTransition } from '@/lib/animations';
-import { useDeleteTransaction } from '@/hooks/useTransactions';
-import { toast } from 'sonner';
 import { DateRangeFilter } from './DateRangeFilter';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import {
@@ -97,7 +86,6 @@ export function TransactionTable({
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [localSearchValue, setLocalSearchValue] = useState(globalFilter ?? '');
   const navigate = useNavigate();
-  const { mutate: deleteTransaction, isPending: isDeleting } = useDeleteTransaction();
 
   // Debounce search input: update Redux state 400ms after user stops typing
   useEffect(() => {
@@ -303,22 +291,6 @@ export function TransactionTable({
     }
   }, [table, onFilteredRowsChange, globalFilter, filteredByDate]);
 
-  const handleDelete = () => {
-    if (!transactionToDelete) return;
-
-    deleteTransaction(transactionToDelete.id, {
-      onSuccess: () => {
-        toast.success('Transaction deleted successfully');
-        setDeleteDialogOpen(false);
-        setTransactionToDelete(null);
-      },
-      onError: (error) => {
-        const errorMessage = error.message || 'Failed to delete transaction';
-        toast.error(errorMessage);
-      },
-    });
-  };
-
   const hasActiveDateFilters = dateFilter?.from || dateFilter?.to;
 
   const handleDateChange = useCallback(
@@ -479,75 +451,13 @@ export function TransactionTable({
       )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Transaction</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          {transactionToDelete && (
-            <div className="my-4 rounded-md bg-muted p-4">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Date:</span>
-                  <span className="font-medium">{formatLocalDate(transactionToDelete.date)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Description:</span>
-                  <span className="font-medium">{transactionToDelete.description}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount:</span>
-                  <span className="font-medium">
-                    {(() => {
-                      const convertedAmount = convertCurrency(
-                        transactionToDelete.amount,
-                        transactionToDelete.date,
-                        transactionToDelete.currencyIsoCode,
-                        displayCurrency,
-                        exchangeRatesMap,
-                      );
-                      const needsOriginalCurrency =
-                        transactionToDelete.currencyIsoCode !== displayCurrency;
-
-                      return (
-                        <>
-                          {formatCurrency(convertedAmount, displayCurrency)}
-                          {needsOriginalCurrency && (
-                            <span className="text-muted-foreground">
-                              {' '}
-                              (
-                              {formatCurrency(
-                                transactionToDelete.amount,
-                                transactionToDelete.currencyIsoCode,
-                              )}
-                              )
-                            </span>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteTransactionModal
+        transaction={transactionToDelete}
+        isOpen={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        displayCurrency={displayCurrency}
+        exchangeRatesMap={exchangeRatesMap}
+      />
     </div>
   );
 }
