@@ -6,6 +6,7 @@ import { fadeInVariants, fadeTransition } from '@/lib/animations';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router';
 import { getMonthBounds } from '@/lib/dateUtils';
+import { buildTransactionsUrl } from '@/lib/urlBuilder';
 import {
   buildAnalyticsReturnUrl,
   ViewMode,
@@ -45,7 +46,12 @@ export function MonthlySpendingCard({
   const returnTo = buildAnalyticsReturnUrl(viewMode, transactionType, year);
 
   // Build URL with date filters, return path, and breadcrumb label
-  const transactionsUrl = `/?dateFrom=${firstDay}&dateTo=${lastDay}&returnTo=${encodeURIComponent(returnTo)}&breadcrumbLabel=${encodeURIComponent(monthLabel)}`;
+  const transactionsUrl = buildTransactionsUrl({
+    dateFrom: firstDay,
+    dateTo: lastDay,
+    returnTo,
+    breadcrumbLabel: monthLabel,
+  });
 
   return (
     <motion.div
