@@ -15,8 +15,10 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Calendar, Scale, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '@/lib/utils';
-import { formatLocalDate } from '@/lib/dateUtils';
-import { buildImportSuccessMessage } from '@/lib/importMessageBuilder';
+import {
+  buildImportSuccessMessage,
+  buildExchangeRateAvailabilityText,
+} from '@/lib/importMessageBuilder';
 import { Transaction } from '@/types/transaction';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { useSearchParams } from 'react-router';
@@ -107,14 +109,10 @@ export function TransactionsPage() {
   }, [searchParams]);
 
   // Memoize the earliest rate text since it only depends on memoized values
-  const earliestRateText = useMemo(() => {
-    if (!earliestExchangeRateDate) return null;
-    const earliestRate = exchangeRatesMap.get(earliestExchangeRateDate);
-    const formattedDate = formatLocalDate(earliestExchangeRateDate);
-    return earliestRate
-      ? `the rate of ${earliestRate.rate.toFixed(4)} THB/USD from ${formattedDate}`
-      : `the earliest available rate from ${formattedDate}`;
-  }, [earliestExchangeRateDate, exchangeRatesMap]);
+  const earliestRateText = useMemo(
+    () => buildExchangeRateAvailabilityText(earliestExchangeRateDate, exchangeRatesMap),
+    [earliestExchangeRateDate, exchangeRatesMap],
+  );
 
   // Calculate stats from FILTERED transactions (provided by the table)
   const { stats, monthlyAverages } = useTransactionStats({

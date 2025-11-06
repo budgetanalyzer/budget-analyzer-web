@@ -1,4 +1,6 @@
 // src/lib/importMessageBuilder.ts
+import { formatLocalDate } from '@/lib/dateUtils';
+import { ExchangeRateResponse } from '@/types/currency';
 
 export interface ImportSuccessMessageParams {
   count: number;
@@ -10,6 +12,27 @@ export interface ImportSuccessMessageParams {
 export interface ImportSuccessMessage {
   type: 'success' | 'warning';
   text: string;
+}
+
+/**
+ * Builds text describing the earliest available exchange rate.
+ *
+ * @param date - The earliest exchange rate date (LocalDate format: YYYY-MM-DD)
+ * @param ratesMap - Map of dates to exchange rate responses
+ * @returns Formatted text describing the rate, or null if no date provided
+ */
+export function buildExchangeRateAvailabilityText(
+  date: string | null,
+  ratesMap: Map<string, ExchangeRateResponse>,
+): string | null {
+  if (!date) return null;
+
+  const earliestRate = ratesMap.get(date);
+  const formattedDate = formatLocalDate(date);
+
+  return earliestRate
+    ? `the rate of ${earliestRate.rate.toFixed(4)} THB/USD from ${formattedDate}`
+    : `the earliest available rate from ${formattedDate}`;
 }
 
 /**
