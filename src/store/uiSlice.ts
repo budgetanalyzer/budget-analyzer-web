@@ -17,6 +17,7 @@ interface UiState {
   theme: 'light' | 'dark';
   selectedTransactionId: number | null;
   displayCurrency: string;
+  hasNavigated: boolean;
   transactionTable: TransactionTableState;
 }
 
@@ -24,6 +25,7 @@ const initialState: UiState = {
   theme: (localStorage.getItem('theme') as 'light' | 'dark') || 'light',
   selectedTransactionId: null,
   displayCurrency: localStorage.getItem('displayCurrency') || 'USD',
+  hasNavigated: false,
   transactionTable: {
     sorting: [{ id: 'date', desc: true }],
     pageIndex: 0,
@@ -75,6 +77,9 @@ const uiSlice = createSlice({
     ) => {
       state.transactionTable.dateFilter = action.payload;
     },
+    setHasNavigated: (state, action: PayloadAction<boolean>) => {
+      state.hasNavigated = action.payload;
+    },
   },
 });
 
@@ -83,6 +88,7 @@ export const {
   setTheme,
   setSelectedTransactionId,
   setDisplayCurrency,
+  setHasNavigated,
   setTransactionTableSorting,
   setTransactionTablePageIndex,
   setTransactionTablePageSize,
