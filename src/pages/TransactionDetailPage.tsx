@@ -1,11 +1,12 @@
 // src/pages/TransactionDetailPage.tsx
-import { useParams, useNavigate, Link } from 'react-router';
+import { useParams, Link } from 'react-router';
 import { motion, LayoutGroup } from 'framer-motion';
 import { useTransaction } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { fadeInVariants, fadeTransition, layoutTransition } from '@/lib/animations';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { BackButton } from '@/components/BackButton';
 import { IconLabel } from '@/components/IconLabel';
 import { CurrencyConversionCard } from '@/components/CurrencyConversionCard';
 import { TransactionMetadataCard } from '@/components/TransactionMetadataCard';
@@ -14,22 +15,13 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { formatCurrency } from '@/lib/utils';
 import { formatLocalDate } from '@/lib/dateUtils';
-import {
-  ArrowLeft,
-  Calendar,
-  Banknote,
-  Building2,
-  CreditCard,
-  FileText,
-  Currency,
-} from 'lucide-react';
+import { Calendar, Banknote, Building2, CreditCard, FileText, Currency } from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';
 import { convertCurrency, findNearestExchangeRate } from '@/lib/currency';
 import { useMemo } from 'react';
 
 export function TransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const transactionId = Number(id);
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
 
@@ -86,10 +78,7 @@ export function TransactionDetailPage() {
   if (error) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
+        <BackButton />
         <div className="flex min-h-[50vh] items-center justify-center">
           <div className="w-full max-w-md">
             <ErrorBanner error={error} onRetry={() => refetch()} />
@@ -112,10 +101,7 @@ export function TransactionDetailPage() {
       className="space-y-6"
     >
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Transactions
-        </Button>
+        <BackButton />
         <Link to="/">
           <Button variant="outline">View All</Button>
         </Link>

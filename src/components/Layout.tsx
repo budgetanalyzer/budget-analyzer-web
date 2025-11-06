@@ -1,12 +1,28 @@
 // src/components/Layout.tsx
 import { Outlet, Link, useLocation } from 'react-router';
+import { useEffect, useRef } from 'react';
 import { Wallet } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CurrencySelector } from '@/components/CurrencySelector';
 import { cn } from '@/lib/utils';
+import { useAppDispatch } from '@/store/hooks';
+import { setHasNavigated } from '@/store/uiSlice';
 
 export function Layout() {
   const location = useLocation();
+  const dispatch = useAppDispatch();
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    // Skip the initial mount - this is the first page load
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Any subsequent location change means user has navigated
+    dispatch(setHasNavigated(true));
+  }, [location.pathname, dispatch]);
 
   return (
     <div className="min-h-screen bg-background">
