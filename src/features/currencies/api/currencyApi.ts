@@ -1,5 +1,5 @@
-// src/api/currencyApi.ts
-import { apiClient } from './client';
+// src/features/currencies/api/currencyApi.ts
+import { apiClient } from '@/api/client';
 import { CurrencyCode, ExchangeRateResponse } from '@/types/currency';
 
 export const currencyApi = {

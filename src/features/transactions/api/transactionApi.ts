@@ -1,5 +1,5 @@
-// src/api/transactionApi.ts
-import { apiClient } from './client';
+// src/features/transactions/api/transactionApi.ts
+import { apiClient } from '@/api/client';
 import { Transaction, TransactionFilter } from '@/types/transaction';
 
 export const transactionApi = {
