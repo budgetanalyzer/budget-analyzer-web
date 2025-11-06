@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { IconLabel } from '@/components/IconLabel';
 import { expandVariants, expandTransition } from '@/lib/animations';
-import { formatCurrency } from '@/lib/utils';
-import { formatLocalDate } from '@/lib/dateUtils';
+import { formatCurrency, formatExchangeRateDisplay } from '@/lib/utils';
 import { ArrowRightLeft, Banknote, Info } from 'lucide-react';
 import { TransactionType } from '@/types/transaction';
 
@@ -80,46 +79,43 @@ export function CurrencyConversionCard({
                 </div>
               </div>
 
-              {conversionInfo.rate && (
-                <div className="flex items-start gap-3">
-                  <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Exchange Rate</p>
-                    <p className="text-base">
-                      1{' '}
-                      {conversionInfo.sourceCurrency === 'USD'
-                        ? 'USD'
-                        : conversionInfo.targetCurrency}{' '}
-                      = {conversionInfo.rate.toFixed(4)}{' '}
-                      {conversionInfo.sourceCurrency === 'USD'
-                        ? conversionInfo.targetCurrency
-                        : 'USD'}
-                    </p>
-                    {conversionInfo.publishedDate && conversionInfo.rateDate && (
-                      <p
-                        className={`text-xs mt-1 ${
-                          conversionInfo.usedFallbackRate ? 'text-warning' : 'text-success'
-                        }`}
-                      >
-                        {conversionInfo.usedFallbackRate ? (
-                          <>
-                            Rate from {formatLocalDate(conversionInfo.rateDate)} (nearest available)
-                            <span className="block mt-0.5 text-muted-foreground">
-                              FRED daily spot rate published on{' '}
-                              {formatLocalDate(conversionInfo.publishedDate)}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            FRED daily spot rate published on{' '}
-                            {formatLocalDate(conversionInfo.publishedDate)}
-                          </>
+              {conversionInfo.rate &&
+                (() => {
+                  const displayInfo = formatExchangeRateDisplay({
+                    rate: conversionInfo.rate,
+                    sourceCurrency: conversionInfo.sourceCurrency,
+                    targetCurrency: conversionInfo.targetCurrency,
+                    publishedDate: conversionInfo.publishedDate,
+                    rateDate: conversionInfo.rateDate,
+                    usedFallbackRate: conversionInfo.usedFallbackRate,
+                  });
+
+                  return (
+                    <div className="flex items-start gap-3">
+                      <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-muted-foreground">Exchange Rate</p>
+                        <p className="text-base">{displayInfo.rateText}</p>
+                        {displayInfo.dateInfo && (
+                          <p
+                            className={`text-xs mt-1 ${
+                              displayInfo.dateInfo.isFallback ? 'text-warning' : 'text-success'
+                            }`}
+                          >
+                            {displayInfo.dateInfo.text.split('\n').map((line, index) => (
+                              <span
+                                key={index}
+                                className={index > 0 ? 'block mt-0.5 text-muted-foreground' : ''}
+                              >
+                                {line}
+                              </span>
+                            ))}
+                          </p>
                         )}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
+                      </div>
+                    </div>
+                  );
+                })()}
             </CardContent>
           </Card>
         </motion.div>
