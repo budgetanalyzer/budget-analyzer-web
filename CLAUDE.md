@@ -57,6 +57,60 @@ npx vitest --grep "renders correctly"
 
 ## Architecture
 
+### Folder Structure
+
+This project follows the **Bulletproof React** architecture pattern with **feature-based organization**:
+
+```
+src/
+├── lib/                    # Third-party library configurations ONLY
+│   └── animations.ts       # Framer Motion preset configs
+│
+├── utils/                  # Generic utility functions
+│   └── cn.ts              # Tailwind class merger
+│
+├── features/              # Feature-based modules (PRIMARY organization)
+│   ├── transactions/
+│   │   ├── components/    # Transaction-specific components
+│   │   ├── hooks/         # Transaction data hooks
+│   │   ├── utils/         # Transaction utilities (currency, dates, navigation)
+│   │   └── pages/         # Transaction pages
+│   │
+│   ├── import/
+│   │   ├── components/    # Import UI components
+│   │   ├── hooks/         # Import logic hooks
+│   │   └── utils/         # Import message builders
+│   │
+│   └── analytics/
+│       ├── components/    # Analytics visualization components
+│       ├── hooks/         # Analytics data hooks
+│       ├── utils/         # Analytics URL state
+│       └── pages/         # Analytics pages
+│
+├── components/            # ONLY truly shared components
+│   ├── Layout.tsx
+│   ├── PageHeader.tsx
+│   ├── ErrorBanner.tsx
+│   └── ui/               # Shadcn/UI primitives
+│
+├── hooks/                # ONLY truly shared hooks
+│   └── useCurrencies.ts
+│
+├── api/                  # API client and endpoints
+├── store/                # Redux store
+├── types/                # Shared TypeScript types
+└── mocks/                # MSW handlers for testing
+```
+
+**Key Principles:**
+
+- **features/ is PRIMARY** - Most code lives in feature folders organized by business capability
+- **lib/ = Third-party configs** - NOT your own utilities or domain logic
+- **utils/ = Your utilities** - Generic helpers like `cn()`
+- **Feature isolation** - Features don't import from other features
+- **Shared stays flat** - Truly shared components/hooks at top level, not nested
+- **Co-locate** - Everything related to a feature lives in its folder
+
 ### State Management Strategy
 
 This app uses a **dual state management** approach:
@@ -64,7 +118,7 @@ This app uses a **dual state management** approach:
 - **React Query (`@tanstack/react-query`)** - All server/async state (transactions data, API calls, caching, loading states)
   - Query keys: `['transactions']` for list, `['transaction', id]` for single item
   - 5-minute stale time, 1 retry on failure
-  - Configured in `src/hooks/useTransactions.ts`
+  - Configured in `src/features/transactions/hooks/useTransactions.ts`
 
 - **Redux Toolkit** - Client-only UI state (theme, search query, selected items)
   - Single slice: `src/store/uiSlice.ts`
@@ -115,7 +169,7 @@ Configured in:
 
 **Correct patterns:**
 
-- ✅ Use React Query hooks (`useQuery`, `useMutation`) in custom hooks (e.g., `src/hooks/useTransactions.ts`)
+- ✅ Use React Query hooks (`useQuery`, `useMutation`) in custom hooks (e.g., `src/features/transactions/hooks/useTransactions.ts`)
 - ✅ Call mutations using the `mutate` function with callbacks: `mutate(data, { onSuccess, onError })`
 - ✅ Keep components synchronous and declarative
 - ✅ Use `isPending`, `isLoading`, `isError` states from hooks for UI feedback
@@ -229,9 +283,9 @@ const handleDateFilterChange = useCallback(
 />
 ```
 
-**Shadcn/UI Pattern**: Components in `src/components/ui/` are copy-pasted primitives (not npm packages). They are fully owned and customizable. Built with Tailwind CSS using the `cn()` utility from `src/lib/utils.ts` for conditional class merging.
+**Shadcn/UI Pattern**: Components in `src/components/ui/` are copy-pasted primitives (not npm packages). They are fully owned and customizable. Built with Tailwind CSS using the `cn()` utility from `src/utils/cn.ts` for conditional class merging.
 
-**Table Implementation**: Uses TanStack Table (v8) in headless mode. See `src/components/TransactionTable.tsx` for column definitions, sorting, filtering, and pagination.
+**Table Implementation**: Uses TanStack Table (v8) in headless mode. See `src/features/transactions/components/TransactionTable.tsx` for column definitions, sorting, filtering, and pagination.
 
 **Error Handling**:
 
@@ -272,10 +326,10 @@ import { fadeVariants, fadeTransition } from '@/lib/animations';
 
 **Date Handling**:
 
-- **CRITICAL**: [src/lib/dateUtils.ts](src/lib/dateUtils.ts) is the ONLY place in the codebase where date operations are allowed
-- **NEVER** import from `date-fns` outside of `dateUtils.ts`
-- **NEVER** use `new Date()` constructor outside of `dateUtils.ts`
-- **NEVER** perform date parsing, formatting, or manipulation outside of `dateUtils.ts`
+- **CRITICAL**: [src/features/transactions/utils/dates.ts](src/features/transactions/utils/dates.ts) is the ONLY place in the codebase where date operations are allowed
+- **NEVER** import from `date-fns` outside of `dates.ts`
+- **NEVER** use `new Date()` constructor outside of `dates.ts`
+- **NEVER** perform date parsing, formatting, or manipulation outside of `dates.ts`
 - All date operations must go through the centralized utilities to avoid timezone bugs
 
 **Date Format Types**:
@@ -285,8 +339,8 @@ import { fadeVariants, fadeTransition } from '@/lib/animations';
 **Correct pattern:**
 
 ```typescript
-// ✅ CORRECT - Import from dateUtils
-import { formatLocalDate, parseLocalDate, formatTimestamp } from '@/lib/dateUtils';
+// ✅ CORRECT - Import from dates utility
+import { formatLocalDate, parseLocalDate, formatTimestamp } from '@/features/transactions/utils/dates';
 
 // Format a LocalDate (YYYY-MM-DD) for display
 const displayDate = formatLocalDate(transaction.date);
@@ -396,6 +450,6 @@ If a solution requires more than 2 lines of explanation for "why this works", it
 
 **Transaction Type System**: All transaction types are defined in `src/types/transaction.ts`. The API returns standardized error responses with type, message, code, and fieldErrors fields (type defined in `src/types/apiError.ts`).
 
-**Date Handling**: All date operations are centralized in [src/lib/dateUtils.ts](src/lib/dateUtils.ts). This module is the ONLY place that imports `date-fns` or uses the `Date` constructor. Use functions like `formatLocalDate()`, `parseLocalDate()`, `formatTimestamp()`, etc. Never import `date-fns` directly or manipulate dates outside of `dateUtils.ts`.
+**Date Handling**: All date operations are centralized in [src/features/transactions/utils/dates.ts](src/features/transactions/utils/dates.ts). This module is the ONLY place that imports `date-fns` or uses the `Date` constructor. Use functions like `formatLocalDate()`, `parseLocalDate()`, `formatTimestamp()`, etc. Never import `date-fns` directly or manipulate dates outside of `dates.ts`.
 
 **Routing**: React Router v7 with data router pattern. Routes defined in `src/App.tsx`. Use `useNavigate()` for programmatic navigation, `<Link>` for declarative navigation.

@@ -1,5 +1,5 @@
 // src/components/ui/Skeleton.tsx
-import { cn } from '@/lib/utils';
+import { cn } from '@/utils/cn';
 
 interface SkeletonProps {
   className?: string;

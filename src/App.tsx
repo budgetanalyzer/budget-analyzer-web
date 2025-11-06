@@ -1,9 +1,9 @@
 // src/App.tsx
 import { Routes, Route } from 'react-router';
 import { Layout } from '@/components/Layout';
-import { TransactionsPage } from '@/pages/TransactionsPage';
-import { TransactionDetailPage } from '@/pages/TransactionDetailPage';
-import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage';
+import { TransactionDetailPage } from '@/features/transactions/pages/TransactionDetailPage';
+import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Toaster } from 'sonner';
 

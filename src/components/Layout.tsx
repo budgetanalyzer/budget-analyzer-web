@@ -5,7 +5,7 @@ import { Wallet } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CurrencySelector } from '@/components/CurrencySelector';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
-import { cn } from '@/lib/utils';
+import { cn } from '@/utils/cn';
 import { useAppDispatch } from '@/store/hooks';
 import { setHasNavigated } from '@/store/uiSlice';
 
