@@ -1,4 +1,4 @@
-// src/features/currencies/api/currencyApi.ts
+// src/api/currencyApi.ts
 import { apiClient } from '@/api/client';
 import { CurrencyCode, ExchangeRateResponse } from '@/types/currency';
 

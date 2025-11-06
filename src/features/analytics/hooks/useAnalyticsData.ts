@@ -1,7 +1,7 @@
 // src/features/analytics/hooks/useAnalyticsData.ts
 import { useMemo } from 'react';
 import { Transaction } from '@/types/transaction';
-import { convertCurrency } from '@/features/transactions/utils/currency';
+import { convertCurrency } from '@/utils/currency';
 import { ExchangeRateResponse } from '@/types/currency';
 import {
   getCurrentYear,
@@ -9,7 +9,7 @@ import {
   formatMonthYear,
   parseLocalDate,
   getMonthKey,
-} from '@/features/transactions/utils/dates';
+} from '@/utils/dates';
 
 export interface MonthlySpending {
   year: number;

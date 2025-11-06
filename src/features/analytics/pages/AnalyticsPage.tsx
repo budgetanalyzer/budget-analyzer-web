@@ -1,6 +1,6 @@
 // src/features/analytics/pages/AnalyticsPage.tsx
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTransactions } from '@/features/transactions/hooks/useTransactions';
+import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useAnalyticsData } from '@/features/analytics/hooks/useAnalyticsData';
 import { fadeInVariants, layoutTransition, fadeVariants, fadeTransition } from '@/lib/animations';
@@ -11,11 +11,11 @@ import { MonthlySpendingGrid } from '@/features/analytics/components/MonthlySpen
 import { YearlySpendingGrid } from '@/features/analytics/components/YearlySpendingGrid';
 import { YearSelector } from '@/features/analytics/components/YearSelector';
 import { ViewModeSelector } from '@/features/analytics/components/ViewModeSelector';
-import { TransactionTypeSelector } from '@/features/transactions/components/TransactionTypeSelector';
+import { TransactionTypeSelector } from '@/features/analytics/components/TransactionTypeSelector';
 import { useAppSelector } from '@/store/hooks';
 import { useSearchParams } from 'react-router';
 import { useCallback, useEffect, useMemo } from 'react';
-import { getCurrentYear } from '@/features/transactions/utils/dates';
+import { getCurrentYear } from '@/utils/dates';
 import {
   ANALYTICS_PARAMS,
   VIEW_MODES,

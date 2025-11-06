@@ -1,21 +1,21 @@
 // src/features/transactions/pages/TransactionsPage.tsx
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { useTransactions } from '@/features/transactions/hooks/useTransactions';
+import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useTransactionStats } from '@/features/transactions/hooks/useTransactionStats';
 import { useTransactionFiltersSync } from '@/features/transactions/hooks/useTransactionFiltersSync';
-import { useImportMessageHandler } from '@/features/import/hooks/useImportMessageHandler';
+import { useImportMessageHandler } from '@/features/transactions/hooks/useImportMessageHandler';
 import { fadeInVariants, layoutTransition } from '@/lib/animations';
 import { TransactionTable } from '@/features/transactions/components/TransactionTable';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { TransactionStatsGrid } from '@/features/transactions/components/TransactionStatsGrid';
-import { ImportButton } from '@/features/import/components/ImportButton';
-import { ImportMessageBanner } from '@/features/import/components/ImportMessageBanner';
+import { ImportButton } from '@/features/transactions/components/ImportButton';
+import { ImportMessageBanner } from '@/features/transactions/components/ImportMessageBanner';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
 import { useMemo, useState, useEffect } from 'react';
-import { buildExchangeRateAvailabilityText } from '@/features/import/utils/messageBuilder';
+import { buildExchangeRateAvailabilityText } from '@/features/transactions/utils/messageBuilder';
 import {
   buildMainStatsConfig,
   buildMonthlyStatsConfig,

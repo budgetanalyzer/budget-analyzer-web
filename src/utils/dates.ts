@@ -1,4 +1,4 @@
-// src/features/transactions/utils/dates.ts
+// src/utils/dates.ts
 /**
  * Centralized date utilities for Budget Analyzer Web
  *

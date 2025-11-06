@@ -1,23 +1,23 @@
 // src/features/transactions/pages/TransactionDetailPage.tsx
 import { useParams, Link } from 'react-router';
 import { motion, LayoutGroup } from 'framer-motion';
-import { useTransaction } from '@/features/transactions/hooks/useTransactions';
+import { useTransaction } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { fadeInVariants, fadeTransition, layoutTransition } from '@/lib/animations';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { BackButton } from '@/components/BackButton';
 import { IconLabel } from '@/components/IconLabel';
-import { CurrencyConversionCard } from '@/features/analytics/components/CurrencyConversionCard';
+import { CurrencyConversionCard } from '@/features/transactions/components/CurrencyConversionCard';
 import { TransactionMetadataCard } from '@/features/transactions/components/TransactionMetadataCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { formatCurrency } from '@/features/transactions/utils/currency';
-import { formatLocalDate } from '@/features/transactions/utils/dates';
+import { formatCurrency } from '@/utils/currency';
+import { formatLocalDate } from '@/utils/dates';
 import { Calendar, Banknote, Building2, CreditCard, FileText, Currency } from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';
-import { convertCurrency, findNearestExchangeRate } from '@/features/transactions/utils/currency';
+import { convertCurrency, findNearestExchangeRate } from '@/utils/currency';
 import { useMemo } from 'react';
 
 export function TransactionDetailPage() {

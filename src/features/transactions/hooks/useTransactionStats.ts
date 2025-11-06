@@ -2,8 +2,8 @@
 import { useMemo } from 'react';
 import { Transaction } from '@/types/transaction';
 import { ExchangeRateResponse } from '@/types/currency';
-import { convertCurrency } from '@/features/transactions/utils/currency';
-import { getDaysBetween, getDateRange } from '@/features/transactions/utils/dates';
+import { convertCurrency } from '@/utils/currency';
+import { getDaysBetween, getDateRange } from '@/utils/dates';
 
 export interface TransactionStats {
   totalTransactions: number;

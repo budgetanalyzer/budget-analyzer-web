@@ -326,7 +326,7 @@ import { fadeVariants, fadeTransition } from '@/lib/animations';
 
 **Date Handling**:
 
-- **CRITICAL**: [src/features/transactions/utils/dates.ts](src/features/transactions/utils/dates.ts) is the ONLY place in the codebase where date operations are allowed
+- **CRITICAL**: [src/utils/dates.ts](src/features/transactions/utils/dates.ts) is the ONLY place in the codebase where date operations are allowed
 - **NEVER** import from `date-fns` outside of `dates.ts`
 - **NEVER** use `new Date()` constructor outside of `dates.ts`
 - **NEVER** perform date parsing, formatting, or manipulation outside of `dates.ts`
@@ -340,7 +340,7 @@ import { fadeVariants, fadeTransition } from '@/lib/animations';
 
 ```typescript
 // ✅ CORRECT - Import from dates utility
-import { formatLocalDate, parseLocalDate, formatTimestamp } from '@/features/transactions/utils/dates';
+import { formatLocalDate, parseLocalDate, formatTimestamp } from '@/utils/dates';
 
 // Format a LocalDate (YYYY-MM-DD) for display
 const displayDate = formatLocalDate(transaction.date);
@@ -450,6 +450,6 @@ If a solution requires more than 2 lines of explanation for "why this works", it
 
 **Transaction Type System**: All transaction types are defined in `src/types/transaction.ts`. The API returns standardized error responses with type, message, code, and fieldErrors fields (type defined in `src/types/apiError.ts`).
 
-**Date Handling**: All date operations are centralized in [src/features/transactions/utils/dates.ts](src/features/transactions/utils/dates.ts). This module is the ONLY place that imports `date-fns` or uses the `Date` constructor. Use functions like `formatLocalDate()`, `parseLocalDate()`, `formatTimestamp()`, etc. Never import `date-fns` directly or manipulate dates outside of `dates.ts`.
+**Date Handling**: All date operations are centralized in [src/utils/dates.ts](src/features/transactions/utils/dates.ts). This module is the ONLY place that imports `date-fns` or uses the `Date` constructor. Use functions like `formatLocalDate()`, `parseLocalDate()`, `formatTimestamp()`, etc. Never import `date-fns` directly or manipulate dates outside of `dates.ts`.
 
 **Routing**: React Router v7 with data router pattern. Routes defined in `src/App.tsx`. Use `useNavigate()` for programmatic navigation, `<Link>` for declarative navigation.

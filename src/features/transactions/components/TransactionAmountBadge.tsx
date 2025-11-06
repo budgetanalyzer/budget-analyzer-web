@@ -1,6 +1,6 @@
 // src/features/transactions/components/TransactionAmountBadge.tsx
 import { ExchangeRateResponse } from '@/types/currency';
-import { convertCurrency, formatCurrency } from '@/features/transactions/utils/currency';
+import { convertCurrency, formatCurrency } from '@/utils/currency';
 import { Badge } from '@/components/ui/Badge';
 import { motion } from 'framer-motion';
 import { fadeInVariants, fadeTransition } from '@/lib/animations';

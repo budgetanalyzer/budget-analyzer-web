@@ -1,12 +1,12 @@
 // src/features/analytics/components/YearlySpendingCard.tsx
 import { Card, CardContent } from '@/components/ui/Card';
-import { formatCurrency } from '@/features/transactions/utils/currency';
+import { formatCurrency } from '@/utils/currency';
 import { motion } from 'framer-motion';
 import { fadeInVariants, fadeTransition } from '@/lib/animations';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router';
-import { getYearBounds } from '@/features/transactions/utils/dates';
-import { buildTransactionsUrl } from '@/features/transactions/utils/navigation';
+import { getYearBounds } from '@/utils/dates';
+import { buildTransactionsUrl } from '@/utils/navigation';
 import {
   buildAnalyticsReturnUrl,
   ViewMode,

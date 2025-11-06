@@ -1,8 +1,8 @@
 // src/features/transactions/components/DeleteTransactionModal.tsx
 import { Transaction } from '@/types/transaction';
 import { ExchangeRateResponse } from '@/types/currency';
-import { convertCurrency, formatCurrency } from '@/features/transactions/utils/currency';
-import { formatLocalDate } from '@/features/transactions/utils/dates';
+import { convertCurrency, formatCurrency } from '@/utils/currency';
+import { formatLocalDate } from '@/utils/dates';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
-import { useDeleteTransaction } from '@/features/transactions/hooks/useTransactions';
+import { useDeleteTransaction } from '@/hooks/useTransactions';
 import { toast } from 'sonner';
 
 interface DeleteTransactionModalProps {

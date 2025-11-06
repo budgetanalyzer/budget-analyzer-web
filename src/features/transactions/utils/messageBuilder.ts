@@ -1,5 +1,5 @@
-// src/features/import/utils/messageBuilder.ts
-import { formatLocalDate } from '@/features/transactions/utils/dates';
+// src/features/transactions/utils/messageBuilder.ts
+import { formatLocalDate } from '@/utils/dates';
 import { ExchangeRateResponse } from '@/types/currency';
 
 export interface ImportSuccessMessageParams {

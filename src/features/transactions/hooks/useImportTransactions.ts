@@ -1,8 +1,8 @@
-// src/features/import/hooks/useImportTransactions.ts
+// src/features/transactions/hooks/useImportTransactions.ts
 import { useMutation, useQueryClient, UseMutationResult } from '@tanstack/react-query';
 import { Transaction } from '@/types/transaction';
-import { transactionApi } from '@/features/transactions/api/transactionApi';
-import { mockTransactions } from '@/features/transactions/api/mockData';
+import { transactionApi } from '@/api/transactionApi';
+import { mockTransactions } from '@/api/mockData';
 import { ApiError } from '@/types/apiError';
 
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';

@@ -1,4 +1,4 @@
-// src/features/import/components/ImportButton.tsx
+// src/features/transactions/components/ImportButton.tsx
 import { useRef, useState } from 'react';
 import { Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select';
-import { useImportTransactions } from '@/features/import/hooks/useImportTransactions';
+import { useImportTransactions } from '@/features/transactions/hooks/useImportTransactions';
 import { motion, AnimatePresence } from 'framer-motion';
 import { collapseFromRightVariants, collapseTransition } from '@/lib/animations';
 import { Transaction } from '@/types/transaction';

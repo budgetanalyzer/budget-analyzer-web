@@ -1,7 +1,7 @@
-// src/features/import/hooks/useImportMessageHandler.ts
+// src/features/transactions/hooks/useImportMessageHandler.ts
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Transaction } from '@/types/transaction';
-import { buildImportSuccessMessage } from '@/features/import/utils/messageBuilder';
+import { buildImportSuccessMessage } from '@/features/transactions/utils/messageBuilder';
 
 interface ImportMessage {
   type: 'success' | 'error' | 'warning';

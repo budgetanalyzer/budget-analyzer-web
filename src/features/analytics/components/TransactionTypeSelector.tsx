@@ -1,4 +1,4 @@
-// src/features/transactions/components/TransactionTypeSelector.tsx
+// src/components/TransactionTypeSelector.tsx
 import { cn } from '@/utils/cn';
 
 interface TransactionTypeSelectorProps {

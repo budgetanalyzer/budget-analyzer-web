@@ -2,10 +2,10 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { CurrencyCode, ExchangeRateResponse } from '@/types/currency';
-import { currencyApi } from '@/features/currencies/api/currencyApi';
-import { mockCurrencies, mockExchangeRates } from '@/features/transactions/api/mockData';
+import { currencyApi } from '@/api/currencyApi';
+import { mockCurrencies, mockExchangeRates } from '@/api/mockData';
 import { ApiError } from '@/types/apiError';
-import { buildExchangeRateMap } from '@/features/transactions/utils/currency';
+import { buildExchangeRateMap } from '@/utils/currency';
 
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 

@@ -1,4 +1,4 @@
-// src/features/transactions/utils/navigation.ts
+// src/utils/navigation.ts
 
 /**
  * Parameters for building a transactions URL with date filters and navigation context.

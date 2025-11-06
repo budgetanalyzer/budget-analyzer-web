@@ -1,7 +1,7 @@
 // src/features/transactions/components/statsConfig.ts
 import { Calendar, Scale, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { formatCurrency } from '@/features/transactions/utils/currency';
+import { formatCurrency } from '@/utils/currency';
 import type {
   TransactionStats,
   MonthlyAverages,
