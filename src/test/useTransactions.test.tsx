@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useTransactions } from '@/hooks/useTransactions';
+import { useTransactions } from '@/features/transactions/hooks/useTransactions';
 import { ReactNode } from 'react';
 
 describe('useTransactions', () => {

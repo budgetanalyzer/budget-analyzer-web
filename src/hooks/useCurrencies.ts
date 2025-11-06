@@ -5,7 +5,7 @@ import { CurrencyCode, ExchangeRateResponse } from '@/types/currency';
 import { currencyApi } from '@/api/currencyApi';
 import { mockCurrencies, mockExchangeRates } from '@/api/mockData';
 import { ApiError } from '@/types/apiError';
-import { buildExchangeRateMap } from '@/lib/currency';
+import { buildExchangeRateMap } from '@/features/transactions/utils/currency';
 
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 

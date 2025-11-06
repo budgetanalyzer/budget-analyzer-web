@@ -1,6 +1,6 @@
 // src/components/LoadingSpinner.tsx
 import { Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/utils/cn';
 
 interface LoadingSpinnerProps {
   className?: string;
