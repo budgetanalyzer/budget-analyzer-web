@@ -100,6 +100,11 @@ export function TransactionsPage() {
     [searchParams, setSearchParams],
   );
 
+  // Helper to check if any filters are active
+  const hasActiveFilters = useCallback(() => {
+    return !!(searchParams.get('dateFrom') || searchParams.get('dateTo') || searchParams.get('q'));
+  }, [searchParams]);
+
   // Memoize the earliest rate text since it only depends on memoized values
   const earliestRateText = useMemo(() => {
     if (!earliestExchangeRateDate) return null;
@@ -232,18 +237,24 @@ export function TransactionsPage() {
                 hasOldTransactions = earliestTransaction.date < earliestExchangeRateDate;
               }
 
+              // Build the base success message
+              const baseMessage = `Successfully imported ${count} transaction(s)`;
+              const filtersActive = hasActiveFilters();
+
               if (hasOldTransactions && earliestRateText) {
                 // Show persistent warning for old transactions (no auto-dismiss)
                 // Use pre-computed memoized rate text
                 setImportMessage({
                   type: 'warning',
-                  text: `Successfully imported ${count} transaction(s). Some transactions are older than our earliest exchange rate. Currency conversions will use ${earliestRateText}.`,
+                  text: `${baseMessage}. Some transactions are older than our earliest exchange rate. Currency conversions will use ${earliestRateText}.${filtersActive ? ' Some may be hidden by your current filters. [Clear filters] to see all.' : ''}`,
                 });
               } else {
-                // Normal success message with auto-dismiss
+                // Normal success message
                 setImportMessage({
                   type: 'success',
-                  text: `Successfully imported ${count} transaction(s)`,
+                  text: filtersActive
+                    ? `${baseMessage}. Some may be hidden by your current filters. [Clear filters] to see all.`
+                    : baseMessage,
                 });
                 setTimeout(() => setImportMessage(null), 5000);
               }
