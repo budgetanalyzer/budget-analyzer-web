@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/Dialog';
 import { formatCurrency } from '@/lib/currency';
 import { convertCurrency } from '@/lib/currency';
+import { TransactionAmountBadge } from '@/components/TransactionAmountBadge';
 import { formatLocalDate, isDateInRange, compareDates } from '@/lib/dateUtils';
 import {
   ArrowUpDown,
@@ -185,23 +186,6 @@ export function TransactionTable({
           );
         },
         cell: ({ row }) => {
-          const amount = row.getValue('amount') as number;
-          const sourceCurrency = row.original.currencyIsoCode;
-          const transactionDate = row.original.date;
-          const isCredit = row.original.type === 'CREDIT';
-
-          // Convert amount to display currency
-          const convertedAmount = convertCurrency(
-            amount,
-            transactionDate,
-            sourceCurrency,
-            displayCurrency,
-            exchangeRatesMap,
-          );
-
-          // Show badge if currency was converted
-          const needsConversion = sourceCurrency !== displayCurrency;
-
           // Show skeleton while exchange rates are loading
           if (isExchangeRatesLoading) {
             return (
@@ -212,26 +196,14 @@ export function TransactionTable({
           }
 
           return (
-            <motion.div
-              variants={fadeInVariants}
-              initial="initial"
-              animate="animate"
-              transition={fadeTransition}
-              className="flex items-center justify-end gap-2"
-            >
-              <div
-                className={`text-right font-semibold ${
-                  isCredit ? 'text-green-600 dark:text-green-400' : 'text-foreground'
-                }`}
-              >
-                {formatCurrency(convertedAmount, displayCurrency)}
-              </div>
-              {needsConversion && (
-                <Badge variant="outline" className="text-xs">
-                  {sourceCurrency}
-                </Badge>
-              )}
-            </motion.div>
+            <TransactionAmountBadge
+              amount={row.getValue('amount') as number}
+              date={row.original.date}
+              currencyCode={row.original.currencyIsoCode}
+              displayCurrency={displayCurrency}
+              exchangeRatesMap={exchangeRatesMap}
+              isCredit={row.original.type === 'CREDIT'}
+            />
           );
         },
       },
