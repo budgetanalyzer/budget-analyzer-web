@@ -4,6 +4,7 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useTransactionStats } from '@/hooks/useTransactionStats';
 import { useTransactionFiltersSync } from '@/hooks/useTransactionFiltersSync';
+import { useImportMessageHandler } from '@/hooks/useImportMessageHandler';
 import { fadeInVariants, layoutTransition } from '@/lib/animations';
 import { TransactionTable } from '@/components/TransactionTable';
 import { ErrorBanner } from '@/components/ErrorBanner';
@@ -16,10 +17,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Calendar, Scale, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/currency';
-import {
-  buildImportSuccessMessage,
-  buildExchangeRateAvailabilityText,
-} from '@/lib/importMessageBuilder';
+import { buildExchangeRateAvailabilityText } from '@/lib/importMessageBuilder';
 import { Transaction } from '@/types/transaction';
 import { useAppSelector } from '@/store/hooks';
 
@@ -40,10 +38,6 @@ export function TransactionsPage() {
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(
     transactions || [],
   );
-  const [importMessage, setImportMessage] = useState<{
-    type: 'success' | 'error' | 'warning';
-    text: string;
-  } | null>(null);
 
   // Update filteredTransactions when transactions change (on load or after import)
   useEffect(() => {
@@ -57,6 +51,14 @@ export function TransactionsPage() {
     () => buildExchangeRateAvailabilityText(earliestExchangeRateDate, exchangeRatesMap),
     [earliestExchangeRateDate, exchangeRatesMap],
   );
+
+  // Handle import success/error messages with auto-dismiss
+  const { importMessage, handleImportSuccess, handleImportError, clearImportMessage } =
+    useImportMessageHandler({
+      earliestExchangeRateDate,
+      earliestRateText,
+      hasActiveFilters,
+    });
 
   // Calculate stats from FILTERED transactions (provided by the table)
   const { stats, monthlyAverages } = useTransactionStats({
@@ -163,46 +165,7 @@ export function TransactionsPage() {
       <PageHeader
         title="Transactions"
         description="View and manage transactions"
-        action={
-          <ImportButton
-            onSuccess={(count, importedTransactions) => {
-              // Check if any transactions are older than our earliest exchange rate
-              // Optimization: Find earliest transaction in O(n) instead of sorting O(n log n)
-              let hasOldTransactions = false;
-
-              if (earliestExchangeRateDate && importedTransactions.length > 0) {
-                // Find the earliest transaction using reduce (O(n))
-                const earliestTransaction = importedTransactions.reduce((earliest, current) =>
-                  current.date < earliest.date ? current : earliest,
-                );
-
-                // Only need to check the earliest transaction
-                hasOldTransactions = earliestTransaction.date < earliestExchangeRateDate;
-              }
-
-              // Build the success message based on conditions
-              const message = buildImportSuccessMessage({
-                count,
-                hasOldTransactions,
-                earliestRateText,
-                filtersActive: hasActiveFilters(),
-              });
-
-              setImportMessage(message);
-
-              // Auto-dismiss success messages (but not warnings)
-              if (message.type === 'success') {
-                setTimeout(() => setImportMessage(null), 5000);
-              }
-            }}
-            onError={(error) => {
-              setImportMessage({
-                type: 'error',
-                text: error.message || 'Failed to import transactions',
-              });
-            }}
-          />
-        }
+        action={<ImportButton onSuccess={handleImportSuccess} onError={handleImportError} />}
       />
 
       <LayoutGroup>
@@ -211,7 +174,7 @@ export function TransactionsPage() {
             <ImportMessageBanner
               type={importMessage.type}
               message={importMessage.text}
-              onClose={() => setImportMessage(null)}
+              onClose={clearImportMessage}
             />
           )}
         </AnimatePresence>

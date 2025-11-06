@@ -52,7 +52,7 @@ export function buildImportSuccessMessage({
   // Warning message for old transactions (takes precedence)
   if (hasOldTransactions && earliestRateText) {
     const filterWarning = filtersActive
-      ? ' Some may be hidden by your current filters. [Clear filters] to see all.'
+      ? '  Some may be hidden by your current filters, [Clear filters] to see all.'
       : '';
 
     return {
@@ -63,7 +63,7 @@ export function buildImportSuccessMessage({
 
   // Normal success message
   const filterWarning = filtersActive
-    ? ' Some may be hidden by your current filters. [Clear filters] to see all.'
+    ? '  Some may be hidden by your current filters, [Clear filters] to see all.'
     : '';
 
   return {
