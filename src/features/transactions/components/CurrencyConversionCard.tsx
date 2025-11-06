@@ -1,10 +1,10 @@
-// src/features/analytics/components/CurrencyConversionCard.tsx
+// src/components/CurrencyConversionCard.tsx
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { IconLabel } from '@/components/IconLabel';
-import { ExchangeRateInfo } from '@/features/analytics/components/ExchangeRateInfo';
+import { ExchangeRateInfo } from '@/features/transactions/components/ExchangeRateInfo';
 import { expandVariants, expandTransition } from '@/lib/animations';
-import { formatCurrency } from '@/features/transactions/utils/currency';
+import { formatCurrency } from '@/utils/currency';
 import { ArrowRightLeft, Banknote } from 'lucide-react';
 import { TransactionType } from '@/types/transaction';
 

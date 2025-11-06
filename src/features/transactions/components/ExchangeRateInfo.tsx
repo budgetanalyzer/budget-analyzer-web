@@ -1,6 +1,6 @@
-// src/features/analytics/components/ExchangeRateInfo.tsx
+// src/components/ExchangeRateInfo.tsx
 import { Info } from 'lucide-react';
-import { formatLocalDate } from '@/features/transactions/utils/dates';
+import { formatLocalDate } from '@/utils/dates';
 
 interface ExchangeRateInfoProps {
   rate: number;

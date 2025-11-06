@@ -1,4 +1,4 @@
-// src/features/transactions/utils/currency.ts
+// src/utils/currency.ts
 import { ExchangeRateResponse } from '@/types/currency';
 
 /**

@@ -2,7 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { IconLabel } from '@/components/IconLabel';
 import { Clock } from 'lucide-react';
-import { formatTimestamp } from '@/features/transactions/utils/dates';
+import { formatTimestamp } from '@/utils/dates';
 
 interface TransactionMetadataCardProps {
   createdAt: string;

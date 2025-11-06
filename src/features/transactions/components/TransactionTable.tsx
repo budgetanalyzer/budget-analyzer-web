@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/DropdownMenu';
 import { TransactionAmountBadge } from '@/features/transactions/components/TransactionAmountBadge';
 import { DeleteTransactionModal } from '@/features/transactions/components/DeleteTransactionModal';
-import { formatLocalDate, isDateInRange, compareDates } from '@/features/transactions/utils/dates';
+import { formatLocalDate, isDateInRange, compareDates } from '@/utils/dates';
 import {
   ArrowUpDown,
   ChevronLeft,

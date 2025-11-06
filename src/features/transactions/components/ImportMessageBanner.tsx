@@ -1,4 +1,4 @@
-// src/features/import/components/ImportMessageBanner.tsx
+// src/features/transactions/components/ImportMessageBanner.tsx
 import { motion } from 'framer-motion';
 import { CheckCircle, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
