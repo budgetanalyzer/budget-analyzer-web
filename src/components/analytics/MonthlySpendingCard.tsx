@@ -34,6 +34,9 @@ export function MonthlySpendingCard({
   const iconColorClass = isCredit ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground';
   const amountColorClass = isCredit ? 'text-green-600 dark:text-green-400' : 'text-foreground';
 
+  // Build URL with date filters, return path, and breadcrumb label
+  const transactionsUrl = `/?dateFrom=${firstDay}&dateTo=${lastDay}&returnTo=/analytics&breadcrumbLabel=${encodeURIComponent(monthLabel)}`;
+
   return (
     <motion.div
       variants={fadeInVariants}
@@ -41,7 +44,7 @@ export function MonthlySpendingCard({
       animate="animate"
       transition={fadeTransition}
     >
-      <Link to={`/?dateFrom=${firstDay}&dateTo=${lastDay}`}>
+      <Link to={transactionsUrl}>
         <Card className="h-full transition-shadow hover:shadow-md hover:border-primary cursor-pointer">
           <CardContent className="pt-6">
             <div className="flex flex-col space-y-3">

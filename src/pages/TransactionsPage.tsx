@@ -74,6 +74,13 @@ export function TransactionsPage() {
       } else {
         params.delete('dateTo');
       }
+
+      // If both filters are cleared, also remove breadcrumb-related params
+      if (!from && !to) {
+        params.delete('returnTo');
+        params.delete('breadcrumbLabel');
+      }
+
       setSearchParams(params, { replace: true });
     },
     [searchParams, setSearchParams],

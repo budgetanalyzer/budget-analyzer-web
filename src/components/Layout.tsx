@@ -1,15 +1,17 @@
 // src/components/Layout.tsx
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation, useSearchParams } from 'react-router';
 import { useEffect, useRef } from 'react';
 import { Wallet } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CurrencySelector } from '@/components/CurrencySelector';
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { cn } from '@/lib/utils';
 import { useAppDispatch } from '@/store/hooks';
 import { setHasNavigated } from '@/store/uiSlice';
 
 export function Layout() {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const dispatch = useAppDispatch();
   const isInitialMount = useRef(true);
 
@@ -23,6 +25,11 @@ export function Layout() {
     // Any subsequent location change means user has navigated
     dispatch(setHasNavigated(true));
   }, [location.pathname, dispatch]);
+
+  // Check if we should show breadcrumbs (only when returnTo and breadcrumbLabel are present)
+  const returnTo = searchParams.get('returnTo');
+  const breadcrumbLabel = searchParams.get('breadcrumbLabel');
+  const showBreadcrumbs = returnTo && breadcrumbLabel;
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,6 +68,7 @@ export function Layout() {
         </div>
       </header>
       <main className="container mx-auto px-4 py-8">
+        {showBreadcrumbs && <Breadcrumbs returnTo={returnTo} label={breadcrumbLabel} />}
         <Outlet />
       </main>
     </div>
