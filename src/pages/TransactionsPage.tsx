@@ -14,7 +14,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Calendar, Scale, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/currency';
 import {
   buildImportSuccessMessage,
   buildExchangeRateAvailabilityText,

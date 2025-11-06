@@ -13,7 +13,7 @@ import { TransactionMetadataCard } from '@/components/TransactionMetadataCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/currency';
 import { formatLocalDate } from '@/lib/dateUtils';
 import { Calendar, Banknote, Building2, CreditCard, FileText, Currency } from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';

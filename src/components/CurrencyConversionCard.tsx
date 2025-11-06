@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { IconLabel } from '@/components/IconLabel';
 import { ExchangeRateInfo } from '@/components/ExchangeRateInfo';
 import { expandVariants, expandTransition } from '@/lib/animations';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/currency';
 import { ArrowRightLeft, Banknote } from 'lucide-react';
 import { TransactionType } from '@/types/transaction';
 

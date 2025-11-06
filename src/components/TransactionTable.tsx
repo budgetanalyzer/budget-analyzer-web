@@ -37,7 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/Dialog';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/currency';
 import { convertCurrency } from '@/lib/currency';
 import { formatLocalDate, isDateInRange, compareDates } from '@/lib/dateUtils';
 import {

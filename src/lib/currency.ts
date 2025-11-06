@@ -96,6 +96,19 @@ export function findNearestExchangeRate(
 }
 
 /**
+ * Format a number as currency with proper locale and symbol
+ * @param amount Numeric amount to format
+ * @param currencyCode ISO 4217 currency code (e.g., 'USD', 'THB')
+ * @returns Formatted currency string (e.g., '$1,234.56')
+ */
+export function formatCurrency(amount: number, currencyCode: string = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currencyCode,
+  }).format(amount);
+}
+
+/**
  * Convert an amount from one currency to another using exchange rate
  * If no exact rate exists for the date, uses the nearest available rate
  *
