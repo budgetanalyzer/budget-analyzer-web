@@ -1,14 +1,52 @@
 // src/api/currencyApi.ts
 import { apiClient } from '@/api/client';
-import { CurrencyCode, ExchangeRateResponse } from '@/types/currency';
+import {
+  CurrencySeriesResponse,
+  CurrencySeriesCreateRequest,
+  CurrencySeriesUpdateRequest,
+  ExchangeRateResponse,
+  ExchangeRateImportResultResponse,
+} from '@/types/currency';
 
 export const currencyApi = {
   /**
-   * Get list of supported currencies
-   * GET /v1/currencies
+   * Get all currency series
+   * GET /v1/currencies?enabledOnly={boolean}
    */
-  getCurrencies: async (): Promise<CurrencyCode[]> => {
-    const response = await apiClient.get<CurrencyCode[]>('/v1/currencies');
+  getCurrencies: async (enabledOnly = false): Promise<CurrencySeriesResponse[]> => {
+    const response = await apiClient.get<CurrencySeriesResponse[]>('/v1/currencies', {
+      params: { enabledOnly },
+    });
+    return response.data;
+  },
+
+  /**
+   * Get currency series by ID
+   * GET /v1/currencies/{id}
+   */
+  getCurrencyById: async (id: number): Promise<CurrencySeriesResponse> => {
+    const response = await apiClient.get<CurrencySeriesResponse>(`/v1/currencies/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Create a new currency series
+   * POST /v1/currencies
+   */
+  createCurrency: async (request: CurrencySeriesCreateRequest): Promise<CurrencySeriesResponse> => {
+    const response = await apiClient.post<CurrencySeriesResponse>('/v1/currencies', request);
+    return response.data;
+  },
+
+  /**
+   * Update an existing currency series
+   * PUT /v1/currencies/{id}
+   */
+  updateCurrency: async (
+    id: number,
+    request: CurrencySeriesUpdateRequest,
+  ): Promise<CurrencySeriesResponse> => {
+    const response = await apiClient.put<CurrencySeriesResponse>(`/v1/currencies/${id}`, request);
     return response.data;
   },
 
@@ -20,12 +58,24 @@ export const currencyApi = {
    */
   getExchangeRates: async (params: {
     targetCurrency: string;
-    startDate?: string; // ISO date format YYYY-MM-DD
-    endDate?: string; // ISO date format YYYY-MM-DD
+    startDate?: string; // LocalDate format YYYY-MM-DD
+    endDate?: string; // LocalDate format YYYY-MM-DD
   }): Promise<ExchangeRateResponse[]> => {
     const response = await apiClient.get<ExchangeRateResponse[]>('/v1/exchange-rates', {
       params,
     });
+    return response.data;
+  },
+
+  /**
+   * Import latest available rates from FRED
+   * GET /v1/exchange-rates/import
+   * Manually triggers daily cron job
+   */
+  importExchangeRates: async (): Promise<ExchangeRateImportResultResponse> => {
+    const response = await apiClient.get<ExchangeRateImportResultResponse>(
+      '/v1/exchange-rates/import',
+    );
     return response.data;
   },
 };

@@ -48,7 +48,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Transaction'
+                  $ref: '#/components/schemas/TransactionResponse'
         '400':
           description: Bad Request
           content:
@@ -122,7 +122,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Transaction'
+                  $ref: '#/components/schemas/TransactionResponse'
         '422':
           description: Unprocessable Entity
           content:
@@ -180,7 +180,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Transaction'
+                  $ref: '#/components/schemas/TransactionResponse'
         '500':
           description: Internal Server Error
           content:
@@ -219,7 +219,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Transaction'
+                $ref: '#/components/schemas/TransactionResponse'
         '404':
           description: Not Found
           content:
@@ -272,6 +272,212 @@ paths:
               example:
                 type: NOT_FOUND
                 message: Not Found
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INTERNAL_ERROR
+                message: Internal Server Error
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: SERVICE_UNAVAILABLE
+                message: Service Unavailable
+  /v1/currencies/{id}:
+    get:
+      tags:
+      - Currency Handler
+      summary: Get currency series by ID
+      description: Retrieve a specific currency series by its unique identifier
+      operationId: getById
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Currency series found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrencySeriesResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: NOT_FOUND
+                message: Not Found
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INTERNAL_ERROR
+                message: Internal Server Error
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: SERVICE_UNAVAILABLE
+                message: Service Unavailable
+    put:
+      tags:
+      - Currency Handler
+      summary: Update currency series
+      description: Update an existing currency series (currency code is immutable,
+        only providerSeriesId and enabled can be changed)
+      operationId: update
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrencySeriesUpdateRequest'
+        required: true
+      responses:
+        '200':
+          description: Currency series updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrencySeriesResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INVALID_REQUEST
+                message: Bad Request
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: NOT_FOUND
+                message: Not Found
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INTERNAL_ERROR
+                message: Internal Server Error
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: SERVICE_UNAVAILABLE
+                message: Service Unavailable
+  /v1/currencies:
+    get:
+      tags:
+      - Currency Handler
+      summary: Get all currency series
+      description: Retrieve all currency series, optionally filtered by enabled status
+      operationId: getAll
+      parameters:
+      - name: enabledOnly
+        in: query
+        description: Filter by enabled status (true = enabled only, false = all)
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CurrencySeriesResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INTERNAL_ERROR
+                message: Internal Server Error
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: SERVICE_UNAVAILABLE
+                message: Service Unavailable
+    post:
+      tags:
+      - Currency Handler
+      summary: Create a new currency series
+      description: Create a new currency series mapping between ISO 4217 code and
+        provider series ID
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrencySeriesCreateRequest'
+        required: true
+      responses:
+        '201':
+          description: Currency series created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrencySeriesResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INVALID_REQUEST
+                message: Bad Request
+        '422':
+          description: Business validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrencySeriesResponse'
         '500':
           description: Internal Server Error
           content:
@@ -362,41 +568,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ImportResultResponse'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-              example:
-                type: INTERNAL_ERROR
-                message: Internal Server Error
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-              example:
-                type: SERVICE_UNAVAILABLE
-                message: Service Unavailable
-  /v1/currencies:
-    get:
-      tags:
-      - Currency Handler
-      summary: Get supported currencies
-      description: Get a list of currencies that have exchange rate data
-      operationId: getSupportedCurrencies
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: string
+                $ref: '#/components/schemas/ExchangeRateImportResultResponse'
         '500':
           description: Internal Server Error
           content:
@@ -487,21 +659,10 @@ components:
           format: date-time
           description: End of last update timestamp range
           example: '2025-10-15T00:00:00Z'
-    Transaction:
+    TransactionResponse:
       type: object
-      description: Transaction entity representing a financial transaction
+      description: Transaction response representing a financial transaction
       properties:
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        deleted:
-          type: boolean
-        deletedAt:
-          type: string
-          format: date-time
         id:
           type: integer
           format: int64
@@ -539,14 +700,26 @@ components:
           type: string
           description: Description of the transaction
           example: Grocery shopping
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the transaction was created
+          example: '2025-10-14T10:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the transaction was last updated
+          example: '2025-10-14T10:30:00Z'
       required:
       - amount
       - bankName
+      - createdAt
       - currencyIsoCode
       - date
       - description
       - id
       - type
+      - updatedAt
     ApiErrorResponse:
       description: Standard API error response format
       properties:
@@ -598,6 +771,75 @@ components:
       - field
       - message
       - rejectedValue
+    CurrencySeriesUpdateRequest:
+      type: object
+      description: Request to update an existing currency series (currency code is
+        immutable)
+      properties:
+        providerSeriesId:
+          type: string
+          description: Exchange rate provider series identifier for this currency
+          example: DEXUSEU
+          maxLength: 50
+          minLength: 0
+        enabled:
+          type: boolean
+          description: Whether this currency is enabled for exchange rate access
+          example: true
+      required:
+      - enabled
+      - providerSeriesId
+    CurrencySeriesResponse:
+      type: object
+      description: Currency series response with mapping details
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier
+          example: 1
+        currencyCode:
+          type: string
+          description: ISO 4217 three-letter currency code
+          example: EUR
+        providerSeriesId:
+          type: string
+          description: Exchange rate provider series identifier
+          example: DEXUSEU
+        enabled:
+          type: boolean
+          description: Whether this currency is enabled for exchange rate access
+          example: true
+      required:
+      - currencyCode
+      - enabled
+      - id
+      - providerSeriesId
+    CurrencySeriesCreateRequest:
+      type: object
+      description: Request to create a new currency series mapping
+      properties:
+        currencyCode:
+          type: string
+          description: ISO 4217 three-letter currency code
+          example: EUR
+          maxLength: 3
+          minLength: 3
+          pattern: ^[A-Z]{3}$
+        providerSeriesId:
+          type: string
+          description: Exchange rate provider series identifier for this currency
+          example: DEXUSEU
+          maxLength: 50
+          minLength: 0
+        enabled:
+          type: boolean
+          default: true
+          description: Whether this currency is enabled for exchange rate access
+          example: true
+      required:
+      - currencyCode
+      - providerSeriesId
     ExchangeRateResponse:
       type: object
       description: Exchange rate response
@@ -622,7 +864,7 @@ components:
         publishedDate:
           type: string
           format: date
-          description: Date the exchange rate was published.  FRED doesn't publish
+          description: Date the exchange rate was published. FRED doesn't publish
             rates for weekends and holidays, so we use the nearest previously published
             rate
           example: '2025-10-31'
@@ -632,9 +874,9 @@ components:
       - publishedDate
       - rate
       - targetCurrency
-    ImportResultResponse:
+    ExchangeRateImportResultResponse:
       type: object
-      description: Import result response
+      description: Exchange rate import result response
       properties:
         newRecords:
           type: integer
@@ -647,18 +889,28 @@ components:
           description: Number of exchange rates that were updated due to having a
             different rate than what we have stored- should never happen, rates shouldn't
             change
-          example: 32.68
+          example: 0
         skippedRecords:
           type: integer
           format: int32
           description: Number of rows in the csv that already had matching exchange
             rates created in the database
+          example: 5
+        earliestExchangeRateDate:
+          type: string
+          format: date
+          description: Date of the earliest exchange rate in this import
+          example: '2025-01-01'
+        latestExchangeRateDate:
+          type: string
+          format: date
+          description: Date of the latest exchange rate in this import
           example: '2025-10-31'
         timestamp:
           type: string
           format: date-time
-          description: Timestamp of the import
-          example: '2025-10-31'
+          description: Timestamp of the import execution
+          example: '2025-10-31T15:30:00Z'
       required:
       - newRecords
       - skippedRecords

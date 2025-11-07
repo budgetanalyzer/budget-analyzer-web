@@ -14,13 +14,13 @@ import { useCurrencies } from '@/hooks/useCurrencies';
 export function CurrencySelector() {
   const dispatch = useAppDispatch();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
-  const { data: currencies, isLoading } = useCurrencies();
+  const { data: currencies, isLoading } = useCurrencies(true); // Only show enabled currencies
 
   const handleCurrencyChange = (currency: string) => {
     dispatch(setDisplayCurrency(currency));
   };
 
-  if (isLoading || !currencies || currencies.length === 0) {
+  if (isLoading) {
     return null;
   }
 
@@ -34,13 +34,22 @@ export function CurrencySelector() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {currencies.map((currency) => (
+          {/* USD is always first - it's the base currency with no exchange rates */}
+          <DropdownMenuItem
+            key="USD"
+            onClick={() => handleCurrencyChange('USD')}
+            className={displayCurrency === 'USD' ? 'bg-accent' : ''}
+          >
+            USD
+          </DropdownMenuItem>
+          {/* Then show all other enabled currencies */}
+          {currencies?.map((currencySeries) => (
             <DropdownMenuItem
-              key={currency}
-              onClick={() => handleCurrencyChange(currency)}
-              className={currency === displayCurrency ? 'bg-accent' : ''}
+              key={currencySeries.id}
+              onClick={() => handleCurrencyChange(currencySeries.currencyCode)}
+              className={currencySeries.currencyCode === displayCurrency ? 'bg-accent' : ''}
             >
-              {currency}
+              {currencySeries.currencyCode}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

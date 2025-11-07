@@ -31,7 +31,7 @@ export function buildExchangeRateAvailabilityText(
   const formattedDate = formatLocalDate(date);
 
   return earliestRate
-    ? `the rate of ${earliestRate.rate.toFixed(4)} THB/USD from ${formattedDate}`
+    ? `the rate of ${earliestRate.rate.toFixed(4)} ${earliestRate.targetCurrency}/${earliestRate.baseCurrency} from ${formattedDate}`
     : `the earliest available rate from ${formattedDate}`;
 }
 
