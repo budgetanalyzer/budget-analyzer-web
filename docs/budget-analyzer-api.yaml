@@ -810,11 +810,23 @@ components:
           type: boolean
           description: Whether this currency is enabled for exchange rate access
           example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when this currency series was created
+          example: '2025-01-15T10:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when this currency series was last updated
+          example: '2025-01-15T14:45:00Z'
       required:
+      - createdAt
       - currencyCode
       - enabled
       - id
       - providerSeriesId
+      - updatedAt
     CurrencySeriesCreateRequest:
       type: object
       description: Request to create a new currency series mapping

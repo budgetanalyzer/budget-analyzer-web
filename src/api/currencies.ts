@@ -9,6 +9,8 @@ export interface CurrencySeries {
   currencyCode: string;
   providerSeriesId: string;
   enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CurrencySeriesCreateRequest {

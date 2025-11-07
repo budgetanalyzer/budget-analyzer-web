@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/Table';
 import { useCurrencies } from '../hooks/useCurrencies';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { formatTimestamp } from '@/utils/dates';
 
 /**
  * Currency list and management page
@@ -74,13 +75,15 @@ export function CurrenciesListPage() {
                   <TableHead className="h-14 font-semibold">Currency Code</TableHead>
                   <TableHead className="font-semibold">Provider Series ID</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold">Created</TableHead>
+                  <TableHead className="font-semibold">Last Updated</TableHead>
                   <TableHead className="text-right font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {currencies.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-32 text-center">
+                    <TableCell colSpan={6} className="h-32 text-center">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Coins className="h-12 w-12 text-muted-foreground/40" />
                         <p className="text-sm font-medium text-muted-foreground">
@@ -122,6 +125,12 @@ export function CurrenciesListPage() {
                             Disabled
                           </Badge>
                         )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatTimestamp(currency.createdAt)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatTimestamp(currency.updatedAt)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
