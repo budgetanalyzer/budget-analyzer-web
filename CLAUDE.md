@@ -38,6 +38,10 @@ Budget Analyzer Web is a React 19 application for managing and analyzing financi
 
 **IMPORTANT**: Always use `npm run lint:fix` to automatically fix formatting issues. Never run `npm run lint` first - it wastes time showing errors that can be auto-fixed.
 
+**ESLint Rule Exceptions**:
+- **NEVER** disable ESLint rules without asking the user first
+- If you encounter an ESLint rule that seems problematic, explain the issue and ask for permission before adding `eslint-disable` comments
+
 ### Testing
 
 - `npm test` - Run tests in watch mode with Vitest

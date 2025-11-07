@@ -2,30 +2,59 @@
 
 /**
  * Currency code (ISO 4217)
- * This is returned as a simple string array from GET /currencies
  */
 export type CurrencyCode = string;
 
 /**
- * Detailed currency information
- * Used in ExchangeRateResponse
+ * Currency series response with mapping details
+ * Returned by GET /v1/currencies
  */
-export interface Currency {
+export interface CurrencySeriesResponse {
+  id: number;
   currencyCode: string;
-  displayName: string;
-  symbol: string;
-  defaultFractionDigits: number;
-  numericCode: number;
-  numericCodeAsString: string;
+  providerSeriesId: string;
+  enabled: boolean;
 }
 
 /**
- * Exchange rate response from GET /exchange-rates
+ * Request to create a new currency series mapping
+ */
+export interface CurrencySeriesCreateRequest {
+  currencyCode: string; // ISO 4217 three-letter code
+  providerSeriesId: string;
+  enabled?: boolean; // Defaults to true
+}
+
+/**
+ * Request to update an existing currency series
+ * Currency code is immutable, only providerSeriesId and enabled can be changed
+ */
+export interface CurrencySeriesUpdateRequest {
+  providerSeriesId: string;
+  enabled: boolean;
+}
+
+/**
+ * Exchange rate response from GET /v1/exchange-rates
+ * baseCurrency and targetCurrency are now simple strings (ISO 4217 codes)
  */
 export interface ExchangeRateResponse {
-  baseCurrency: Currency;
-  targetCurrency: Currency;
-  date: string; // ISO date format
+  baseCurrency: string;
+  targetCurrency: string;
+  date: string; // LocalDate format (YYYY-MM-DD)
   rate: number;
-  publishedDate: string; // ISO date format
+  publishedDate: string; // LocalDate format (YYYY-MM-DD)
+}
+
+/**
+ * Exchange rate import result response
+ * Returned by GET /v1/exchange-rates/import
+ */
+export interface ExchangeRateImportResultResponse {
+  newRecords: number;
+  updatedRecords: number;
+  skippedRecords: number;
+  earliestExchangeRateDate?: string; // LocalDate format (YYYY-MM-DD)
+  latestExchangeRateDate?: string; // LocalDate format (YYYY-MM-DD)
+  timestamp: string; // ISO 8601 timestamp
 }
