@@ -1,9 +1,12 @@
 import { useNavigate } from 'react-router-dom';
-import { useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { ArrowLeft, PlusCircle } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
+import { MessageBanner } from '@/components/MessageBanner';
 import { CurrencyForm } from '../components/CurrencyForm';
 import { useCreateCurrency } from '../hooks/useCurrencies';
+import { ApiError } from '@/types/apiError';
 
 /**
  * Create new currency page
@@ -11,12 +14,40 @@ import { useCreateCurrency } from '../hooks/useCurrencies';
 export function CurrencyCreatePage() {
   const navigate = useNavigate();
   const { mutate: createCurrency, isPending } = useCreateCurrency();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const clearErrorMessage = useCallback(() => {
+    setErrorMessage(null);
+  }, []);
 
   const handleSubmit = useCallback(
     (data: { currencyCode: string; providerSeriesId: string; enabled: boolean }) => {
       createCurrency(data, {
-        onSuccess: () => {
-          navigate('/admin/currencies');
+        onSuccess: (newCurrency) => {
+          // Navigate immediately with success message in state
+          navigate('/admin/currencies', {
+            state: {
+              message: {
+                type: 'success',
+                text: `Currency ${newCurrency.currencyCode} created successfully`,
+              },
+            },
+          });
+        },
+        onError: (error: Error) => {
+          // Check for specific error code and show error on current page
+          let message = 'Failed to create currency';
+
+          if (error instanceof ApiError) {
+            if (error.response.code === 'INVALID_PROVIDER_SERIES_ID') {
+              message =
+                'The Provider Series ID is invalid. Please check the FRED documentation for the correct series ID.';
+            } else {
+              message = error.message;
+            }
+          }
+
+          setErrorMessage(message);
         },
       });
     },
@@ -47,8 +78,18 @@ export function CurrencyCreatePage() {
           </div>
         </div>
 
-        <div className="max-w-2xl rounded-xl border bg-card p-8 shadow-sm">
-          <CurrencyForm onSubmit={handleSubmit} isSubmitting={isPending} mode="create" />
+        <div className="max-w-2xl space-y-4">
+          {/* Error Banner */}
+          <AnimatePresence mode="wait">
+            {errorMessage && (
+              <MessageBanner type="error" message={errorMessage} onClose={clearErrorMessage} />
+            )}
+          </AnimatePresence>
+
+          {/* Form */}
+          <div className="rounded-xl border bg-card p-8 shadow-sm">
+            <CurrencyForm onSubmit={handleSubmit} isSubmitting={isPending} mode="create" />
+          </div>
         </div>
       </div>
     </div>

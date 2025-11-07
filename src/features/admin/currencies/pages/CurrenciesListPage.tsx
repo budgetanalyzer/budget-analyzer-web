@@ -1,7 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Pencil, Coins } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { MessageBanner } from '@/components/MessageBanner';
 import {
   Table,
   TableBody,
@@ -14,12 +17,60 @@ import { useCurrencies } from '../hooks/useCurrencies';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatTimestamp } from '@/utils/dates';
 
+interface LocationState {
+  message?: {
+    type: 'success' | 'error' | 'warning';
+    text: string;
+  };
+}
+
 /**
  * Currency list and management page
  */
 export function CurrenciesListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: currencies, isLoading, error } = useCurrencies();
+  const [message, setMessage] = useState<LocationState['message'] | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle message from navigation state (e.g., after create/edit)
+  useEffect(() => {
+    const state = location.state as LocationState;
+    if (state?.message) {
+      setMessage(state.message);
+
+      // Clear the navigation state to prevent showing the message again on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+
+      // Auto-dismiss success messages after 5 seconds
+      if (state.message.type === 'success') {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        timeoutRef.current = setTimeout(() => {
+          setMessage(null);
+        }, 5000);
+      }
+    }
+  }, [location, navigate]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  const clearMessage = useCallback(() => {
+    setMessage(null);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
 
   return (
     <div className="h-full bg-gradient-to-br from-background to-muted/20">
@@ -46,6 +97,15 @@ export function CurrenciesListPage() {
             </Button>
           </Link>
         </div>
+
+        {/* Success/Error Banner */}
+        <AnimatePresence mode="wait">
+          {message && (
+            <div className="mb-6">
+              <MessageBanner type={message.type} message={message.text} onClose={clearMessage} />
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Error state */}
         {error && (

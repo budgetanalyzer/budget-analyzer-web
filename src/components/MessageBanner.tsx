@@ -1,16 +1,20 @@
-// src/features/transactions/components/ImportMessageBanner.tsx
+// src/components/MessageBanner.tsx
 import { motion } from 'framer-motion';
 import { CheckCircle, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { fadeVariants, fadeTransition } from '@/lib/animations';
 
-export interface ImportMessageBannerProps {
+export interface MessageBannerProps {
   type: 'success' | 'error' | 'warning';
   message: string;
   onClose: () => void;
 }
 
-export function ImportMessageBanner({ type, message, onClose }: ImportMessageBannerProps) {
+/**
+ * Generic reusable banner component for displaying messages
+ * Can be used across the application for success, error, or warning messages
+ */
+export function MessageBanner({ type, message, onClose }: MessageBannerProps) {
   const colorClasses = {
     success: 'bg-success/15 text-success',
     warning: 'bg-warning/15 text-warning',
@@ -19,7 +23,7 @@ export function ImportMessageBanner({ type, message, onClose }: ImportMessageBan
 
   return (
     <motion.div
-      key="import-message"
+      key="message-banner"
       variants={fadeVariants}
       initial="initial"
       animate="animate"

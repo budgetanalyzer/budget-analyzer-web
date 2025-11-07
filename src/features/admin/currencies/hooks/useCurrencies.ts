@@ -1,8 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import * as currenciesApi from '@/api/currencies';
 import type { CurrencySeriesCreateRequest, CurrencySeriesUpdateRequest } from '@/api/currencies';
-import { ApiError } from '@/types/apiError';
 
 /**
  * Query key factory for currencies
@@ -45,13 +43,9 @@ export function useCreateCurrency() {
 
   return useMutation({
     mutationFn: (data: CurrencySeriesCreateRequest) => currenciesApi.createCurrency(data),
-    onSuccess: (newCurrency) => {
+    onSuccess: () => {
       // Invalidate all currency lists to refetch with new data
       queryClient.invalidateQueries({ queryKey: currenciesKeys.lists() });
-      toast.success(`Currency ${newCurrency.currencyCode} created successfully`);
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to create currency');
     },
   });
 }
@@ -69,10 +63,6 @@ export function useUpdateCurrency() {
       // Invalidate lists and specific detail query
       queryClient.invalidateQueries({ queryKey: currenciesKeys.lists() });
       queryClient.invalidateQueries({ queryKey: currenciesKeys.detail(updatedCurrency.id) });
-      toast.success(`Currency ${updatedCurrency.currencyCode} updated successfully`);
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to update currency');
     },
   });
 }

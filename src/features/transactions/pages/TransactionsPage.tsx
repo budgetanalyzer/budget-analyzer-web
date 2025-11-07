@@ -11,7 +11,7 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { TransactionStatsGrid } from '@/features/transactions/components/TransactionStatsGrid';
 import { ImportButton } from '@/features/transactions/components/ImportButton';
-import { ImportMessageBanner } from '@/features/transactions/components/ImportMessageBanner';
+import { MessageBanner } from '@/components/MessageBanner';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
 import { useMemo, useState, useEffect } from 'react';
@@ -109,7 +109,7 @@ export function TransactionsPage() {
       <LayoutGroup>
         <AnimatePresence>
           {importMessage && (
-            <ImportMessageBanner
+            <MessageBanner
               type={importMessage.type}
               message={importMessage.text}
               onClose={clearImportMessage}
