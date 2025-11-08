@@ -14,6 +14,8 @@ export interface CurrencySeriesResponse {
   currencyCode: string;
   providerSeriesId: string;
   enabled: boolean;
+  createdAt: string; // ISO 8601 timestamp
+  updatedAt: string; // ISO 8601 timestamp
 }
 
 /**

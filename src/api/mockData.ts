@@ -8,12 +8,16 @@ export const mockCurrencies: CurrencySeriesResponse[] = [
     currencyCode: 'USD',
     providerSeriesId: 'USD',
     enabled: true,
+    createdAt: '2025-01-15T10:00:00Z',
+    updatedAt: '2025-01-15T10:00:00Z',
   },
   {
     id: 2,
     currencyCode: 'THB',
     providerSeriesId: 'DEXTHUS',
     enabled: true,
+    createdAt: '2025-01-15T10:30:00Z',
+    updatedAt: '2025-01-15T10:30:00Z',
   },
 ];
 
