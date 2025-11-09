@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Settings, DollarSign, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '@/features/admin/hooks/useAuth';
 import { cn } from '@/utils/cn';
 
 interface NavItem {
