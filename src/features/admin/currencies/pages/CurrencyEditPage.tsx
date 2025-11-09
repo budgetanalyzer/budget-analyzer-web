@@ -7,8 +7,7 @@ import { MessageBanner } from '@/components/MessageBanner';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CurrencyForm } from '@/features/admin/currencies/components/CurrencyForm';
 import { useCurrency, useUpdateCurrency } from '@/hooks/useCurrencies';
-import { ApiError } from '@/types/apiError';
-import { getErrorMessage } from '@/utils/errorMessages';
+import { formatApiError } from '@/utils/errorMessages';
 
 /**
  * Edit existing currency page
@@ -48,15 +47,7 @@ export function CurrencyEditPage() {
             });
           },
           onError: (error: Error) => {
-            // Map 422 error codes to user-friendly messages
-            let message = 'Failed to update currency';
-
-            if (error instanceof ApiError && error.status === 422) {
-              message = getErrorMessage(error.response.code, error.response.message);
-            } else if (error instanceof ApiError) {
-              message = error.response.message;
-            }
-
+            const message = formatApiError(error, 'Failed to update currency');
             setErrorMessage(message);
           },
         },

@@ -1,4 +1,5 @@
 // src/utils/errorMessages.ts
+import { ApiError } from '@/types/apiError';
 
 /**
  * Maps 422 Unprocessable Entity error codes to user-friendly messages.
@@ -54,4 +55,27 @@ export function formatFieldErrors(
   }
 
   return fieldErrors.map((err) => `${err.field}: ${err.message}`).join(', ');
+}
+
+/**
+ * Formats an error from a React Query mutation into a user-friendly message.
+ *
+ * This centralizes the error formatting logic to avoid repetitive instanceof checks.
+ *
+ * @param error - The error from a mutation's onError callback
+ * @param defaultMessage - Fallback message if error can't be parsed
+ * @returns User-friendly error message
+ */
+export function formatApiError(error: Error, defaultMessage: string): string {
+  if (error instanceof ApiError) {
+    // 422 errors use custom error code mappings
+    if (error.status === 422) {
+      return getErrorMessage(error.response.code, error.response.message);
+    }
+    // All other API errors use the server's message directly
+    return error.response.message;
+  }
+
+  // Non-API errors (network errors, etc.)
+  return error.message || defaultMessage;
 }

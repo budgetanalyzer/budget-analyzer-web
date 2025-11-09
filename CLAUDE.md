@@ -280,6 +280,7 @@ const handleDateFilterChange = useCallback(
   - **ALWAYS** keep `errorMessages.ts` in sync with the API spec's error codes
   - When adding/updating API endpoints, check the spec's 422 response examples and update the error message mappings
   - Error messages should be concise (no periods) to match the API's message format and toast/banner conventions
+  - **Use `formatApiError(error, defaultMessage)` in mutation `onError` callbacks** - This centralizes error formatting logic and handles 422 code mapping automatically
 
 **Animation Configuration**:
 
