@@ -6,6 +6,7 @@ import { currencyApi } from '@/api/currencyApi';
 import { mockCurrencies, mockExchangeRates } from '@/api/mockData';
 import { ApiError } from '@/types/apiError';
 import { buildExchangeRateMap } from '@/utils/currency';
+import { useTransactions } from '@/hooks/useTransactions';
 
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
@@ -77,21 +78,21 @@ export const useExchangeRates = (params: {
  *
  * IMPORTANT: The API always returns USD as base currency (USD→targetCurrency).
  * This hook intelligently fetches only the rates needed based on:
- * - Currencies present in the transactions
+ * - Currencies present in the full transaction list
  * - The selected display currency
- * - Date range covering the transactions
+ * - Always fetches the full date range (2000-01-01 onwards) to avoid refetching on filter changes
  *
  * Uses React Query's useQueries to fetch rates for all needed currencies in parallel.
  * TODO: Future optimization - create a batch fetch API endpoint
  *
- * @param transactions Array of transactions to analyze for currency usage
  * @param displayCurrency The currently selected display currency
  */
-export const useExchangeRatesMap = (params: {
-  transactions?: { date: string; currencyIsoCode: string }[];
-  displayCurrency: string;
-}) => {
-  const { transactions, displayCurrency } = params;
+export const useExchangeRatesMap = (params: { displayCurrency: string }) => {
+  const { displayCurrency } = params;
+
+  // Always fetch the full transaction list to determine all currencies needed
+  // This ensures we don't refetch rates when users filter transactions or view single transactions
+  const { data: transactions } = useTransactions();
 
   // Extract unique non-USD currencies from transactions + display currency
   const currenciesNeeded = useMemo(() => {
@@ -114,16 +115,17 @@ export const useExchangeRatesMap = (params: {
     return Array.from(currencies);
   }, [transactions, displayCurrency]);
 
-  // Calculate date range from transactions
-  const dateRange = useMemo(() => {
+  // Always fetch the full date range (2000-01-01 onwards)
+  // This prevents refetching when transactions are filtered, deleted, or when viewing single transactions
+  const dateRange = useMemo<{ startDate?: string; endDate?: string }>(() => {
+    // Only fetch rates if we have transactions (and thus know which currencies we need)
     if (!transactions || transactions.length === 0) {
       return { startDate: undefined, endDate: undefined };
     }
 
-    const dates = transactions.map((t) => t.date);
     return {
-      startDate: dates.reduce((min, date) => (date < min ? date : min)),
-      endDate: dates.reduce((max, date) => (date > max ? date : max)),
+      startDate: '2000-01-01',
+      endDate: undefined, // Fetch all available rates from start date onwards
     };
   }, [transactions]);
 
@@ -137,10 +139,11 @@ export const useExchangeRatesMap = (params: {
           await new Promise((resolve) => setTimeout(resolve, 400));
           // Filter by currency and date range if provided
           let filtered = mockExchangeRates.filter((rate) => rate.targetCurrency === targetCurrency);
-          if (dateRange.startDate && dateRange.endDate) {
-            filtered = filtered.filter(
-              (rate) => rate.date >= dateRange.startDate! && rate.date <= dateRange.endDate!,
-            );
+          if (dateRange.startDate) {
+            filtered = filtered.filter((rate) => rate.date >= dateRange.startDate!);
+          }
+          if (dateRange.endDate) {
+            filtered = filtered.filter((rate) => rate.date <= dateRange.endDate!);
           }
           return filtered;
         }

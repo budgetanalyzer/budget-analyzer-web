@@ -43,13 +43,6 @@ const dateRangeCache = new WeakMap<
  * Find the nearest available exchange rate for a given date and currency
  * Falls back to closest available rate if exact date not found.
  *
- * In practice the API will always return a rate for every date
- * it has in a range.  So transactions prior to the range of dates
- * for which we have an exchange rate will always use the earliest
- * rate we have, which is 1981-01-02,20.6611 for THB.  And for
- * transactions that occur after the range of rates for which we
- * have data, we will always use the most recent rate we have.
- *
  * @param date Transaction date (YYYY-MM-DD)
  * @param targetCurrency The target currency to look up (e.g., 'THB', 'JPY')
  * @param ratesMap Nested map: date -> (targetCurrency -> ExchangeRateResponse)
@@ -92,7 +85,11 @@ export function findNearestExchangeRate(
   }
 
   // Transaction before the earliest rate? Use earliest rate
+  // This should not happen with API validation enforcing year 2000+ for imports
   if (date < dateRange.earliest) {
+    console.error(
+      `[findNearestExchangeRate] Transaction date ${date} is before earliest available rate ${dateRange.earliest} for ${targetCurrency}. This should not happen with current API validation.`,
+    );
     const earliestCurrencyMap = ratesMap.get(dateRange.earliest);
     return earliestCurrencyMap?.get(targetCurrency) || null;
   }

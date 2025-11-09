@@ -31,11 +31,9 @@ export function TransactionsPage() {
     useTransactionFiltersSync();
 
   // Fetch exchange rates and build map for currency conversion
-  const {
-    exchangeRatesMap,
-    exchangeRatesData,
-    isLoading: isExchangeRatesLoading,
-  } = useExchangeRatesMap({ transactions, displayCurrency });
+  const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap({
+    displayCurrency,
+  });
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(
     transactions || [],
   );
@@ -50,7 +48,6 @@ export function TransactionsPage() {
   // Handle import success/error messages with auto-dismiss
   const { importMessage, handleImportSuccess, handleImportError, clearImportMessage } =
     useImportMessageHandler({
-      exchangeRatesData,
       hasActiveFilters,
     });
 

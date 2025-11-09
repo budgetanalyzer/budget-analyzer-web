@@ -29,7 +29,6 @@ export function TransactionDetailPage() {
 
   // Fetch exchange rates and build map for currency conversion
   const { exchangeRatesMap } = useExchangeRatesMap({
-    transactions: transaction ? [transaction] : undefined,
     displayCurrency,
   });
 
