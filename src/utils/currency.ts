@@ -2,58 +2,68 @@
 import { ExchangeRateResponse } from '@/types/currency';
 
 /**
- * Build a Map of date -> exchange rate response for fast O(1) lookups
+ * Build a nested Map structure for fast O(1) lookups by date and currency
  * @param rates Array of exchange rate responses from API
- * @returns Map with date string (YYYY-MM-DD) as key and full ExchangeRateResponse as value
+ * @returns Map with structure: date -> (targetCurrency -> ExchangeRateResponse)
+ *
+ * Example:
+ * {
+ *   '2025-01-01' => {
+ *     'THB' => { baseCurrency: 'USD', targetCurrency: 'THB', rate: 33.5, ... },
+ *     'JPY' => { baseCurrency: 'USD', targetCurrency: 'JPY', rate: 110.2, ... }
+ *   },
+ *   '2025-01-02' => { ... }
+ * }
  */
 export function buildExchangeRateMap(
   rates: ExchangeRateResponse[],
-): Map<string, ExchangeRateResponse> {
-  const map = new Map<string, ExchangeRateResponse>();
+): Map<string, Map<string, ExchangeRateResponse>> {
+  const map = new Map<string, Map<string, ExchangeRateResponse>>();
   rates.forEach((rate) => {
-    map.set(rate.date, rate);
+    let currencyMap = map.get(rate.date);
+    if (!currencyMap) {
+      currencyMap = new Map<string, ExchangeRateResponse>();
+      map.set(rate.date, currencyMap);
+    }
+    currencyMap.set(rate.targetCurrency, rate);
   });
   return map;
 }
 
 // Cache for earliest/latest dates per ratesMap to avoid repeated calculations
 const dateRangeCache = new WeakMap<
-  Map<string, ExchangeRateResponse>,
+  Map<string, Map<string, ExchangeRateResponse>>,
   {
     earliest: string;
     latest: string;
-    earliestRate: ExchangeRateResponse;
-    latestRate: ExchangeRateResponse;
   }
 >();
 
 /**
- * Find the nearest available exchange rate for a given date
+ * Find the nearest available exchange rate for a given date and currency
  * Falls back to closest available rate if exact date not found.
  *
- * In practice the API will always return a rate for every date
- * it has in a range.  So transactions prior to the range of dates
- * for which we have an exchange rate will always use the earliest
- * rate we have, which is 1981-01-02,20.6611 for THB.  And for
- * transactions that occur after the range of rates for which we
- * have data, we will always use the most recent rate we have.
- *
  * @param date Transaction date (YYYY-MM-DD)
- * @param ratesMap Map of dates to exchange rate responses
+ * @param targetCurrency The target currency to look up (e.g., 'THB', 'JPY')
+ * @param ratesMap Nested map: date -> (targetCurrency -> ExchangeRateResponse)
  * @returns Exchange rate response for nearest available date, or null if no rates available
  */
 export function findNearestExchangeRate(
   date: string,
-  ratesMap: Map<string, ExchangeRateResponse>,
+  targetCurrency: string,
+  ratesMap: Map<string, Map<string, ExchangeRateResponse>>,
 ): ExchangeRateResponse | null {
   if (ratesMap.size === 0) {
     return null;
   }
 
   // First try exact match (O(1) - the happy path for most transactions)
-  const exactMatch = ratesMap.get(date);
-  if (exactMatch) {
-    return exactMatch;
+  const currencyMapForDate = ratesMap.get(date);
+  if (currencyMapForDate) {
+    const exactMatch = currencyMapForDate.get(targetCurrency);
+    if (exactMatch) {
+      return exactMatch;
+    }
   }
 
   // Get or compute the date range boundaries (cached per ratesMap instance)
@@ -70,29 +80,34 @@ export function findNearestExchangeRate(
     dateRange = {
       earliest,
       latest,
-      earliestRate: ratesMap.get(earliest)!,
-      latestRate: ratesMap.get(latest)!,
     };
     dateRangeCache.set(ratesMap, dateRange);
   }
 
   // Transaction before the earliest rate? Use earliest rate
+  // This should not happen with API validation enforcing year 2000+ for imports
   if (date < dateRange.earliest) {
-    return dateRange.earliestRate;
+    console.error(
+      `[findNearestExchangeRate] Transaction date ${date} is before earliest available rate ${dateRange.earliest} for ${targetCurrency}. This should not happen with current API validation.`,
+    );
+    const earliestCurrencyMap = ratesMap.get(dateRange.earliest);
+    return earliestCurrencyMap?.get(targetCurrency) || null;
   }
 
   // Transaction after the latest rate? Use latest rate
   if (date > dateRange.latest) {
-    return dateRange.latestRate;
+    const latestCurrencyMap = ratesMap.get(dateRange.latest);
+    return latestCurrencyMap?.get(targetCurrency) || null;
   }
 
   // Date is within range but no exact match
   // This should rarely happen if API returns continuous daily rates
   // Log a warning and fall back to earliest rate for safety
   console.warn(
-    `[findNearestExchangeRate] Missing rate for date ${date} within range [${dateRange.earliest}, ${dateRange.latest}]`,
+    `[findNearestExchangeRate] Missing rate for ${targetCurrency} on date ${date} within range [${dateRange.earliest}, ${dateRange.latest}]`,
   );
-  return dateRange.earliestRate;
+  const earliestCurrencyMap = ratesMap.get(dateRange.earliest);
+  return earliestCurrencyMap?.get(targetCurrency) || null;
 }
 
 /**
@@ -109,14 +124,19 @@ export function formatCurrency(amount: number, currencyCode: string = 'USD'): st
 }
 
 /**
- * Convert an amount from one currency to another using exchange rate
+ * Convert an amount from one currency to another using exchange rate triangulation through USD
  * If no exact rate exists for the date, uses the nearest available rate
+ *
+ * All exchange rates are stored with USD as the base currency (USD -> targetCurrency).
+ * For non-USD to non-USD conversions (e.g., THB -> JPY), we triangulate through USD:
+ * 1. Convert source currency to USD (divide by source rate)
+ * 2. Convert USD to target currency (multiply by target rate)
  *
  * @param amount Amount in source currency
  * @param date Transaction date (YYYY-MM-DD)
  * @param sourceCurrency Source currency code (e.g., 'THB')
- * @param targetCurrency Target currency code (e.g., 'USD')
- * @param ratesMap Map of dates to exchange rate responses
+ * @param targetCurrency Target currency code (e.g., 'JPY')
+ * @param ratesMap Nested map: date -> (targetCurrency -> ExchangeRateResponse)
  * @returns Converted amount in target currency
  */
 export function convertCurrency(
@@ -124,30 +144,53 @@ export function convertCurrency(
   date: string,
   sourceCurrency: string,
   targetCurrency: string,
-  ratesMap: Map<string, ExchangeRateResponse>,
+  ratesMap: Map<string, Map<string, ExchangeRateResponse>>,
 ): number {
   // No conversion needed if currencies are the same
   if (sourceCurrency === targetCurrency) {
     return amount;
   }
 
-  // Get the exchange rate response for this date (or nearest available)
-  const exchangeRateResponse = findNearestExchangeRate(date, ratesMap);
+  // Case 1: Converting FROM USD
+  if (sourceCurrency === 'USD') {
+    // USD -> targetCurrency: multiply by rate
+    const targetRate = findNearestExchangeRate(date, targetCurrency, ratesMap);
+    if (!targetRate) {
+      console.warn(
+        `[convertCurrency] No rate found for ${targetCurrency} on ${date}, returning original amount`,
+      );
+      return amount;
+    }
+    return amount * targetRate.rate;
+  }
 
-  // If no rate found at all, return original amount
-  if (!exchangeRateResponse) {
+  // Case 2: Converting TO USD
+  if (targetCurrency === 'USD') {
+    // sourceCurrency -> USD: divide by rate
+    const sourceRate = findNearestExchangeRate(date, sourceCurrency, ratesMap);
+    if (!sourceRate) {
+      console.warn(
+        `[convertCurrency] No rate found for ${sourceCurrency} on ${date}, returning original amount`,
+      );
+      return amount;
+    }
+    return amount / sourceRate.rate;
+  }
+
+  // Case 3: Converting between two non-USD currencies (e.g., THB -> JPY)
+  // Triangulate through USD: THB -> USD -> JPY
+  const sourceRate = findNearestExchangeRate(date, sourceCurrency, ratesMap);
+  const targetRate = findNearestExchangeRate(date, targetCurrency, ratesMap);
+
+  if (!sourceRate || !targetRate) {
+    console.warn(
+      `[convertCurrency] Missing rates for ${sourceCurrency} or ${targetCurrency} on ${date}, returning original amount`,
+    );
     return amount;
   }
 
-  const rate = exchangeRateResponse.rate;
-
-  // Apply conversion based on direction
-  // Note: Exchange rates are stored as baseCurrency (USD) -> targetCurrency (THB)
-  if (sourceCurrency === 'USD') {
-    // USD -> THB: multiply by rate
-    return amount * rate;
-  } else {
-    // THB -> USD: divide by rate
-    return amount / rate;
-  }
+  // Step 1: Convert to USD (divide by source rate)
+  const amountInUSD = amount / sourceRate.rate;
+  // Step 2: Convert from USD to target currency (multiply by target rate)
+  return amountInUSD * targetRate.rate;
 }

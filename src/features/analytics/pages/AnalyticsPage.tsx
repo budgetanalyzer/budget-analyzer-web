@@ -36,7 +36,10 @@ export function AnalyticsPage() {
     TRANSACTION_TYPES.DEBIT;
 
   // Fetch exchange rates for currency conversion
-  const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap();
+  const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap({
+    transactions,
+    displayCurrency,
+  });
 
   // Get selected year from URL or default to current year
   const currentYear = useMemo(() => getCurrentYear(), []);

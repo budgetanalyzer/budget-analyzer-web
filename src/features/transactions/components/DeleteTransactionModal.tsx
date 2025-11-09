@@ -20,7 +20,7 @@ interface DeleteTransactionModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   displayCurrency: string;
-  exchangeRatesMap: Map<string, ExchangeRateResponse>;
+  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
 }
 
 export function DeleteTransactionModal({

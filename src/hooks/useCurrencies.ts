@@ -6,6 +6,7 @@ import { currencyApi } from '@/api/currencyApi';
 import { mockCurrencies, mockExchangeRates } from '@/api/mockData';
 import { ApiError } from '@/types/apiError';
 import { buildExchangeRateMap } from '@/utils/currency';
+import { useTransactions } from '@/hooks/useTransactions';
 
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
@@ -73,40 +74,70 @@ export const useExchangeRates = (params: {
 };
 
 /**
- * Fetch exchange rates for all non-USD currencies and build a Map for fast lookups
+ * Fetch exchange rates for currencies used in transactions and build a Map for fast lookups
  *
  * IMPORTANT: The API always returns USD as base currency (USD→targetCurrency).
- * We need to fetch rates for ALL non-USD currencies because:
- * - Transactions can be in any currency
- * - Display currency can be any currency
- * - The convertCurrency function handles both directions (multiply or divide)
+ * This hook intelligently fetches only the rates needed based on:
+ * - Currencies present in the full transaction list
+ * - The selected display currency
+ * - Always fetches the full date range (2000-01-01 onwards) to avoid refetching on filter changes
  *
- * Uses React Query's useQueries to fetch rates for all enabled non-USD currencies in parallel.
+ * Uses React Query's useQueries to fetch rates for all needed currencies in parallel.
  * TODO: Future optimization - create a batch fetch API endpoint
+ *
+ * @param displayCurrency The currently selected display currency
  */
-export const useExchangeRatesMap = () => {
-  // First, get the list of all enabled currency series
-  const { data: currencies } = useCurrencies(true);
+export const useExchangeRatesMap = (params: { displayCurrency: string }) => {
+  const { displayCurrency } = params;
 
-  // Get all non-USD currency codes that need exchange rates
-  const nonUsdCurrencies = useMemo(() => {
-    if (!currencies) return [];
-    return currencies
-      .filter((currencySeries) => currencySeries.currencyCode !== 'USD')
-      .map((currencySeries) => currencySeries.currencyCode);
-  }, [currencies]);
+  // Always fetch the full transaction list to determine all currencies needed
+  // This ensures we don't refetch rates when users filter transactions or view single transactions
+  const { data: transactions } = useTransactions();
 
-  // Fetch exchange rates for ALL non-USD currencies in parallel using useQueries
+  // Extract unique non-USD currencies from transactions + display currency
+  const currenciesNeeded = useMemo(() => {
+    const currencies = new Set<string>();
+
+    // Add currencies from transactions (excluding USD since it's the base)
+    if (transactions) {
+      transactions.forEach((t) => {
+        if (t.currencyIsoCode !== 'USD') {
+          currencies.add(t.currencyIsoCode);
+        }
+      });
+    }
+
+    // Always include display currency if it's not USD
+    if (displayCurrency !== 'USD') {
+      currencies.add(displayCurrency);
+    }
+
+    return Array.from(currencies);
+  }, [transactions, displayCurrency]);
+
+  // Always fetch the full date range (2000-01-01 onwards)
+  // This prevents refetching when transactions are filtered, deleted, or when viewing single transactions
+  const startDate = transactions?.length ? '2000-01-01' : undefined;
+
+  // Fetch exchange rates for needed currencies in parallel using useQueries
   // Use the combine option to efficiently merge results and avoid unnecessary re-renders
   const combinedResult = useQueries({
-    queries: nonUsdCurrencies.map((targetCurrency) => ({
-      queryKey: ['exchangeRates', targetCurrency, undefined, undefined],
+    queries: currenciesNeeded.map((targetCurrency: string) => ({
+      queryKey: ['exchangeRates', targetCurrency, startDate],
       queryFn: async () => {
         if (USE_MOCK_DATA) {
           await new Promise((resolve) => setTimeout(resolve, 400));
-          return mockExchangeRates.filter((rate) => rate.targetCurrency === targetCurrency);
+          // Filter by currency and start date if provided
+          let filtered = mockExchangeRates.filter((rate) => rate.targetCurrency === targetCurrency);
+          if (startDate) {
+            filtered = filtered.filter((rate) => rate.date >= startDate);
+          }
+          return filtered;
         }
-        return currencyApi.getExchangeRates({ targetCurrency });
+        return currencyApi.getExchangeRates({
+          targetCurrency,
+          startDate,
+        });
       },
       staleTime: Infinity,
       gcTime: Infinity,
@@ -134,7 +165,9 @@ export const useExchangeRatesMap = () => {
 
   // Build the exchange rates map from all combined data
   const exchangeRatesMap = useMemo(() => {
-    if (allExchangeRatesData.length === 0) return new Map<string, ExchangeRateResponse>();
+    if (allExchangeRatesData.length === 0) {
+      return new Map<string, Map<string, ExchangeRateResponse>>();
+    }
     return buildExchangeRateMap(allExchangeRatesData);
   }, [allExchangeRatesData]);
 

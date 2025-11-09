@@ -13,10 +13,9 @@ import {
 import { useImportTransactions } from '@/features/transactions/hooks/useImportTransactions';
 import { motion, AnimatePresence } from 'framer-motion';
 import { collapseFromRightVariants, collapseTransition } from '@/lib/animations';
-import { Transaction } from '@/types/transaction';
 
 interface ImportButtonProps {
-  onSuccess?: (count: number, transactions: Transaction[]) => void;
+  onSuccess?: (count: number) => void;
   onError?: (error: Error) => void;
 }
 
@@ -59,7 +58,7 @@ export function ImportButton({ onSuccess, onError }: ImportButtonProps) {
           setFormat('');
           setAccountId('');
           setIsExpanded(false);
-          onSuccess?.(data.length, data);
+          onSuccess?.(data.length);
         },
         onError: (error) => {
           onError?.(error);

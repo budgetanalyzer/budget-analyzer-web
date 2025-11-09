@@ -15,7 +15,6 @@ import { MessageBanner } from '@/components/MessageBanner';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
 import { useMemo, useState, useEffect } from 'react';
-import { buildExchangeRateAvailabilityText } from '@/features/transactions/utils/messageBuilder';
 import {
   buildMainStatsConfig,
   buildMonthlyStatsConfig,
@@ -32,11 +31,9 @@ export function TransactionsPage() {
     useTransactionFiltersSync();
 
   // Fetch exchange rates and build map for currency conversion
-  const {
-    exchangeRatesMap,
-    earliestExchangeRateDate,
-    isLoading: isExchangeRatesLoading,
-  } = useExchangeRatesMap();
+  const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap({
+    displayCurrency,
+  });
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(
     transactions || [],
   );
@@ -48,17 +45,9 @@ export function TransactionsPage() {
     }
   }, [transactions]);
 
-  // Memoize the earliest rate text since it only depends on memoized values
-  const earliestRateText = useMemo(
-    () => buildExchangeRateAvailabilityText(earliestExchangeRateDate, exchangeRatesMap),
-    [earliestExchangeRateDate, exchangeRatesMap],
-  );
-
   // Handle import success/error messages with auto-dismiss
   const { importMessage, handleImportSuccess, handleImportError, clearImportMessage } =
     useImportMessageHandler({
-      earliestExchangeRateDate,
-      earliestRateText,
       hasActiveFilters,
     });
 

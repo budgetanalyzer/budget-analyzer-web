@@ -40,7 +40,7 @@ export interface AnalyticsData {
 export function useAnalyticsData(
   transactions: Transaction[] | undefined,
   displayCurrency: string,
-  exchangeRatesMap: Map<string, ExchangeRateResponse>,
+  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>,
   selectedYear: number,
   transactionType: 'debit' | 'credit' = 'debit',
 ): AnalyticsData {

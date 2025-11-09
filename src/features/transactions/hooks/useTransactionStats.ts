@@ -23,7 +23,7 @@ export interface MonthlyAverages {
 export interface UseTransactionStatsOptions {
   transactions: Transaction[];
   displayCurrency: string;
-  exchangeRatesMap: Map<string, ExchangeRateResponse>;
+  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
 }
 
 export function useTransactionStats({

@@ -10,7 +10,7 @@ interface TransactionAmountBadgeProps {
   date: string;
   currencyCode: string;
   displayCurrency: string;
-  exchangeRatesMap: Map<string, ExchangeRateResponse>;
+  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
   isCredit: boolean;
 }
 

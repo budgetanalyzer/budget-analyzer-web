@@ -28,7 +28,9 @@ export function TransactionDetailPage() {
   const { data: transaction, isLoading, error, refetch } = useTransaction(transactionId);
 
   // Fetch exchange rates and build map for currency conversion
-  const { exchangeRatesMap } = useExchangeRatesMap();
+  const { exchangeRatesMap } = useExchangeRatesMap({
+    displayCurrency,
+  });
 
   // Calculate conversion info
   const conversionInfo = useMemo(() => {
@@ -49,8 +51,17 @@ export function TransactionDetailPage() {
       exchangeRatesMap,
     );
 
+    // Determine which currency rate to display to the user
+    // For X->USD conversions, show the source currency rate
+    // For all other conversions (USD->X or X->Y), show the target currency rate
+    const currencyToLookup = displayCurrency === 'USD' ? sourceCurrency : displayCurrency;
+
     // Get the full exchange rate response from the map (or nearest available)
-    const exchangeRateResponse = findNearestExchangeRate(transaction.date, exchangeRatesMap);
+    const exchangeRateResponse = findNearestExchangeRate(
+      transaction.date,
+      currencyToLookup,
+      exchangeRatesMap,
+    );
 
     // State 3: Missing rate - we had to use a rate from a completely different date
     const usedFallbackRate = exchangeRateResponse?.date !== transaction.date;

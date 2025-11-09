@@ -62,7 +62,7 @@ interface TransactionTableProps {
   onDateFilterChange?: (from: string | null, to: string | null) => void;
   onSearchChange?: (query: string) => void;
   displayCurrency: string;
-  exchangeRatesMap: Map<string, ExchangeRateResponse>;
+  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
   isExchangeRatesLoading: boolean;
 }
 
