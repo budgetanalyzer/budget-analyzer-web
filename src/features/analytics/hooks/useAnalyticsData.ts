@@ -31,6 +31,7 @@ export interface AnalyticsData {
   yearlySpending: YearlySpending[];
   earliestYear: number;
   latestYear: number;
+  yearsWithTransactions: number[];
 }
 
 /**
@@ -185,10 +186,16 @@ export function useAnalyticsData(
       .sort((a, b) => a.year - b.year);
   }, [transactions, displayCurrency, exchangeRatesMap, transactionType]);
 
+  // Extract years that have transactions (memoized based on yearlySpending)
+  const yearsWithTransactions = useMemo<number[]>(() => {
+    return yearlySpending.map((ys) => ys.year);
+  }, [yearlySpending]);
+
   return {
     monthlySpending,
     yearlySpending,
     earliestYear,
     latestYear,
+    yearsWithTransactions,
   };
 }
