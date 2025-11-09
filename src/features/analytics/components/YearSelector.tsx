@@ -5,24 +5,15 @@ import { cn } from '@/utils/cn';
 
 interface YearSelectorProps {
   selectedYear: number;
-  earliestYear: number;
-  latestYear: number;
+  years: number[];
   onChange: (year: number) => void;
 }
 
 const MAX_VISIBLE_YEARS = 5;
 
-export function YearSelector({
-  selectedYear,
-  earliestYear,
-  latestYear,
-  onChange,
-}: YearSelectorProps) {
+export function YearSelector({ selectedYear, years, onChange }: YearSelectorProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const selectedButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Generate array of years from earliest to latest
-  const years = Array.from({ length: latestYear - earliestYear + 1 }, (_, i) => earliestYear + i);
 
   const totalYears = years.length;
   const showArrows = totalYears > MAX_VISIBLE_YEARS;

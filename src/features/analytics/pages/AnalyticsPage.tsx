@@ -47,7 +47,7 @@ export function AnalyticsPage() {
   const selectedYear = yearParam ? parseInt(yearParam, 10) : currentYear;
 
   // Process analytics data with memoization
-  const { monthlySpending, yearlySpending, earliestYear } = useAnalyticsData(
+  const { monthlySpending, yearlySpending, earliestYear, yearsWithTransactions } = useAnalyticsData(
     transactions,
     displayCurrency,
     exchangeRatesMap,
@@ -167,8 +167,7 @@ export function AnalyticsPage() {
           {viewMode === 'monthly' && (
             <YearSelector
               selectedYear={selectedYear}
-              earliestYear={earliestYear}
-              latestYear={currentYear}
+              years={yearsWithTransactions}
               onChange={handleYearChange}
             />
           )}
