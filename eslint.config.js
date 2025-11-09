@@ -64,6 +64,14 @@ export default [
       ],
       'no-undef': 'off', //TypeScript handles undefined checks
 
+      // Prevent relative imports to parent directories (enforce @/* path aliases)
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['../*', '../../*', '../../../*'],
+        },
+      ],
+
       // Enforce feature isolation and unidirectional architecture
       'import/no-restricted-paths': [
         'error',

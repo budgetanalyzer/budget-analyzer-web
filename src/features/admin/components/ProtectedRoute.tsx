@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '@/features/admin/hooks/useAuth';
 import type { UserRole } from '@/types/auth';
 
 interface ProtectedRouteProps {

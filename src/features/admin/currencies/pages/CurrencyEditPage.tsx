@@ -5,7 +5,7 @@ import { AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { MessageBanner } from '@/components/MessageBanner';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { CurrencyForm } from '../components/CurrencyForm';
+import { CurrencyForm } from '@/features/admin/currencies/components/CurrencyForm';
 import { useCurrency, useUpdateCurrency } from '@/hooks/useCurrencies';
 import { ApiError } from '@/types/apiError';
 

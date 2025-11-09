@@ -4,7 +4,7 @@ import { ArrowLeft, PlusCircle } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { MessageBanner } from '@/components/MessageBanner';
-import { CurrencyForm } from '../components/CurrencyForm';
+import { CurrencyForm } from '@/features/admin/currencies/components/CurrencyForm';
 import { useCreateCurrency } from '@/hooks/useCurrencies';
 import { ApiError } from '@/types/apiError';
 
