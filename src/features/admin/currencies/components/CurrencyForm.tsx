@@ -29,7 +29,7 @@ export function CurrencyForm({ initialData, onSubmit, isSubmitting, mode }: Curr
     (e: FormEvent) => {
       e.preventDefault();
       onSubmit({
-        currencyCode: currencyCode.toUpperCase().trim(),
+        currencyCode: currencyCode.trim(),
         providerSeriesId: providerSeriesId.trim(),
         enabled,
       });
@@ -47,13 +47,12 @@ export function CurrencyForm({ initialData, onSubmit, isSubmitting, mode }: Curr
         <Input
           id="currencyCode"
           value={currencyCode}
-          onChange={(e) => setCurrencyCode(e.target.value)}
+          onChange={(e) => setCurrencyCode(e.target.value.toUpperCase())}
           placeholder="EUR"
           maxLength={3}
           pattern="[A-Z]{3}"
           disabled={mode === 'edit'} // Currency code is immutable
           required
-          className="uppercase"
         />
         <p className="text-xs text-muted-foreground">
           {mode === 'edit'
@@ -70,7 +69,7 @@ export function CurrencyForm({ initialData, onSubmit, isSubmitting, mode }: Curr
         <Input
           id="providerSeriesId"
           value={providerSeriesId}
-          onChange={(e) => setProviderSeriesId(e.target.value)}
+          onChange={(e) => setProviderSeriesId(e.target.value.toUpperCase())}
           placeholder="DEXUSEU"
           maxLength={50}
           required
