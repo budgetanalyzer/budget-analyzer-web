@@ -169,6 +169,7 @@ Configured in:
 - ❌ IIFEs (Immediately Invoked Function Expressions) in JSX
 - ❌ Multi-line logic or calculations directly in JSX expressions
 - ❌ Complex inline handlers (more than 1-2 lines) - extract to custom hooks or separate components
+- ❌ `useRef` to work around data flow issues - indicates a design problem that needs proper fixing
 
 **Example of correct pattern:**
 
@@ -230,6 +231,21 @@ Never use IIFEs or multi-line logic directly in JSX. Extract to components, hook
 const formattedAmount = formatTransactionAmount(amount, date, currency, displayCurrency, ratesMap);
 <span>{formattedAmount.primary} {formattedAmount.original && `(${formattedAmount.original})`}</span>
 ```
+
+**useRef - When and When NOT to Use:**
+
+`useRef` is ONLY appropriate for:
+- ✅ Accessing DOM elements (e.g., `inputRef.current.focus()`)
+- ✅ Storing mutable values that don't trigger re-renders (timers, animation IDs, previous values)
+- ✅ Integrating with third-party imperative APIs
+
+`useRef` is NEVER appropriate for:
+- ❌ Working around state synchronization issues
+- ❌ Caching derived data (use `useMemo` instead)
+- ❌ Storing props or state snapshots to "fix" stale closures
+- ❌ Bypassing React's normal data flow
+
+If you find yourself reaching for `useRef` to solve a problem, step back and ask: "What is the actual data flow issue here?" Then fix the root cause.
 
 **Performance - Memoizing Callbacks:**
 

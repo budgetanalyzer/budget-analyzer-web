@@ -8,8 +8,6 @@ interface SelectContextValue {
   onValueChange: (value: string) => void;
   open: boolean;
   setOpen: (open: boolean) => void;
-  selectedLabel: string | null;
-  setSelectedLabel: (label: string | null) => void;
 }
 
 const SelectContext = React.createContext<SelectContextValue | undefined>(undefined);
@@ -30,12 +28,9 @@ interface SelectProps {
 
 export function Select({ children, value, onValueChange }: SelectProps) {
   const [open, setOpen] = React.useState(false);
-  const [selectedLabel, setSelectedLabel] = React.useState<string | null>(null);
 
   return (
-    <SelectContext.Provider
-      value={{ value, onValueChange, open, setOpen, selectedLabel, setSelectedLabel }}
-    >
+    <SelectContext.Provider value={{ value, onValueChange, open, setOpen }}>
       <div className="relative">{children}</div>
     </SelectContext.Provider>
   );
@@ -76,16 +71,23 @@ SelectTrigger.displayName = 'SelectTrigger';
 
 interface SelectValueProps {
   placeholder?: string;
+  children?: React.ReactNode;
 }
 
-export function SelectValue({ placeholder }: SelectValueProps) {
-  const { value, selectedLabel } = useSelect();
+export function SelectValue({ placeholder, children }: SelectValueProps) {
+  const { value } = useSelect();
 
   if (!value) {
     return <span className="text-muted-foreground">{placeholder}</span>;
   }
 
-  return <span>{selectedLabel || value}</span>;
+  // If children are provided, use them as the display value
+  if (children) {
+    return <span>{children}</span>;
+  }
+
+  // Fallback to the raw value
+  return <span>{value}</span>;
 }
 
 interface SelectContentProps {
@@ -143,7 +145,7 @@ interface SelectItemProps {
 }
 
 export function SelectItem({ children, value, className }: SelectItemProps) {
-  const { value: selectedValue, onValueChange, setOpen, setSelectedLabel } = useSelect();
+  const { value: selectedValue, onValueChange, setOpen } = useSelect();
   const isSelected = selectedValue === value;
 
   return (
@@ -151,7 +153,6 @@ export function SelectItem({ children, value, className }: SelectItemProps) {
       type="button"
       onClick={() => {
         onValueChange(value);
-        setSelectedLabel(typeof children === 'string' ? children : value);
         setOpen(false);
       }}
       className={cn(
