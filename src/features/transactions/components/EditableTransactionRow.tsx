@@ -26,6 +26,7 @@ interface EditableTransactionRowProps {
   onDelete: (transaction: Transaction) => void;
   onRowClick: (transaction: Transaction) => void;
   isUpdating: boolean;
+  columnSizes: number[];
 }
 
 export const EditableTransactionRow = memo(function EditableTransactionRow({
@@ -37,6 +38,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
   onDelete,
   onRowClick,
   isUpdating,
+  columnSizes,
 }: EditableTransactionRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editingDescription, setEditingDescription] = useState('');
@@ -112,53 +114,57 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       }
     >
       {/* Date */}
-      <TableCell>{formatLocalDate(transaction.date)}</TableCell>
+      <TableCell style={{ width: `${columnSizes[0]}px` }}>
+        {formatLocalDate(transaction.date)}
+      </TableCell>
 
       {/* Description */}
-      <TableCell>
+      <TableCell style={{ width: `${columnSizes[1]}px` }}>
         {isEditing ? (
           <Input
             value={editingDescription}
             onChange={(e) => setEditingDescription(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isUpdating}
-            className="max-w-md"
+            className="w-full"
             maxLength={500}
             autoFocus
           />
         ) : (
-          <div className="max-w-md truncate">{transaction.description}</div>
+          <div className="truncate">{transaction.description}</div>
         )}
       </TableCell>
 
       {/* Bank Name */}
-      <TableCell>{transaction.bankName}</TableCell>
+      <TableCell style={{ width: `${columnSizes[2]}px` }}>
+        <div className="truncate">{transaction.bankName}</div>
+      </TableCell>
 
       {/* Account ID */}
-      <TableCell>
+      <TableCell style={{ width: `${columnSizes[3]}px` }}>
         {isEditing ? (
           <Input
             value={editingAccountId}
             onChange={(e) => setEditingAccountId(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isUpdating}
-            className="max-w-md"
+            className="w-full"
             maxLength={100}
           />
         ) : (
-          <div className="max-w-md truncate">{transaction.accountId || ''}</div>
+          <div className="truncate">{transaction.accountId || ''}</div>
         )}
       </TableCell>
 
       {/* Type */}
-      <TableCell>
+      <TableCell style={{ width: `${columnSizes[4]}px` }}>
         <Badge variant={transaction.type === 'CREDIT' ? 'success' : 'secondary'}>
           {transaction.type}
         </Badge>
       </TableCell>
 
       {/* Amount */}
-      <TableCell>
+      <TableCell style={{ width: `${columnSizes[5]}px` }}>
         {isExchangeRatesLoading ? (
           <div className="flex items-center justify-end gap-2">
             <Skeleton className="h-5 w-24" />
@@ -176,7 +182,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       </TableCell>
 
       {/* Actions */}
-      <TableCell>
+      <TableCell style={{ width: `${columnSizes[6]}px` }}>
         {isEditing ? (
           <div className="flex justify-end gap-2">
             <Button
