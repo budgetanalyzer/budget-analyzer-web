@@ -1,6 +1,6 @@
 // src/api/transactionApi.ts
 import { apiClient } from '@/api/client';
-import { Transaction, TransactionFilter } from '@/types/transaction';
+import { Transaction, TransactionFilter, TransactionUpdateRequest } from '@/types/transaction';
 
 export const transactionApi = {
   getTransactions: async (): Promise<Transaction[]> => {
@@ -20,6 +20,11 @@ export const transactionApi = {
 
   deleteTransaction: async (id: number): Promise<void> => {
     await apiClient.delete(`/v1/transactions/${id}`);
+  },
+
+  updateTransaction: async (id: number, data: TransactionUpdateRequest): Promise<Transaction> => {
+    const response = await apiClient.patch<Transaction>(`/v1/transactions/${id}`, data);
+    return response.data;
   },
 
   importTransactions: async (

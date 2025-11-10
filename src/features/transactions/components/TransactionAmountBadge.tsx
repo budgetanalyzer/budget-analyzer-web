@@ -1,4 +1,5 @@
 // src/features/transactions/components/TransactionAmountBadge.tsx
+import { useMemo } from 'react';
 import { ExchangeRateResponse } from '@/types/currency';
 import { convertCurrency, formatCurrency } from '@/utils/currency';
 import { Badge } from '@/components/ui/Badge';
@@ -22,12 +23,9 @@ export function TransactionAmountBadge({
   exchangeRatesMap,
   isCredit,
 }: TransactionAmountBadgeProps) {
-  const convertedAmount = convertCurrency(
-    amount,
-    date,
-    currencyCode,
-    displayCurrency,
-    exchangeRatesMap,
+  const convertedAmount = useMemo(
+    () => convertCurrency(amount, date, currencyCode, displayCurrency, exchangeRatesMap),
+    [amount, date, currencyCode, displayCurrency, exchangeRatesMap],
   );
 
   const needsConversion = currencyCode !== displayCurrency;

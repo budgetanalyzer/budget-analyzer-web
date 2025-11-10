@@ -14,17 +14,19 @@ import { ImportButton } from '@/features/transactions/components/ImportButton';
 import { MessageBanner } from '@/components/MessageBanner';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import {
   buildMainStatsConfig,
   buildMonthlyStatsConfig,
 } from '@/features/transactions/components/statsConfig';
-import { Transaction } from '@/types/transaction';
 import { useAppSelector } from '@/store/hooks';
+import { isDateInRange } from '@/utils/dates';
 
 export function TransactionsPage() {
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
+  const globalFilter = useAppSelector((state) => state.ui.transactionTable.globalFilter);
+  const dateFilter = useAppSelector((state) => state.ui.transactionTable.dateFilter);
 
   // Sync URL params with Redux state for transaction filters
   const { handleDateFilterChange, handleSearchChange, hasActiveFilters } =
@@ -34,16 +36,34 @@ export function TransactionsPage() {
   const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap({
     displayCurrency,
   });
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(
-    transactions || [],
-  );
 
-  // Update filteredTransactions when transactions change (on load or after import)
-  useEffect(() => {
-    if (transactions) {
-      setFilteredTransactions(transactions);
+  // Apply filters to transactions
+  const filteredTransactions = useMemo(() => {
+    if (!transactions) return [];
+
+    let filtered = transactions;
+
+    // Apply date filter
+    if (dateFilter?.from && dateFilter?.to) {
+      filtered = filtered.filter((transaction) =>
+        isDateInRange(transaction.date, dateFilter.from!, dateFilter.to!),
+      );
     }
-  }, [transactions]);
+
+    // Apply text search filter
+    if (globalFilter) {
+      const searchLower = globalFilter.toLowerCase();
+      filtered = filtered.filter((transaction) => {
+        return (
+          transaction.description.toLowerCase().includes(searchLower) ||
+          transaction.bankName.toLowerCase().includes(searchLower) ||
+          (transaction.accountId && transaction.accountId.toLowerCase().includes(searchLower))
+        );
+      });
+    }
+
+    return filtered;
+  }, [transactions, dateFilter, globalFilter]);
 
   // Handle import success/error messages with auto-dismiss
   const { importMessage, handleImportSuccess, handleImportError, clearImportMessage } =
@@ -51,7 +71,7 @@ export function TransactionsPage() {
       hasActiveFilters,
     });
 
-  // Calculate stats from FILTERED transactions (provided by the table)
+  // Calculate stats from FILTERED transactions
   const { stats, monthlyAverages } = useTransactionStats({
     transactions: filteredTransactions,
     displayCurrency,
@@ -125,8 +145,7 @@ export function TransactionsPage() {
             <CardContent className="pt-6">
               {transactions && (
                 <TransactionTable
-                  transactions={transactions}
-                  onFilteredRowsChange={setFilteredTransactions}
+                  transactions={filteredTransactions}
                   onDateFilterChange={handleDateFilterChange}
                   onSearchChange={handleSearchChange}
                   displayCurrency={displayCurrency}

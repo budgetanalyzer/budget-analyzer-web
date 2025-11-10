@@ -32,3 +32,8 @@ export interface TransactionFilter {
   updatedAfter?: string;
   updatedBefore?: string;
 }
+
+export interface TransactionUpdateRequest {
+  description?: string;
+  accountId?: string;
+}
