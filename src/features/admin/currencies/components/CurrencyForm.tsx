@@ -87,12 +87,9 @@ export function CurrencyForm({ initialData, onSubmit, isSubmitting, mode }: Curr
         <label htmlFor="enabled" className="text-sm font-medium">
           Status *
         </label>
-        <Select
-          value={enabled ? 'true' : 'false'}
-          onValueChange={(val) => setEnabled(val === 'true')}
-        >
+        <Select value={String(enabled)} onValueChange={(val) => setEnabled(val === 'true')}>
           <SelectTrigger id="enabled">
-            <SelectValue />
+            <SelectValue>{enabled ? 'Enabled' : 'Disabled'}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="true">Enabled</SelectItem>
