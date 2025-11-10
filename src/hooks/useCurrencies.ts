@@ -26,8 +26,7 @@ const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
  */
 const currenciesKeys = {
   all: ['currencies'] as const,
-  details: () => [...currenciesKeys.all, 'detail'] as const,
-  detail: (id: number) => [...currenciesKeys.details(), id] as const,
+  detail: (id: number) => [...currenciesKeys.all, 'detail', id] as const,
 };
 
 /**
@@ -312,11 +311,10 @@ export const useUpdateCurrency = () => {
       }
       return currencyApi.updateCurrency(id, data);
     },
-    onSuccess: async (updatedCurrency) => {
+    onSuccess: async () => {
       // Invalidate all currency queries (both full list and enabled-only)
       // Await to ensure cache is refreshed before component callbacks run
       await queryClient.invalidateQueries({ queryKey: currenciesKeys.all });
-      await queryClient.invalidateQueries({ queryKey: currenciesKeys.detail(updatedCurrency.id) });
     },
   });
 };
