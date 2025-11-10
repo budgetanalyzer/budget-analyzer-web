@@ -270,6 +270,14 @@ const handleDateFilterChange = useCallback(
 
 **Table Implementation**: Uses TanStack Table (v8) in headless mode. See `src/features/transactions/components/TransactionTable.tsx` for column definitions, sorting, filtering, and pagination.
 
+**Form Validation**:
+
+- **CRITICAL**: All form field validation (maxLength, pattern, minLength, etc.) MUST match the constraints defined in the OpenAPI spec
+- When creating or editing forms, always check [docs/budget-analyzer-api.yaml](docs/budget-analyzer-api.yaml) for the corresponding request schema
+- Apply HTML5 validation attributes (`maxLength`, `minLength`, `pattern`, `required`) to input fields to match API constraints
+- This provides better UX by preventing validation errors before they reach the backend
+- Example: If the API schema specifies `maxLength: 100` for a field, add `maxLength={100}` to the corresponding `<Input>` component
+
 **Error Handling**:
 
 - `ErrorBoundary.tsx` - React error boundary for component crashes

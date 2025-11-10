@@ -12,10 +12,10 @@ interface IconLabelProps {
 export function IconLabel({ icon: Icon, label, value, valueClassName }: IconLabelProps) {
   return (
     <div className="flex items-start gap-3">
-      <Icon className="h-5 w-5 text-muted-foreground mt-0.5" />
-      <div className="flex-1">
+      <Icon className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+      <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <p className={valueClassName || 'text-base'}>{value}</p>
+        <p className={`break-words ${valueClassName || 'text-base'}`}>{value}</p>
       </div>
     </div>
   );

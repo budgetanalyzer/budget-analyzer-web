@@ -123,6 +123,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
             onKeyDown={handleKeyDown}
             disabled={isUpdating}
             className="max-w-md"
+            maxLength={500}
             autoFocus
           />
         ) : (
@@ -142,6 +143,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
             onKeyDown={handleKeyDown}
             disabled={isUpdating}
             className="max-w-md"
+            maxLength={100}
           />
         ) : (
           <div className="max-w-md truncate">{transaction.accountId || ''}</div>
