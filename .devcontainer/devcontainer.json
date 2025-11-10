@@ -1,6 +1,6 @@
 {
   "name": "budget-analyzer-web",
-  "dockerComposeFile": "../../budget-analyzer/claude-code-sandbox/docker-compose.yml",
+  "dockerComposeFile": "../../orchestration/claude-code-sandbox/docker-compose.yml",
   "service": "claude-dev",
   "workspaceFolder": "/workspace/budget-analyzer-web",
   "shutdownAction": "none",
