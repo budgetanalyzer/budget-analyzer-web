@@ -122,7 +122,7 @@ export function TransactionTable({
 
   // Define columns for TanStack Table
   // Note: Cell rendering is handled by EditableTransactionRow, not by these column definitions
-  // These columns are only used for: headers, sorting configuration, and column count
+  // These columns are only used for: headers, sorting configuration, and column widths
   const columns = useMemo<ColumnDef<Transaction>[]>(
     () => [
       {
@@ -142,22 +142,36 @@ export function TransactionTable({
         sortingFn: (rowA, rowB) => {
           return compareDates(rowA.getValue('date') as string, rowB.getValue('date') as string);
         },
+        size: 120,
+        minSize: 120,
+        maxSize: 120,
       },
       {
         accessorKey: 'description',
         header: 'Description',
+        size: 400,
+        minSize: 200,
       },
       {
         accessorKey: 'bankName',
         header: 'Bank',
+        size: 150,
+        minSize: 120,
+        maxSize: 150,
       },
       {
         accessorKey: 'accountId',
         header: 'Account',
+        size: 180,
+        minSize: 150,
+        maxSize: 200,
       },
       {
         accessorKey: 'type',
         header: 'Type',
+        size: 100,
+        minSize: 100,
+        maxSize: 100,
       },
       {
         accessorKey: 'amount',
@@ -173,10 +187,16 @@ export function TransactionTable({
             </Button>
           );
         },
+        size: 150,
+        minSize: 130,
+        maxSize: 150,
       },
       {
         id: 'actions',
         header: '',
+        size: 60,
+        minSize: 60,
+        maxSize: 60,
       },
     ],
     [],
@@ -281,7 +301,7 @@ export function TransactionTable({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead key={header.id} style={{ width: `${header.getSize()}px` }}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -305,6 +325,7 @@ export function TransactionTable({
                     onDelete={handleDeleteTransaction}
                     onRowClick={handleRowClick}
                     isUpdating={isUpdating}
+                    columnSizes={table.getAllColumns().map((col) => col.getSize())}
                   />
                 ))
             ) : (
