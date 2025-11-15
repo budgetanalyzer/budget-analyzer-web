@@ -34,6 +34,9 @@ Budget Analyzer Web is a full-featured React application that provides:
 
 - Node.js 18+
 - npm, yarn, or pnpm
+- Docker and Docker Compose (backend infrastructure must be running)
+
+**Backend infrastructure setup**: See [getting-started.md](https://github.com/budget-analyzer/orchestration/blob/main/docs/development/getting-started.md)
 
 ### Installation
 
@@ -48,16 +51,18 @@ cp .env.example .env
 npm run dev
 ```
 
-The application will open at `http://localhost:3000`
+The application will open at `http://localhost:8080` (served through NGINX gateway)
 
 ### Environment Configuration
 
 Edit `.env` to configure your API endpoint:
 
 ```env
-VITE_API_BASE_URL=http://localhost:8080/api
+VITE_API_BASE_URL=/api
 VITE_USE_MOCK_DATA=true
 ```
+
+**Note**: The frontend development server runs on port 3000, but NGINX gateway serves it on port 8080. Use relative path `/api` for API calls to work through the gateway.
 
 Set `VITE_USE_MOCK_DATA=false` when connecting to a real backend.
 
@@ -130,19 +135,25 @@ src/
 
 ### Connecting to Backend
 
-Update `.env` to point to your backend:
+Ensure backend infrastructure is running (see prerequisites above), then update `.env`:
 
 ```env
-VITE_API_BASE_URL=http://localhost:8080/api
+VITE_API_BASE_URL=/api
 VITE_USE_MOCK_DATA=false
 ```
 
+All API requests go through the NGINX gateway at `http://localhost:8080/api/*`
+
 ### Expected Endpoints
 
-- `GET /transactions` - List all transactions
-- `GET /transactions/{id}` - Get single transaction
-- `GET /currencies` - List currencies
-- `GET /exchange-rates` - Get exchange rates
+All endpoints accessed through gateway at `http://localhost:8080/api/*`:
+
+- `GET /api/v1/transactions` - List all transactions
+- `GET /api/v1/transactions/{id}` - Get single transaction
+- `GET /api/v1/currencies` - List currencies
+- `GET /api/v1/exchange-rates` - Get exchange rates
+
+**API Documentation**: `http://localhost:8080/api/docs`
 
 ### Error Format
 
