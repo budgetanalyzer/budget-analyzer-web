@@ -36,7 +36,7 @@ Budget Analyzer Web is a full-featured React application that provides:
 - npm, yarn, or pnpm
 - Docker and Docker Compose (backend infrastructure must be running)
 
-**Backend infrastructure setup**: See [getting-started.md](https://github.com/budget-analyzer/orchestration/blob/main/docs/development/getting-started.md)
+**Backend infrastructure setup**: See [getting-started.md](https://github.com/budgetanalyzer/orchestration/blob/main/docs/development/getting-started.md)
 
 ### Installation
 
@@ -208,14 +208,14 @@ This frontend integrates with the Budget Analyzer microservices:
 - **Currency Service** for currency and exchange rates
 - **API Gateway** (NGINX) for unified routing
 
-See the [orchestration repository](https://github.com/budget-analyzer/orchestration) for full system setup.
+See the [orchestration repository](https://github.com/budgetanalyzer/orchestration) for full system setup.
 
 ## Related Repositories
 
-- **Orchestration**: https://github.com/budget-analyzer/orchestration
-- **Service Common**: https://github.com/budget-analyzer/service-common
-- **Transaction Service**: https://github.com/budget-analyzer/transaction-service
-- **Currency Service**: https://github.com/budget-analyzer/currency-service
+- **Orchestration**: https://github.com/budgetanalyzer/orchestration
+- **Service Common**: https://github.com/budgetanalyzer/service-common
+- **Transaction Service**: https://github.com/budgetanalyzer/transaction-service
+- **Currency Service**: https://github.com/budgetanalyzer/currency-service
 
 ## License
 
