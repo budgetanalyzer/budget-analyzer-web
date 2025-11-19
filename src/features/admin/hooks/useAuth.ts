@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import type { User, UserRole } from '@/types/auth';
 import * as authApi from '@/api/auth';
 
@@ -18,11 +19,7 @@ export function useAuth() {
   const queryClient = useQueryClient();
 
   // Get current user from Session Gateway
-  const {
-    data: user,
-    isLoading,
-    error,
-  } = useQuery<User | null>({
+  const { data: user, isLoading } = useQuery<User | null>({
     queryKey: ['auth', 'currentUser'],
     queryFn: async () => {
       try {
@@ -30,7 +27,7 @@ export function useAuth() {
         // This validates the session cookie and returns user info
         const user = await authApi.getCurrentUser();
         return user;
-      } catch (error) {
+      } catch {
         // No valid session - user is not authenticated
         return null;
       }
@@ -68,7 +65,6 @@ export function useAuth() {
     user,
     isLoading,
     isAuthenticated: !!user,
-    error,
 
     // Operations
     login,
