@@ -1,10 +1,13 @@
 // src/components/Layout.tsx
 import { Outlet, Link, useLocation, useSearchParams } from 'react-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { Wallet } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CurrencySelector } from '@/components/CurrencySelector';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { Button } from '@/components/ui/Button';
+import { UserProfileDropdown } from '@/features/auth/components/UserProfileDropdown';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { cn } from '@/utils/cn';
 import { useAppDispatch } from '@/store/hooks';
 import { setHasNavigated } from '@/store/uiSlice';
@@ -14,6 +17,7 @@ export function Layout() {
   const [searchParams] = useSearchParams();
   const dispatch = useAppDispatch();
   const isInitialMount = useRef(true);
+  const { isAuthenticated, isLoading, login } = useAuth();
 
   useEffect(() => {
     // Skip the initial mount - this is the first page load
@@ -30,6 +34,11 @@ export function Layout() {
   const returnTo = searchParams.get('returnTo');
   const breadcrumbLabel = searchParams.get('breadcrumbLabel');
   const showBreadcrumbs = returnTo && breadcrumbLabel;
+
+  // Handle login with current path as return URL
+  const handleLogin = useCallback(() => {
+    login(location.pathname);
+  }, [login, location.pathname]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -64,6 +73,17 @@ export function Layout() {
           <div className="flex items-center gap-2">
             <CurrencySelector />
             <ThemeToggle />
+            {!isLoading && (
+              <>
+                {isAuthenticated ? (
+                  <UserProfileDropdown />
+                ) : (
+                  <Button variant="default" size="sm" onClick={handleLogin}>
+                    Login
+                  </Button>
+                )}
+              </>
+            )}
           </div>
         </div>
       </header>

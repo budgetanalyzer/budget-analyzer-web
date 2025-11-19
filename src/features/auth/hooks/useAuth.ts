@@ -37,7 +37,7 @@ export function useAuth() {
   });
 
   // Login - redirect to Session Gateway OAuth flow
-  const login = () => {
+  const login = (returnUrl?: string) => {
     // Redirect to Session Gateway OAuth2 authorization endpoint
     // Session Gateway will:
     // 1. Redirect to Auth0 for authentication
@@ -45,7 +45,10 @@ export function useAuth() {
     // 3. Store tokens in Redis
     // 4. Set session cookie
     // 5. Redirect back to frontend
-    window.location.href = '/oauth2/authorization/auth0';
+    const url = returnUrl
+      ? `/oauth2/authorization/auth0?returnUrl=${encodeURIComponent(returnUrl)}`
+      : '/oauth2/authorization/auth0';
+    window.location.href = url;
   };
 
   // Logout mutation
