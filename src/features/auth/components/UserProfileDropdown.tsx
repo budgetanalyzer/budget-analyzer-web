@@ -48,17 +48,6 @@ export function UserProfileDropdown() {
           </div>
         </div>
 
-        {/* Roles section (if user has roles) */}
-        {user.roles && user.roles.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <div className="px-2 py-1.5">
-              <p className="text-xs font-medium text-muted-foreground">Roles</p>
-              <p className="text-xs text-foreground">{user.roles.join(', ')}</p>
-            </div>
-          </>
-        )}
-
         <DropdownMenuSeparator />
 
         {/* Logout button */}

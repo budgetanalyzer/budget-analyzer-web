@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import type { User, UserRole } from '@/types/auth';
+import type { User } from '@/types/auth';
 import * as authApi from '@/api/auth';
 
 /**
@@ -73,11 +73,6 @@ export function useAuth() {
     login,
     logout: () => logoutMutation.mutate(),
     isLoggingOut: logoutMutation.isPending,
-
-    // Authorization helpers
-    hasRole: (role: UserRole) => user?.roles?.includes(role) ?? false,
-    hasAnyRole: (...roles: UserRole[]) => roles.some((role) => user?.roles?.includes(role)),
-    hasAllRoles: (...roles: UserRole[]) => roles.every((role) => user?.roles?.includes(role)),
   };
 }
 
@@ -91,25 +86,6 @@ export function useRequireAuth() {
 
   if (!isLoading && !isAuthenticated) {
     navigate('/login', { replace: true });
-  }
-
-  return { isLoading };
-}
-
-/**
- * Hook to require specific role
- * Redirects to unauthorized page if user doesn't have the role
- */
-export function useRequireRole(role: UserRole) {
-  const { hasRole, isLoading, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
-  if (!isLoading) {
-    if (!isAuthenticated) {
-      navigate('/login', { replace: true });
-    } else if (!hasRole(role)) {
-      navigate('/unauthorized', { replace: true });
-    }
   }
 
   return { isLoading };

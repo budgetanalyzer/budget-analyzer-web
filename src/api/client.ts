@@ -33,7 +33,7 @@ apiClient.interceptors.request.use(
     console.group('[API Client] Request Debug Info');
     console.log('URL:', config.url);
     console.log('Base URL:', config.baseURL);
-    console.log('Full URL:', config.baseURL + config.url);
+    console.log('Full URL:', (config.baseURL || '') + (config.url || ''));
     console.log('Method:', config.method?.toUpperCase());
     console.log('withCredentials:', config.withCredentials);
     console.log('Cookies available:', document.cookie || '(none)');

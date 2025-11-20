@@ -32,11 +32,11 @@ function App() {
         {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Admin routes - protected by authentication and ADMIN role */}
+        {/* Admin routes - protected by authentication */}
         <Route
           path="/admin"
           element={
-            <ProtectedRoute requiredRole="ADMIN">
+            <ProtectedRoute>
               <AdminLayout />
             </ProtectedRoute>
           }
