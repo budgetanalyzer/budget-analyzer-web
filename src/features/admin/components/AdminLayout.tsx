@@ -39,14 +39,7 @@ export function AdminLayout() {
               <Settings className="h-6 w-6" />
               <h1 className="text-xl font-bold">Admin Console</h1>
             </div>
-            {user && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                {user.email}
-                <span className="ml-2 text-xs font-medium text-primary">
-                  {user.roles.join(', ')}
-                </span>
-              </p>
-            )}
+            {user && <p className="mt-2 text-sm text-muted-foreground">{user.email}</p>}
           </div>
 
           {/* Navigation */}

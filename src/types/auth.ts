@@ -1,12 +1,6 @@
 /**
- * Authentication and authorization types
+ * Authentication types
  */
-
-/**
- * User roles for authorization
- * These come from the JWT claims in the backend
- */
-export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
 
 /**
  * User profile information from Session Gateway /user endpoint
@@ -20,5 +14,4 @@ export interface User {
   emailVerified?: boolean;
   authenticated: boolean;
   registrationId?: string; // OAuth2 registration ID (e.g., "auth0")
-  roles?: UserRole[]; // Custom roles (if added to JWT by backend)
 }
