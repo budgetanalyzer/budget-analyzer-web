@@ -105,20 +105,19 @@ cat src/store/hooks.ts
 - Response interceptor normalizes all errors to `ApiError` class
 - Base URL: `VITE_API_BASE_URL` (dev default: `/api`)
 
-**Development Proxy:**
-```typescript
-// vite.config.ts
-proxy: {
-  '/api': {
-    target: 'http://localhost:8080',
-    changeOrigin: true,
-  },
-}
-```
+**Development Architecture (HTTPS):**
 
-Frontend calls `/api/v1/transactions` → Vite proxies to `http://localhost:8080/api/v1/transactions` → NGINX gateway
+Browser access: `https://app.budgetanalyzer.localhost`
 
-See [vite.config.ts:14-23](vite.config.ts#L14-L23)
+Request flow:
+1. Browser → NGINX (port 443, SSL termination)
+2. NGINX → Session Gateway (port 8081)
+3. Session Gateway → NGINX API Gateway (`https://api.budgetanalyzer.localhost`)
+4. NGINX API Gateway → Backend services (Transaction: 8082, Currency: 8084)
+
+**Setup**: Run `orchestration/nginx/scripts/dev/setup-local-https.sh` to generate SSL certificates with mkcert.
+
+**Important**: Vite dev server (port 3000) is proxied through NGINX, not accessed directly.
 
 ## Component Patterns
 
@@ -266,7 +265,7 @@ npx vitest --grep "renders correctly"
 Required (see `.env.example`):
 
 - `VITE_API_BASE_URL` - API endpoint
-  - Dev default: `/api` (proxied to localhost:8080)
+  - Dev default: `/api` (routed through Session Gateway to `https://api.budgetanalyzer.localhost`)
   - Production: Full URL like `https://api.bleurubin.com`
 
 - `VITE_USE_MOCK_DATA` - Enable mock data

@@ -4,7 +4,9 @@ import type { User } from '@/types/auth';
 /**
  * Auth API endpoints
  *
- * Authentication is handled by the Session Gateway (port 8081).
+ * Authentication is handled by the Session Gateway (port 8081), accessed via
+ * NGINX SSL termination at https://app.budgetanalyzer.localhost (port 443).
+ *
  * All requests go through the Session Gateway which manages:
  * - OAuth2/OIDC flows with Auth0
  * - Session cookies (HttpOnly, Secure, SameSite)
