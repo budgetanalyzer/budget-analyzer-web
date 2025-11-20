@@ -5,14 +5,14 @@ import react from '@vitejs/plugin-react';
 /**
  * Vite Configuration for Budget Analyzer Web
  *
- * Development flow:
+ * Development flow (HTTPS):
  * 1. Vite dev server runs on port 3000 (hot reload)
- * 2. Session Gateway (8081) proxies frontend requests to NGINX (8080)
- * 3. NGINX (8080) proxies frontend requests to Vite (3000)
- * 4. Browser accesses app via http://localhost:8081
+ * 2. Browser accesses app via https://app.budgetanalyzer.localhost
+ * 3. NGINX (port 443) terminates SSL and proxies to Session Gateway (8081)
+ * 4. Session Gateway proxies frontend requests to NGINX → Vite (3000)
  *
- * All API requests go through Session Gateway → NGINX → Backend services
- * All frontend requests go through Session Gateway → NGINX → Vite
+ * API request flow:
+ * Browser → NGINX (443) → Session Gateway (8081) → NGINX API (api.budgetanalyzer.localhost) → Backend services
  *
  * Production:
  * - Vite builds static files to dist/
@@ -29,7 +29,8 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0', // Allow Docker to access the dev server
-    // Note: In dev, access the app via http://localhost:8081 (Session Gateway)
+    allowedHosts: true, // Allow all hosts (needed for Docker/NGINX proxy access)
+    // Note: In dev, access the app via https://app.budgetanalyzer.localhost (NGINX → Session Gateway)
     // not http://localhost:3000 (Vite dev server directly)
   },
 });

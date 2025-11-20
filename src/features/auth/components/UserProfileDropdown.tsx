@@ -1,0 +1,72 @@
+import { LogOut } from 'lucide-react';
+import { Avatar } from '@/components/ui/Avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { Button } from '@/components/ui/Button';
+
+/**
+ * User profile dropdown component
+ * Displays user avatar and provides logout functionality
+ */
+export function UserProfileDropdown() {
+  const { user, logout, isLoggingOut } = useAuth();
+
+  if (!user) {
+    return null;
+  }
+
+  // Generate fallback initials from name or email
+  const fallback = user.name
+    ? user.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : user.email[0].toUpperCase();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
+          <Avatar src={user.picture} alt={user.name || user.email} fallback={fallback} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        {/* User info section */}
+        <div className="flex items-center gap-3 p-2">
+          <Avatar src={user.picture} alt={user.name || user.email} fallback={fallback} />
+          <div className="flex flex-col space-y-1">
+            {user.name && <p className="text-sm font-medium leading-none">{user.name}</p>}
+            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+          </div>
+        </div>
+
+        {/* Roles section (if user has roles) */}
+        {user.roles && user.roles.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <div className="px-2 py-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Roles</p>
+              <p className="text-xs text-foreground">{user.roles.join(', ')}</p>
+            </div>
+          </>
+        )}
+
+        <DropdownMenuSeparator />
+
+        {/* Logout button */}
+        <DropdownMenuItem onClick={logout} disabled={isLoggingOut}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

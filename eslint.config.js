@@ -90,6 +90,7 @@ export default [
             },
 
             // Prevent shared modules from importing feature code
+            // Exception: auth feature is a cross-cutting concern accessible from shared components
             {
               target: [
                 './src/components',
@@ -101,6 +102,7 @@ export default [
                 './src/store',
               ],
               from: ['./src/features'],
+              except: ['./auth'],
             },
           ],
         },

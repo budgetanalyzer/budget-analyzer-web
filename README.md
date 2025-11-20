@@ -52,7 +52,7 @@ cp .env.example .env
 npm run dev
 ```
 
-**IMPORTANT**: Access the app via Session Gateway at `http://localhost:8081`, NOT directly via Vite (`http://localhost:3000`).
+**IMPORTANT**: Access the app via `https://app.budgetanalyzer.localhost`, NOT directly via Vite (`http://localhost:3000`). Run `orchestration/nginx/scripts/dev/setup-local-https.sh` first to generate SSL certificates.
 
 ### Environment Configuration
 
@@ -65,9 +65,9 @@ VITE_API_BASE_URL=/api
 ### Development vs Production URLs
 
 **Development:**
-- Access app: `http://localhost:8081` (Session Gateway)
-- Request flow: Browser → Session Gateway (8081) → NGINX (8080) → Vite (3000)
-- API calls: Browser → Session Gateway (8081) → NGINX (8080) → Backend services
+- Access app: `https://app.budgetanalyzer.localhost` (NGINX → Session Gateway)
+- Request flow: Browser → NGINX (443) → Session Gateway (8081) → NGINX → Vite (3000)
+- API calls: Browser → NGINX (443) → Session Gateway (8081) → NGINX API (`api.budgetanalyzer.localhost`) → Backend services
 
 **Production:**
 - Access app: `https://budgetanalyzer.com` (Load Balancer)
@@ -158,18 +158,18 @@ VITE_API_BASE_URL=/api
 VITE_USE_MOCK_DATA=false
 ```
 
-All API requests go through the NGINX gateway at `http://localhost:8080/api/*`
+All API requests go through the NGINX gateway at `https://api.budgetanalyzer.localhost/api/*`
 
 ### Expected Endpoints
 
-All endpoints accessed through gateway at `http://localhost:8080/api/*`:
+All endpoints accessed through gateway at `https://api.budgetanalyzer.localhost/api/*`:
 
 - `GET /api/v1/transactions` - List all transactions
 - `GET /api/v1/transactions/{id}` - Get single transaction
 - `GET /api/v1/currencies` - List currencies
 - `GET /api/v1/exchange-rates` - Get exchange rates
 
-**API Documentation**: `http://localhost:8080/api/docs`
+**API Documentation**: `https://api.budgetanalyzer.localhost/api/docs`
 
 ### Error Format
 
