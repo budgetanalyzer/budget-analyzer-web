@@ -23,7 +23,7 @@ Browser → Session Gateway (8081) → NGINX (8080) → Backend Services
 ### Access URLs
 
 **Development:**
-- Frontend: `http://localhost:8081` (Session Gateway)
+- Frontend: `https://app.budgetanalyzer.localhost` (Session Gateway)
 - DO NOT use `http://localhost:3000` (Vite dev server) - authentication won't work
 
 **Production:**
@@ -31,13 +31,13 @@ Browser → Session Gateway (8081) → NGINX (8080) → Backend Services
 
 ### Request Flow (Development)
 
-1. Browser requests `http://localhost:8081/`
+1. Browser requests `https://app.budgetanalyzer.localhost/`
 2. Session Gateway proxies to NGINX (8080)
 3. NGINX proxies to Vite dev server (3000)
 4. Vite serves React app with HMR
 
 For API requests:
-1. Browser requests `http://localhost:8081/api/transactions`
+1. Browser requests `https://app.budgetanalyzer.localhost/api/transactions`
 2. Session Gateway validates session cookie
 3. Session Gateway adds JWT from Redis
 4. Session Gateway proxies to NGINX (8080)
@@ -94,7 +94,7 @@ const { user, isAuthenticated, isLoading } = useAuth();
 VITE_API_BASE_URL=/api
 
 # Access app via Session Gateway in development
-# http://localhost:8081
+# https://app.budgetanalyzer.localhost
 ```
 
 ### Session Gateway (application.yml)
@@ -221,7 +221,7 @@ Session Gateway proxies to NGINX (8080) for both API and frontend requests.
 ### "Not authenticated" even after login
 
 **Cause**: Accessing Vite dev server directly (http://localhost:3000)
-**Solution**: Access via Session Gateway (http://localhost:8081)
+**Solution**: Access via Session Gateway (https://app.budgetanalyzer.localhost)
 
 ### CORS errors
 
@@ -237,12 +237,12 @@ Session Gateway proxies to NGINX (8080) for both API and frontend requests.
 
 ### Manual Testing
 
-1. Navigate to `http://localhost:8081/login`
+1. Navigate to `https://app.budgetanalyzer.localhost/login`
 2. Click "Sign in with Auth0"
 3. Login with Auth0 credentials
 4. Check browser DevTools → Application → Cookies
 5. Should see `SESSION` cookie with HttpOnly flag
-6. Navigate to `http://localhost:8081/admin`
+6. Navigate to `https://app.budgetanalyzer.localhost/admin`
 7. Should see admin panel (if user has ADMIN role)
 
 ### Automated Testing

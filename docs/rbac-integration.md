@@ -222,7 +222,7 @@ public class UserController {
 **Testing:**
 ```bash
 # With authenticated session
-curl -H "Cookie: SESSION=xxx" http://localhost:8081/user
+curl -H "Cookie: SESSION=xxx" https://app.budgetanalyzer.localhost/user
 
 # Expected response:
 {
@@ -413,7 +413,7 @@ describe('ProtectedRoute', () => {
 **2. Session Gateway /user Endpoint:**
 ```bash
 # Test with authenticated session
-curl -H "Cookie: SESSION=xxx" http://localhost:8081/user | jq
+curl -H "Cookie: SESSION=xxx" https://app.budgetanalyzer.localhost/user | jq
 
 # Verify response includes roles:
 {
@@ -424,10 +424,10 @@ curl -H "Cookie: SESSION=xxx" http://localhost:8081/user | jq
 **3. Backend Authorization:**
 ```bash
 # As ADMIN - should succeed
-curl -H "Cookie: SESSION=xxx" http://localhost:8081/api/v1/admin/currencies
+curl -H "Cookie: SESSION=xxx" https://app.budgetanalyzer.localhost/api/v1/admin/currencies
 
 # As USER (non-admin) - should return 403 Forbidden
-curl -H "Cookie: SESSION=xxx" http://localhost:8081/api/v1/admin/currencies
+curl -H "Cookie: SESSION=xxx" https://app.budgetanalyzer.localhost/api/v1/admin/currencies
 # Expected: {"status": 403, "error": "Forbidden"}
 ```
 
@@ -540,7 +540,7 @@ curl -H "Cookie: SESSION=xxx" http://localhost:8081/api/v1/admin/currencies
 **Debug:**
 ```bash
 # Check Session Gateway /user endpoint
-curl -H "Cookie: SESSION=xxx" http://localhost:8081/user | jq .roles
+curl -H "Cookie: SESSION=xxx" https://app.budgetanalyzer.localhost/user | jq .roles
 
 # Check Auth0 JWT
 # Login, copy access token, decode at jwt.io

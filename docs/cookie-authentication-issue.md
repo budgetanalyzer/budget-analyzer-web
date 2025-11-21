@@ -8,14 +8,14 @@ After Auth0 integration, transaction imports fail with "Unable to reach the serv
 
 The session cookie is not being included in the `Cookie` header when making API requests to `/api/v1/transactions/import`, even though:
 - Cookie exists in browser's Application → Cookies storage
-- Request is same-origin (`http://localhost:8081`)
+- Request is same-origin (`https://app.budgetanalyzer.localhost`)
 - Axios is configured with `withCredentials: true`
 - Login flow works correctly
 
 ## Investigation Results
 
 ### Confirmed Working ✅
-1. User can access app via `http://localhost:8081` (Session Gateway)
+1. User can access app via `https://app.budgetanalyzer.localhost` (Session Gateway)
 2. Auth0 login flow completes successfully
 3. Session cookie appears in DevTools → Application → Cookies
 4. Frontend code has `withCredentials: true` configured
@@ -85,7 +85,7 @@ Ensure CORS headers allow credentials:
 ```nginx
 # NGINX configuration
 add_header 'Access-Control-Allow-Credentials' 'true' always;
-add_header 'Access-Control-Allow-Origin' 'http://localhost:8081' always;
+add_header 'Access-Control-Allow-Origin' 'https://app.budgetanalyzer.localhost' always;
 add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
 add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
 ```
@@ -98,7 +98,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-            .allowedOrigins("http://localhost:8081")
+            .allowedOrigins("https://app.budgetanalyzer.localhost")
             .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
             .allowedHeaders("*")
             .allowCredentials(true);  // ← CRITICAL

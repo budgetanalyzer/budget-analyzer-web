@@ -125,7 +125,7 @@ npm install
 # 2. Start development server
 npm run dev
 
-# 3. Open browser at http://localhost:3000
+# 3. Open browser at https://app.budgetanalyzer.localhost
 ```
 
 The app runs with mock data by default. To connect to real API:
