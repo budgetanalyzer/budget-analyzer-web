@@ -265,6 +265,7 @@ vi.mock('@/features/admin/hooks/useAuth', () => ({
 
 ## References
 
-- [Authentication Implementation Plan](../../orchestration/docs/architecture/authentication-implementation-plan.md)
-- [Security Architecture](../../orchestration/docs/architecture/security-architecture.md)
-- Session Gateway README: `../session-gateway/README.md`
+See the [orchestration repository](https://github.com/budgetanalyzer/orchestration) for:
+- Authentication Implementation Plan
+- Security Architecture
+- Session Gateway README

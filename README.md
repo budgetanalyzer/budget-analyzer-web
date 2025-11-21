@@ -80,7 +80,7 @@ VITE_API_BASE_URL=/api
 - Stores JWTs server-side in Redis (never exposed to browser)
 - Automatically adds JWTs to API requests
 
-See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for complete authentication guide.
+See [docs/authentication.md](docs/authentication.md) for complete authentication guide.
 
 ## Features
 

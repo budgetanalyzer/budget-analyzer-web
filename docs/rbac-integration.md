@@ -38,7 +38,7 @@ export interface User {
 
 ### Authentication Hook
 
-**File:** [src/features/admin/hooks/useAuth.ts](../src/features/admin/hooks/useAuth.ts)
+**File:** [src/features/auth/hooks/useAuth.ts](../src/features/auth/hooks/useAuth.ts)
 
 ```typescript
 export function useAuth() {
@@ -621,7 +621,7 @@ console.log('Has role:', hasRole(requiredRole));
 
 ### Frontend Files (Production Ready)
 - [src/types/auth.ts](../src/types/auth.ts) - User and UserRole types
-- [src/features/admin/hooks/useAuth.ts](../src/features/admin/hooks/useAuth.ts) - Authentication hook
+- [src/features/auth/hooks/useAuth.ts](../src/features/auth/hooks/useAuth.ts) - Authentication hook
 - [src/features/admin/components/ProtectedRoute.tsx](../src/features/admin/components/ProtectedRoute.tsx) - Route protection
 - [src/api/auth.ts](../src/api/auth.ts) - Auth API client
 - [src/api/client.ts](../src/api/client.ts) - API client with credentials
