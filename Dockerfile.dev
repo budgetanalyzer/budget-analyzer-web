@@ -1,0 +1,21 @@
+# Development Dockerfile for React/Vite with HMR
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies first for better caching
+COPY package*.json ./
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Expose Vite dev server port
+EXPOSE 3000
+
+# Configure environment for container
+ENV NODE_ENV=development
+ENV VITE_HOST=0.0.0.0
+
+# Start Vite dev server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]

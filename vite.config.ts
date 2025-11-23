@@ -29,7 +29,13 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0', // Allow Docker to access the dev server
+    strictPort: true,
     allowedHosts: true, // Allow all hosts (needed for Docker/NGINX proxy access)
+    watch: {
+      // Use polling for Docker/Kubernetes file watching
+      usePolling: true,
+      interval: 1000,
+    },
     // Note: In dev, access the app via https://app.budgetanalyzer.localhost (NGINX → Session Gateway)
     // not http://localhost:3000 (Vite dev server directly)
   },
