@@ -7,6 +7,7 @@ import {
   getPaginationRowModel,
   ColumnDef,
   flexRender,
+  RowSelectionState,
 } from '@tanstack/react-table';
 import { Transaction } from '@/types/transaction';
 import { ExchangeRateResponse } from '@/types/currency';
@@ -22,6 +23,9 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DeleteTransactionModal } from '@/features/transactions/components/DeleteTransactionModal';
 import { EditableTransactionRow } from '@/features/transactions/components/EditableTransactionRow';
+import { BulkDeleteBar } from '@/features/transactions/components/BulkDeleteBar';
+import { BulkDeleteModal } from '@/features/transactions/components/BulkDeleteModal';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { compareDates } from '@/utils/dates';
 import {
   ArrowUpDown,
@@ -73,6 +77,8 @@ export function TransactionTable({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [localSearchValue, setLocalSearchValue] = useState(globalFilter ?? '');
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { mutate: updateTransaction, isPending: isUpdating } = useUpdateTransaction();
 
@@ -120,11 +126,49 @@ export function TransactionTable({
     [navigate],
   );
 
+  // Get selected transaction IDs
+  const selectedIds = useMemo(() => {
+    return Object.keys(rowSelection)
+      .filter((key) => rowSelection[key])
+      .map((key) => parseInt(key, 10));
+  }, [rowSelection]);
+
+  // Handle bulk delete
+  const handleBulkDelete = useCallback(() => {
+    setBulkDeleteDialogOpen(true);
+  }, []);
+
+  const handleBulkDeleteSuccess = useCallback(() => {
+    setRowSelection({});
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    setRowSelection({});
+  }, []);
+
   // Define columns for TanStack Table
   // Note: Cell rendering is handled by EditableTransactionRow, not by these column definitions
   // These columns are only used for: headers, sorting configuration, and column widths
   const columns = useMemo<ColumnDef<Transaction>[]>(
     () => [
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected()
+                ? true
+                : table.getIsSomePageRowsSelected()
+                  ? 'indeterminate'
+                  : false
+            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          />
+        ),
+        size: 50,
+        minSize: 50,
+        maxSize: 50,
+      },
       {
         accessorKey: 'date',
         header: ({ column }) => {
@@ -211,7 +255,11 @@ export function TransactionTable({
         pageIndex,
         pageSize,
       },
+      rowSelection,
     },
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
+    getRowId: (row) => row.id.toString(),
     onSortingChange: (updater) => {
       const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
       dispatch(setTransactionTableSorting(newSorting));
@@ -326,6 +374,8 @@ export function TransactionTable({
                     onRowClick={handleRowClick}
                     isUpdating={isUpdating}
                     columnSizes={table.getAllColumns().map((col) => col.getSize())}
+                    isSelected={row.getIsSelected()}
+                    onSelectionChange={(checked) => row.toggleSelected(checked)}
                   />
                 ))
             ) : (
@@ -398,6 +448,22 @@ export function TransactionTable({
         onOpenChange={setDeleteDialogOpen}
         displayCurrency={displayCurrency}
         exchangeRatesMap={exchangeRatesMap}
+      />
+
+      {/* Bulk Delete Bar */}
+      <BulkDeleteBar
+        selectedCount={selectedIds.length}
+        onDelete={handleBulkDelete}
+        onClearSelection={handleClearSelection}
+        isVisible={selectedIds.length > 0}
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <BulkDeleteModal
+        selectedIds={selectedIds}
+        isOpen={bulkDeleteDialogOpen}
+        onOpenChange={setBulkDeleteDialogOpen}
+        onSuccess={handleBulkDeleteSuccess}
       />
     </div>
   );
