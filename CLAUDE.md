@@ -1,10 +1,17 @@
 # Budget Analyzer Web - React Financial Management Application
 
-## Scope Restriction
+## Repository Scope
 
-**IMPORTANT: This is a frontend-only repository.** Do NOT access files in the parent directory (`/workspace/`) or sibling repositories (session-gateway, orchestration, etc.). Stay within `/workspace/budget-analyzer-web/` only.
+**Boundary**: This repository only.
 
-If changes are needed in backend services or orchestration, inform the user and let them handle it in the appropriate repo.
+**Allowed**:
+- Read `../service-common/` and `../orchestration/docs/`
+- All operations within this repository
+
+**Forbidden**:
+- Writing outside this repository
+
+Cross-service changes: coordinate through orchestration or service-common.
 
 ## Application Purpose
 
