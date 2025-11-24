@@ -8,8 +8,6 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Toaster } from 'sonner';
 
 // Admin imports
-import { AdminLayout } from '@/features/admin/components/AdminLayout';
-import { ProtectedRoute } from '@/features/admin/components/ProtectedRoute';
 import { UnauthorizedPage } from '@/features/admin/components/UnauthorizedPage';
 import { CurrenciesListPage } from '@/features/admin/currencies/pages/CurrenciesListPage';
 import { CurrencyCreatePage } from '@/features/admin/currencies/pages/CurrencyCreatePage';
@@ -23,31 +21,23 @@ function App() {
   return (
     <ErrorBoundary>
       <Routes>
-        {/* Public routes */}
+        {/* Main app routes */}
         <Route path="/" element={<Layout />}>
           <Route index element={<TransactionsPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="transactions/:id" element={<TransactionDetailPage />} />
+          {/* Admin routes - using main layout until permissions are implemented */}
+          <Route path="admin">
+            <Route index element={<Navigate to="/admin/currencies" replace />} />
+            <Route path="currencies" element={<CurrenciesListPage />} />
+            <Route path="currencies/new" element={<CurrencyCreatePage />} />
+            <Route path="currencies/:id" element={<CurrencyEditPage />} />
+          </Route>
         </Route>
 
         {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/peace" element={<PeacePage />} />
-
-        {/* Admin routes - protected by authentication */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="/admin/currencies" replace />} />
-          <Route path="currencies" element={<CurrenciesListPage />} />
-          <Route path="currencies/new" element={<CurrencyCreatePage />} />
-          <Route path="currencies/:id" element={<CurrencyEditPage />} />
-        </Route>
 
         {/* Error routes */}
         <Route path="/unauthorized" element={<UnauthorizedPage />} />

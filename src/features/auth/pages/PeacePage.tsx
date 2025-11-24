@@ -22,7 +22,7 @@ export function PeacePage() {
             Peace out
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            You've been logged out successfully
+            You&apos;ve been logged out successfully
           </p>
         </div>
         <div className="mt-8 space-y-6">

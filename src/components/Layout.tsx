@@ -68,6 +68,17 @@ export function Layout() {
               >
                 Analytics
               </Link>
+              <Link
+                to="/admin/currencies"
+                className={cn(
+                  'text-sm font-medium transition-colors hover:text-primary',
+                  location.pathname.startsWith('/admin')
+                    ? 'text-foreground'
+                    : 'text-muted-foreground',
+                )}
+              >
+                Currencies
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-2">
