@@ -1,5 +1,11 @@
 # Budget Analyzer Web - React Financial Management Application
 
+## Scope Restriction
+
+**IMPORTANT: This is a frontend-only repository.** Do NOT access files in the parent directory (`/workspace/`) or sibling repositories (session-gateway, orchestration, etc.). Stay within `/workspace/budget-analyzer-web/` only.
+
+If changes are needed in backend services or orchestration, inform the user and let them handle it in the appropriate repo.
+
 ## Application Purpose
 
 React 19 web application for managing and analyzing financial transactions.

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { User } from '@/types/auth';
 import * as authApi from '@/api/auth';
@@ -51,17 +51,15 @@ export function useAuth() {
     window.location.href = url;
   };
 
-  // Logout mutation
-  const logoutMutation = useMutation({
-    mutationFn: () => authApi.logout(),
-    onSuccess: () => {
-      // Clear user data from cache
-      queryClient.setQueryData(['auth', 'currentUser'], null);
-      queryClient.clear(); // Clear all cached data
-      // Redirect to home page after logout
-      window.location.href = '/';
-    },
-  });
+  // Logout - navigate to Session Gateway logout endpoint
+  // This allows the browser to follow the full redirect chain:
+  // /logout → Session Gateway clears session → Auth0 logout → back to app
+  const logout = () => {
+    // Clear cached data before navigating
+    queryClient.clear();
+    // Navigate to logout endpoint (browser follows redirects)
+    window.location.href = '/logout';
+  };
 
   return {
     // State
@@ -71,8 +69,7 @@ export function useAuth() {
 
     // Operations
     login,
-    logout: () => logoutMutation.mutate(),
-    isLoggingOut: logoutMutation.isPending,
+    logout,
   };
 }
 

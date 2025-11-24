@@ -17,6 +17,7 @@ import { CurrencyEditPage } from '@/features/admin/currencies/pages/CurrencyEdit
 
 // Auth imports
 import { LoginPage } from '@/features/auth/pages/LoginPage';
+import { PeacePage } from '@/features/auth/pages/PeacePage';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
 
         {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/peace" element={<PeacePage />} />
 
         {/* Admin routes - protected by authentication */}
         <Route

@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/Button';
  * Displays user avatar and provides logout functionality
  */
 export function UserProfileDropdown() {
-  const { user, logout, isLoggingOut } = useAuth();
+  const { user, logout } = useAuth();
 
   if (!user) {
     return null;
@@ -51,9 +51,9 @@ export function UserProfileDropdown() {
         <DropdownMenuSeparator />
 
         {/* Logout button */}
-        <DropdownMenuItem onClick={logout} disabled={isLoggingOut}>
+        <DropdownMenuItem onClick={logout}>
           <LogOut className="mr-2 h-4 w-4" />
-          <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+          <span>Logout</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
