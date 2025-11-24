@@ -22,6 +22,16 @@ export const transactionApi = {
     await apiClient.delete(`/v1/transactions/${id}`);
   },
 
+  bulkDeleteTransactions: async (
+    ids: number[],
+  ): Promise<{ deletedCount: number; notFoundIds: number[] }> => {
+    const response = await apiClient.post<{ deletedCount: number; notFoundIds: number[] }>(
+      '/v1/transactions/bulk-delete',
+      { ids },
+    );
+    return response.data;
+  },
+
   updateTransaction: async (id: number, data: TransactionUpdateRequest): Promise<Transaction> => {
     const response = await apiClient.patch<Transaction>(`/v1/transactions/${id}`, data);
     return response.data;

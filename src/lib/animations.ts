@@ -100,3 +100,21 @@ export const collapseTransition: Transition = {
   duration: ANIMATION_DURATION.normal,
   ease: ANIMATION_EASING,
 };
+
+/**
+ * Slide up from bottom with fade
+ * Use for floating action bars that appear at the bottom of the viewport
+ */
+export const slideUpVariants: Variants = {
+  initial: { opacity: 0, y: 100 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: 100 },
+};
+
+/**
+ * Transition for slide up animations
+ */
+export const slideUpTransition: Transition = {
+  duration: ANIMATION_DURATION.normal,
+  ease: ANIMATION_EASING,
+};
