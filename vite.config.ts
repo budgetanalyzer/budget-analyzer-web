@@ -37,11 +37,11 @@ export default defineConfig({
       interval: 1000,
     },
     hmr: {
-      // Connect HMR WebSocket directly to port-forwarded Vite server
-      // This bypasses the proxy chain for reliable hot reload
-      host: 'localhost',
-      port: 3000,
-      protocol: 'ws',
+      // Connect HMR WebSocket through the gateway (same origin as browser)
+      // Browser at https://app.budgetanalyzer.localhost connects via wss://
+      // Gateway stack (Envoy → Session Gateway → NGINX) proxies to Vite
+      clientPort: 443, // Use HTTPS port (gateway entry point)
+      // No explicit host/protocol - uses browser's current origin
     },
     // Note: In dev, access the app via https://app.budgetanalyzer.localhost (NGINX → Session Gateway)
     // not http://localhost:3000 (Vite dev server directly)

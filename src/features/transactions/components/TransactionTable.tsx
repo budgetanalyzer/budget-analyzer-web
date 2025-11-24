@@ -224,7 +224,7 @@ export function TransactionTable({
             <Button
               variant="ghost"
               onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-              className="hover:bg-transparent"
+              className="w-full justify-end hover:bg-transparent"
             >
               Amount
               <ArrowUpDown className="ml-2 h-4 w-4" />
