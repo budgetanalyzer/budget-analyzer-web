@@ -338,3 +338,11 @@ cat src/store/uiSlice.ts
 - NEVER disable ESLint rules without permission
 - User controls dev server (`npm run dev`) manually
 - Always use `npm run lint:fix` (auto-fixes)
+
+### Web Search Year Awareness
+
+Claude's training data may default to an outdated year. When using WebSearch for best practices or current information:
+
+1. Check `<env>Today's date</env>` for the actual current year
+2. Include that year in searches (e.g., "React best practices 2025" not 2024)
+3. This ensures results reflect current standards, not outdated patterns
