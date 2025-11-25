@@ -1,8 +1,6 @@
 # Budget Analyzer Web
 
-> **⚠️ Work in Progress**: This project is under active development. Features and documentation are subject to change.
-
-Modern React web application for Budget Analyzer - a personal finance management tool for tracking transactions, analyzing spending patterns, and managing budgets.
+Modern React web application for Budget Analyzer - a reference architecture for microservices with a React frontend.
 
 ## Overview
 
