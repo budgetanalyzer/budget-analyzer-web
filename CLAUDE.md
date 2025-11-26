@@ -1,17 +1,26 @@
 # Budget Analyzer Web - React Financial Management Application
 
-## Repository Scope
+## Tree Position
 
-**Boundary**: This repository only.
+**Archetype**: interface
+**Scope**: budgetanalyzer ecosystem
+**Role**: React SPA; bridges users to the backend system
 
-**Allowed**:
-- Read `../service-common/` and `../orchestration/docs/`
-- All operations within this repository
+### Relationships
+- **Interfaces with**: Users (browser), backend services (via API gateway)
+- **Coordinated by**: orchestration
+- **Observed by**: architecture-conversations
+- **Isolated from**: service-common (different tech stack)
 
-**Forbidden**:
-- Writing outside this repository
+### Permissions
+- **Read**: `../orchestration/docs/`, API specs from services
+- **Write**: This repository only
 
-Cross-service changes: coordinate through orchestration or service-common.
+### Discovery
+```bash
+# API I consume
+cat ../orchestration/nginx/nginx.k8s.conf | grep location
+```
 
 ## Application Purpose
 
@@ -346,3 +355,7 @@ Claude's training data may default to an outdated year. When using WebSearch for
 1. Check `<env>Today's date</env>` for the actual current year
 2. Include that year in searches (e.g., "React best practices 2025" not 2024)
 3. This ensures results reflect current standards, not outdated patterns
+
+## Conversation Capture
+
+When the user asks to save this conversation, write it to `/workspace/architecture-conversations/conversations/` following the format in INDEX.md.
