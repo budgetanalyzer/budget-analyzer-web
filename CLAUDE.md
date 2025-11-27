@@ -348,13 +348,15 @@ cat src/store/uiSlice.ts
 - User controls dev server (`npm run dev`) manually
 - Always use `npm run lint:fix` (auto-fixes)
 
-### Web Search Year Awareness
+## Web Search Protocol
 
-Claude's training data may default to an outdated year. When using WebSearch for best practices or current information:
+BEFORE any WebSearch tool call:
+1. Read `Today's date` from `<env>` block
+2. Extract the current year
+3. Use current year in queries about "latest", "best", "current" topics
+4. NEVER use previous years unless explicitly searching historical content
 
-1. Check `<env>Today's date</env>` for the actual current year
-2. Include that year in searches (e.g., "React best practices 2025" not 2024)
-3. This ensures results reflect current standards, not outdated patterns
+FAILURE MODE: Training data defaults to 2023/2024. Override with `<env>` year.
 
 ## Conversation Capture
 
