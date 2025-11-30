@@ -1,5 +1,9 @@
 # Budget Analyzer Web
 
+> "Archetype: interface. Role: React SPA; bridges users to the backend system."
+>
+> — [CLAUDE.md](CLAUDE.md#tree-position)
+
 Modern React web application for Budget Analyzer - a reference architecture for microservices with a React frontend.
 
 ## Overview
