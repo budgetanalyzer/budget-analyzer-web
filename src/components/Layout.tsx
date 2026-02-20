@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Wallet } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CurrencySelector } from '@/components/CurrencySelector';
+import { ViewSelector } from '@/components/ViewSelector';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { UserProfileDropdown } from '@/features/auth/components/UserProfileDropdown';
@@ -79,6 +80,7 @@ export function Layout() {
               >
                 Currencies
               </Link>
+              <ViewSelector />
             </nav>
           </div>
           <div className="flex items-center gap-2">

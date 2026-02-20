@@ -63,7 +63,7 @@ export const useTransactions = () => {
   return useQuery<Transaction[], ApiError>({
     queryKey: ['transactions'],  // ← Cache key
     queryFn: async () => {
-      // Fetch from API or return mock data
+      // Fetch from API
       return transactionApi.getTransactions();
     },
     staleTime: 1000 * 60 * 5,  // Cache for 5 minutes

@@ -9,7 +9,7 @@ import {
   flexRender,
   RowSelectionState,
 } from '@tanstack/react-table';
-import { Transaction } from '@/types/transaction';
+import { Transaction, TransactionType } from '@/types/transaction';
 import { ExchangeRateResponse } from '@/types/currency';
 import {
   Table,
@@ -25,6 +25,8 @@ import { DeleteTransactionModal } from '@/features/transactions/components/Delet
 import { EditableTransactionRow } from '@/features/transactions/components/EditableTransactionRow';
 import { BulkDeleteBar } from '@/features/transactions/components/BulkDeleteBar';
 import { BulkDeleteModal } from '@/features/transactions/components/BulkDeleteModal';
+import { SaveAsViewButton } from '@/components/SaveAsViewButton';
+import { ViewCriteriaApi } from '@/types/view';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { compareDates } from '@/utils/dates';
 import {
@@ -44,7 +46,18 @@ import {
   setTransactionTablePageIndex,
   setTransactionTableGlobalFilter,
   setTransactionTableDateFilter,
+  setTransactionTableBankNameFilter,
+  setTransactionTableAccountIdFilter,
+  setTransactionTableTypeFilter,
+  setTransactionTableAmountFilter,
 } from '@/store/uiSlice';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/Select';
 import { useUpdateTransaction } from '@/hooks/useTransactions';
 import { formatApiError } from '@/utils/errorMessages';
 import { toast } from 'sonner';
@@ -54,18 +67,34 @@ interface TransactionTableProps {
   transactions: Transaction[];
   onDateFilterChange?: (from: string | null, to: string | null) => void;
   onSearchChange?: (query: string) => void;
+  onBankNameFilterChange?: (bankName: string | null) => void;
+  onAccountIdFilterChange?: (accountId: string | null) => void;
+  onTypeFilterChange?: (type: TransactionType | null) => void;
+  onAmountFilterChange?: (min: number | null, max: number | null) => void;
+  onClearAllFilters?: () => void;
   displayCurrency: string;
   exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
   isExchangeRatesLoading: boolean;
+  availableBankNames: string[];
+  availableAccountIds: string[];
+  viewCriteria?: ViewCriteriaApi;
 }
 
 export function TransactionTable({
   transactions,
   onDateFilterChange,
   onSearchChange,
+  onBankNameFilterChange,
+  onAccountIdFilterChange,
+  onTypeFilterChange,
+  onAmountFilterChange,
+  onClearAllFilters,
   displayCurrency,
   exchangeRatesMap,
   isExchangeRatesLoading,
+  availableBankNames,
+  availableAccountIds,
+  viewCriteria,
 }: TransactionTableProps) {
   const dispatch = useAppDispatch();
   const sorting = useAppSelector((state) => state.ui.transactionTable.sorting);
@@ -73,26 +102,56 @@ export function TransactionTable({
   const pageSize = useAppSelector((state) => state.ui.transactionTable.pageSize);
   const globalFilter = useAppSelector((state) => state.ui.transactionTable.globalFilter);
   const dateFilter = useAppSelector((state) => state.ui.transactionTable.dateFilter);
+  const bankNameFilter = useAppSelector((state) => state.ui.transactionTable.bankNameFilter);
+  const accountIdFilter = useAppSelector((state) => state.ui.transactionTable.accountIdFilter);
+  const typeFilter = useAppSelector((state) => state.ui.transactionTable.typeFilter);
+  const amountFilter = useAppSelector((state) => state.ui.transactionTable.amountFilter);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [localSearchValue, setLocalSearchValue] = useState(globalFilter ?? '');
+  const [localMinAmount, setLocalMinAmount] = useState(amountFilter.min?.toString() ?? '');
+  const [localMaxAmount, setLocalMaxAmount] = useState(amountFilter.max?.toString() ?? '');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
   const navigate = useNavigate();
   const { mutate: updateTransaction, isPending: isUpdating } = useUpdateTransaction();
 
-  // Debounce the search value: only updates 400ms after user stops typing
-  const debouncedSearchValue = useDebounce(localSearchValue, 400);
+  // Debounce amount filters only (search uses explicit submit)
+  const debouncedMinAmount = useDebounce(localMinAmount, 400);
+  const debouncedMaxAmount = useDebounce(localMaxAmount, 400);
 
-  // Update Redux and URL when debounced search value changes
+  // Submit search on Enter key press
+  const handleSearchSubmit = useCallback(() => {
+    dispatch(setTransactionTableGlobalFilter(localSearchValue));
+    onSearchChange?.(localSearchValue);
+  }, [localSearchValue, dispatch, onSearchChange]);
+
+  // Handle search input keydown - submit on Enter
+  const handleSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        handleSearchSubmit();
+      }
+    },
+    [handleSearchSubmit],
+  );
+
+  // Handle clearing search - submit immediately
+  const handleClearSearch = useCallback(() => {
+    setLocalSearchValue('');
+    dispatch(setTransactionTableGlobalFilter(''));
+    onSearchChange?.('');
+  }, [dispatch, onSearchChange]);
+
+  // Update Redux and URL when debounced amount values change
   useEffect(() => {
-    dispatch(setTransactionTableGlobalFilter(debouncedSearchValue));
-    // Update URL for bookmarkability (if callback provided)
-    if (onSearchChange) {
-      onSearchChange(debouncedSearchValue);
-    }
-  }, [debouncedSearchValue, dispatch, onSearchChange]);
+    const min = debouncedMinAmount ? parseFloat(debouncedMinAmount) : null;
+    const max = debouncedMaxAmount ? parseFloat(debouncedMaxAmount) : null;
+    dispatch(setTransactionTableAmountFilter({ min, max }));
+    onAmountFilterChange?.(min, max);
+  }, [debouncedMinAmount, debouncedMaxAmount, dispatch, onAmountFilterChange]);
 
   // Handle save from row component
   const handleSaveTransaction = useCallback(
@@ -126,12 +185,20 @@ export function TransactionTable({
     [navigate],
   );
 
-  // Get selected transaction IDs
+  // Get selected transaction IDs (from row selection)
   const selectedIds = useMemo(() => {
     return Object.keys(rowSelection)
       .filter((key) => rowSelection[key])
       .map((key) => parseInt(key, 10));
   }, [rowSelection]);
+
+  // Get all filtered transaction IDs (for "select all matching" mode)
+  const allFilteredIds = useMemo(() => {
+    return transactions.map((t) => t.id);
+  }, [transactions]);
+
+  // Determine which IDs to use for deletion
+  const idsToDelete = selectAllMatching ? allFilteredIds : selectedIds;
 
   // Handle bulk delete
   const handleBulkDelete = useCallback(() => {
@@ -140,10 +207,16 @@ export function TransactionTable({
 
   const handleBulkDeleteSuccess = useCallback(() => {
     setRowSelection({});
+    setSelectAllMatching(false);
   }, []);
 
   const handleClearSelection = useCallback(() => {
     setRowSelection({});
+    setSelectAllMatching(false);
+  }, []);
+
+  const handleSelectAllMatching = useCallback(() => {
+    setSelectAllMatching(true);
   }, []);
 
   // Define columns for TanStack Table
@@ -258,7 +331,14 @@ export function TransactionTable({
       rowSelection,
     },
     enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: (updater) => {
+      const newSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
+      setRowSelection(newSelection);
+      // Reset "select all matching" when selection changes manually
+      if (selectAllMatching) {
+        setSelectAllMatching(false);
+      }
+    },
     getRowId: (row) => row.id.toString(),
     onSortingChange: (updater) => {
       const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
@@ -279,9 +359,25 @@ export function TransactionTable({
   // Reset to page 1 when filters change
   useEffect(() => {
     dispatch(setTransactionTablePageIndex(0));
-  }, [globalFilter, dateFilter, dispatch]);
+  }, [
+    globalFilter,
+    dateFilter,
+    bankNameFilter,
+    accountIdFilter,
+    typeFilter,
+    amountFilter,
+    dispatch,
+  ]);
 
-  const hasActiveDateFilters = dateFilter?.from || dateFilter?.to;
+  const hasActiveFilters =
+    dateFilter?.from ||
+    dateFilter?.to ||
+    globalFilter ||
+    bankNameFilter ||
+    accountIdFilter ||
+    typeFilter ||
+    amountFilter.min !== null ||
+    amountFilter.max !== null;
 
   const handleDateChange = useCallback(
     (from: string | null, to: string | null) => {
@@ -295,13 +391,50 @@ export function TransactionTable({
     [dispatch, onDateFilterChange],
   );
 
-  const handleClearDateFilters = () => {
+  const handleBankNameChange = useCallback(
+    (bankName: string) => {
+      const value = bankName === 'all' ? null : bankName;
+      dispatch(setTransactionTableBankNameFilter(value));
+      onBankNameFilterChange?.(value);
+    },
+    [dispatch, onBankNameFilterChange],
+  );
+
+  const handleAccountIdChange = useCallback(
+    (accountId: string) => {
+      const value = accountId === 'all' ? null : accountId;
+      dispatch(setTransactionTableAccountIdFilter(value));
+      onAccountIdFilterChange?.(value);
+    },
+    [dispatch, onAccountIdFilterChange],
+  );
+
+  const handleTypeChange = useCallback(
+    (type: string) => {
+      const value = type === 'all' ? null : (type as TransactionType);
+      dispatch(setTransactionTableTypeFilter(value));
+      onTypeFilterChange?.(value);
+    },
+    [dispatch, onTypeFilterChange],
+  );
+
+  const handleClearFilters = useCallback(() => {
+    // Clear local state
+    setLocalSearchValue('');
+    setLocalMinAmount('');
+    setLocalMaxAmount('');
+
+    // Clear Redux state
+    dispatch(setTransactionTableGlobalFilter(''));
     dispatch(setTransactionTableDateFilter({ from: null, to: null }));
-    // Clear date filter URL params
-    if (onDateFilterChange) {
-      onDateFilterChange(null, null);
-    }
-  };
+    dispatch(setTransactionTableBankNameFilter(null));
+    dispatch(setTransactionTableAccountIdFilter(null));
+    dispatch(setTransactionTableTypeFilter(null));
+    dispatch(setTransactionTableAmountFilter({ min: null, max: null }));
+
+    // Clear all URL params at once (avoids race conditions)
+    onClearAllFilters?.();
+  }, [dispatch, onClearAllFilters]);
 
   return (
     <div className="space-y-4">
@@ -309,14 +442,15 @@ export function TransactionTable({
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search transactions..."
+            placeholder={`"exact phrase" term1 term2 ↵`}
             value={localSearchValue}
             onChange={(e) => setLocalSearchValue(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
             className="pl-9 pr-9"
           />
           {localSearchValue && (
             <button
-              onClick={() => setLocalSearchValue('')}
+              onClick={handleClearSearch}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               title="Clear search"
             >
@@ -329,19 +463,107 @@ export function TransactionTable({
           to={dateFilter?.to || null}
           onChange={handleDateChange}
         />
-        {hasActiveDateFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClearDateFilters}
-            className="h-9 px-3"
-            title="Clear date filters"
-          >
-            <X className="mr-1.5 h-4 w-4" />
-            Clear filters
-          </Button>
+        {availableBankNames.length > 1 && (
+          <Select value={bankNameFilter ?? 'all'} onValueChange={handleBankNameChange}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="All Banks" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Banks</SelectItem>
+              {availableBankNames.map((bank) => (
+                <SelectItem key={bank} value={bank}>
+                  {bank}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {availableAccountIds.length > 1 && (
+          <Select value={accountIdFilter ?? 'all'} onValueChange={handleAccountIdChange}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="All Accounts" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Accounts</SelectItem>
+              {availableAccountIds.map((account) => (
+                <SelectItem key={account} value={account}>
+                  {account}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <Select value={typeFilter ?? 'all'} onValueChange={handleTypeChange}>
+          <SelectTrigger className="w-[100px]">
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="DEBIT">Debit</SelectItem>
+            <SelectItem value="CREDIT">Credit</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-1">
+          <Input
+            type="number"
+            placeholder="Min"
+            value={localMinAmount}
+            onChange={(e) => setLocalMinAmount(e.target.value)}
+            className="w-[80px]"
+            min="0"
+            step="0.01"
+          />
+          <span className="text-muted-foreground">-</span>
+          <Input
+            type="number"
+            placeholder="Max"
+            value={localMaxAmount}
+            onChange={(e) => setLocalMaxAmount(e.target.value)}
+            className="w-[80px]"
+            min="0"
+            step="0.01"
+          />
+        </div>
+        {/* Filter Actions - visual separator and action buttons */}
+        {hasActiveFilters && (
+          <>
+            <div className="mx-1 h-6 w-px bg-border" />
+            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 px-3">
+              <X className="mr-1.5 h-4 w-4" />
+              Clear
+            </Button>
+            {viewCriteria && <SaveAsViewButton criteria={viewCriteria} />}
+          </>
         )}
       </div>
+
+      {/* Select all matching banner */}
+      {table.getIsAllPageRowsSelected() && transactions.length > pageSize && !selectAllMatching && (
+        <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
+          <span>
+            All {Math.min(pageSize, transactions.length)} transactions on this page are selected.
+          </span>
+          <button
+            onClick={handleSelectAllMatching}
+            className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            Select all {transactions.length} transactions matching this filter
+          </button>
+        </div>
+      )}
+
+      {/* Confirmation banner when all matching are selected */}
+      {selectAllMatching && (
+        <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
+          <span>All {transactions.length} transactions matching this filter are selected.</span>
+          <button
+            onClick={handleClearSelection}
+            className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
 
       <div className="rounded-md border">
         <Table>
@@ -452,15 +674,15 @@ export function TransactionTable({
 
       {/* Bulk Delete Bar */}
       <BulkDeleteBar
-        selectedCount={selectedIds.length}
+        selectedCount={idsToDelete.length}
         onDelete={handleBulkDelete}
         onClearSelection={handleClearSelection}
-        isVisible={selectedIds.length > 0}
+        isVisible={selectedIds.length > 0 || selectAllMatching}
       />
 
       {/* Bulk Delete Confirmation Dialog */}
       <BulkDeleteModal
-        selectedIds={selectedIds}
+        selectedIds={idsToDelete}
         isOpen={bulkDeleteDialogOpen}
         onOpenChange={setBulkDeleteDialogOpen}
         onSuccess={handleBulkDeleteSuccess}

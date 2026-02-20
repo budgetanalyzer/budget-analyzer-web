@@ -1,6 +1,7 @@
 // src/store/uiSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { SortingState } from '@tanstack/react-table';
+import { TransactionType } from '@/types/transaction';
 
 interface TransactionTableState {
   sorting: SortingState;
@@ -11,6 +12,13 @@ interface TransactionTableState {
     from: string | null;
     to: string | null;
   };
+  bankNameFilter: string | null;
+  accountIdFilter: string | null;
+  typeFilter: TransactionType | null;
+  amountFilter: {
+    min: number | null;
+    max: number | null;
+  };
 }
 
 interface UiState {
@@ -19,6 +27,7 @@ interface UiState {
   displayCurrency: string;
   hasNavigated: boolean;
   transactionTable: TransactionTableState;
+  selectedViewIds: string[];
 }
 
 const initialState: UiState = {
@@ -35,7 +44,15 @@ const initialState: UiState = {
       from: null,
       to: null,
     },
+    bankNameFilter: null,
+    accountIdFilter: null,
+    typeFilter: null,
+    amountFilter: {
+      min: null,
+      max: null,
+    },
   },
+  selectedViewIds: JSON.parse(localStorage.getItem('selectedViewIds') || '[]'),
 };
 
 const uiSlice = createSlice({
@@ -77,8 +94,38 @@ const uiSlice = createSlice({
     ) => {
       state.transactionTable.dateFilter = action.payload;
     },
+    setTransactionTableBankNameFilter: (state, action: PayloadAction<string | null>) => {
+      state.transactionTable.bankNameFilter = action.payload;
+    },
+    setTransactionTableAccountIdFilter: (state, action: PayloadAction<string | null>) => {
+      state.transactionTable.accountIdFilter = action.payload;
+    },
+    setTransactionTableTypeFilter: (state, action: PayloadAction<TransactionType | null>) => {
+      state.transactionTable.typeFilter = action.payload;
+    },
+    setTransactionTableAmountFilter: (
+      state,
+      action: PayloadAction<{ min: number | null; max: number | null }>,
+    ) => {
+      state.transactionTable.amountFilter = action.payload;
+    },
     setHasNavigated: (state, action: PayloadAction<boolean>) => {
       state.hasNavigated = action.payload;
+    },
+    toggleViewSelection: (state, action: PayloadAction<string>) => {
+      const viewId = action.payload;
+      const currentSet = new Set(state.selectedViewIds);
+      if (currentSet.has(viewId)) {
+        currentSet.delete(viewId);
+      } else {
+        currentSet.add(viewId);
+      }
+      state.selectedViewIds = Array.from(currentSet);
+      localStorage.setItem('selectedViewIds', JSON.stringify(state.selectedViewIds));
+    },
+    setSelectedViewIds: (state, action: PayloadAction<string[]>) => {
+      state.selectedViewIds = action.payload;
+      localStorage.setItem('selectedViewIds', JSON.stringify(action.payload));
     },
   },
 });
@@ -94,5 +141,11 @@ export const {
   setTransactionTablePageSize,
   setTransactionTableGlobalFilter,
   setTransactionTableDateFilter,
+  setTransactionTableBankNameFilter,
+  setTransactionTableAccountIdFilter,
+  setTransactionTableTypeFilter,
+  setTransactionTableAmountFilter,
+  toggleViewSelection,
+  setSelectedViewIds,
 } = uiSlice.actions;
 export default uiSlice.reducer;

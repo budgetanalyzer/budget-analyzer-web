@@ -1,6 +1,13 @@
 // src/api/transactionApi.ts
 import { apiClient } from '@/api/client';
-import { Transaction, TransactionFilter, TransactionUpdateRequest } from '@/types/transaction';
+import {
+  Transaction,
+  TransactionFilter,
+  TransactionUpdateRequest,
+  PreviewResponse,
+  PreviewTransaction,
+  BatchImportResponse,
+} from '@/types/transaction';
 
 export const transactionApi = {
   getTransactions: async (): Promise<Transaction[]> => {
@@ -37,23 +44,21 @@ export const transactionApi = {
     return response.data;
   },
 
-  importTransactions: async (
-    files: File[],
+  previewTransactions: async (
+    file: File,
     format: string,
     accountId?: string,
-  ): Promise<Transaction[]> => {
+  ): Promise<PreviewResponse> => {
     const formData = new FormData();
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
+    formData.append('file', file);
 
     const params = new URLSearchParams({ format });
     if (accountId) {
       params.append('accountId', accountId);
     }
 
-    const response = await apiClient.post<Transaction[]>(
-      `/v1/transactions/import?${params.toString()}`,
+    const response = await apiClient.post<PreviewResponse>(
+      `/v1/transactions/preview?${params.toString()}`,
       formData,
       {
         headers: {
@@ -61,6 +66,15 @@ export const transactionApi = {
         },
       },
     );
+    return response.data;
+  },
+
+  batchImportTransactions: async (
+    transactions: PreviewTransaction[],
+  ): Promise<BatchImportResponse> => {
+    const response = await apiClient.post<BatchImportResponse>('/v1/transactions/batch', {
+      transactions,
+    });
     return response.data;
   },
 };

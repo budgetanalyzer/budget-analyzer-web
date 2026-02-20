@@ -113,14 +113,6 @@ cat src/store/hooks.ts
 
 ### API Layer
 
-**Three-mode system** for development flexibility:
-
-1. **Mock Data Mode** (default) - Static mocks from `src/api/mockData.ts`
-2. **MSW Mode** (tests) - Mock Service Worker handlers
-3. **Real API Mode** - Actual backend via axios
-
-**Toggle:** `VITE_USE_MOCK_DATA` environment variable
-
 **API Client (`src/api/client.ts`):**
 - Axios instance with 10s timeout
 - Request interceptor for auth tokens (future)
@@ -290,10 +282,6 @@ Required (see `.env.example`):
   - Dev default: `/api` (routed through Session Gateway to `https://api.budgetanalyzer.localhost`)
   - Production: Full URL like `https://api.bleurubin.com`
 
-- `VITE_USE_MOCK_DATA` - Enable mock data
-  - `true` - Use static mocks
-  - `false` - Make real API calls
-
 ## Code Quality
 
 **Principles**: Production parity, explicit over clever, question complexity
@@ -348,16 +336,13 @@ cat src/store/uiSlice.ts
 - User controls dev server (`npm run dev`) manually
 - Always use `npm run lint:fix` (auto-fixes)
 
-## Web Search Protocol
+## Honest Discourse
 
-BEFORE any WebSearch tool call:
-1. Read `Today's date` from `<env>` block
-2. Extract the current year
-3. Use current year in queries about "latest", "best", "current" topics
-4. NEVER use previous years unless explicitly searching historical content
+Do not over-validate ideas. The user wants honest pushback, not agreement.
 
-FAILURE MODE: Training data defaults to 2023/2024. Override with `<env>` year.
+- If something seems wrong, say so directly
+- Distinguish "novel" from "obvious in retrospect"
+- Push back on vague claims — ask for concrete constraints
+- Don't say "great question" or "that's a really interesting point"
+- Skip the preamble and caveats — just answer
 
-## Conversation Capture
-
-When the user asks to save this conversation, write it to `/workspace/architecture-conversations/conversations/` following the format in INDEX.md.

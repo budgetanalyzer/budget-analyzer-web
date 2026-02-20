@@ -12,6 +12,12 @@ import { UnauthorizedPage } from '@/features/admin/components/UnauthorizedPage';
 import { CurrenciesListPage } from '@/features/admin/currencies/pages/CurrenciesListPage';
 import { CurrencyCreatePage } from '@/features/admin/currencies/pages/CurrencyCreatePage';
 import { CurrencyEditPage } from '@/features/admin/currencies/pages/CurrencyEditPage';
+import { StatementFormatsListPage } from '@/features/admin/statement-formats/pages/StatementFormatsListPage';
+import { StatementFormatCreatePage } from '@/features/admin/statement-formats/pages/StatementFormatCreatePage';
+import { StatementFormatEditPage } from '@/features/admin/statement-formats/pages/StatementFormatEditPage';
+
+// Views imports
+import { ViewPage, ViewsPage } from '@/features/views';
 
 // Auth imports
 import { LoginPage } from '@/features/auth/pages/LoginPage';
@@ -26,12 +32,17 @@ function App() {
           <Route index element={<TransactionsPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="transactions/:id" element={<TransactionDetailPage />} />
+          <Route path="views" element={<ViewsPage />} />
+          <Route path="views/:id" element={<ViewPage />} />
           {/* Admin routes - using main layout until permissions are implemented */}
           <Route path="admin">
             <Route index element={<Navigate to="/admin/currencies" replace />} />
             <Route path="currencies" element={<CurrenciesListPage />} />
             <Route path="currencies/new" element={<CurrencyCreatePage />} />
             <Route path="currencies/:id" element={<CurrencyEditPage />} />
+            <Route path="statement-formats" element={<StatementFormatsListPage />} />
+            <Route path="statement-formats/new" element={<StatementFormatCreatePage />} />
+            <Route path="statement-formats/:formatKey" element={<StatementFormatEditPage />} />
           </Route>
         </Route>
 

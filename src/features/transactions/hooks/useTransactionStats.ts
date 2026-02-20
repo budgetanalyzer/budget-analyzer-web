@@ -10,6 +10,8 @@ export interface TransactionStats {
   totalCredits: number;
   totalDebits: number;
   netBalance: number;
+  earliestDate: string | null;
+  latestDate: string | null;
 }
 
 export interface MonthlyAverages {
@@ -44,6 +46,8 @@ export function useTransactionStats({
         totalCredits: 0,
         totalDebits: 0,
         netBalance: 0,
+        earliestDate: null,
+        latestDate: null,
       };
     }
 
@@ -70,6 +74,9 @@ export function useTransactionStats({
 
     const netBalance = totalCredits - totalDebits;
 
+    // Calculate date range
+    const dateRange = getDateRange(transactions.map((t) => t.date));
+
     const endTime = performance.now();
     console.log('[Stats] Calculation took', (endTime - startTime).toFixed(2), 'ms');
 
@@ -78,6 +85,8 @@ export function useTransactionStats({
       totalCredits,
       totalDebits,
       netBalance,
+      earliestDate: dateRange?.earliest ?? null,
+      latestDate: dateRange?.latest ?? null,
     };
   }, [transactions, displayCurrency, exchangeRatesMap]);
 
