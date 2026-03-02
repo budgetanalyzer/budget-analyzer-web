@@ -50,7 +50,7 @@ export function PreviewTable({
           <TableHead className="w-[130px]">Date</TableHead>
           <TableHead className="min-w-[200px]">Description</TableHead>
           <TableHead className="w-[120px]">Type</TableHead>
-          <TableHead className="w-[120px] text-right">Amount</TableHead>
+          <TableHead className="w-[160px] text-right">Amount</TableHead>
           <TableHead className="w-[80px]">Currency</TableHead>
           <TableHead className="w-[150px]">Account ID</TableHead>
           <TableHead className="w-[60px]"></TableHead>

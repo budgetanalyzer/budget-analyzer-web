@@ -140,7 +140,7 @@ export const PreviewTableRow = memo(function PreviewTableRow({
       </TableCell>
 
       {/* Amount */}
-      <TableCell className="w-[120px]">
+      <TableCell className="w-[160px]">
         <div className="relative">
           <Input
             type="number"

@@ -8,6 +8,7 @@ import { useView, useViewTransactions, viewKeys } from '@/hooks/useViews';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAppSelector } from '@/store/hooks';
+import { useTransactionStats } from '@/features/transactions/hooks/useTransactionStats';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -76,23 +77,17 @@ export function ViewPage() {
     displayCurrency,
   });
 
-  // Calculate stats from view transactions
+  // Calculate stats with proper currency conversion
+  const { stats: transactionStats } = useTransactionStats({
+    transactions: transactions ?? [],
+    displayCurrency,
+    exchangeRatesMap,
+  });
+
   const stats = useMemo<StatCardConfig[]>(() => {
     if (!transactions || !view) return [];
 
-    const totalTransactions = transactions.length;
     const pinnedTransactions = transactions.filter((t) => t.membershipType === 'PINNED').length;
-
-    // Calculate totals (simple sum without currency conversion for now)
-    let totalSpend = 0;
-    let totalIncome = 0;
-    transactions.forEach((t) => {
-      if (t.type === 'DEBIT') {
-        totalSpend += Math.abs(t.amount);
-      } else {
-        totalIncome += t.amount;
-      }
-    });
 
     // Calculate date range
     const dateRange = getDateRange(transactions.map((t) => t.date));
@@ -108,7 +103,7 @@ export function ViewPage() {
     return [
       {
         title: 'Total Transactions',
-        value: totalTransactions.toString(),
+        value: transactionStats.totalTransactions.toString(),
         description: dateRangeDescription,
         icon: Hash,
         iconClassName: 'text-blue-500',
@@ -122,7 +117,7 @@ export function ViewPage() {
       },
       {
         title: 'Total Spend',
-        value: formatCurrency(totalSpend, displayCurrency),
+        value: formatCurrency(transactionStats.totalDebits, displayCurrency),
         description: 'Sum of debits',
         icon: Calendar,
         iconClassName: 'text-red-500',
@@ -130,14 +125,14 @@ export function ViewPage() {
       },
       {
         title: 'Total Income',
-        value: formatCurrency(totalIncome, displayCurrency),
+        value: formatCurrency(transactionStats.totalCredits, displayCurrency),
         description: 'Sum of credits',
         icon: Calendar,
         iconClassName: 'text-green-500',
         valueClassName: 'text-green-600 dark:text-green-400',
       },
     ];
-  }, [transactions, view, displayCurrency]);
+  }, [transactions, view, displayCurrency, transactionStats]);
 
   const isLoading = isViewLoading || isTransactionsLoading;
   const error = viewError || transactionsError;
