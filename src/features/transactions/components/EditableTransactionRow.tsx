@@ -12,11 +12,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { TransactionAmountBadge } from '@/features/transactions/components/TransactionAmountBadge';
 import { formatLocalDate } from '@/utils/dates';
-import { MoreVertical, Pencil, Trash2, Check, X } from 'lucide-react';
+import { MoreVertical, Pencil, Trash2, Check, X, FolderPlus } from 'lucide-react';
+import { useViews, usePinTransaction } from '@/hooks/useViews';
+import { toast } from 'sonner';
+import { formatApiError } from '@/utils/errorMessages';
 
 interface EditableTransactionRowProps {
   transaction: Transaction;
@@ -48,6 +55,10 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
   const [isEditing, setIsEditing] = useState(false);
   const [editingDescription, setEditingDescription] = useState('');
   const [editingAccountId, setEditingAccountId] = useState('');
+
+  // Fetch views for "Add to View" submenu
+  const { data: views, isLoading: isLoadingViews } = useViews();
+  const { mutate: pinTransaction, isPending: isPinning } = usePinTransaction();
 
   const handleStartEdit = useCallback(() => {
     setIsEditing(true);
@@ -108,6 +119,23 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       onRowClick(transaction);
     }
   }, [isEditing, onRowClick, transaction]);
+
+  const handlePinToView = useCallback(
+    (viewId: string, viewName: string) => {
+      pinTransaction(
+        { viewId, txnId: transaction.id },
+        {
+          onSuccess: () => {
+            toast.success(`Added to "${viewName}"`);
+          },
+          onError: (error) => {
+            toast.error(formatApiError(error, 'Failed to add to view'));
+          },
+        },
+      );
+    },
+    [pinTransaction, transaction.id],
+  );
 
   return (
     <TableRow
@@ -250,6 +278,33 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit
                 </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={isLoadingViews || isPinning}>
+                    <FolderPlus className="mr-2 h-4 w-4" />
+                    Add to View
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {isLoadingViews ? (
+                      <DropdownMenuItem disabled>Loading views...</DropdownMenuItem>
+                    ) : views && views.length > 0 ? (
+                      views.map((view) => (
+                        <DropdownMenuItem
+                          key={view.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePinToView(view.id, view.name);
+                          }}
+                          disabled={isPinning}
+                        >
+                          {view.name}
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <DropdownMenuItem disabled>No views available</DropdownMenuItem>
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   destructive
                   onClick={(e) => {

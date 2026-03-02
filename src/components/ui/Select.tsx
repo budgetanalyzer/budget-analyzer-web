@@ -40,10 +40,11 @@ interface SelectTriggerProps {
   children: React.ReactNode;
   className?: string;
   id?: string;
+  disabled?: boolean;
 }
 
 export const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(
-  ({ children, className, id }, ref) => {
+  ({ children, className, id, disabled }, ref) => {
     const { open, setOpen } = useSelect();
 
     return (
@@ -51,7 +52,8 @@ export const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerPr
         ref={ref}
         id={id}
         type="button"
-        onClick={() => setOpen(!open)}
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(!open)}
         className={cn(
           'flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
           'placeholder:text-muted-foreground',

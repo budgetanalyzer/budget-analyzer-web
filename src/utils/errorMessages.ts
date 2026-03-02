@@ -11,8 +11,12 @@ const ERROR_MESSAGES: Record<string, string> = {
   // Transaction import errors
   CSV_FORMAT_NOT_SUPPORTED: 'This CSV format is not supported',
   CSV_PARSING_ERROR: 'Unable to parse the CSV file',
+  FORMAT_NOT_SUPPORTED: 'This statement format is not supported',
   TRANSACTION_DATE_TOO_OLD: 'Transaction dates before the year 2000 are not supported',
   TRANSACTION_DATE_TOO_FAR_IN_FUTURE: 'Transaction dates in the future are not supported',
+
+  // Statement format errors
+  FORMAT_KEY_ALREADY_EXISTS: 'A format with this key already exists',
 
   // Currency errors
   INVALID_PROVIDER_SERIES_ID: 'The requested currency series id is invalid',

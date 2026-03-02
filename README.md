@@ -2,7 +2,7 @@
 
 > "Archetype: interface. Role: React SPA; bridges users to the backend system."
 >
-> — [CLAUDE.md](CLAUDE.md#tree-position)
+> — [AGENTS.md](AGENTS.md#tree-position)
 
 Modern React web application for Budget Analyzer - a reference architecture for microservices with a React frontend.
 
@@ -86,13 +86,6 @@ See [docs/authentication.md](docs/authentication.md) for complete authentication
 
 ## Features
 
-### Mock Data Mode
-
-By default, the app runs with mock data for:
-- Testing UI without a backend
-- Independent feature development
-- Simulating API errors and edge cases
-
 ### Transaction List
 
 - Summary cards with financial statistics
@@ -157,7 +150,6 @@ Ensure backend infrastructure is running (see prerequisites above), then update 
 
 ```env
 VITE_API_BASE_URL=/api
-VITE_USE_MOCK_DATA=false
 ```
 
 All API requests go through the NGINX gateway at `https://api.budgetanalyzer.localhost/api/*`

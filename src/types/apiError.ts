@@ -2,7 +2,8 @@
 export interface FieldError {
   field: string;
   message: string;
-  rejectedValue: unknown;
+  rejectedValue?: unknown;
+  index?: number;
 }
 
 export type ApiErrorType =

@@ -2,6 +2,7 @@
 import { Calendar, Scale, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { formatCurrency } from '@/utils/currency';
+import { formatLocalDate } from '@/utils/dates';
 import type {
   TransactionStats,
   MonthlyAverages,
@@ -26,6 +27,12 @@ export interface StatCardConfig {
  * @param displayCurrency Currency code for formatting amounts
  * @returns Array of stat card configurations
  */
+function formatDateRange(earliest: string | null, latest: string | null): string {
+  if (!earliest || !latest) return 'No transactions';
+  if (earliest === latest) return formatLocalDate(earliest);
+  return `${formatLocalDate(earliest)} - ${formatLocalDate(latest)}`;
+}
+
 export function buildMainStatsConfig(
   stats: TransactionStats,
   displayCurrency: string,
@@ -34,7 +41,7 @@ export function buildMainStatsConfig(
     {
       title: 'Total Transactions',
       value: stats.totalTransactions,
-      description: 'Filtered results',
+      description: formatDateRange(stats.earliestDate, stats.latestDate),
       icon: Wallet,
     },
     {

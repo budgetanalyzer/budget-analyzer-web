@@ -21,21 +21,46 @@ import {
 } from '@/features/transactions/components/statsConfig';
 import { useAppSelector } from '@/store/hooks';
 import { isDateInRange } from '@/utils/dates';
+import { parseSearchTerms } from '@/utils/parseSearchTerms';
+import { ViewCriteriaApi } from '@/types/view';
 
 export function TransactionsPage() {
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const globalFilter = useAppSelector((state) => state.ui.transactionTable.globalFilter);
   const dateFilter = useAppSelector((state) => state.ui.transactionTable.dateFilter);
+  const bankNameFilter = useAppSelector((state) => state.ui.transactionTable.bankNameFilter);
+  const accountIdFilter = useAppSelector((state) => state.ui.transactionTable.accountIdFilter);
+  const typeFilter = useAppSelector((state) => state.ui.transactionTable.typeFilter);
+  const amountFilter = useAppSelector((state) => state.ui.transactionTable.amountFilter);
 
   // Sync URL params with Redux state for transaction filters
-  const { handleDateFilterChange, handleSearchChange, hasActiveFilters } =
-    useTransactionFiltersSync();
+  const {
+    handleDateFilterChange,
+    handleSearchChange,
+    handleBankNameFilterChange,
+    handleAccountIdFilterChange,
+    handleTypeFilterChange,
+    handleAmountFilterChange,
+    hasActiveFilters,
+    clearAllFilters,
+  } = useTransactionFiltersSync();
 
   // Fetch exchange rates and build map for currency conversion
   const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap({
     displayCurrency,
   });
+
+  // Compute available filter options from all transactions
+  const availableBankNames = useMemo(() => {
+    if (!transactions) return [];
+    return [...new Set(transactions.map((t) => t.bankName))].sort();
+  }, [transactions]);
+
+  const availableAccountIds = useMemo(() => {
+    if (!transactions) return [];
+    return [...new Set(transactions.map((t) => t.accountId).filter(Boolean) as string[])].sort();
+  }, [transactions]);
 
   // Apply filters to transactions
   const filteredTransactions = useMemo(() => {
@@ -50,20 +75,56 @@ export function TransactionsPage() {
       );
     }
 
-    // Apply text search filter
+    // Apply text search filter (supports quoted phrases and OR matching)
     if (globalFilter) {
-      const searchLower = globalFilter.toLowerCase();
-      filtered = filtered.filter((transaction) => {
-        return (
-          transaction.description.toLowerCase().includes(searchLower) ||
-          transaction.bankName.toLowerCase().includes(searchLower) ||
-          (transaction.accountId && transaction.accountId.toLowerCase().includes(searchLower))
-        );
-      });
+      const searchTerms = parseSearchTerms(globalFilter);
+      if (searchTerms.length > 0) {
+        filtered = filtered.filter((transaction) => {
+          const description = transaction.description.toLowerCase();
+          const bankName = transaction.bankName.toLowerCase();
+          // OR: match if ANY term matches
+          return searchTerms.some((term) => description.includes(term) || bankName.includes(term));
+        });
+      }
+    }
+
+    // Apply bank name filter
+    if (bankNameFilter) {
+      filtered = filtered.filter((transaction) => transaction.bankName === bankNameFilter);
+    }
+
+    // Apply account ID filter
+    if (accountIdFilter) {
+      filtered = filtered.filter((transaction) => transaction.accountId === accountIdFilter);
+    }
+
+    // Apply type filter
+    if (typeFilter) {
+      filtered = filtered.filter((transaction) => transaction.type === typeFilter);
+    }
+
+    // Apply amount filter
+    if (amountFilter.min !== null) {
+      filtered = filtered.filter(
+        (transaction) => Math.abs(transaction.amount) >= amountFilter.min!,
+      );
+    }
+    if (amountFilter.max !== null) {
+      filtered = filtered.filter(
+        (transaction) => Math.abs(transaction.amount) <= amountFilter.max!,
+      );
     }
 
     return filtered;
-  }, [transactions, dateFilter, globalFilter]);
+  }, [
+    transactions,
+    dateFilter,
+    globalFilter,
+    bankNameFilter,
+    accountIdFilter,
+    typeFilter,
+    amountFilter,
+  ]);
 
   // Handle import success/error messages with auto-dismiss
   const { importMessage, handleImportSuccess, handleImportError, clearImportMessage } =
@@ -88,6 +149,33 @@ export function TransactionsPage() {
     () => buildMonthlyStatsConfig(monthlyAverages, displayCurrency),
     [monthlyAverages, displayCurrency],
   );
+
+  // Build criteria from current filters for SaveAsViewButton
+  const viewCriteria = useMemo((): ViewCriteriaApi => {
+    const criteria: ViewCriteriaApi = {};
+    if (dateFilter?.from) {
+      criteria.startDate = dateFilter.from;
+    }
+    if (dateFilter?.to) {
+      criteria.endDate = dateFilter.to;
+    }
+    if (globalFilter) {
+      criteria.searchText = globalFilter;
+    }
+    if (bankNameFilter) {
+      criteria.bankNames = [bankNameFilter];
+    }
+    if (accountIdFilter) {
+      criteria.accountIds = [accountIdFilter];
+    }
+    if (amountFilter.min !== null) {
+      criteria.minAmount = amountFilter.min;
+    }
+    if (amountFilter.max !== null) {
+      criteria.maxAmount = amountFilter.max;
+    }
+    return criteria;
+  }, [dateFilter, globalFilter, bankNameFilter, accountIdFilter, amountFilter]);
 
   if (isLoading) {
     return (
@@ -148,9 +236,17 @@ export function TransactionsPage() {
                   transactions={filteredTransactions}
                   onDateFilterChange={handleDateFilterChange}
                   onSearchChange={handleSearchChange}
+                  onBankNameFilterChange={handleBankNameFilterChange}
+                  onAccountIdFilterChange={handleAccountIdFilterChange}
+                  onTypeFilterChange={handleTypeFilterChange}
+                  onAmountFilterChange={handleAmountFilterChange}
+                  onClearAllFilters={clearAllFilters}
                   displayCurrency={displayCurrency}
                   exchangeRatesMap={exchangeRatesMap}
                   isExchangeRatesLoading={isExchangeRatesLoading}
+                  availableBankNames={availableBankNames}
+                  availableAccountIds={availableAccountIds}
+                  viewCriteria={viewCriteria}
                 />
               )}
             </CardContent>
