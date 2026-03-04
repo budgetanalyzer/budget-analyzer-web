@@ -50,10 +50,10 @@ For API requests:
 ```typescript
 // User clicks login button
 const { login } = useAuth();
-login(); // Redirects to /oauth2/authorization/auth0
+login(); // Redirects to /oauth2/authorization/idp
 
 // Session Gateway handles:
-// 1. Redirect to Auth0 login
+// 1. Redirect to IdP login
 // 2. OAuth callback
 // 3. Store JWT in Redis
 // 4. Set session cookie
@@ -70,7 +70,7 @@ logout(); // Calls POST /logout
 // Session Gateway handles:
 // 1. Invalidate Redis session
 // 2. Clear session cookie
-// 3. Redirect to Auth0 logout
+// 3. Redirect to IdP logout
 // 4. Redirect back to frontend
 ```
 
@@ -145,7 +145,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      window.location.href = '/oauth2/authorization/auth0';
+      window.location.href = '/oauth2/authorization/idp';
     }
     throw error;
   }
@@ -156,13 +156,13 @@ apiClient.interceptors.response.use(
 
 ```typescript
 interface User {
-  sub: string;             // User ID (Auth0 subject)
+  sub: string;             // User ID (IdP subject)
   email: string;
   name?: string;
   picture?: string;        // Profile picture URL
   emailVerified?: boolean;
   authenticated: boolean;
-  registrationId?: string; // "auth0"
+  registrationId?: string; // "idp"
   roles?: UserRole[];      // Custom roles (if added by backend)
 }
 ```
@@ -238,8 +238,8 @@ Session Gateway proxies to NGINX (8080) for both API and frontend requests.
 ### Manual Testing
 
 1. Navigate to `https://app.budgetanalyzer.localhost/login`
-2. Click "Sign in with Auth0"
-3. Login with Auth0 credentials
+2. Click "Sign in"
+3. Login with your credentials
 4. Check browser DevTools → Application → Cookies
 5. Should see `SESSION` cookie with HttpOnly flag
 6. Navigate to `https://app.budgetanalyzer.localhost/admin`

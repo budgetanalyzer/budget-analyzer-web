@@ -8,7 +8,7 @@ import type { User } from '@/types/auth';
  * NGINX SSL termination at https://app.budgetanalyzer.localhost (port 443).
  *
  * All requests go through the Session Gateway which manages:
- * - OAuth2/OIDC flows with Auth0
+ * - OAuth2/OIDC flows with identity provider
  * - Session cookies (HttpOnly, Secure, SameSite)
  * - JWT token storage in Redis
  * - Automatic token refresh
@@ -42,7 +42,7 @@ export async function getCurrentUser(): Promise<User> {
  * Calls Session Gateway /logout endpoint which:
  * - Invalidates Redis session
  * - Clears session cookie
- * - Redirects to Auth0 logout (then back to app)
+ * - Redirects to IdP logout (then back to app)
  */
 export async function logout(): Promise<void> {
   await authClient.post('/logout');

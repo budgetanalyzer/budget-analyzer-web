@@ -70,7 +70,6 @@ export function TransactionDetailPage() {
       needsConversion: true as const,
       convertedAmount,
       rate: exchangeRateResponse?.rate,
-      publishedDate: exchangeRateResponse?.publishedDate,
       rateDate: exchangeRateResponse?.date,
       usedFallbackRate,
       sourceCurrency,

@@ -44,7 +44,6 @@ export interface ExchangeRateResponse {
   targetCurrency: string;
   date: string; // LocalDate format (YYYY-MM-DD)
   rate: number;
-  publishedDate: string; // LocalDate format (YYYY-MM-DD)
 }
 
 /**

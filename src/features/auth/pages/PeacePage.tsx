@@ -4,7 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 /**
  * Peace Page - Logout confirmation
  *
- * Displayed after successful logout from Auth0.
+ * Displayed after successful logout from identity provider.
  * Provides option to sign back in.
  */
 export function PeacePage() {

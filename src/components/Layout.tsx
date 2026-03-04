@@ -9,6 +9,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { UserProfileDropdown } from '@/features/auth/components/UserProfileDropdown';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { Authorization } from '@/lib/authorization';
 import { cn } from '@/utils/cn';
 import { useAppDispatch } from '@/store/hooks';
 import { setHasNavigated } from '@/store/uiSlice';
@@ -69,17 +70,19 @@ export function Layout() {
               >
                 Analytics
               </Link>
-              <Link
-                to="/admin/currencies"
-                className={cn(
-                  'text-sm font-medium transition-colors hover:text-primary',
-                  location.pathname.startsWith('/admin')
-                    ? 'text-foreground'
-                    : 'text-muted-foreground',
-                )}
-              >
-                Currencies
-              </Link>
+              <Authorization allowedRoles={['ADMIN']}>
+                <Link
+                  to="/admin/currencies"
+                  className={cn(
+                    'text-sm font-medium transition-colors hover:text-primary',
+                    location.pathname.startsWith('/admin')
+                      ? 'text-foreground'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  Currencies
+                </Link>
+              </Authorization>
               <ViewSelector />
             </nav>
           </div>

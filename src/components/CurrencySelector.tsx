@@ -42,8 +42,11 @@ export function CurrencySelector() {
           >
             USD
           </DropdownMenuItem>
-          {/* Then show all other enabled currencies */}
-          {currencies?.map((currencySeries) => (
+          {/* Then show all other enabled currencies, sorted alphabetically */}
+          {currencies
+            ?.slice()
+            .sort((a, b) => a.currencyCode.localeCompare(b.currencyCode))
+            .map((currencySeries) => (
             <DropdownMenuItem
               key={currencySeries.id}
               onClick={() => handleCurrencyChange(currencySeries.currencyCode)}

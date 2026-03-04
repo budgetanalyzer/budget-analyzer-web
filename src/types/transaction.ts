@@ -12,25 +12,6 @@ export interface Transaction {
   description: string;
   createdAt: string;
   updatedAt: string;
-  deleted?: boolean;
-  deletedAt?: string;
-}
-
-export interface TransactionFilter {
-  id?: number;
-  accountId?: string;
-  bankName?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  currencyIsoCode?: string;
-  minAmount?: number;
-  maxAmount?: number;
-  type?: TransactionType;
-  description?: string;
-  createdAfter?: string;
-  createdBefore?: string;
-  updatedAfter?: string;
-  updatedBefore?: string;
 }
 
 export interface TransactionUpdateRequest {

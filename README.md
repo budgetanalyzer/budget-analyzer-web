@@ -15,7 +15,7 @@ Budget Analyzer Web is a full-featured React application that provides:
 - **Multi-currency Support**: Handle transactions in different currencies
 - **Responsive Design**: Mobile-first design with dark mode support
 - **Advanced Table**: Sortable, filterable, and paginated transaction views
-- **Secure Authentication**: OAuth2/OIDC via Auth0 with session-based security
+- **Secure Authentication**: OAuth2/OIDC via identity provider (IdP) with session-based security
 
 ## Technology Stack
 
@@ -77,7 +77,7 @@ VITE_API_BASE_URL=/api
 - API calls: Browser → Load Balancer → Session Gateway → NGINX → Backend services
 
 **Why Session Gateway?**
-- Handles OAuth2 authentication with Auth0
+- Handles OAuth2 authentication with identity provider
 - Manages session cookies (HttpOnly, Secure, SameSite)
 - Stores JWTs server-side in Redis (never exposed to browser)
 - Automatically adds JWTs to API requests
@@ -214,15 +214,19 @@ The optimized files will be in `dist/`. Deploy to any static hosting:
 ## Integration
 
 This frontend integrates with the Budget Analyzer microservices:
+- **[Session Gateway](https://github.com/budgetanalyzer/session-gateway)** (BFF) — handles OAuth2 login, mints internal JWTs, stores tokens server-side in Redis (never exposed to browser)
+- **API Gateway** (NGINX) for unified routing, with JWT validation via [Token Validation Service](https://github.com/budgetanalyzer/token-validation-service)
 - **Transaction Service** for transaction data
 - **Currency Service** for currency and exchange rates
-- **API Gateway** (NGINX) for unified routing
+- **[Permission Service](https://github.com/budgetanalyzer/permission-service)** for user roles and permissions (resolved during login, embedded in JWT)
 
 See the [orchestration repository](https://github.com/budgetanalyzer/orchestration) for full system setup.
 
 ## Related Repositories
 
 - **Orchestration**: https://github.com/budgetanalyzer/orchestration
+- **Session Gateway**: https://github.com/budgetanalyzer/session-gateway
+- **Permission Service**: https://github.com/budgetanalyzer/permission-service
 - **Service Common**: https://github.com/budgetanalyzer/service-common
 - **Transaction Service**: https://github.com/budgetanalyzer/transaction-service
 - **Currency Service**: https://github.com/budgetanalyzer/currency-service

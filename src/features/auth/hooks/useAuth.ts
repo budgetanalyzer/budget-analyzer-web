@@ -9,7 +9,7 @@ import * as authApi from '@/api/auth';
  *
  * Authentication flow:
  * 1. User clicks login -> redirected to Session Gateway OAuth flow
- * 2. Session Gateway handles OAuth with Auth0, stores JWT in Redis
+ * 2. Session Gateway handles OAuth with identity provider, stores JWT in Redis
  * 3. Session Gateway sets HttpOnly session cookie in browser
  * 4. Frontend checks /user endpoint to get current user info
  * 5. All API calls include session cookie automatically (credentials: 'include')
@@ -40,20 +40,20 @@ export function useAuth() {
   const login = (returnUrl?: string) => {
     // Redirect to Session Gateway OAuth2 authorization endpoint
     // Session Gateway will:
-    // 1. Redirect to Auth0 for authentication
+    // 1. Redirect to identity provider for authentication
     // 2. Handle OAuth callback
     // 3. Store tokens in Redis
     // 4. Set session cookie
     // 5. Redirect back to frontend
     const url = returnUrl
-      ? `/oauth2/authorization/auth0?returnUrl=${encodeURIComponent(returnUrl)}`
-      : '/oauth2/authorization/auth0';
+      ? `/oauth2/authorization/idp?returnUrl=${encodeURIComponent(returnUrl)}`
+      : '/oauth2/authorization/idp';
     window.location.href = url;
   };
 
   // Logout - navigate to Session Gateway logout endpoint
   // This allows the browser to follow the full redirect chain:
-  // /logout → Session Gateway clears session → Auth0 logout → back to app
+  // /logout → Session Gateway clears session → IdP logout → back to app
   const logout = () => {
     // Clear cached data before navigating
     queryClient.clear();

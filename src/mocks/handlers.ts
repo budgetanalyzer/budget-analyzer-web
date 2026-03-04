@@ -2,6 +2,15 @@
 import { http, HttpResponse } from 'msw';
 
 export const handlers = [
+  http.get('/user', () => {
+    return HttpResponse.json({
+      sub: 'mock-user-id',
+      email: 'admin@example.com',
+      name: 'Admin User',
+      authenticated: true,
+      roles: ['ADMIN'],
+    });
+  }),
   http.get('/api/v1/transactions', () => {
     return HttpResponse.json([
       {
