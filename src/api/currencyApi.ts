@@ -21,34 +21,31 @@ export const currencyApi = {
 
   /**
    * Get currency series by ID
-   * GET /v1/admin/currencies/{id}
+   * GET /v1/currencies/{id}
    */
   getCurrencyById: async (id: number): Promise<CurrencySeriesResponse> => {
-    const response = await apiClient.get<CurrencySeriesResponse>(`/v1/admin/currencies/${id}`);
+    const response = await apiClient.get<CurrencySeriesResponse>(`/v1/currencies/${id}`);
     return response.data;
   },
 
   /**
    * Create a new currency series
-   * POST /v1/admin/currencies
+   * POST /v1/currencies
    */
   createCurrency: async (request: CurrencySeriesCreateRequest): Promise<CurrencySeriesResponse> => {
-    const response = await apiClient.post<CurrencySeriesResponse>('/v1/admin/currencies', request);
+    const response = await apiClient.post<CurrencySeriesResponse>('/v1/currencies', request);
     return response.data;
   },
 
   /**
    * Update an existing currency series
-   * PUT /v1/admin/currencies/{id}
+   * PUT /v1/currencies/{id}
    */
   updateCurrency: async (
     id: number,
     request: CurrencySeriesUpdateRequest,
   ): Promise<CurrencySeriesResponse> => {
-    const response = await apiClient.put<CurrencySeriesResponse>(
-      `/v1/admin/currencies/${id}`,
-      request,
-    );
+    const response = await apiClient.put<CurrencySeriesResponse>(`/v1/currencies/${id}`, request);
     return response.data;
   },
 

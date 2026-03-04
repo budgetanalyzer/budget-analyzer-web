@@ -14,14 +14,9 @@ export function UnauthorizedPage() {
         <p className="mb-6 text-lg text-muted-foreground">
           You don&apos;t have permission to access this page.
         </p>
-        <div className="flex gap-4 justify-center">
-          <Link to="/">
-            <Button variant="default">Go to Home</Button>
-          </Link>
-          <Link to="/admin">
-            <Button variant="outline">Admin Dashboard</Button>
-          </Link>
-        </div>
+        <Link to="/">
+          <Button variant="default">Go to Home</Button>
+        </Link>
       </div>
     </div>
   );

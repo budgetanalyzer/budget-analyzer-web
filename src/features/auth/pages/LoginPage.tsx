@@ -7,7 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
  *
  * Redirects users to Session Gateway OAuth2 flow.
  * Session Gateway will:
- * 1. Redirect to Auth0 for authentication
+ * 1. Redirect to identity provider for authentication
  * 2. Handle OAuth callback
  * 3. Store tokens in Redis
  * 4. Set HttpOnly session cookie
@@ -49,7 +49,7 @@ export function LoginPage() {
             onClick={handleLogin}
             className="group relative flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
-            Sign in with Auth0
+            Sign in
           </button>
         </div>
       </div>

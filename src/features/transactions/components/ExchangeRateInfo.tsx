@@ -6,7 +6,6 @@ interface ExchangeRateInfoProps {
   rate: number;
   sourceCurrency: string;
   targetCurrency: string;
-  publishedDate?: string;
   rateDate?: string;
   usedFallbackRate: boolean;
 }
@@ -19,7 +18,6 @@ export function ExchangeRateInfo({
   rate,
   sourceCurrency,
   targetCurrency,
-  publishedDate,
   rateDate,
   usedFallbackRate,
 }: ExchangeRateInfoProps) {
@@ -36,17 +34,12 @@ export function ExchangeRateInfo({
       <div className="flex-1">
         <p className="text-sm font-medium text-muted-foreground">Exchange Rate</p>
         <p className="text-base">{rateText}</p>
-        {publishedDate && rateDate && (
+        {rateDate && (
           <p className={`text-xs mt-1 ${usedFallbackRate ? 'text-warning' : 'text-success'}`}>
             {usedFallbackRate ? (
-              <>
-                Rate from {formatLocalDate(rateDate)} (nearest available)
-                <span className="block mt-0.5 text-muted-foreground">
-                  FRED daily spot rate published on {formatLocalDate(publishedDate)}
-                </span>
-              </>
+              <>Rate from {formatLocalDate(rateDate)} (nearest available)</>
             ) : (
-              <>FRED daily spot rate published on {formatLocalDate(publishedDate)}</>
+              <>FRED daily spot rate for {formatLocalDate(rateDate)}</>
             )}
           </p>
         )}

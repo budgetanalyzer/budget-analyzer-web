@@ -2,7 +2,6 @@
 import { apiClient } from '@/api/client';
 import {
   Transaction,
-  TransactionFilter,
   TransactionUpdateRequest,
   PreviewResponse,
   PreviewTransaction,
@@ -17,11 +16,6 @@ export const transactionApi = {
 
   getTransaction: async (id: number): Promise<Transaction> => {
     const response = await apiClient.get<Transaction>(`/v1/transactions/${id}`);
-    return response.data;
-  },
-
-  searchTransactions: async (filter: TransactionFilter): Promise<Transaction[]> => {
-    const response = await apiClient.post<Transaction[]>('/v1/transactions/search', filter);
     return response.data;
   },
 

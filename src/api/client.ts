@@ -78,7 +78,7 @@ apiClient.interceptors.response.use(
       console.warn('Redirecting to login...');
       console.groupEnd();
       // Redirect to login - Session Gateway will handle OAuth flow
-      window.location.href = '/oauth2/authorization/auth0';
+      window.location.href = '/oauth2/authorization/idp';
       return;
     }
 

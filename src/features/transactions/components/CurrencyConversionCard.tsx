@@ -16,7 +16,6 @@ type ConversionInfo =
       needsConversion: true;
       convertedAmount: number;
       rate?: number;
-      publishedDate?: string;
       rateDate?: string;
       usedFallbackRate: boolean;
       sourceCurrency: string;
@@ -85,7 +84,6 @@ export function CurrencyConversionCard({
                   rate={conversionInfo.rate}
                   sourceCurrency={conversionInfo.sourceCurrency}
                   targetCurrency={conversionInfo.targetCurrency}
-                  publishedDate={conversionInfo.publishedDate}
                   rateDate={conversionInfo.rateDate}
                   usedFallbackRate={conversionInfo.usedFallbackRate}
                 />

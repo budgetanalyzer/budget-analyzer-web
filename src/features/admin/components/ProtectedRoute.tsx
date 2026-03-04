@@ -1,18 +1,23 @@
 import { Navigate } from 'react-router-dom';
+import type { UserRole } from '@/types/auth';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useAuthorization } from '@/lib/useAuthorization';
 
 interface ProtectedRouteProps {
+  allowedRoles?: UserRole[];
   children: React.ReactNode;
 }
 
 /**
- * Route guard component that protects routes based on authentication
+ * Route guard component that protects routes based on authentication and roles
  *
  * Usage:
  * - <ProtectedRoute>...</ProtectedRoute> - Requires authentication only
+ * - <ProtectedRoute allowedRoles={['ADMIN']}>...</ProtectedRoute> - Requires auth + role
  */
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
+export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth();
+  const { checkAccess } = useAuthorization();
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -31,6 +36,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/login" replace />;
   }
 
-  // User is authenticated
+  // Check role-based access if roles are specified
+  if (allowedRoles && !checkAccess({ allowedRoles })) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  // User is authenticated and authorized
   return <>{children}</>;
 }

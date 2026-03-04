@@ -12,7 +12,9 @@ export type ApiErrorType =
   | 'NOT_FOUND'
   | 'APPLICATION_ERROR'
   | 'SERVICE_UNAVAILABLE'
-  | 'INTERNAL_ERROR';
+  | 'INTERNAL_ERROR'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN';
 
 export interface ApiErrorResponse {
   type: ApiErrorType;
