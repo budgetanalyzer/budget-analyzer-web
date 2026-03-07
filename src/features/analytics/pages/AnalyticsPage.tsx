@@ -1,11 +1,14 @@
 // src/features/analytics/pages/AnalyticsPage.tsx
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
+import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
 import { useAnalyticsData } from '@/features/analytics/hooks/useAnalyticsData';
 import { fadeInVariants, layoutTransition, fadeVariants, fadeTransition } from '@/lib/animations';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { MissingExchangeRatesBanner } from '@/components/MissingExchangeRatesBanner';
 import { PageHeader } from '@/components/PageHeader';
 import { MonthlySpendingGrid } from '@/features/analytics/components/MonthlySpendingGrid';
 import { YearlySpendingGrid } from '@/features/analytics/components/YearlySpendingGrid';
@@ -25,6 +28,7 @@ import {
 } from '@/features/analytics/utils/urlState';
 
 export function AnalyticsPage() {
+  const queryClient = useQueryClient();
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -36,9 +40,20 @@ export function AnalyticsPage() {
     TRANSACTION_TYPES.DEBIT;
 
   // Fetch exchange rates for currency conversion
-  const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap({
+  const {
+    exchangeRatesMap,
+    pendingCurrencies,
+    isLoading: isExchangeRatesLoading,
+  } = useExchangeRatesMap({
     displayCurrency,
   });
+
+  const disabledCurrencies = useMissingCurrencies();
+
+  const handleRefreshExchangeRates = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
+    queryClient.invalidateQueries({ queryKey: ['currencies'] });
+  }, [queryClient]);
 
   // Get selected year from URL or default to current year (will be updated to latestYear with data)
   const currentYear = useMemo(() => getCurrentYear(), []);
@@ -156,6 +171,17 @@ export function AnalyticsPage() {
             : 'Yearly spending overview'
         }
       />
+
+      <AnimatePresence>
+        {(disabledCurrencies.length > 0 || pendingCurrencies.length > 0) && (
+          <MissingExchangeRatesBanner
+            disabledCurrencies={disabledCurrencies}
+            pendingCurrencies={pendingCurrencies}
+            onRefresh={handleRefreshExchangeRates}
+            isRefreshing={isExchangeRatesLoading}
+          />
+        )}
+      </AnimatePresence>
 
       <motion.div
         variants={fadeInVariants}

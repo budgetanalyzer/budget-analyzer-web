@@ -1,4 +1,5 @@
 // src/components/CurrencySelector.tsx
+import { useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import {
@@ -15,6 +16,14 @@ export function CurrencySelector() {
   const dispatch = useAppDispatch();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const { data: currencies, isLoading } = useCurrencies(true); // Only show enabled currencies
+
+  // Reset display currency to USD if the selected currency is no longer enabled
+  const enabledCodes = currencies?.map((c) => c.currencyCode);
+  useEffect(() => {
+    if (enabledCodes && displayCurrency !== 'USD' && !enabledCodes.includes(displayCurrency)) {
+      dispatch(setDisplayCurrency('USD'));
+    }
+  }, [enabledCodes, displayCurrency, dispatch]);
 
   const handleCurrencyChange = (currency: string) => {
     dispatch(setDisplayCurrency(currency));
@@ -47,14 +56,14 @@ export function CurrencySelector() {
             ?.slice()
             .sort((a, b) => a.currencyCode.localeCompare(b.currencyCode))
             .map((currencySeries) => (
-            <DropdownMenuItem
-              key={currencySeries.id}
-              onClick={() => handleCurrencyChange(currencySeries.currencyCode)}
-              className={currencySeries.currencyCode === displayCurrency ? 'bg-accent' : ''}
-            >
-              {currencySeries.currencyCode}
-            </DropdownMenuItem>
-          ))}
+              <DropdownMenuItem
+                key={currencySeries.id}
+                onClick={() => handleCurrencyChange(currencySeries.currencyCode)}
+                className={currencySeries.currencyCode === displayCurrency ? 'bg-accent' : ''}
+              >
+                {currencySeries.currencyCode}
+              </DropdownMenuItem>
+            ))}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

@@ -3,6 +3,7 @@ import { apiClient } from '@/api/client';
 import {
   Transaction,
   TransactionUpdateRequest,
+  TransactionCountFilter,
   PreviewResponse,
   PreviewTransaction,
   BatchImportResponse,
@@ -69,6 +70,11 @@ export const transactionApi = {
     const response = await apiClient.post<BatchImportResponse>('/v1/transactions/batch', {
       transactions,
     });
+    return response.data;
+  },
+
+  countTransactions: async (filter: TransactionCountFilter): Promise<number> => {
+    const response = await apiClient.get<number>('/v1/transactions/count', { params: filter });
     return response.data;
   },
 };

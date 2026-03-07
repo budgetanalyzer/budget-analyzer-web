@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { MessageBanner } from '@/components/MessageBanner';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CurrencyForm } from '@/features/admin/currencies/components/CurrencyForm';
+import { ConfirmDisableCurrencyDialog } from '@/features/admin/currencies/components/ConfirmDisableCurrencyDialog';
 import { useCurrency, useUpdateCurrency } from '@/hooks/useCurrencies';
 import { formatApiError } from '@/utils/errorMessages';
 
@@ -20,23 +21,24 @@ export function CurrencyEditPage() {
   const { data: currency, isLoading, error } = useCurrency(currencyId);
   const { mutate: updateCurrency, isPending } = useUpdateCurrency();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState<{
+    enabled: boolean;
+  } | null>(null);
 
   const clearErrorMessage = useCallback(() => {
     setErrorMessage(null);
   }, []);
 
-  const handleSubmit = useCallback(
-    (data: { currencyCode: string; providerSeriesId: string; enabled: boolean }) => {
+  const submitUpdate = useCallback(
+    (enabled: boolean) => {
       updateCurrency(
         {
           id: currencyId,
-          data: {
-            enabled: data.enabled,
-          },
+          data: { enabled },
         },
         {
           onSuccess: (updatedCurrency) => {
-            // Navigate immediately with success message in state
             navigate('/admin/currencies', {
               state: {
                 message: {
@@ -55,6 +57,32 @@ export function CurrencyEditPage() {
     },
     [currencyId, updateCurrency, navigate],
   );
+
+  const handleSubmit = useCallback(
+    (data: { currencyCode: string; providerSeriesId: string; enabled: boolean }) => {
+      // Intercept enabled→disabled transition
+      if (currency?.enabled && !data.enabled) {
+        setPendingSubmitData({ enabled: data.enabled });
+        setShowConfirmDialog(true);
+        return;
+      }
+      submitUpdate(data.enabled);
+    },
+    [currency?.enabled, submitUpdate],
+  );
+
+  const handleConfirmDisable = useCallback(() => {
+    setShowConfirmDialog(false);
+    if (pendingSubmitData) {
+      submitUpdate(pendingSubmitData.enabled);
+      setPendingSubmitData(null);
+    }
+  }, [pendingSubmitData, submitUpdate]);
+
+  const handleCancelDisable = useCallback(() => {
+    setShowConfirmDialog(false);
+    setPendingSubmitData(null);
+  }, []);
 
   return (
     <div className="h-full bg-gradient-to-br from-background to-muted/20">
@@ -118,6 +146,15 @@ export function CurrencyEditPage() {
               />
             </div>
           </div>
+        )}
+        {currency && (
+          <ConfirmDisableCurrencyDialog
+            currencyCode={currency.currencyCode}
+            isOpen={showConfirmDialog}
+            onConfirm={handleConfirmDisable}
+            onCancel={handleCancelDisable}
+            isSubmitting={isPending}
+          />
         )}
       </div>
     </div>

@@ -52,3 +52,7 @@ export interface BatchImportResponse {
   duplicatesSkipped: number;
   transactions: Transaction[];
 }
+
+export interface TransactionCountFilter {
+  currencyIsoCode?: string;
+}

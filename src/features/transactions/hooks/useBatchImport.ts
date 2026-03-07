@@ -17,6 +17,7 @@ export const useBatchImport = (): UseMutationResult<
     onSuccess: () => {
       // Invalidate transactions query to refetch the updated list
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transactionCount'] });
     },
   });
 };

@@ -1,7 +1,9 @@
 // src/features/transactions/pages/TransactionsPage.tsx
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
+import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
 import { useTransactionStats } from '@/features/transactions/hooks/useTransactionStats';
 import { useTransactionFiltersSync } from '@/features/transactions/hooks/useTransactionFiltersSync';
 import { useImportMessageHandler } from '@/features/transactions/hooks/useImportMessageHandler';
@@ -12,9 +14,10 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { TransactionStatsGrid } from '@/features/transactions/components/TransactionStatsGrid';
 import { ImportButton } from '@/features/transactions/components/ImportButton';
 import { MessageBanner } from '@/components/MessageBanner';
+import { MissingExchangeRatesBanner } from '@/components/MissingExchangeRatesBanner';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   buildMainStatsConfig,
   buildMonthlyStatsConfig,
@@ -25,6 +28,7 @@ import { parseSearchTerms } from '@/utils/parseSearchTerms';
 import { ViewCriteriaApi } from '@/types/view';
 
 export function TransactionsPage() {
+  const queryClient = useQueryClient();
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const globalFilter = useAppSelector((state) => state.ui.transactionTable.globalFilter);
@@ -47,9 +51,20 @@ export function TransactionsPage() {
   } = useTransactionFiltersSync();
 
   // Fetch exchange rates and build map for currency conversion
-  const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap({
+  const {
+    exchangeRatesMap,
+    pendingCurrencies,
+    isLoading: isExchangeRatesLoading,
+  } = useExchangeRatesMap({
     displayCurrency,
   });
+
+  const disabledCurrencies = useMissingCurrencies();
+
+  const handleRefreshExchangeRates = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
+    queryClient.invalidateQueries({ queryKey: ['currencies'] });
+  }, [queryClient]);
 
   // Compute available filter options from all transactions
   const availableBankNames = useMemo(() => {
@@ -205,6 +220,14 @@ export function TransactionsPage() {
 
       <LayoutGroup>
         <AnimatePresence>
+          {(disabledCurrencies.length > 0 || pendingCurrencies.length > 0) && (
+            <MissingExchangeRatesBanner
+              disabledCurrencies={disabledCurrencies}
+              pendingCurrencies={pendingCurrencies}
+              onRefresh={handleRefreshExchangeRates}
+              isRefreshing={isExchangeRatesLoading}
+            />
+          )}
           {importMessage && (
             <MessageBanner
               type={importMessage.type}
