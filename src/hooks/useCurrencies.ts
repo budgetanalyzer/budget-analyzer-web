@@ -86,6 +86,16 @@ export const useExchangeRatesMap = (params: { displayCurrency: string }) => {
   // This ensures we don't refetch rates when users filter transactions or view single transactions
   const { data: transactions } = useTransactions();
 
+  // Fetch enabled currencies to categorize missing rates
+  const { data: enabledCurrencies } = useCurrencies(true);
+
+  // Build set of enabled currency codes (USD always available)
+  const enabledCurrencyCodes = useMemo(() => {
+    const codes = new Set<string>(['USD']);
+    enabledCurrencies?.forEach((c) => codes.add(c.currencyCode));
+    return codes;
+  }, [enabledCurrencies]);
+
   // Extract unique non-USD currencies from transactions + display currency
   const currenciesNeeded = useMemo(() => {
     const currencies = new Set<string>();
@@ -129,21 +139,32 @@ export const useExchangeRatesMap = (params: { displayCurrency: string }) => {
     combine: (results) => {
       // Combine all exchange rate data from all queries
       const allRates: ExchangeRateResponse[] = [];
-      results.forEach((result) => {
-        if (result.data) {
+      const currenciesWithNoRates: string[] = [];
+
+      results.forEach((result, index) => {
+        if (result.data && result.data.length > 0) {
           allRates.push(...result.data);
+        } else if (!result.isLoading && !result.error) {
+          // Currency fetch completed but no rates returned
+          currenciesWithNoRates.push(currenciesNeeded[index]);
         }
       });
 
       return {
         data: allRates,
+        currenciesWithNoRates,
         isLoading: results.some((result) => result.isLoading),
         error: results.find((result) => result.error)?.error as ApiError | undefined,
       };
     },
   });
 
-  const { data: allExchangeRatesData, isLoading, error } = combinedResult;
+  const { data: allExchangeRatesData, currenciesWithNoRates, isLoading, error } = combinedResult;
+
+  const pendingCurrencies = useMemo(
+    () => currenciesWithNoRates.filter((c) => enabledCurrencyCodes.has(c)),
+    [currenciesWithNoRates, enabledCurrencyCodes],
+  );
 
   // Build the exchange rates map from all combined data
   const exchangeRatesMap = useMemo(() => {
@@ -171,6 +192,7 @@ export const useExchangeRatesMap = (params: { displayCurrency: string }) => {
     exchangeRatesData: allExchangeRatesData,
     sortedExchangeRateDates,
     earliestExchangeRateDate,
+    pendingCurrencies,
     isLoading,
     error,
   };
@@ -221,6 +243,7 @@ export const useUpdateCurrency = () => {
       // Await to ensure cache is refreshed before component callbacks run
       await queryClient.invalidateQueries({ queryKey: currenciesKeys.all });
       await queryClient.invalidateQueries({ queryKey: currenciesKeys.detail(updatedCurrency.id) });
+      queryClient.invalidateQueries({ queryKey: ['transactionCount'] });
     },
   });
 };

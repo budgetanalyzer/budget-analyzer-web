@@ -34,6 +34,8 @@ export const useDeleteTransaction = () => {
         if (!oldData) return oldData;
         return oldData.filter((transaction) => transaction.id !== deletedId);
       });
+
+      queryClient.invalidateQueries({ queryKey: ['transactionCount'] });
     },
   });
 };

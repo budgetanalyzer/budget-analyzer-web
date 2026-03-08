@@ -1,29 +1,44 @@
 // src/features/views/pages/ViewsPage.tsx
-import { useEffect } from 'react';
-import { motion, LayoutGroup } from 'framer-motion';
+import { useEffect, useCallback } from 'react';
+import { motion, LayoutGroup, AnimatePresence } from 'framer-motion';
 import { Bookmark } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useViews } from '@/hooks/useViews';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
+import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { toggleViewSelection, setSelectedViewIds } from '@/store/uiSlice';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { MissingExchangeRatesBanner } from '@/components/MissingExchangeRatesBanner';
 import { fadeInVariants, layoutTransition } from '@/lib/animations';
 import { SelectableViewCard } from '@/features/views/components/SelectableViewCard';
 import { AggregateViewStats } from '@/features/views/components/AggregateViewStats';
 
 export function ViewsPage() {
   const dispatch = useAppDispatch();
+  const queryClient = useQueryClient();
   const { data: views, isLoading, error, refetch } = useViews();
   const { data: transactions } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const selectedViewIds = useAppSelector((state) => state.ui.selectedViewIds);
-  const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap({
+  const {
+    exchangeRatesMap,
+    pendingCurrencies,
+    isLoading: isExchangeRatesLoading,
+  } = useExchangeRatesMap({
     displayCurrency,
   });
+
+  const disabledCurrencies = useMissingCurrencies();
+
+  const handleRefreshExchangeRates = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
+    queryClient.invalidateQueries({ queryKey: ['currencies'] });
+  }, [queryClient]);
 
   // Convert selectedViewIds to Set for efficient lookup
   const selectedViewIdsSet = new Set(selectedViewIds);
@@ -69,6 +84,17 @@ export function ViewsPage() {
         title="Saved Views"
         description={`${viewsList.length} view${viewsList.length !== 1 ? 's' : ''}`}
       />
+
+      <AnimatePresence>
+        {(disabledCurrencies.length > 0 || pendingCurrencies.length > 0) && (
+          <MissingExchangeRatesBanner
+            disabledCurrencies={disabledCurrencies}
+            pendingCurrencies={pendingCurrencies}
+            onRefresh={handleRefreshExchangeRates}
+            isRefreshing={isExchangeRatesLoading}
+          />
+        )}
+      </AnimatePresence>
 
       {viewsList.length === 0 ? (
         <motion.div

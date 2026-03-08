@@ -22,6 +22,10 @@
 cat ../orchestration/nginx/nginx.k8s.conf | grep location
 ```
 
+## Code Exploration
+
+NEVER use Agent/subagent tools for code exploration. Use Grep, Glob, and Read directly.
+
 ## Application Purpose
 
 React 19 web application for managing and analyzing financial transactions.

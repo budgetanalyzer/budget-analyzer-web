@@ -1,11 +1,12 @@
 // src/features/views/pages/ViewPage.tsx
 import { useMemo, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
-import { motion, LayoutGroup } from 'framer-motion';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { motion, LayoutGroup, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Hash, Pin, Calendar, Settings2 } from 'lucide-react';
 import { useView, useViewTransactions, viewKeys } from '@/hooks/useViews';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
+import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAppSelector } from '@/store/hooks';
 import { useTransactionStats } from '@/features/transactions/hooks/useTransactionStats';
@@ -14,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { MissingExchangeRatesBanner } from '@/components/MissingExchangeRatesBanner';
 import { ViewCriteriaSummary } from '@/features/views/components/ViewCriteriaSummary';
 import { ViewTransactionTable } from '@/features/views/components/ViewTransactionTable';
 import { ViewSettingsMenu } from '@/features/views/components/ViewSettingsMenu';
@@ -31,6 +33,7 @@ import { ApiError } from '@/types/apiError';
 
 export function ViewPage() {
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
 
   // Modal state
@@ -44,6 +47,11 @@ export function ViewPage() {
   const handleEditClose = useCallback(() => setIsEditModalOpen(false), []);
   const handleDeleteClose = useCallback(() => setIsDeleteModalOpen(false), []);
   const handleManageClose = useCallback(() => setIsManageModalOpen(false), []);
+
+  const handleRefreshExchangeRates = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
+    queryClient.invalidateQueries({ queryKey: ['currencies'] });
+  }, [queryClient]);
 
   // Fetch view metadata and transactions
   const {
@@ -73,9 +81,15 @@ export function ViewPage() {
   });
 
   // Fetch exchange rates for currency conversion
-  const { exchangeRatesMap, isLoading: isExchangeRatesLoading } = useExchangeRatesMap({
+  const {
+    exchangeRatesMap,
+    pendingCurrencies,
+    isLoading: isExchangeRatesLoading,
+  } = useExchangeRatesMap({
     displayCurrency,
   });
+
+  const disabledCurrencies = useMissingCurrencies();
 
   // Calculate stats with proper currency conversion
   const { stats: transactionStats } = useTransactionStats({
@@ -194,6 +208,17 @@ export function ViewPage() {
           </div>
         }
       />
+
+      <AnimatePresence>
+        {(disabledCurrencies.length > 0 || pendingCurrencies.length > 0) && (
+          <MissingExchangeRatesBanner
+            disabledCurrencies={disabledCurrencies}
+            pendingCurrencies={pendingCurrencies}
+            onRefresh={handleRefreshExchangeRates}
+            isRefreshing={isExchangeRatesLoading}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Criteria Summary */}
       <motion.div

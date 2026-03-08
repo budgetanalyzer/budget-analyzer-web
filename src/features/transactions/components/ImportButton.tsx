@@ -1,5 +1,5 @@
 // src/features/transactions/components/ImportButton.tsx
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useMemo } from 'react';
 import { Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { collapseFromRightVariants, collapseTransition } from '@/lib/animations';
 import { PreviewResponse } from '@/types/transaction';
 import { useStatementFormats } from '@/hooks/useStatementFormats';
+import { useCurrencies } from '@/hooks/useCurrencies';
 
 interface ImportButtonProps {
   onSuccess?: (count: number) => void;
@@ -36,6 +37,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     isLoading: isLoadingFormats,
     isError: isFormatsError,
   } = useStatementFormats();
+  const { data: enabledCurrencies } = useCurrencies(true);
   const [isExpanded, setIsExpandedState] = useState(false);
 
   const setIsExpanded = useCallback(
@@ -53,10 +55,20 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     previewData: null,
   });
 
-  // Filter to only enabled formats (ensure array even if data is malformed)
-  const enabledFormats = Array.isArray(statementFormats)
-    ? statementFormats.filter((f) => f.enabled)
-    : [];
+  // Build set of enabled currency codes (USD always available)
+  const enabledCurrencyCodes = useMemo(() => {
+    const codes = new Set<string>(['USD']);
+    enabledCurrencies?.forEach((c) => codes.add(c.currencyCode));
+    return codes;
+  }, [enabledCurrencies]);
+
+  // Filter to only enabled formats with enabled currencies
+  const enabledFormats = useMemo(() => {
+    if (!Array.isArray(statementFormats)) return [];
+    return statementFormats.filter(
+      (f) => f.enabled && enabledCurrencyCodes.has(f.defaultCurrencyIsoCode),
+    );
+  }, [statementFormats, enabledCurrencyCodes]);
 
   // Get display label for selected format
   const selectedFormat = enabledFormats.find((f) => f.formatKey === format);
