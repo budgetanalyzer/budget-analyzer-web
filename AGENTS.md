@@ -26,6 +26,17 @@ cat ../orchestration/nginx/nginx.k8s.conf | grep location
 
 NEVER use Agent/subagent tools for code exploration. Use Grep, Glob, and Read directly.
 
+## Documentation Discipline
+
+Always keep documentation up to date after any configuration or code change.
+
+Update the nearest affected documentation in the same work:
+- `AGENTS.md` when instructions, guardrails, discovery commands, or repository-specific workflow changes
+- `README.md` when setup, usage, or repository purpose changes
+- `docs/` when architecture, configuration, APIs, behaviors, or operational workflows change
+
+Do not leave documentation updates as follow-up work.
+
 ## Application Purpose
 
 React 19 web application for managing and analyzing financial transactions.
@@ -349,4 +360,3 @@ Do not over-validate ideas. The user wants honest pushback, not agreement.
 - Push back on vague claims — ask for concrete constraints
 - Don't say "great question" or "that's a really interesting point"
 - Skip the preamble and caveats — just answer
-
