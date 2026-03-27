@@ -70,12 +70,9 @@ export function YearSelector({ selectedYear, years, onChange }: YearSelectorProp
         ref={scrollContainerRef}
         className={cn(
           'flex items-center gap-1 rounded-lg border border-input bg-muted p-1',
-          showArrows && 'max-w-md overflow-x-auto scroll-smooth',
+          showArrows && 'max-w-md overflow-x-auto scroll-smooth snap-x snap-mandatory',
           showArrows && '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         )}
-        style={{
-          scrollSnapType: showArrows ? 'x mandatory' : undefined,
-        }}
       >
         {years.map((year) => {
           const isSelected = year === selectedYear;

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { useDeleteTransaction } from '@/hooks/useTransactions';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/useToast';
 
 interface DeleteTransactionModalProps {
   transaction: Transaction | null;

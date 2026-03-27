@@ -1,14 +1,20 @@
 # Development Dockerfile for React/Vite with HMR
-FROM node:20-alpine
+FROM node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c
 
 WORKDIR /app
 
+RUN addgroup -S app -g 1001 \
+    && adduser -S app -u 1001 -G app
+
 # Install dependencies first for better caching
 COPY package*.json ./
-RUN npm install
+RUN npm install \
+    && chown -R 1001:1001 /app
 
 # Copy source code
-COPY . .
+COPY --chown=1001:1001 . .
+
+USER 1001:1001
 
 # Expose Vite dev server port
 EXPOSE 3000

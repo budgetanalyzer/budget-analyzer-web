@@ -8,6 +8,10 @@ import { store } from '@/store';
 import App from './App';
 import './index.css';
 
+// Derive basename from Vite's base URL so the app works under subpath mounts
+// (e.g. /_prod-smoke/) while defaulting to '/' for normal dev/production builds.
+const basename = import.meta.env.BASE_URL.replace(/\/+$/, '') || '/';
+
 // Initialize theme from localStorage
 const theme = localStorage.getItem('theme') as 'light' | 'dark' | null;
 if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -29,7 +33,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
+        <BrowserRouter basename={basename}>
           <App />
         </BrowserRouter>
       </QueryClientProvider>

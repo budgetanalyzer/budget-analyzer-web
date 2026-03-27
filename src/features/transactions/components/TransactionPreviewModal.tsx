@@ -13,7 +13,7 @@ import { PreviewWarningBanner } from '@/features/transactions/components/Preview
 import { PreviewTable } from '@/features/transactions/components/PreviewTable';
 import { useBatchImport } from '@/features/transactions/hooks/useBatchImport';
 import { PreviewTransaction, PreviewWarning, PreviewResponse } from '@/types/transaction';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/useToast';
 import { formatApiError } from '@/utils/errorMessages';
 
 interface TransactionPreviewModalProps {
