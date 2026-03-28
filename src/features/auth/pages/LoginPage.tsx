@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { isAdmin } from '@/features/auth/utils/role';
+import { useNavigate, useSearchParams } from 'react-router';
 
 /**
  * Login Page
@@ -14,7 +15,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
  * 5. Redirect back to frontend (to returnUrl if provided)
  */
 export function LoginPage() {
-  const { isAuthenticated, login } = useAuth();
+  const { user, isAuthenticated, login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -22,11 +23,12 @@ export function LoginPage() {
   const returnUrl = searchParams.get('returnUrl');
 
   useEffect(() => {
-    // If already authenticated, redirect to returnUrl or admin
-    if (isAuthenticated) {
-      navigate(returnUrl || '/admin', { replace: true });
-    }
-  }, [isAuthenticated, navigate, returnUrl]);
+    if (!isAuthenticated || !user) return;
+
+    // Role-aware default redirect: admin → /admin, user → /
+    const defaultPath = isAdmin(user.roles) ? '/admin' : '/';
+    navigate(returnUrl || defaultPath, { replace: true });
+  }, [isAuthenticated, user, navigate, returnUrl]);
 
   const handleLogin = useCallback(() => {
     // Pass returnUrl to login function (if provided)

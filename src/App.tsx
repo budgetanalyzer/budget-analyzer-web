@@ -1,5 +1,5 @@
 // src/App.tsx
-import { Routes, Route, Navigate, Outlet } from 'react-router';
+import { Routes, Route } from 'react-router';
 import { Layout } from '@/components/Layout';
 import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage';
 import { TransactionDetailPage } from '@/features/transactions/pages/TransactionDetailPage';
@@ -8,7 +8,10 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Toaster } from '@/components/ui/Toaster';
 
 // Admin imports
-import { ProtectedRoute } from '@/features/admin/components/ProtectedRoute';
+import { AdminRoute } from '@/features/admin/components/AdminRoute';
+import { AdminLayout } from '@/features/admin/components/AdminLayout';
+import { AdminDashboard } from '@/features/admin/pages/AdminDashboard';
+import { AdminNotFoundPage } from '@/features/admin/pages/AdminNotFoundPage';
 import { UnauthorizedPage } from '@/features/admin/components/UnauthorizedPage';
 import { CurrenciesListPage } from '@/features/admin/currencies/pages/CurrenciesListPage';
 import { CurrencyCreatePage } from '@/features/admin/currencies/pages/CurrencyCreatePage';
@@ -28,30 +31,27 @@ function App() {
   return (
     <ErrorBoundary>
       <Routes>
-        {/* Main app routes */}
-        <Route path="/" element={<Layout />}>
-          <Route index element={<TransactionsPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
-          <Route path="transactions/:id" element={<TransactionDetailPage />} />
-          <Route path="views" element={<ViewsPage />} />
-          <Route path="views/:id" element={<ViewPage />} />
-          {/* Admin routes - role-gated to ADMIN users */}
-          <Route
-            path="admin"
-            element={
-              <ProtectedRoute allowedRoles={['ADMIN']}>
-                <Outlet />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/admin/currencies" replace />} />
+        {/* Admin — top-level, separate layout */}
+        <Route path="/admin" element={<AdminRoute />}>
+          <Route element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
             <Route path="currencies" element={<CurrenciesListPage />} />
             <Route path="currencies/new" element={<CurrencyCreatePage />} />
             <Route path="currencies/:id" element={<CurrencyEditPage />} />
             <Route path="statement-formats" element={<StatementFormatsListPage />} />
             <Route path="statement-formats/new" element={<StatementFormatCreatePage />} />
             <Route path="statement-formats/:formatKey" element={<StatementFormatEditPage />} />
+            <Route path="*" element={<AdminNotFoundPage />} />
           </Route>
+        </Route>
+
+        {/* User — standard layout */}
+        <Route path="/" element={<Layout />}>
+          <Route index element={<TransactionsPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="transactions/:id" element={<TransactionDetailPage />} />
+          <Route path="views" element={<ViewsPage />} />
+          <Route path="views/:id" element={<ViewPage />} />
         </Route>
 
         {/* Auth routes */}

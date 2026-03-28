@@ -1,5 +1,5 @@
 // src/components/Layout.tsx
-import { Outlet, Link, useLocation, useSearchParams } from 'react-router';
+import { Outlet, Link, Navigate, useLocation, useSearchParams } from 'react-router';
 import { useEffect, useRef, useCallback } from 'react';
 import { Wallet } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -9,7 +9,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { UserProfileDropdown } from '@/features/auth/components/UserProfileDropdown';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { Authorization } from '@/lib/authorization';
+import { isAdmin } from '@/features/auth/utils/role';
 import { cn } from '@/utils/cn';
 import { useAppDispatch } from '@/store/hooks';
 import { setHasNavigated } from '@/store/uiSlice';
@@ -19,7 +19,7 @@ export function Layout() {
   const [searchParams] = useSearchParams();
   const dispatch = useAppDispatch();
   const isInitialMount = useRef(true);
-  const { isAuthenticated, isLoading, login } = useAuth();
+  const { user, isAuthenticated, isLoading, login } = useAuth();
 
   useEffect(() => {
     // Skip the initial mount - this is the first page load
@@ -41,6 +41,11 @@ export function Layout() {
   const handleLogin = useCallback(() => {
     login(location.pathname);
   }, [login, location.pathname]);
+
+  // Redirect admin users to /admin (after all hooks)
+  if (!isLoading && user && isAdmin(user.roles)) {
+    return <Navigate to="/admin" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -70,19 +75,6 @@ export function Layout() {
               >
                 Analytics
               </Link>
-              <Authorization allowedRoles={['ADMIN']}>
-                <Link
-                  to="/admin/currencies"
-                  className={cn(
-                    'text-sm font-medium transition-colors hover:text-primary',
-                    location.pathname.startsWith('/admin')
-                      ? 'text-foreground'
-                      : 'text-muted-foreground',
-                  )}
-                >
-                  Currencies
-                </Link>
-              </Authorization>
               <ViewSelector />
             </nav>
           </div>
