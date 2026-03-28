@@ -9,11 +9,12 @@ import * as authApi from '@/api/auth';
  *
  * Authentication flow:
  * 1. User clicks login -> redirected to Session Gateway OAuth flow
- * 2. Session Gateway handles OAuth with identity provider, stores JWT in Redis
- * 3. Session Gateway sets HttpOnly session cookie in browser
- * 4. Frontend checks /user endpoint to get current user info
- * 5. All API calls include session cookie automatically (credentials: 'include')
- * 6. Session Gateway adds JWT to requests before forwarding to backend
+ * 2. Session Gateway handles OAuth with identity provider, stores tokens in Redis
+ * 3. Session Gateway dual-writes session data to ext_authz Redis schema
+ * 4. Session Gateway sets HttpOnly session cookie in browser
+ * 5. Frontend checks /user endpoint to get current user info
+ * 6. All API calls include session cookie automatically (credentials: 'include')
+ * 7. ext_authz validates session and injects identity headers per-request
  */
 export function useAuth() {
   const queryClient = useQueryClient();

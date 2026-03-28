@@ -5,13 +5,13 @@ import type { User } from '@/types/auth';
  * Auth API endpoints
  *
  * Authentication is handled by the Session Gateway (port 8081), accessed via
- * NGINX SSL termination at https://app.budgetanalyzer.localhost (port 443).
+ * Istio Ingress Gateway at https://app.budgetanalyzer.localhost (port 443).
  *
- * All requests go through the Session Gateway which manages:
+ * All auth-path requests are routed by Istio Ingress to Session Gateway:
  * - OAuth2/OIDC flows with identity provider
  * - Session cookies (HttpOnly, Secure, SameSite)
- * - JWT token storage in Redis
- * - Automatic token refresh
+ * - Token storage in Redis (for refresh) + dual-write to ext_authz Redis schema
+ * - Automatic token refresh with permission re-fetch
  *
  * Frontend never sees JWTs - they're managed server-side by Session Gateway.
  */

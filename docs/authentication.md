@@ -2,28 +2,42 @@
 
 ## Overview
 
-Budget Analyzer uses a **Session Gateway (BFF) pattern** for authentication. This means:
+Budget Analyzer uses a **Session Gateway (BFF) pattern** with **Istio ext_authz** for per-request validation. This means:
 - JWTs are never exposed to the browser (XSS protection)
 - Session cookies are HttpOnly, Secure, and SameSite
-- All auth flows are handled server-side by the Session Gateway
+- Auth lifecycle flows are handled server-side by the Session Gateway
+- Per-request session validation is handled by ext_authz at the Istio ingress layer
 - Frontend only needs to call `/user` endpoint and redirect to login/logout
 
 ## Architecture
 
 ```
-Browser → Session Gateway (8081) → NGINX (8080) → Backend Services
-          ├─ OAuth2 flows
-          ├─ Session cookies (HttpOnly)
-          ├─ Token management in Redis
-          └─ JWT relay to backend
+API requests:
+  Browser → Istio Ingress (:443) → ext_authz (:9002) → NGINX (:8080) → Backend Services
+
+Auth paths (/oauth2/*, /login/oauth2/*, /logout, /user, /auth/*):
+  Browser → Istio Ingress (:443) → Session Gateway (:8081)
+
+Frontend pages:
+  Browser → Istio Ingress (:443) → NGINX (:8080) → Vite (:3000)
 ```
+
+### Component Roles
+
+| Component | Port | Role |
+|-----------|------|------|
+| Istio Ingress Gateway | 443 (HTTPS) | SSL termination, ext_authz enforcement on `/api/*`, auth-path rate limiting, routing |
+| ext_authz | 9002 (HTTP) | Per-request session validation via Redis lookup, identity header injection |
+| Session Gateway | 8081 (HTTP) | OAuth2 flows, session lifecycle, token storage, dual-write to ext_authz Redis |
+| NGINX Gateway | 8080 (HTTP) | Request routing, backend rate limiting, load balancing |
+| Permission Service | 8086 (HTTP) | Roles/permissions resolution (called by Session Gateway) |
 
 ## Development Setup
 
 ### Access URLs
 
 **Development:**
-- Frontend: `https://app.budgetanalyzer.localhost` (Session Gateway)
+- Frontend: `https://app.budgetanalyzer.localhost` (Istio Ingress Gateway)
 - DO NOT use `http://localhost:3000` (Vite dev server) - authentication won't work
 
 **Production:**
@@ -31,17 +45,21 @@ Browser → Session Gateway (8081) → NGINX (8080) → Backend Services
 
 ### Request Flow (Development)
 
+For frontend pages:
 1. Browser requests `https://app.budgetanalyzer.localhost/`
-2. Session Gateway proxies to NGINX (8080)
-3. NGINX proxies to Vite dev server (3000)
-4. Vite serves React app with HMR
+2. Istio Ingress Gateway terminates SSL
+3. Istio routes to NGINX (8080)
+4. NGINX proxies to Vite dev server (3000)
+5. Vite serves React app with HMR
 
 For API requests:
 1. Browser requests `https://app.budgetanalyzer.localhost/api/transactions`
-2. Session Gateway validates session cookie
-3. Session Gateway adds JWT from Redis
-4. Session Gateway proxies to NGINX (8080)
-5. NGINX validates JWT and routes to backend services
+2. Istio Ingress calls ext_authz (9002)
+3. ext_authz looks up session in Redis (`extauthz:session:{id}`)
+4. If valid: ext_authz injects `X-User-Id`, `X-Roles`, `X-Permissions` headers
+5. Istio routes to NGINX (8080) with injected identity headers
+6. NGINX routes to appropriate backend service
+7. Backend service reads identity from headers and enforces data-level authorization
 
 ## Authentication Flows
 
@@ -54,10 +72,13 @@ login(); // Redirects to /oauth2/authorization/idp
 
 // Session Gateway handles:
 // 1. Redirect to IdP login
-// 2. OAuth callback
-// 3. Store JWT in Redis
-// 4. Set session cookie
-// 5. Redirect back to frontend
+// 2. OAuth callback (/login/oauth2/code/idp)
+// 3. Exchange authorization code for tokens
+// 4. Store Auth0 tokens in Redis (for refresh)
+// 5. Call permission-service to resolve roles/permissions
+// 6. Dual-write session data to ext_authz Redis schema
+// 7. Set session cookie (HttpOnly, Secure, SameSite)
+// 8. Redirect back to frontend
 ```
 
 ### Logout Flow
@@ -65,13 +86,14 @@ login(); // Redirects to /oauth2/authorization/idp
 ```typescript
 // User clicks logout button
 const { logout } = useAuth();
-logout(); // Calls POST /logout
+logout(); // Navigates to /logout
 
 // Session Gateway handles:
-// 1. Invalidate Redis session
-// 2. Clear session cookie
-// 3. Redirect to IdP logout
-// 4. Redirect back to frontend
+// 1. Invalidate Spring Session in Redis
+// 2. Delete ext_authz Redis session key
+// 3. Clear session cookie
+// 4. Redirect to IdP logout
+// 5. Redirect back to frontend
 ```
 
 ### Check Authentication Status
@@ -80,46 +102,9 @@ logout(); // Calls POST /logout
 // On app load, check if user is authenticated
 const { user, isAuthenticated, isLoading } = useAuth();
 
-// Internally calls GET /user endpoint
+// Internally calls GET /user endpoint (routed to Session Gateway)
 // Returns user info if session is valid
 // Returns null if no valid session
-```
-
-## Configuration Files
-
-### Frontend (.env)
-
-```bash
-# API base URL - all API requests go here
-VITE_API_BASE_URL=/api
-
-# Access app via Session Gateway in development
-# https://app.budgetanalyzer.localhost
-```
-
-### Session Gateway (application.yml)
-
-```yaml
-# API route: /api/* → NGINX → Backend services
-# Frontend route: /** → NGINX → React app (Vite or static files)
-
-spring:
-  cloud:
-    gateway:
-      routes:
-        - id: api-route
-          uri: http://localhost:8080
-          predicates:
-            - Path=/api/**
-          filters:
-            - TokenRefresh=
-            - TokenRelay=
-
-        - id: frontend-route
-          uri: http://localhost:8080
-          predicates:
-            - Path=/**
-          order: 10000
 ```
 
 ## API Client Configuration
@@ -134,7 +119,7 @@ const apiClient = axios.create({
 });
 
 // No need to manually add Authorization header
-// Session Gateway adds JWT automatically
+// ext_authz validates the session and injects identity headers
 ```
 
 ### Error Handling
@@ -152,6 +137,28 @@ apiClient.interceptors.response.use(
 );
 ```
 
+## Configuration Files
+
+### Frontend (.env)
+
+```bash
+# API base URL - all API requests go here
+VITE_API_BASE_URL=/api
+
+# Access app via Istio Ingress Gateway in development
+# https://app.budgetanalyzer.localhost
+```
+
+### Routing (Istio Ingress Gateway)
+
+The Istio Ingress Gateway routes requests based on path:
+
+- `/auth/*`, `/oauth2/*`, `/login/oauth2/*`, `/logout`, `/user` → Session Gateway (8081)
+- `/api/*` → NGINX (8080), with ext_authz enforcement
+- `/login`, `/*` → NGINX (8080), frontend (no auth required)
+
+Session Gateway does **not** proxy API or frontend requests. It only handles auth lifecycle paths.
+
 ## User Info Structure
 
 ```typescript
@@ -163,7 +170,7 @@ interface User {
   emailVerified?: boolean;
   authenticated: boolean;
   registrationId?: string; // "idp"
-  roles?: UserRole[];      // Custom roles (if added by backend)
+  roles: UserRole[];       // Resolved by permission-service
 }
 ```
 
@@ -195,13 +202,11 @@ production CSP and browser security behavior on the real public origin — it is
 not a separate application mode. Auth and API paths remain root-relative (`/api`,
 `/oauth2/authorization/idp`, `/logout`) regardless of which build is used.
 
-### Load Balancer Configuration
+### Production Entry Point
 
-Two entry points:
-- `budgetanalyzer.com` → Session Gateway (8081) - for web browsers
-- `api.budgetanalyzer.com` → NGINX (8080) - for M2M clients
-
-Session Gateway proxies to NGINX (8080) for both API and frontend requests.
+Single entry point: Istio Ingress Gateway (port 443)
+- All browser traffic enters through Istio Ingress
+- Session Gateway and NGINX are internal services, not directly accessible
 
 ## Security Features
 
@@ -210,32 +215,38 @@ Session Gateway proxies to NGINX (8080) for both API and frontend requests.
 - **HttpOnly**: JavaScript cannot access cookies (XSS protection)
 - **Secure**: HTTPS only (in production)
 - **SameSite=Strict**: CSRF protection
-- **30-minute timeout**: Automatic session expiration
+- **30-minute timeout**: Sliding session expiration
 
 ### Token Management
 
-- JWTs stored server-side in Redis
-- Automatic token refresh (5-minute threshold)
+- Auth0 tokens stored server-side in Redis by Session Gateway (for refresh)
+- Session data dual-written to ext_authz Redis schema (`extauthz:session:{id}`)
+- ext_authz validates sessions per-request via Redis lookup
+- Proactive token refresh (5-minute threshold) with permission re-fetch
 - No tokens in browser localStorage/sessionStorage
 - No tokens in browser JavaScript
 
 ### Defense in Depth
 
-1. **Session Gateway**: Validates session cookie
-2. **NGINX**: Validates JWT signature (auth_request)
-3. **Backend Services**: Enforce data-level authorization
+1. **Session Gateway**: Manages auth lifecycle, prevents token exposure to browser
+2. **ext_authz (Istio Ingress)**: Validates every API request via Redis session lookup, injects identity headers
+3. **Backend Services**: Enforce data-level authorization using identity headers
+
+### Instant Session Revocation
+
+Delete the Redis session key → next request immediately fails at ext_authz. No token expiry window to wait out.
 
 ## Common Issues
 
 ### "Not authenticated" even after login
 
 **Cause**: Accessing Vite dev server directly (http://localhost:3000)
-**Solution**: Access via Session Gateway (https://app.budgetanalyzer.localhost)
+**Solution**: Access via Istio Ingress Gateway (https://app.budgetanalyzer.localhost)
 
 ### CORS errors
 
 **Cause**: Making requests to different origins
-**Solution**: All requests should go to same origin (Session Gateway port 8081)
+**Solution**: All requests should go to same origin (Istio Ingress Gateway, port 443)
 
 ### Session expires immediately
 
@@ -275,6 +286,7 @@ vi.mock('@/features/admin/hooks/useAuth', () => ({
 ## References
 
 See the [orchestration repository](https://github.com/budgetanalyzer/orchestration) for:
-- Authentication Implementation Plan
-- Security Architecture
-- Session Gateway README
+- [Security Architecture](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/security-architecture.md)
+- [BFF + API Gateway Pattern](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/bff-api-gateway-pattern.md)
+- [Port Reference](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/port-reference.md)
+- Session Gateway Repository

@@ -7,12 +7,11 @@ import { ApiError, ApiErrorResponse } from '@/types/apiError';
  *
  * Authentication flow:
  * - All requests include session cookies automatically (withCredentials: true)
- * - Session Gateway validates session cookie
- * - Session Gateway adds JWT to Authorization header
- * - Session Gateway forwards request to NGINX
- * - NGINX validates JWT and routes to backend services
+ * - Istio ingress ext_authz validates session cookie via Redis lookup
+ * - ext_authz injects identity headers (X-User-Id, X-Roles, X-Permissions)
+ * - NGINX routes request to backend services
  *
- * No need to manually add Authorization header - Session Gateway handles it.
+ * No need to manually add Authorization header - ext_authz handles identity.
  */
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
