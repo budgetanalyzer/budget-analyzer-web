@@ -55,6 +55,19 @@
 }
 
 @layer base {
+  /* Admin visual identity — amber primary, warm tints */
+  .admin {
+    --primary: 24.6 95% 53.1%;
+    --primary-foreground: 60 9.1% 97.8%;
+    --ring: 24.6 95% 53.1%;
+  }
+
+  .dark .admin {
+    --primary: 32 95% 58%;
+    --primary-foreground: 24 10% 10%;
+    --ring: 32 95% 58%;
+  }
+
   * {
     @apply border-border;
   }
