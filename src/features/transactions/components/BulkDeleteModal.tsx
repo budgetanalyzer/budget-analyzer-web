@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { useBulkDeleteTransactions } from '@/hooks/useBulkDeleteTransactions';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/useToast';
 
 interface BulkDeleteModalProps {
   selectedIds: number[];

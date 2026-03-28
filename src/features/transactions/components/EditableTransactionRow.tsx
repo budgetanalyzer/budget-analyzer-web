@@ -22,7 +22,7 @@ import { TransactionAmountBadge } from '@/features/transactions/components/Trans
 import { formatLocalDate } from '@/utils/dates';
 import { MoreVertical, Pencil, Trash2, Check, X, FolderPlus } from 'lucide-react';
 import { useViews, usePinTransaction } from '@/hooks/useViews';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/useToast';
 import { formatApiError } from '@/utils/errorMessages';
 
 interface EditableTransactionRowProps {
@@ -34,7 +34,7 @@ interface EditableTransactionRowProps {
   onDelete: (transaction: Transaction) => void;
   onRowClick: (transaction: Transaction) => void;
   isUpdating: boolean;
-  columnSizes: number[];
+  columnWidthClasses: string[];
   isSelected: boolean;
   onSelectionChange: (checked: boolean) => void;
 }
@@ -48,7 +48,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
   onDelete,
   onRowClick,
   isUpdating,
-  columnSizes,
+  columnWidthClasses,
   isSelected,
   onSelectionChange,
 }: EditableTransactionRowProps) {
@@ -149,17 +149,15 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       }
     >
       {/* Checkbox */}
-      <TableCell style={{ width: `${columnSizes[0]}px` }} onClick={(e) => e.stopPropagation()}>
+      <TableCell className={columnWidthClasses[0]} onClick={(e) => e.stopPropagation()}>
         <Checkbox checked={isSelected} onCheckedChange={onSelectionChange} disabled={isEditing} />
       </TableCell>
 
       {/* Date */}
-      <TableCell style={{ width: `${columnSizes[1]}px` }}>
-        {formatLocalDate(transaction.date)}
-      </TableCell>
+      <TableCell className={columnWidthClasses[1]}>{formatLocalDate(transaction.date)}</TableCell>
 
       {/* Description */}
-      <TableCell style={{ width: `${columnSizes[2]}px` }}>
+      <TableCell className={columnWidthClasses[2]}>
         {isEditing ? (
           <Input
             value={editingDescription}
@@ -176,12 +174,12 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       </TableCell>
 
       {/* Bank Name */}
-      <TableCell style={{ width: `${columnSizes[3]}px` }}>
+      <TableCell className={columnWidthClasses[3]}>
         <div className="truncate">{transaction.bankName}</div>
       </TableCell>
 
       {/* Account ID */}
-      <TableCell style={{ width: `${columnSizes[4]}px` }}>
+      <TableCell className={columnWidthClasses[4]}>
         {isEditing ? (
           <Input
             value={editingAccountId}
@@ -197,14 +195,14 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       </TableCell>
 
       {/* Type */}
-      <TableCell style={{ width: `${columnSizes[5]}px` }}>
+      <TableCell className={columnWidthClasses[5]}>
         <Badge variant={transaction.type === 'CREDIT' ? 'success' : 'secondary'}>
           {transaction.type}
         </Badge>
       </TableCell>
 
       {/* Amount */}
-      <TableCell style={{ width: `${columnSizes[6]}px` }}>
+      <TableCell className={columnWidthClasses[6]}>
         {isExchangeRatesLoading ? (
           <div className="flex items-center justify-end gap-2">
             <Skeleton className="h-5 w-24" />
@@ -222,7 +220,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       </TableCell>
 
       {/* Actions */}
-      <TableCell style={{ width: `${columnSizes[7]}px` }}>
+      <TableCell className={columnWidthClasses[7]}>
         {isEditing ? (
           <div className="flex justify-end gap-2">
             <Button

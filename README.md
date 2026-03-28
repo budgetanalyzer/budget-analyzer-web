@@ -56,6 +56,8 @@ npm run dev
 
 **IMPORTANT**: Access the app via `https://app.budgetanalyzer.localhost`, NOT directly via Vite (`http://localhost:3000`). Run `orchestration/nginx/scripts/dev/setup-local-https.sh` first to generate SSL certificates.
 
+The checked-in Docker development runtime now drops root and runs Vite as UID/GID `1001`. Keep container-oriented changes compatible with `npm run dev -- --host 0.0.0.0 --port 3000` under that non-root user because Tilt relies on that path for the Kubernetes HMR workflow.
+
 ### Environment Configuration
 
 Edit `.env` to configure your API endpoint:
@@ -196,6 +198,17 @@ Using Shadcn/UI for:
 - Full customization control
 - Tailwind CSS integration
 - Built-in accessibility
+
+### CSP Compliance
+
+The production build is served with a strict Content Security Policy (`style-src 'self'` — no `unsafe-inline`). This means:
+
+- **No inline `style={...}` props** — all styling uses Tailwind CSS classes
+- **No runtime CSS injection** — libraries that call `document.createElement('style')` are banned
+- **Custom toast system** — `sonner` was replaced with a Radix-based toast (`src/components/ui/Toast.tsx`) because sonner unconditionally injects `<style>` elements on import
+- **Column widths** use a static Tailwind class map (`src/utils/columnWidth.ts`) instead of inline style props
+
+This constraint ensures the CSP policy can be enforced without weakening it. See `AGENTS.md` for the full guardrail.
 
 ## Deployment
 

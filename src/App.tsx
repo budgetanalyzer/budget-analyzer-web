@@ -5,7 +5,7 @@ import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage
 import { TransactionDetailPage } from '@/features/transactions/pages/TransactionDetailPage';
 import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { Toaster } from 'sonner';
+import { Toaster } from '@/components/ui/Toaster';
 
 // Admin imports
 import { ProtectedRoute } from '@/features/admin/components/ProtectedRoute';
@@ -61,7 +61,7 @@ function App() {
         {/* Error routes */}
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
       </Routes>
-      <Toaster richColors position="top-right" />
+      <Toaster />
     </ErrorBoundary>
   );
 }

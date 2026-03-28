@@ -179,12 +179,21 @@ VITE_API_BASE_URL=/api
 ### Build Process
 
 ```bash
-# Build static files
+# Build static files (served at /)
 npm run build
+
+# Build for production-smoke verification (served at /_prod-smoke/)
+npm run build:prod-smoke
 
 # Output: dist/ directory
 # NGINX serves these files in production
 ```
+
+The `build:prod-smoke` command produces a bundle whose assets and router basename
+are set to `/_prod-smoke/`. This is used only by orchestration to verify
+production CSP and browser security behavior on the real public origin — it is
+not a separate application mode. Auth and API paths remain root-relative (`/api`,
+`/oauth2/authorization/idp`, `/logout`) regardless of which build is used.
 
 ### Load Balancer Configuration
 

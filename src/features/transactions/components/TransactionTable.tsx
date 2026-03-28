@@ -60,8 +60,9 @@ import {
 } from '@/components/ui/Select';
 import { useUpdateTransaction } from '@/hooks/useTransactions';
 import { formatApiError } from '@/utils/errorMessages';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/useToast';
 import { useDebounce } from '@/hooks/useDebounce';
+import { columnWidthClass } from '@/utils/columnWidth';
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -571,7 +572,7 @@ export function TransactionTable({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} style={{ width: `${header.getSize()}px` }}>
+                  <TableHead key={header.id} className={columnWidthClass(header.getSize())}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -595,7 +596,9 @@ export function TransactionTable({
                     onDelete={handleDeleteTransaction}
                     onRowClick={handleRowClick}
                     isUpdating={isUpdating}
-                    columnSizes={table.getAllColumns().map((col) => col.getSize())}
+                    columnWidthClasses={table
+                      .getAllColumns()
+                      .map((col) => columnWidthClass(col.getSize()))}
                     isSelected={row.getIsSelected()}
                     onSelectionChange={(checked) => row.toggleSelected(checked)}
                   />

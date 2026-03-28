@@ -29,7 +29,7 @@ import {
   useExcludeTransaction,
   useUnexcludeTransaction,
 } from '@/hooks/useViews';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/useToast';
 import { formatApiError } from '@/utils/errorMessages';
 
 interface ManageViewTransactionsModalProps {

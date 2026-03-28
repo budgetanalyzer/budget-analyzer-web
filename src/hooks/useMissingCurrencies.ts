@@ -31,7 +31,7 @@ export const useMissingCurrencies = (): string[] => {
   // Return codes where count > 0
   return useMemo(() => {
     return disabledCurrencyCodes.filter((_, index) => {
-      const result = countResults[index] as { data?: number; error?: ApiError };
+      const result = countResults[index] as unknown as { data?: number; error?: ApiError };
       return result.data != null && result.data > 0;
     });
   }, [disabledCurrencyCodes, countResults]);

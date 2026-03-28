@@ -45,6 +45,7 @@ import {
 import { useNavigate } from 'react-router';
 import { cn } from '@/utils/cn';
 import { usePinTransaction, useUnpinTransaction, useExcludeTransaction } from '@/hooks/useViews';
+import { columnWidthClass } from '@/utils/columnWidth';
 
 interface ViewTransactionTableProps {
   transactions: ViewTransaction[];
@@ -317,7 +318,7 @@ export function ViewTransactionTable({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} style={{ width: `${header.getSize()}px` }}>
+                  <TableHead key={header.id} className={columnWidthClass(header.getSize())}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -339,7 +340,7 @@ export function ViewTransactionTable({
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} style={{ width: `${cell.column.getSize()}px` }}>
+                    <TableCell key={cell.id} className={columnWidthClass(cell.column.getSize())}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

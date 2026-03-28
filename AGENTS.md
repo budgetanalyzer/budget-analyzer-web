@@ -256,7 +256,8 @@ Configured in:
 ```bash
 npm install          # Install dependencies
 npm run dev          # Start dev server (port 3000)
-npm run build        # Type-check + build for production
+npm run build        # Type-check + build for production (served at /)
+npm run build:prod-smoke  # Build for /_prod-smoke/ (CSP/security verification only)
 npm run preview      # Preview production build
 ```
 
@@ -327,6 +328,26 @@ find src -name "use*.ts" | grep -v test
 cat src/store/uiSlice.ts
 ```
 
+## Strict CSP Compliance
+
+This application is served behind a strict Content Security Policy: `style-src 'self'` with NO `'unsafe-inline'` and NO `'unsafe-eval'`. Every piece of frontend code MUST comply.
+
+**Do NOT introduce any of the following:**
+- Inline `style={...}` props on React elements (produces DOM `style=""` attributes)
+- Libraries that call `document.createElement('style')` or inject `<style>` elements at runtime
+- Libraries that use `CSSStyleSheet.insertRule()`, `styleSheet.cssText`, or `eval()`/`new Function()` for CSS
+- Any mechanism that creates inline styles or dynamic style elements
+
+**Use Tailwind classes for all styling.** If a dynamic width/size is needed, add an entry to `src/utils/columnWidth.ts` (static Tailwind class map) rather than using inline style props.
+
+**Toast notifications:** Use the custom `@/hooks/useToast` hook and `@/components/ui/Toast.tsx` (Radix-based). Do NOT use `sonner` — it was removed because it unconditionally injects `<style>` elements on import, violating strict CSP. There is no opt-out in sonner.
+
+**Before adding any new UI dependency**, verify it does not inject styles at runtime. Check the bundled output:
+```bash
+npm run build:prod-smoke && rg -n "createElement\('style'\)|styleSheet\.cssText|eval\(" dist/
+```
+If matches appear, the dependency violates CSP and must not be used.
+
 ## NOTES FOR AI AGENTS
 
 **CRITICAL - Prerequisites First**: Before implementing any plan or feature:
@@ -334,6 +355,13 @@ cat src/store/uiSlice.ts
 2. If prerequisites are NOT satisfied, STOP immediately and inform the user
 3. Do NOT attempt to hack around missing prerequisites - this leads to broken implementations that must be deleted
 4. Complete prerequisites first, then return to the original task
+
+**CSP compliance** (MANDATORY):
+- NEVER use inline `style={...}` props — use Tailwind classes
+- NEVER add libraries that inject styles at runtime (e.g., `sonner`)
+- Use `src/utils/columnWidth.ts` for dynamic column widths
+- Use `@/hooks/useToast` for toast notifications (NOT `sonner`)
+- Verify new UI dependencies: `npm run build:prod-smoke && rg "createElement\('style'\)" dist/`
 
 **Critical patterns**:
 - NO async/await in components - use React Query hooks with callbacks
@@ -345,6 +373,7 @@ cat src/store/uiSlice.ts
 - Animations: `src/lib/animations.ts`
 - Dates: `src/utils/dates.ts`
 - Error messages: `src/utils/errorMessages.ts` (sync with OpenAPI spec)
+- Column widths: `src/utils/columnWidth.ts` (Tailwind class map, NOT inline styles)
 
 **Other**:
 - NEVER disable ESLint rules without permission
