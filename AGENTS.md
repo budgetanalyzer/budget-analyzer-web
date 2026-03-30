@@ -380,6 +380,8 @@ If matches appear, the dependency violates CSP and must not be used.
 - User controls dev server (`npm run dev`) manually
 - Always use `npm run lint:fix` (auto-fixes)
 
+**NO GIT WRITE OPERATIONS**: Never run git commands (commit, push, checkout, reset, etc.) without explicit user request. The user controls git workflow entirely. You may suggest what to commit, but don't do it.
+
 ## Honest Discourse
 
 Do not over-validate ideas. The user wants honest pushback, not agreement.
