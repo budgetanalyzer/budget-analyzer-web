@@ -10,10 +10,10 @@ import type { User } from '@/types/auth';
  * All auth-path requests are routed by Istio Ingress to Session Gateway:
  * - OAuth2/OIDC flows with identity provider
  * - Session cookies (HttpOnly, Secure, SameSite)
- * - Token storage in Redis (for refresh) + dual-write to ext_authz Redis schema
- * - Automatic token refresh with permission re-fetch
+ * - Token storage in Redis session hash (for refresh)
+ * - Frontend heartbeat (GET /auth/session) refreshes IDP tokens and extends session TTL
  *
- * Frontend never sees JWTs - they're managed server-side by Session Gateway.
+ * Frontend never sees tokens - they're managed server-side by Session Gateway.
  */
 
 // Create a separate axios instance for auth that includes credentials
@@ -30,7 +30,7 @@ const authClient = axios.create({
 /**
  * Get current user profile
  * Calls Session Gateway /user endpoint which validates session cookie
- * and returns user info extracted from JWT
+ * and returns user info from session hash
  */
 export async function getCurrentUser(): Promise<User> {
   const response = await authClient.get<User>('/user');
