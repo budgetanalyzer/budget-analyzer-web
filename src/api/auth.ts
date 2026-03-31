@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { User } from '@/types/auth';
+import type { SessionStatus } from '@/types/session';
 
 /**
  * Auth API endpoints
@@ -34,6 +35,16 @@ const authClient = axios.create({
  */
 export async function getCurrentUser(): Promise<User> {
   const response = await authClient.get<User>('/user');
+  return response.data;
+}
+
+/**
+ * Get session status for heartbeat
+ * Calls Session Gateway /auth/session which validates session,
+ * refreshes IDP tokens if needed, and extends session TTL
+ */
+export async function getSessionStatus(): Promise<SessionStatus> {
+  const response = await authClient.get<SessionStatus>('/auth/session');
   return response.data;
 }
 

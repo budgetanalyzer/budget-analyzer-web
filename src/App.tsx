@@ -5,6 +5,7 @@ import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage
 import { TransactionDetailPage } from '@/features/transactions/pages/TransactionDetailPage';
 import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { SessionHeartbeatProvider } from '@/components/SessionHeartbeatProvider';
 import { Toaster } from '@/components/ui/Toaster';
 
 // Admin imports
@@ -61,6 +62,7 @@ function App() {
         {/* Error routes */}
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
       </Routes>
+      <SessionHeartbeatProvider />
       <Toaster />
     </ErrorBoundary>
   );
