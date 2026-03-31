@@ -31,7 +31,9 @@ interface UiState {
 }
 
 const initialState: UiState = {
-  theme: (localStorage.getItem('theme') as 'light' | 'dark') || 'light',
+  theme:
+    (localStorage.getItem('theme') as 'light' | 'dark') ||
+    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
   selectedTransactionId: null,
   displayCurrency: localStorage.getItem('displayCurrency') || 'USD',
   hasNavigated: false,
