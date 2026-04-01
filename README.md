@@ -69,20 +69,20 @@ VITE_API_BASE_URL=/api
 ### Development vs Production URLs
 
 **Development:**
-- Access app: `https://app.budgetanalyzer.localhost` (NGINX → Session Gateway)
-- Request flow: Browser → NGINX (443) → Session Gateway (8081) → NGINX → Vite (3000)
-- API calls: Browser → NGINX (443) → Session Gateway (8081) → NGINX API (`api.budgetanalyzer.localhost`) → Backend services
+- Access app: `https://app.budgetanalyzer.localhost` (Istio Ingress Gateway)
+- Auth flow: Browser → Istio Ingress (443) → Session Gateway (8081)
+- API calls: Browser → Istio Ingress (443) → ext_authz (9002) → NGINX (8080) → Backend services
+- Frontend: Browser → Istio Ingress (443) → NGINX (8080) → Vite (3000)
 
 **Production:**
-- Access app: `https://budgetanalyzer.com` (Load Balancer)
-- Request flow: Browser → Load Balancer → Session Gateway → NGINX → Static files
-- API calls: Browser → Load Balancer → Session Gateway → NGINX → Backend services
+- Access app: Load balancer domain (e.g., `https://budgetanalyzer.com`)
+- Same Istio Ingress Gateway routing (Session Gateway for auth, ext_authz for API validation)
 
 **Why Session Gateway?**
 - Handles OAuth2 authentication with identity provider
 - Manages session cookies (HttpOnly, Secure, SameSite)
-- Stores JWTs server-side in Redis (never exposed to browser)
-- Automatically adds JWTs to API requests
+- Stores Auth0 refresh tokens server-side in Redis (never exposed to browser)
+- ext_authz validates sessions per-request via Redis lookup and injects identity headers
 
 See [docs/authentication.md](docs/authentication.md) for complete authentication guide.
 
@@ -227,11 +227,12 @@ The optimized files will be in `dist/`. Deploy to any static hosting:
 ## Integration
 
 This frontend integrates with the Budget Analyzer microservices:
-- **[Session Gateway](https://github.com/budgetanalyzer/session-gateway)** (BFF) — handles OAuth2 login, mints internal JWTs, stores tokens server-side in Redis (never exposed to browser)
-- **API Gateway** (NGINX) for unified routing, with JWT validation via [Token Validation Service](https://github.com/budgetanalyzer/token-validation-service)
+- **[Session Gateway](https://github.com/budgetanalyzer/session-gateway)** — handles OAuth2 login, session management, stores Auth0 refresh tokens server-side in Redis (never exposed to browser)
+- **ext_authz** (Istio Ingress) — per-request session validation via Redis lookup, injects identity headers
+- **API Gateway** (NGINX) for request routing to backend services
 - **Transaction Service** for transaction data
 - **Currency Service** for currency and exchange rates
-- **[Permission Service](https://github.com/budgetanalyzer/permission-service)** for user roles and permissions (resolved during login, embedded in JWT)
+- **[Permission Service](https://github.com/budgetanalyzer/permission-service)** for user roles and permissions (resolved during login, stored in session hash)
 
 See the [orchestration repository](https://github.com/budgetanalyzer/orchestration) for full system setup.
 

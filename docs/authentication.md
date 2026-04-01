@@ -2,7 +2,7 @@
 
 ## Overview
 
-Budget Analyzer uses a **Session Gateway (BFF) pattern** with **Istio ext_authz** for per-request validation. This means:
+Budget Analyzer uses a **Session Gateway pattern** with **Istio ext_authz** for per-request validation. This means:
 - JWTs are never exposed to the browser (XSS protection)
 - Session cookies are HttpOnly, Secure, and SameSite
 - Auth lifecycle flows are handled server-side by the Session Gateway
@@ -28,7 +28,7 @@ Frontend pages:
 |-----------|------|------|
 | Istio Ingress Gateway | 443 (HTTPS) | SSL termination, ext_authz enforcement on `/api/*`, auth-path rate limiting, routing |
 | ext_authz | 9002 (HTTP) | Per-request session validation via Redis lookup, identity header injection |
-| Session Gateway | 8081 (HTTP) | OAuth2 flows, session lifecycle, token storage, dual-write to ext_authz Redis |
+| Session Gateway | 8081 (HTTP) | OAuth2 flows, session lifecycle, token storage, session hash creation in Redis |
 | NGINX Gateway | 8080 (HTTP) | Request routing, backend rate limiting, load balancing |
 | Permission Service | 8086 (HTTP) | Roles/permissions resolution (called by Session Gateway) |
 
@@ -55,7 +55,7 @@ For frontend pages:
 For API requests:
 1. Browser requests `https://app.budgetanalyzer.localhost/api/transactions`
 2. Istio Ingress calls ext_authz (9002)
-3. ext_authz looks up session in Redis (`extauthz:session:{id}`)
+3. ext_authz looks up session in Redis (`session:{id}`)
 4. If valid: ext_authz injects `X-User-Id`, `X-Roles`, `X-Permissions` headers
 5. Istio routes to NGINX (8080) with injected identity headers
 6. NGINX routes to appropriate backend service
@@ -74,9 +74,9 @@ login(); // Redirects to /oauth2/authorization/idp
 // 1. Redirect to IdP login
 // 2. OAuth callback (/login/oauth2/code/idp)
 // 3. Exchange authorization code for tokens
-// 4. Store Auth0 tokens in Redis (for refresh)
+// 4. Store tokens in Redis session hash (for refresh)
 // 5. Call permission-service to resolve roles/permissions
-// 6. Dual-write session data to ext_authz Redis schema
+// 6. Write session data to Redis hash (session:{id})
 // 7. Set session cookie (HttpOnly, Secure, SameSite)
 // 8. Redirect back to frontend
 ```
@@ -89,11 +89,10 @@ const { logout } = useAuth();
 logout(); // Navigates to /logout
 
 // Session Gateway handles:
-// 1. Invalidate Spring Session in Redis
-// 2. Delete ext_authz Redis session key
-// 3. Clear session cookie
-// 4. Redirect to IdP logout
-// 5. Redirect back to frontend
+// 1. Delete session hash from Redis
+// 2. Clear session cookie
+// 3. Redirect to IdP logout
+// 4. Redirect back to frontend
 ```
 
 ### Check Authentication Status
@@ -106,6 +105,56 @@ const { user, isAuthenticated, isLoading } = useAuth();
 // Returns user info if session is valid
 // Returns null if no valid session
 ```
+
+### Session Heartbeat
+
+The frontend periodically calls `GET /auth/session` to keep the session alive and validate the IDP grant. Implemented via `SessionHeartbeatProvider` (mounted in `App.tsx`) which uses the `useSessionHeartbeat` hook.
+
+**What it provides:**
+- **Sliding session TTL**: Each heartbeat resets the 30-minute session expiry
+- **IDP grant validation**: If Auth0 has revoked the user's grant (disabled account, withdrawn consent), the refresh fails and the session is terminated
+- **Token refresh**: When the IDP access token is within 10 minutes of expiry, the heartbeat triggers a server-side token refresh
+- **Inactivity warning**: A non-dismissable modal appears before session expiry, allowing the user to click "Continue" to extend the session
+
+**Response:**
+```json
+{
+  "authenticated": true,
+  "userId": "user123",
+  "roles": ["ADMIN", "USER"],
+  "expiresAt": 1711720800,
+  "tokenRefreshed": false
+}
+```
+
+The frontend derives remaining time as `expiresAt - Math.floor(Date.now() / 1000)`.
+
+**Server response behavior:**
+- 200: Session is valid (may have refreshed IDP token)
+- 401: No valid session or IDP grant revoked — redirect to login
+- 502: Transient IDP error — retry on next interval
+
+**Frontend behavior:**
+- Heartbeat fires immediately on mount, then every 5 minutes if user is active
+- If user is inactive (no mouse, keyboard, click, scroll, or touch events), heartbeat is skipped
+- Scroll tracking uses capture phase to detect scrolling in overflow containers (not just window scroll)
+- A warning modal appears 5 minutes before session expiry (based on `expiresAt` from server)
+- Expiry warnings are synced across tabs via `BroadcastChannel` — if one tab extends the session, other tabs reschedule their warning timers
+- On network error or 502 transient error, retries once; if retry fails, shows a toast warning
+- On 401, redirects to `/oauth2/authorization/idp`
+
+**Configuration (environment variables, all optional):**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_HEARTBEAT_INTERVAL_MS` | `300000` (5 min) | Interval between heartbeat calls |
+| `VITE_WARNING_BEFORE_EXPIRY_SECONDS` | `300` (5 min) | Show warning this many seconds before expiry |
+
+**Key files:**
+- `src/components/SessionHeartbeatProvider.tsx` — composition: auth check + heartbeat + modal
+- `src/hooks/useSessionHeartbeat.ts` — core heartbeat + warning timer logic
+- `src/hooks/useActivityTracking.ts` — window event-based activity detection
+- `src/components/InactivityWarningModal.tsx` — non-dismissable warning dialog
 
 ## API Client Configuration
 
@@ -167,9 +216,7 @@ interface User {
   email: string;
   name?: string;
   picture?: string;        // Profile picture URL
-  emailVerified?: boolean;
   authenticated: boolean;
-  registrationId?: string; // "idp"
   roles: UserRole[];       // Resolved by permission-service
 }
 ```
@@ -219,10 +266,9 @@ Single entry point: Istio Ingress Gateway (port 443)
 
 ### Token Management
 
-- Auth0 tokens stored server-side in Redis by Session Gateway (for refresh)
-- Session data dual-written to ext_authz Redis schema (`extauthz:session:{id}`)
-- ext_authz validates sessions per-request via Redis lookup
-- Proactive token refresh (5-minute threshold) with permission re-fetch
+- Auth0 refresh tokens stored server-side in Redis session hash (`session:{id}`)
+- ext_authz reads session hashes directly from Redis for per-request validation
+- Frontend heartbeat (`GET /auth/session`) refreshes IDP tokens near expiry and extends session TTL
 - No tokens in browser localStorage/sessionStorage
 - No tokens in browser JavaScript
 
@@ -287,6 +333,6 @@ vi.mock('@/features/admin/hooks/useAuth', () => ({
 
 See the [orchestration repository](https://github.com/budgetanalyzer/orchestration) for:
 - [Security Architecture](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/security-architecture.md)
-- [BFF + API Gateway Pattern](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/bff-api-gateway-pattern.md)
+- [Session-Based Edge Authorization Pattern](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/session-edge-authorization-pattern.md)
 - [Port Reference](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/port-reference.md)
 - Session Gateway Repository

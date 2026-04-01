@@ -27,4 +27,13 @@ export const handlers = [
   http.delete('/api/v1/transactions/:id', () => {
     return new HttpResponse(null, { status: 204 });
   }),
+  http.get('/auth/session', () => {
+    return HttpResponse.json({
+      authenticated: true,
+      userId: 'mock-user-id',
+      roles: ['ADMIN'],
+      expiresAt: Math.floor(Date.now() / 1000) + 1800,
+      tokenRefreshed: false,
+    });
+  }),
 ];

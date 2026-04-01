@@ -130,23 +130,21 @@ cat src/store/hooks.ts
 
 **API Client (`src/api/client.ts`):**
 - Axios instance with 10s timeout
-- Request interceptor for auth tokens (future)
 - Response interceptor normalizes all errors to `ApiError` class
 - Base URL: `VITE_API_BASE_URL` (dev default: `/api`)
+- Session cookies sent automatically (`withCredentials: true`)
 
-**Development Architecture (HTTPS):**
+**Development Architecture:**
 
 Browser access: `https://app.budgetanalyzer.localhost`
 
 Request flow:
-1. Browser → NGINX (port 443, SSL termination)
-2. NGINX → Session Gateway (port 8081)
-3. Session Gateway → NGINX API Gateway (`https://api.budgetanalyzer.localhost`)
-4. NGINX API Gateway → Backend services (Transaction: 8082, Currency: 8084)
+1. Browser → Istio Ingress Gateway (port 443, SSL termination)
+2. Auth paths (`/oauth2/*`, `/auth/*`, `/login/oauth2/*`, `/logout`, `/user`) → Session Gateway (8081)
+3. API paths (`/api/*`) → ext_authz (9002, session validation) → NGINX (8080) → Backend services
+4. Frontend paths (`/*`) → NGINX (8080) → Vite (3000)
 
-**Setup**: Run `orchestration/nginx/scripts/dev/setup-local-https.sh` to generate SSL certificates with mkcert.
-
-**Important**: Vite dev server (port 3000) is proxied through NGINX, not accessed directly.
+**Important**: Access the app via Istio Ingress Gateway, not Vite dev server (port 3000) directly.
 
 ## Component Patterns
 
@@ -295,7 +293,7 @@ npx vitest --grep "renders correctly"
 Required (see `.env.example`):
 
 - `VITE_API_BASE_URL` - API endpoint
-  - Dev default: `/api` (routed through Session Gateway to `https://api.budgetanalyzer.localhost`)
+  - Dev default: `/api` (routed through Istio Ingress → ext_authz → NGINX → backend services)
   - Production: Full URL like `https://api.bleurubin.com`
 
 ## Code Quality
