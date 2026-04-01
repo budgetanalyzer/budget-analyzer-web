@@ -111,7 +111,7 @@ const { user, isAuthenticated, isLoading } = useAuth();
 The frontend periodically calls `GET /auth/session` to keep the session alive and validate the IDP grant. Implemented via `SessionHeartbeatProvider` (mounted in `App.tsx`) which uses the `useSessionHeartbeat` hook.
 
 **What it provides:**
-- **Sliding session TTL**: Each heartbeat resets the 30-minute session expiry
+- **Sliding session TTL**: Each heartbeat resets the 15-minute session expiry
 - **IDP grant validation**: If Auth0 has revoked the user's grant (disabled account, withdrawn consent), the refresh fails and the session is terminated
 - **Token refresh**: When the IDP access token is within 10 minutes of expiry, the heartbeat triggers a server-side token refresh
 - **Inactivity warning**: A non-dismissable modal appears before session expiry, allowing the user to click "Continue" to extend the session
@@ -135,7 +135,7 @@ The frontend derives remaining time as `expiresAt - Math.floor(Date.now() / 1000
 - 502: Transient IDP error — retry on next interval
 
 **Frontend behavior:**
-- Heartbeat fires immediately on mount, then every 5 minutes if user is active
+- Heartbeat fires immediately on mount, then every 3 minutes if user is active
 - If user is inactive (no mouse, keyboard, click, scroll, or touch events), heartbeat is skipped
 - Scroll tracking uses capture phase to detect scrolling in overflow containers (not just window scroll)
 - A warning modal appears 5 minutes before session expiry (based on `expiresAt` from server)
@@ -147,7 +147,7 @@ The frontend derives remaining time as `expiresAt - Math.floor(Date.now() / 1000
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VITE_HEARTBEAT_INTERVAL_MS` | `300000` (5 min) | Interval between heartbeat calls |
+| `VITE_HEARTBEAT_INTERVAL_MS` | `180000` (3 min) | Interval between heartbeat calls |
 | `VITE_WARNING_BEFORE_EXPIRY_SECONDS` | `300` (5 min) | Show warning this many seconds before expiry |
 
 **Key files:**
@@ -262,7 +262,7 @@ Single entry point: Istio Ingress Gateway (port 443)
 - **HttpOnly**: JavaScript cannot access cookies (XSS protection)
 - **Secure**: HTTPS only (in production)
 - **SameSite=Strict**: CSRF protection
-- **30-minute timeout**: Sliding session expiration
+- **15-minute timeout**: Sliding session expiration
 
 ### Token Management
 
