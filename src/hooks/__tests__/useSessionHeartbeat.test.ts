@@ -38,7 +38,7 @@ class MockBroadcastChannel {
 
 vi.stubGlobal('BroadcastChannel', MockBroadcastChannel);
 
-const DEFAULT_HEARTBEAT_INTERVAL_MS = 3 * 60 * 1000;
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
 const mockGetSessionStatus = vi.mocked(authApi.getSessionStatus);
 const mockWasActive = vi.fn<() => boolean>();
 

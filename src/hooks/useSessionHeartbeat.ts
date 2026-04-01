@@ -7,7 +7,7 @@ import { useActivityTracking } from '@/hooks/useActivityTracking';
 const LOGOUT_PATH = '/logout';
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS =
-  Number(import.meta.env.VITE_HEARTBEAT_INTERVAL_MS) || 3 * 60 * 1000;
+  Number(import.meta.env.VITE_HEARTBEAT_INTERVAL_MS) || 2 * 60 * 1000;
 const DEFAULT_WARNING_BEFORE_EXPIRY_S =
   Number(import.meta.env.VITE_WARNING_BEFORE_EXPIRY_SECONDS) || 5 * 60;
 
