@@ -9,7 +9,7 @@ const LOGOUT_PATH = '/logout';
 const DEFAULT_HEARTBEAT_INTERVAL_MS =
   Number(import.meta.env.VITE_HEARTBEAT_INTERVAL_MS) || 2 * 60 * 1000;
 const DEFAULT_WARNING_BEFORE_EXPIRY_S =
-  Number(import.meta.env.VITE_WARNING_BEFORE_EXPIRY_SECONDS) || 5 * 60;
+  Number(import.meta.env.VITE_WARNING_BEFORE_EXPIRY_SECONDS) || 2 * 60;
 
 interface UseSessionHeartbeatOptions {
   enabled: boolean;
@@ -36,15 +36,17 @@ export function useSessionHeartbeat({
 }: UseSessionHeartbeatOptions) {
   const [showWarning, setShowWarning] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const channelRef = useRef<BroadcastChannel>(undefined);
   const { wasActiveSinceLastCheck } = useActivityTracking();
 
   const scheduleWarning = useCallback(
-    (expiresAt: number) => {
+    (serverExpiresAt: number) => {
       clearTimeout(warningTimerRef.current);
-      const expiresInSeconds = expiresAt - Math.floor(Date.now() / 1000);
+      setExpiresAt(serverExpiresAt);
+      const expiresInSeconds = serverExpiresAt - Math.floor(Date.now() / 1000);
       const delaySec = Math.max(0, expiresInSeconds - warningBeforeExpirySec);
 
       if (delaySec === 0) {
@@ -115,5 +117,5 @@ export function useSessionHeartbeat({
     };
   }, [enabled, heartbeatIntervalMs, performHeartbeat, scheduleWarning, wasActiveSinceLastCheck]);
 
-  return { showWarning, isSending, sendHeartbeat: performHeartbeat };
+  return { showWarning, isSending, sendHeartbeat: performHeartbeat, expiresAt };
 }

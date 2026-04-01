@@ -24,6 +24,7 @@ describe('SessionHeartbeatProvider', () => {
       showWarning: false,
       isSending: false,
       sendHeartbeat: vi.fn(),
+      expiresAt: null,
     });
 
     render(<SessionHeartbeatProvider />);
@@ -48,6 +49,7 @@ describe('SessionHeartbeatProvider', () => {
       showWarning: false,
       isSending: false,
       sendHeartbeat: vi.fn(),
+      expiresAt: null,
     });
 
     render(<SessionHeartbeatProvider />);
@@ -72,6 +74,7 @@ describe('SessionHeartbeatProvider', () => {
       showWarning: true,
       isSending: false,
       sendHeartbeat: vi.fn(),
+      expiresAt: null,
     });
 
     render(<SessionHeartbeatProvider />);

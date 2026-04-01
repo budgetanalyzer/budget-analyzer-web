@@ -114,7 +114,7 @@ The frontend periodically calls `GET /auth/session` to keep the session alive an
 - **Sliding session TTL**: Each heartbeat resets the 15-minute session expiry
 - **IDP grant validation**: If Auth0 has revoked the user's grant (disabled account, withdrawn consent), the refresh fails and the session is terminated
 - **Token refresh**: When the IDP access token is within 10 minutes of expiry, the heartbeat triggers a server-side token refresh
-- **Inactivity warning**: A non-dismissable modal appears before session expiry, allowing the user to click "Continue" to extend the session
+- **Inactivity warning**: A non-dismissable modal with a live countdown timer appears before session expiry, allowing the user to click "Continue" to extend the session. If the countdown reaches zero, the user is automatically redirected to `/logout`
 
 **Response:**
 ```json
@@ -138,7 +138,7 @@ The frontend derives remaining time as `expiresAt - Math.floor(Date.now() / 1000
 - Heartbeat fires immediately on mount, then every 3 minutes if user is active
 - If user is inactive (no mouse, keyboard, click, scroll, or touch events), heartbeat is skipped
 - Scroll tracking uses capture phase to detect scrolling in overflow containers (not just window scroll)
-- A warning modal appears 5 minutes before session expiry (based on `expiresAt` from server)
+- A warning modal with a live countdown timer appears 2 minutes before session expiry (based on `expiresAt` from server)
 - Expiry warnings are synced across tabs via `BroadcastChannel` — if one tab extends the session, other tabs reschedule their warning timers
 - On network error or 502 transient error, retries once; if retry fails, shows a toast warning
 - On 401, redirects to `/oauth2/authorization/idp`
@@ -148,13 +148,14 @@ The frontend derives remaining time as `expiresAt - Math.floor(Date.now() / 1000
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VITE_HEARTBEAT_INTERVAL_MS` | `180000` (3 min) | Interval between heartbeat calls |
-| `VITE_WARNING_BEFORE_EXPIRY_SECONDS` | `300` (5 min) | Show warning this many seconds before expiry |
+| `VITE_WARNING_BEFORE_EXPIRY_SECONDS` | `120` (2 min) | Show warning this many seconds before expiry |
 
 **Key files:**
 - `src/components/SessionHeartbeatProvider.tsx` — composition: auth check + heartbeat + modal
 - `src/hooks/useSessionHeartbeat.ts` — core heartbeat + warning timer logic
 - `src/hooks/useActivityTracking.ts` — window event-based activity detection
-- `src/components/InactivityWarningModal.tsx` — non-dismissable warning dialog
+- `src/hooks/useCountdown.ts` — live countdown timer hook
+- `src/components/InactivityWarningModal.tsx` — non-dismissable warning dialog with countdown and auto-redirect
 
 ## API Client Configuration
 
