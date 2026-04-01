@@ -167,7 +167,7 @@ describe('useSessionHeartbeat', () => {
     expect(result.current.showWarning).toBe(true);
   });
 
-  it('redirects to login on 401 response', async () => {
+  it('redirects to logout on 401 response', async () => {
     mockGetSessionStatus.mockRejectedValue(make401Error());
     const hrefSetter = vi.fn();
     Object.defineProperty(window, 'location', {
@@ -183,7 +183,7 @@ describe('useSessionHeartbeat', () => {
 
     renderHook(() => useSessionHeartbeat({ enabled: true }));
     await advanceTimers(0);
-    expect(hrefSetter).toHaveBeenCalledWith('/oauth2/authorization/idp');
+    expect(hrefSetter).toHaveBeenCalledWith('/logout');
   });
 
   it('retries once on network error then shows toast warning', async () => {

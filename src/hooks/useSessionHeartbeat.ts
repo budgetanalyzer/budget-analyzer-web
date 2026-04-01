@@ -4,7 +4,7 @@ import { getSessionStatus } from '@/api/auth';
 import { toast } from '@/hooks/useToast';
 import { useActivityTracking } from '@/hooks/useActivityTracking';
 
-const LOGIN_PATH = '/oauth2/authorization/idp';
+const LOGOUT_PATH = '/logout';
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS =
   Number(import.meta.env.VITE_HEARTBEAT_INTERVAL_MS) || 3 * 60 * 1000;
@@ -67,7 +67,7 @@ export function useSessionHeartbeat({
       channelRef.current?.postMessage({ expiresAt: status.expiresAt });
     } catch (error) {
       if (isStatus401(error)) {
-        window.location.href = LOGIN_PATH;
+        window.location.href = LOGOUT_PATH;
         return;
       }
       if (isNetworkError(error) || isTransientError(error)) {
@@ -78,7 +78,7 @@ export function useSessionHeartbeat({
           channelRef.current?.postMessage({ expiresAt: status.expiresAt });
         } catch (retryError) {
           if (isStatus401(retryError)) {
-            window.location.href = LOGIN_PATH;
+            window.location.href = LOGOUT_PATH;
             return;
           }
           toast.warning('Unable to reach the server. Your session may expire.');
