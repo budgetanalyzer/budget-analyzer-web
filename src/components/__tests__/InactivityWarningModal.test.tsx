@@ -155,12 +155,7 @@ describe('InactivityWarningModal', () => {
 
   it('disables Continue button when isSending is true', () => {
     render(
-      <InactivityWarningModal
-        open={true}
-        isSending={true}
-        onContinue={vi.fn()}
-        expiresAt={null}
-      />,
+      <InactivityWarningModal open={true} isSending={true} onContinue={vi.fn()} expiresAt={null} />,
     );
     expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
   });

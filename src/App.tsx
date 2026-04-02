@@ -27,6 +27,7 @@ import { ViewPage, ViewsPage } from '@/features/views';
 // Auth imports
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { PeacePage } from '@/features/auth/pages/PeacePage';
+import { ErrorPage } from '@/features/auth/pages/ErrorPage';
 
 function App() {
   return (
@@ -60,6 +61,7 @@ function App() {
         <Route path="/peace" element={<PeacePage />} />
 
         {/* Error routes */}
+        <Route path="/oops" element={<ErrorPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
       </Routes>
       <SessionHeartbeatProvider />
