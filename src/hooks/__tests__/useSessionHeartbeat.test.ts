@@ -304,6 +304,17 @@ describe('useSessionHeartbeat', () => {
     sender.close();
   });
 
+  it('exposes expiresAt from the heartbeat response', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const expectedExpiresAt = now + 900;
+    mockGetSessionStatus.mockResolvedValue(makeSessionStatus({ expiresAt: expectedExpiresAt }));
+
+    const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
+    await advanceTimers(0);
+
+    expect(result.current.expiresAt).toBe(expectedExpiresAt);
+  });
+
   it('closes BroadcastChannel on unmount', async () => {
     renderHook(() => useSessionHeartbeat({ enabled: true }));
     await advanceTimers(0);
