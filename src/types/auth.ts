@@ -5,7 +5,7 @@
 export type UserRole = 'USER' | 'ADMIN';
 
 /**
- * User profile information from Session Gateway /user endpoint
+ * User profile information from Session Gateway /auth/v1/user endpoint
  * Maps to OAuth2User attributes from identity provider
  */
 export interface User {
@@ -13,8 +13,6 @@ export interface User {
   email: string;
   name?: string;
   picture?: string; // Profile picture URL from identity provider
-  emailVerified?: boolean;
   authenticated: boolean;
-  registrationId?: string; // OAuth2 registration ID (e.g., "idp")
   roles: UserRole[];
 }

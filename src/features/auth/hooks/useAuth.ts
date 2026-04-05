@@ -11,8 +11,8 @@ import * as authApi from '@/api/auth';
  * 1. User clicks login -> redirected to Session Gateway OAuth flow
  * 2. Session Gateway handles OAuth with identity provider, stores tokens in Redis session hash
  * 3. Session Gateway sets HttpOnly session cookie in browser
- * 4. Frontend checks /user endpoint to get current user info
- * 5. Frontend heartbeat (GET /auth/session) extends session TTL and refreshes IDP tokens
+ * 4. Frontend checks /auth/v1/user endpoint to get current user info
+ * 5. Frontend heartbeat (GET /auth/v1/session) extends session TTL and refreshes IDP tokens
  * 6. All API calls include session cookie automatically (credentials: 'include')
  * 7. ext_authz reads session hash from Redis and injects identity headers per-request
  */
@@ -24,7 +24,7 @@ export function useAuth() {
     queryKey: ['auth', 'currentUser'],
     queryFn: async () => {
       try {
-        // Call Session Gateway /user endpoint to get current user
+        // Call Session Gateway /auth/v1/user endpoint to get current user
         // This validates the session cookie and returns user info
         const user = await authApi.getCurrentUser();
         return user;
