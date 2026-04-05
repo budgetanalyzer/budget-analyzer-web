@@ -2,7 +2,7 @@
 import { http, HttpResponse } from 'msw';
 
 export const handlers = [
-  http.get('/user', () => {
+  http.get('/auth/v1/user', () => {
     return HttpResponse.json({
       sub: 'mock-user-id',
       email: 'admin@example.com',
@@ -27,7 +27,7 @@ export const handlers = [
   http.delete('/api/v1/transactions/:id', () => {
     return new HttpResponse(null, { status: 204 });
   }),
-  http.get('/auth/session', () => {
+  http.get('/auth/v1/session', () => {
     return HttpResponse.json({
       authenticated: true,
       userId: 'mock-user-id',

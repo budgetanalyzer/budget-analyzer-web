@@ -26,10 +26,13 @@ tags:
   - name: Transactions
     description: Import and manipulate transactions
     x-service: transaction-service
-  - name: Currency Series Handler
+  - name: Admin Transactions
+    description: Admin transaction search and management
+    x-service: transaction-service
+  - name: Currency Series
     description: Endpoints for querying, creating, and updating currency series
     x-service: currency-service
-  - name: Exchange Rates Handler
+  - name: Exchange Rates
     description: Endpoints for querying and importing exchange rates
     x-service: currency-service
 paths:
@@ -1192,9 +1195,125 @@ paths:
       tags:
         - Transactions
       summary: Count transactions
-      description: Returns the count of active transactions matching the given filter
-        criteria. Non-admin users only count their own transactions.
+      description: Returns the count of active transactions owned by the requesting
+        user and matching the given filter criteria.
       operationId: countTransactions
+      parameters:
+        - name: filter
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/TransactionFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+                format: int64
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INTERNAL_ERROR
+                message: Internal Server Error
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: SERVICE_UNAVAILABLE
+                message: Service Unavailable
+  /v1/admin/transactions:
+    get:
+      tags:
+        - Admin Transactions
+      summary: Search transactions across all users
+      operationId: searchTransactions
+      parameters:
+        - name: filter
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/TransactionFilter'
+        - name: page
+          in: query
+          description: Zero-based page index (0..N)
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          description: The size of the page to be returned
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+        - name: sort
+          in: query
+          description: 'Sorting criteria in the format: property,(asc|desc). Default
+            sort order is ascending. Multiple sort criteria are supported.'
+          required: false
+          schema:
+            type: array
+            default:
+              - date,DESC
+              - id,DESC
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: {}
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              examples:
+                Invalid Sort Field:
+                  summary: Unsupported sort field requested
+                  description: Invalid Sort Field
+                  value:
+                    type: VALIDATION_ERROR
+                    message: 'Unsupported sort field: invalid. Allowed sort fields:
+                      id, ownerId, accountId, bankName, date, currencyIsoCode, amount,
+                      type, description, createdAt, updatedAt'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INTERNAL_ERROR
+                message: Internal Server Error
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: SERVICE_UNAVAILABLE
+                message: Service Unavailable
+  /v1/admin/transactions/count:
+    get:
+      tags:
+        - Admin Transactions
+      summary: Count transactions across all users
+      operationId: countTransactions_1
       parameters:
         - name: filter
           in: query
@@ -1230,7 +1349,7 @@ paths:
   /v1/currencies/{id}:
     get:
       tags:
-        - Currency Series Handler
+        - Currency Series
       summary: Get currency series by ID
       description: Retrieve a currency series by its unique identifier
       operationId: getById
@@ -1277,7 +1396,7 @@ paths:
                 message: Service Unavailable
     put:
       tags:
-        - Currency Series Handler
+        - Currency Series
       summary: Update currency series
       description: Update an existing currency series (currency code and provider
         series ID are immutable, only enabled status can be changed)
@@ -1341,7 +1460,7 @@ paths:
   /v1/exchange-rates/import:
     post:
       tags:
-        - Exchange Rates Handler
+        - Exchange Rates
       summary: Import latest available rates from FRED
       description: Retrieve latest un-imported exchange rates from FRED for all enabled
         currencies - manually triggers daily cron job
@@ -1385,7 +1504,7 @@ paths:
   /v1/currencies:
     get:
       tags:
-        - Currency Series Handler
+        - Currency Series
       summary: Get all currency series
       description: Retrieve all currency series, optionally filtered by enabled status
       operationId: getAll
@@ -1426,7 +1545,7 @@ paths:
                 message: Service Unavailable
     post:
       tags:
-        - Currency Series Handler
+        - Currency Series
       summary: Create a new currency series
       description: Create a new currency series. This endpoint is typically used when
         FRED adds support for new currency pairs. The 23 commonly-used currencies
@@ -1504,7 +1623,7 @@ paths:
   /v1/exchange-rates:
     get:
       tags:
-        - Exchange Rates Handler
+        - Exchange Rates
       summary: Get exchange rates
       description: Get exchange rates for converting USD to the target currency
       operationId: getExchangeRates
@@ -2211,6 +2330,12 @@ components:
           format: int64
           description: Unique identifier for the transaction
           example: 1
+        ownerId:
+          type: string
+          description: ID of the user who owns the transaction. Only effective on
+            admin endpoints; ignored on user-scoped endpoints where the authenticated
+            user is always applied.
+          example: usr_test123
         accountId:
           type: string
           description: Identifier for the account associated with the transaction
