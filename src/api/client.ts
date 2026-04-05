@@ -42,14 +42,11 @@ apiClient.interceptors.response.use(
       throw new ApiError(error.response.status, apiErrorResponse, apiErrorResponse.message);
     } else if (error.request) {
       // Request made but no response received
-      const hasCookies = document.cookie.length > 0;
-      const errorMessage = hasCookies
-        ? 'Unable to reach the server. The session cookie exists but may not be sent with the request. Check browser console for details.'
-        : 'Unable to reach the server. No session cookie found - you may need to log in again.';
-
+      // Note: BA_SESSION cookie is HttpOnly so document.cookie cannot detect it.
+      // A missing document.cookie does NOT mean the user is unauthenticated.
       throw new ApiError(503, {
         type: 'SERVICE_UNAVAILABLE',
-        message: errorMessage,
+        message: 'Unable to reach the server. Please try again later.',
       });
     } else {
       throw new ApiError(500, {
