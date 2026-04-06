@@ -41,7 +41,6 @@ const navItems: NavItem[] = [
     to: '/admin/transactions',
     label: 'Transactions',
     icon: List,
-    disabled: true,
   },
   {
     to: '/admin/users/deactivate',

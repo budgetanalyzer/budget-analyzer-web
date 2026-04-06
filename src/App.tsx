@@ -20,6 +20,7 @@ import { CurrencyEditPage } from '@/features/admin/currencies/pages/CurrencyEdit
 import { StatementFormatsListPage } from '@/features/admin/statement-formats/pages/StatementFormatsListPage';
 import { StatementFormatCreatePage } from '@/features/admin/statement-formats/pages/StatementFormatCreatePage';
 import { StatementFormatEditPage } from '@/features/admin/statement-formats/pages/StatementFormatEditPage';
+import { AdminTransactionsPage } from '@/features/admin/transactions/pages/AdminTransactionsPage';
 import { DeactivateUserPage } from '@/features/admin/users/pages/DeactivateUserPage';
 
 // Views imports
@@ -44,6 +45,7 @@ function App() {
             <Route path="statement-formats" element={<StatementFormatsListPage />} />
             <Route path="statement-formats/new" element={<StatementFormatCreatePage />} />
             <Route path="statement-formats/:formatKey" element={<StatementFormatEditPage />} />
+            <Route path="transactions" element={<AdminTransactionsPage />} />
             <Route path="users/deactivate" element={<DeactivateUserPage />} />
             <Route path="*" element={<AdminNotFoundPage />} />
           </Route>

@@ -27,6 +27,34 @@ export const handlers = [
   http.delete('/api/v1/transactions/:id', () => {
     return new HttpResponse(null, { status: 204 });
   }),
+  http.get('/api/v1/admin/transactions', () => {
+    return HttpResponse.json({
+      content: [
+        {
+          id: 1,
+          ownerId: 'usr_test123',
+          accountId: 'checking-3223',
+          bankName: 'Capital One',
+          date: '2025-10-14',
+          currencyIsoCode: 'USD',
+          amount: 100.5,
+          type: 'DEBIT',
+          description: 'Grocery shopping',
+          createdAt: '2025-10-14T10:30:00Z',
+          updatedAt: '2025-10-14T10:30:00Z',
+        },
+      ],
+      metadata: {
+        page: 0,
+        size: 50,
+        numberOfElements: 1,
+        totalElements: 1,
+        totalPages: 1,
+        first: true,
+        last: true,
+      },
+    });
+  }),
   http.get('/auth/v1/session', () => {
     return HttpResponse.json({
       userId: 'mock-user-id',
