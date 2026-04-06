@@ -44,7 +44,7 @@ const mockWasActive = vi.fn<() => boolean>();
 
 function makeSessionStatus(overrides?: Partial<SessionStatus>): SessionStatus {
   return {
-    authenticated: true,
+    active: true,
     userId: 'user-1',
     roles: ['ADMIN'],
     expiresAt: Math.floor(Date.now() / 1000) + 1800,
