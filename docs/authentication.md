@@ -118,7 +118,6 @@ The frontend periodically calls `GET /auth/v1/session` to keep the session alive
 **Response:**
 ```json
 {
-  "authenticated": true,
   "userId": "user123",
   "roles": ["ADMIN", "USER"],
   "expiresAt": 1711720800

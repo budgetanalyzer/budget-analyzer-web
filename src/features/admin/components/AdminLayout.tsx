@@ -1,5 +1,13 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { DollarSign, FileText, LayoutDashboard, List, LogOut, Shield, UserMinus } from 'lucide-react';
+import {
+  DollarSign,
+  FileText,
+  LayoutDashboard,
+  List,
+  LogOut,
+  Shield,
+  UserMinus,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Avatar } from '@/components/ui/Avatar';

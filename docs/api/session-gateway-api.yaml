@@ -155,10 +155,6 @@ components:
       type: object
       description: Session status from heartbeat endpoint
       properties:
-        active:
-          type: boolean
-          description: Always true when this response is returned
-          example: true
         userId:
           type: string
           description: User's internal ID
