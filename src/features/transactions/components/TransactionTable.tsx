@@ -39,7 +39,7 @@ import {
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { DateRangeFilter } from './DateRangeFilter';
+import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import {
   setTransactionTableSorting,

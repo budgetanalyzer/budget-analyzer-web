@@ -144,9 +144,9 @@ Single source of truth. ADMIN in the array → admin experience, always.
 
 **Goal:** Admin can browse ALL users' transactions. No edit, delete, import, or bulk actions.
 
-**Status:** Not started. Depends on Phase 2 + **backend admin transactions endpoint**.
+**Status:** Complete. See [admin-ux-phase-3-transactions.md](./admin-ux-phase-3-transactions.md) for the implementation plan and rationale.
 
-**Backend prerequisite:** Endpoint returning transactions across all users with user info per transaction and user-based filtering. Do not start Phase 3 frontend work until this endpoint exists.
+**Backend prerequisite:** Endpoint returning transactions across all users with user-based filtering. Satisfied by `GET /v1/admin/transactions` (`docs/api/budget-analyzer-api.yaml:1239-1463`). Owner email/name on the row was deferred — the transaction service does not join across the permission/identity service.
 
 **Decision: New `AdminTransactionTable` (not reusing `TransactionTable`)**
 
@@ -184,7 +184,7 @@ Existing `TransactionTable` is deeply coupled to user operations (inline edit, d
 
 ## Open Questions
 
-- What user info should the transaction owner column show? (email, name, ID?)
+- ~~What user info should the transaction owner column show? (email, name, ID?)~~ **Resolved:** ID only. Per user decision, transaction-service does not join across permission-service. Revisit when an identity lookup endpoint exists.
 - Should admin have any write actions beyond currencies/statement-formats? (e.g., disable a user account)
 - Does the admin need export for the all-transactions view?
-- How does the backend admin transactions endpoint work? (separate endpoint vs query param on existing)
+- ~~How does the backend admin transactions endpoint work? (separate endpoint vs query param on existing)~~ **Resolved:** Single search endpoint `GET /v1/admin/transactions`. The `id` query param covers lookup-by-id, so no separate by-id endpoint is needed.
