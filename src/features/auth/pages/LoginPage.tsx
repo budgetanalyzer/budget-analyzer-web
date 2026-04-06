@@ -10,7 +10,7 @@ import { useNavigate, useSearchParams } from 'react-router';
  * Session Gateway will:
  * 1. Redirect to identity provider for authentication
  * 2. Handle OAuth callback
- * 3. Store tokens in Redis
+ * 3. Store session data in Redis
  * 4. Set HttpOnly session cookie
  * 5. Redirect back to frontend (to returnUrl if provided)
  */

@@ -33,7 +33,6 @@ export const handlers = [
       userId: 'mock-user-id',
       roles: ['ADMIN'],
       expiresAt: Math.floor(Date.now() / 1000) + 1800,
-      tokenRefreshed: false,
     });
   }),
 ];
