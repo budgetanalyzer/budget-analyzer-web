@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select';
-import { useDebounce } from '@/hooks/useDebounce';
 import type { AdminTransactionsQuery } from '@/types/adminTransaction';
 import type { TransactionType } from '@/types/transaction';
 import { hasActiveFilters } from '@/features/admin/transactions/utils/urlState';
@@ -22,168 +21,106 @@ interface AdminTransactionFiltersProps {
   onClear: () => void;
 }
 
+type DraftType = 'all' | TransactionType;
+
+interface DraftFilters {
+  description: string;
+  ownerId: string;
+  bankName: string;
+  accountId: string;
+  minAmount: string;
+  maxAmount: string;
+  dateFrom: string;
+  dateTo: string;
+  type: DraftType;
+}
+
+function draftFromQuery(query: AdminTransactionsQuery): DraftFilters {
+  return {
+    description: query.description ?? '',
+    ownerId: query.ownerId ?? '',
+    bankName: query.bankName ?? '',
+    accountId: query.accountId ?? '',
+    minAmount: query.minAmount !== undefined ? String(query.minAmount) : '',
+    maxAmount: query.maxAmount !== undefined ? String(query.maxAmount) : '',
+    dateFrom: query.dateFrom ?? '',
+    dateTo: query.dateTo ?? '',
+    type: query.type ?? 'all',
+  };
+}
+
+function parseAmount(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (trimmed === '') return undefined;
+  const parsed = Number(trimmed);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function draftToQueryPatch(draft: DraftFilters): Partial<AdminTransactionsQuery> {
+  return {
+    description: draft.description.trim() || undefined,
+    ownerId: draft.ownerId.trim() || undefined,
+    bankName: draft.bankName.trim() || undefined,
+    accountId: draft.accountId.trim() || undefined,
+    minAmount: parseAmount(draft.minAmount),
+    maxAmount: parseAmount(draft.maxAmount),
+    dateFrom: draft.dateFrom || undefined,
+    dateTo: draft.dateTo || undefined,
+    type: draft.type === 'all' ? undefined : draft.type,
+  };
+}
+
 export function AdminTransactionFilters({
   query,
   onChange,
   onClear,
 }: AdminTransactionFiltersProps) {
-  // Description input uses explicit submit (Enter), so we keep local state.
-  const [localDescription, setLocalDescription] = useState(query.description ?? '');
+  const [draft, setDraft] = useState<DraftFilters>(() => draftFromQuery(query));
 
-  // Owner / bank / account / amounts use a debounced sync to URL.
-  const [localOwnerId, setLocalOwnerId] = useState(query.ownerId ?? '');
-  const [localBank, setLocalBank] = useState(query.bankName ?? '');
-  const [localAccount, setLocalAccount] = useState(query.accountId ?? '');
-  const [localMinAmount, setLocalMinAmount] = useState(
-    query.minAmount !== undefined ? String(query.minAmount) : '',
-  );
-  const [localMaxAmount, setLocalMaxAmount] = useState(
-    query.maxAmount !== undefined ? String(query.maxAmount) : '',
-  );
+  // Reset the draft whenever the parent query changes (Clear All, browser
+  // back/forward, deep-linked URLs).
+  useEffect(() => {
+    setDraft(draftFromQuery(query));
+  }, [query]);
 
-  // Sync local state when query changes externally (e.g. clear, browser nav).
-  useEffect(() => {
-    setLocalDescription(query.description ?? '');
-  }, [query.description]);
-  useEffect(() => {
-    setLocalOwnerId(query.ownerId ?? '');
-  }, [query.ownerId]);
-  useEffect(() => {
-    setLocalBank(query.bankName ?? '');
-  }, [query.bankName]);
-  useEffect(() => {
-    setLocalAccount(query.accountId ?? '');
-  }, [query.accountId]);
-  useEffect(() => {
-    setLocalMinAmount(query.minAmount !== undefined ? String(query.minAmount) : '');
-  }, [query.minAmount]);
-  useEffect(() => {
-    setLocalMaxAmount(query.maxAmount !== undefined ? String(query.maxAmount) : '');
-  }, [query.maxAmount]);
-
-  const debouncedOwnerId = useDebounce(localOwnerId, 400);
-  const debouncedBank = useDebounce(localBank, 400);
-  const debouncedAccount = useDebounce(localAccount, 400);
-  const debouncedMinAmount = useDebounce(localMinAmount, 400);
-  const debouncedMaxAmount = useDebounce(localMaxAmount, 400);
-
-  // Push debounced values into query params (only when they actually change).
-  // Each effect only fires when the debounced value has caught up to the live
-  // local input. This prevents a stale typed value from being written back to
-  // the URL after an external query change (Clear All, browser nav) reset
-  // localXxx but the debounced value still holds the old value.
-  useEffect(() => {
-    if (debouncedOwnerId !== localOwnerId) return;
-    const next = debouncedOwnerId.trim() || undefined;
-    if (next !== query.ownerId) onChange({ ownerId: next });
-  }, [debouncedOwnerId, localOwnerId, query.ownerId, onChange]);
-
-  useEffect(() => {
-    if (debouncedBank !== localBank) return;
-    const next = debouncedBank.trim() || undefined;
-    if (next !== query.bankName) onChange({ bankName: next });
-  }, [debouncedBank, localBank, query.bankName, onChange]);
-
-  useEffect(() => {
-    if (debouncedAccount !== localAccount) return;
-    const next = debouncedAccount.trim() || undefined;
-    if (next !== query.accountId) onChange({ accountId: next });
-  }, [debouncedAccount, localAccount, query.accountId, onChange]);
-
-  useEffect(() => {
-    if (debouncedMinAmount !== localMinAmount) return;
-    const parsed = debouncedMinAmount === '' ? undefined : Number(debouncedMinAmount);
-    const next = parsed !== undefined && !Number.isNaN(parsed) ? parsed : undefined;
-    if (next !== query.minAmount) onChange({ minAmount: next });
-  }, [debouncedMinAmount, localMinAmount, query.minAmount, onChange]);
-
-  useEffect(() => {
-    if (debouncedMaxAmount !== localMaxAmount) return;
-    const parsed = debouncedMaxAmount === '' ? undefined : Number(debouncedMaxAmount);
-    const next = parsed !== undefined && !Number.isNaN(parsed) ? parsed : undefined;
-    if (next !== query.maxAmount) onChange({ maxAmount: next });
-  }, [debouncedMaxAmount, localMaxAmount, query.maxAmount, onChange]);
-
-  const handleSearchSubmit = useCallback(() => {
-    const next = localDescription.trim() || undefined;
-    onChange({ description: next });
-  }, [localDescription, onChange]);
-
-  const handleSearchKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        handleSearchSubmit();
-      }
+  const handleSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      onChange(draftToQueryPatch(draft));
     },
-    [handleSearchSubmit],
+    [draft, onChange],
   );
 
-  const handleClearSearch = useCallback(() => {
-    setLocalDescription('');
-    onChange({ description: undefined });
-  }, [onChange]);
+  const handleDateChange = useCallback((from: string | null, to: string | null) => {
+    setDraft((d) => ({ ...d, dateFrom: from ?? '', dateTo: to ?? '' }));
+  }, []);
 
-  const handleDateChange = useCallback(
-    (from: string | null, to: string | null) => {
-      onChange({
-        dateFrom: from ?? undefined,
-        dateTo: to ?? undefined,
-      });
-    },
-    [onChange],
-  );
-
-  const handleTypeChange = useCallback(
-    (value: string) => {
-      const next = value === 'all' ? undefined : (value as TransactionType);
-      onChange({ type: next });
-    },
-    [onChange],
-  );
-
-  const handleClearAll = useCallback(() => {
-    setLocalDescription('');
-    setLocalOwnerId('');
-    setLocalBank('');
-    setLocalAccount('');
-    setLocalMinAmount('');
-    setLocalMaxAmount('');
-    onClear();
-  }, [onClear]);
+  const handleTypeChange = useCallback((value: string) => {
+    setDraft((d) => ({ ...d, type: value as DraftType }));
+  }, []);
 
   const filtersActive = hasActiveFilters(query);
 
   return (
-    <div className="mb-4 space-y-3">
+    <form onSubmit={handleSubmit} className="mb-4 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[240px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search description (press Enter)"
-            value={localDescription}
-            onChange={(e) => setLocalDescription(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            className="pl-9 pr-9"
+            placeholder="Search description"
+            value={draft.description}
+            onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+            className="pl-9"
           />
-          {localDescription && (
-            <button
-              type="button"
-              onClick={handleClearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Clear search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
         </div>
 
         <DateRangeFilter
-          from={query.dateFrom ?? null}
-          to={query.dateTo ?? null}
+          from={draft.dateFrom || null}
+          to={draft.dateTo || null}
           onChange={handleDateChange}
         />
 
-        <Select value={query.type ?? 'all'} onValueChange={handleTypeChange}>
+        <Select value={draft.type} onValueChange={handleTypeChange}>
           <SelectTrigger className="w-[110px]">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
@@ -198,8 +135,8 @@ export function AdminTransactionFilters({
           <Input
             type="number"
             placeholder="Min"
-            value={localMinAmount}
-            onChange={(e) => setLocalMinAmount(e.target.value)}
+            value={draft.minAmount}
+            onChange={(e) => setDraft((d) => ({ ...d, minAmount: e.target.value }))}
             className="w-[90px]"
             min="0"
             step="0.01"
@@ -208,18 +145,23 @@ export function AdminTransactionFilters({
           <Input
             type="number"
             placeholder="Max"
-            value={localMaxAmount}
-            onChange={(e) => setLocalMaxAmount(e.target.value)}
+            value={draft.maxAmount}
+            onChange={(e) => setDraft((d) => ({ ...d, maxAmount: e.target.value }))}
             className="w-[90px]"
             min="0"
             step="0.01"
           />
         </div>
 
+        <Button type="submit" size="sm" className="h-9 px-3">
+          <Search className="mr-1.5 h-4 w-4" />
+          Search
+        </Button>
+
         {filtersActive && (
           <>
             <div className="mx-1 h-6 w-px bg-border" />
-            <Button variant="ghost" size="sm" onClick={handleClearAll} className="h-9 px-3">
+            <Button type="button" variant="ghost" size="sm" onClick={onClear} className="h-9 px-3">
               <X className="mr-1.5 h-4 w-4" />
               Clear all
             </Button>
@@ -230,8 +172,8 @@ export function AdminTransactionFilters({
       <div className="flex flex-wrap items-start gap-2">
         <div className="flex flex-col">
           <Input
-            value={localOwnerId}
-            onChange={(e) => setLocalOwnerId(e.target.value)}
+            value={draft.ownerId}
+            onChange={(e) => setDraft((d) => ({ ...d, ownerId: e.target.value }))}
             placeholder="Filter by owner ID (e.g. usr_test123)"
             className="w-[280px] font-mono text-xs"
           />
@@ -240,18 +182,18 @@ export function AdminTransactionFilters({
           </p>
         </div>
         <Input
-          value={localBank}
-          onChange={(e) => setLocalBank(e.target.value)}
+          value={draft.bankName}
+          onChange={(e) => setDraft((d) => ({ ...d, bankName: e.target.value }))}
           placeholder="Filter by bank name…"
           className="w-[200px]"
         />
         <Input
-          value={localAccount}
-          onChange={(e) => setLocalAccount(e.target.value)}
+          value={draft.accountId}
+          onChange={(e) => setDraft((d) => ({ ...d, accountId: e.target.value }))}
           placeholder="Filter by account ID…"
           className="w-[200px]"
         />
       </div>
-    </div>
+    </form>
   );
 }
