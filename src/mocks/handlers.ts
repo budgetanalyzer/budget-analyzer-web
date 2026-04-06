@@ -29,7 +29,7 @@ export const handlers = [
   }),
   http.get('/auth/v1/session', () => {
     return HttpResponse.json({
-      authenticated: true,
+      active: true,
       userId: 'mock-user-id',
       roles: ['ADMIN'],
       expiresAt: Math.floor(Date.now() / 1000) + 1800,

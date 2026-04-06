@@ -1,5 +1,5 @@
 export interface SessionStatus {
-  authenticated: boolean;
+  active: boolean;
   userId: string;
   roles: string[];
   expiresAt: number; // Unix epoch seconds

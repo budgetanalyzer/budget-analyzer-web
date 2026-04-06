@@ -21,63 +21,7 @@ tags:
     description: Authentication status and user information
   - name: Session
     description: Session heartbeat and status
-  - name: Token Exchange
-    description: Token exchange for native clients
 paths:
-  /auth/token/exchange:
-    post:
-      tags:
-        - Token Exchange
-      summary: Exchange IDP token for session token
-      description: Validates an IDP access token via userinfo, creates a session,
-        and returns an opaque bearer token for native clients.
-      operationId: exchangeToken
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TokenExchangeRequest'
-        required: true
-      responses:
-        '200':
-          description: Token exchange successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TokenExchangeResponse'
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-              example:
-                type: INVALID_REQUEST
-                message: Bad Request
-        '401':
-          description: Invalid IDP access token
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/TokenExchangeResponse'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-              example:
-                type: INTERNAL_ERROR
-                message: Internal Server Error
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-              example:
-                type: SERVICE_UNAVAILABLE
-                message: Service Unavailable
   /logout:
     get:
       tags:
@@ -144,8 +88,8 @@ paths:
       tags:
         - Session
       summary: Session heartbeat
-      description: Validates the local Redis-backed session and extends the session
-        TTL. Returns 401 if no valid session exists.
+      description: Validates the local session and extends its TTL. Returns 401 if
+        no valid session.
       operationId: getSessionStatus
       responses:
         '200':
@@ -176,32 +120,6 @@ paths:
                 message: Service Unavailable
 components:
   schemas:
-    TokenExchangeRequest:
-      type: object
-      description: Token exchange request
-      properties:
-        accessToken:
-          type: string
-          description: IDP access token
-      required:
-        - accessToken
-    TokenExchangeResponse:
-      type: object
-      description: Token exchange response
-      properties:
-        token:
-          type: string
-          description: Opaque bearer token
-          example: abc123-session-id
-        expiresIn:
-          type: integer
-          format: int64
-          description: Token lifetime in seconds
-          example: 900
-        tokenType:
-          type: string
-          description: Token type
-          example: Bearer
     UserInfoResponse:
       type: object
       description: Authenticated user information
@@ -237,7 +155,7 @@ components:
       type: object
       description: Session status from heartbeat endpoint
       properties:
-        authenticated:
+        active:
           type: boolean
           description: Always true when this response is returned
           example: true
