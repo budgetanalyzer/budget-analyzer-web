@@ -74,7 +74,7 @@ login(); // Redirects to /oauth2/authorization/idp
 // 1. Redirect to IdP login
 // 2. OAuth callback (/login/oauth2/code/idp)
 // 3. Exchange authorization code for tokens
-// 4. Store tokens in Redis session hash (for refresh)
+// 4. Store session data in Redis session hash
 // 5. Call permission-service to resolve roles/permissions
 // 6. Write session data to Redis hash (session:{id})
 // 7. Set session cookie (HttpOnly, Secure, SameSite)
@@ -108,12 +108,11 @@ const { user, isAuthenticated, isLoading } = useAuth();
 
 ### Session Heartbeat
 
-The frontend periodically calls `GET /auth/session` to keep the session alive and validate the IDP grant. Implemented via `SessionHeartbeatProvider` (mounted in `App.tsx`) which uses the `useSessionHeartbeat` hook.
+The frontend periodically calls `GET /auth/v1/session` to keep the session alive. Implemented via `SessionHeartbeatProvider` (mounted in `App.tsx`) which uses the `useSessionHeartbeat` hook.
 
 **What it provides:**
 - **Sliding session TTL**: Each heartbeat resets the 15-minute session expiry
-- **IDP grant validation**: If Auth0 has revoked the user's grant (disabled account, withdrawn consent), the refresh fails and the session is terminated
-- **Token refresh**: When the IDP access token is within 10 minutes of expiry, the heartbeat triggers a server-side token refresh
+- **Local session validation**: Heartbeat validates the Redis-backed session only; it does not call Auth0
 - **Inactivity warning**: A non-dismissable modal with a live countdown timer appears before session expiry, allowing the user to click "Continue" to extend the session. If the countdown reaches zero, the user is automatically redirected to `/logout`
 
 **Response:**
@@ -122,20 +121,19 @@ The frontend periodically calls `GET /auth/session` to keep the session alive an
   "authenticated": true,
   "userId": "user123",
   "roles": ["ADMIN", "USER"],
-  "expiresAt": 1711720800,
-  "tokenRefreshed": false
+  "expiresAt": 1711720800
 }
 ```
 
 The frontend derives remaining time as `expiresAt - Math.floor(Date.now() / 1000)`.
 
 **Server response behavior:**
-- 200: Session is valid (may have refreshed IDP token)
-- 401: No valid session or IDP grant revoked — redirect to login
-- 502: Transient IDP error — retry on next interval
+- 200: Session is valid and the server extends the Redis session TTL
+- 401: No valid session — redirect to login
+- 502: Transient gateway/backend error — retry on next interval
 
 **Frontend behavior:**
-- Heartbeat fires immediately on mount, then every 3 minutes if user is active
+- Heartbeat fires immediately on mount, then every 2 minutes by default if user is active
 - If user is inactive (no mouse, keyboard, click, scroll, or touch events), heartbeat is skipped
 - Scroll tracking uses capture phase to detect scrolling in overflow containers (not just window scroll)
 - A warning modal with a live countdown timer appears 2 minutes before session expiry (based on `expiresAt` from server)
@@ -147,7 +145,7 @@ The frontend derives remaining time as `expiresAt - Math.floor(Date.now() / 1000
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VITE_HEARTBEAT_INTERVAL_MS` | `180000` (3 min) | Interval between heartbeat calls |
+| `VITE_HEARTBEAT_INTERVAL_MS` | `120000` (2 min) | Interval between heartbeat calls |
 | `VITE_WARNING_BEFORE_EXPIRY_SECONDS` | `120` (2 min) | Show warning this many seconds before expiry |
 
 **Key files:**
@@ -267,9 +265,9 @@ Single entry point: Istio Ingress Gateway (port 443)
 
 ### Token Management
 
-- Auth0 refresh tokens stored server-side in Redis session hash (`session:{id}`)
+- Session data stored server-side in Redis session hash (`session:{id}`)
 - ext_authz reads session hashes directly from Redis for per-request validation
-- Frontend heartbeat (`GET /auth/session`) refreshes IDP tokens near expiry and extends session TTL
+- Frontend heartbeat (`GET /auth/v1/session`) extends the Redis session TTL for active users
 - No tokens in browser localStorage/sessionStorage
 - No tokens in browser JavaScript
 

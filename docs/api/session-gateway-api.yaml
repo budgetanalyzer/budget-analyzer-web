@@ -144,9 +144,8 @@ paths:
       tags:
         - Session
       summary: Session heartbeat
-      description: Validates the session, refreshes the IDP token if near expiry,
-        and extends the session TTL. Returns 401 if no valid session or the IDP grant
-        was revoked.
+      description: Validates the local Redis-backed session and extends the session
+        TTL. Returns 401 if no valid session exists.
       operationId: getSessionStatus
       responses:
         '200':
@@ -156,7 +155,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionStatusResponse'
         '401':
-          description: No valid session or IDP grant revoked
+          description: No valid session
         '500':
           description: Internal Server Error
           content:
@@ -258,10 +257,6 @@ components:
           format: int64
           description: Unix epoch seconds when session expires
           example: 1711720800
-        tokenRefreshed:
-          type: boolean
-          description: Whether IDP token was refreshed
-          example: false
     ApiErrorResponse:
       description: Standard API error response format
       properties:

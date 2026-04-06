@@ -81,7 +81,7 @@ VITE_API_BASE_URL=/api
 **Why Session Gateway?**
 - Handles OAuth2 authentication with identity provider
 - Manages session cookies (HttpOnly, Secure, SameSite)
-- Stores Auth0 refresh tokens server-side in Redis (never exposed to browser)
+- Stores session data server-side in Redis (tokens never exposed to browser)
 - ext_authz validates sessions per-request via Redis lookup and injects identity headers
 
 See [docs/authentication.md](docs/authentication.md) for complete authentication guide.
@@ -227,7 +227,7 @@ The optimized files will be in `dist/`. Deploy to any static hosting:
 ## Integration
 
 This frontend integrates with the Budget Analyzer microservices:
-- **[Session Gateway](https://github.com/budgetanalyzer/session-gateway)** — handles OAuth2 login, session management, stores Auth0 refresh tokens server-side in Redis (never exposed to browser)
+- **[Session Gateway](https://github.com/budgetanalyzer/session-gateway)** — handles OAuth2 login, session management, stores session data server-side in Redis (tokens never exposed to browser)
 - **ext_authz** (Istio Ingress) — per-request session validation via Redis lookup, injects identity headers
 - **API Gateway** (NGINX) for request routing to backend services
 - **Transaction Service** for transaction data

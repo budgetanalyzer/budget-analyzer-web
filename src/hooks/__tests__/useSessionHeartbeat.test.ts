@@ -48,7 +48,6 @@ function makeSessionStatus(overrides?: Partial<SessionStatus>): SessionStatus {
     userId: 'user-1',
     roles: ['ADMIN'],
     expiresAt: Math.floor(Date.now() / 1000) + 1800,
-    tokenRefreshed: false,
     ...overrides,
   };
 }

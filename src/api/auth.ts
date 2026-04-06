@@ -11,8 +11,8 @@ import type { SessionStatus } from '@/types/session';
  * All auth-path requests are routed by Istio Ingress to Session Gateway:
  * - OAuth2/OIDC flows with identity provider
  * - Session cookies (HttpOnly, Secure, SameSite)
- * - Token storage in Redis session hash (for refresh)
- * - Frontend heartbeat (GET /auth/v1/session) refreshes IDP tokens and extends session TTL
+ * - Session data stored server-side in the Redis session hash
+ * - Frontend heartbeat (GET /auth/v1/session) extends the Redis session TTL (local only — does not call Auth0)
  *
  * Frontend never sees tokens - they're managed server-side by Session Gateway.
  */
@@ -40,8 +40,8 @@ export async function getCurrentUser(): Promise<User> {
 
 /**
  * Get session status for heartbeat
- * Calls Session Gateway /auth/v1/session which validates session,
- * refreshes IDP tokens if needed, and extends session TTL
+ * Calls Session Gateway /auth/v1/session which validates the
+ * Redis-backed session and extends its TTL (local only — does not call Auth0)
  */
 export async function getSessionStatus(): Promise<SessionStatus> {
   const response = await authClient.get<SessionStatus>('/auth/v1/session');
