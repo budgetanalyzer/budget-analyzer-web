@@ -28,6 +28,8 @@ interface UiState {
   hasNavigated: boolean;
   transactionTable: TransactionTableState;
   selectedViewIds: string[];
+  adminSidebarOpen: boolean;
+  adminSidebarMobileOpen: boolean;
 }
 
 const initialState: UiState = {
@@ -55,6 +57,11 @@ const initialState: UiState = {
     },
   },
   selectedViewIds: JSON.parse(localStorage.getItem('selectedViewIds') || '[]'),
+  adminSidebarOpen:
+    localStorage.getItem('adminSidebarOpen') === null
+      ? true
+      : localStorage.getItem('adminSidebarOpen') === 'true',
+  adminSidebarMobileOpen: false,
 };
 
 const uiSlice = createSlice({
@@ -65,6 +72,16 @@ const uiSlice = createSlice({
       state.theme = state.theme === 'light' ? 'dark' : 'light';
       localStorage.setItem('theme', state.theme);
       document.documentElement.classList.toggle('dark', state.theme === 'dark');
+    },
+    toggleAdminSidebar: (state) => {
+      state.adminSidebarOpen = !state.adminSidebarOpen;
+      localStorage.setItem('adminSidebarOpen', String(state.adminSidebarOpen));
+    },
+    setAdminSidebarMobileOpen: (state, action: PayloadAction<boolean>) => {
+      state.adminSidebarMobileOpen = action.payload;
+    },
+    toggleAdminSidebarMobile: (state) => {
+      state.adminSidebarMobileOpen = !state.adminSidebarMobileOpen;
     },
     setTheme: (state, action: PayloadAction<'light' | 'dark'>) => {
       state.theme = action.payload;
@@ -149,5 +166,8 @@ export const {
   setTransactionTableAmountFilter,
   toggleViewSelection,
   setSelectedViewIds,
+  toggleAdminSidebar,
+  setAdminSidebarMobileOpen,
+  toggleAdminSidebarMobile,
 } = uiSlice.actions;
 export default uiSlice.reducer;
