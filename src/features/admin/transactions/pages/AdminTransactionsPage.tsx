@@ -67,7 +67,7 @@ export function AdminTransactionsPage() {
 
   return (
     <div className="h-full bg-gradient-to-br from-background to-muted/20">
-      <div className="container mx-auto px-8 py-10">
+      <div className="container mx-auto px-4 py-6">
         <div className="mb-6">
           <PageHeader
             title="Transactions"

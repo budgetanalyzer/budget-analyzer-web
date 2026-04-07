@@ -10,6 +10,8 @@ import {
   type PaginationState,
 } from '@tanstack/react-table';
 import {
+  ArrowDown,
+  ArrowUp,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
@@ -36,8 +38,10 @@ import {
   SelectValue,
 } from '@/components/ui/Select';
 import type { AdminTransaction, PageMetadata } from '@/types/adminTransaction';
-import { formatLocalDate, formatTimestamp } from '@/utils/dates';
+import { formatLocalDate } from '@/utils/dates';
 import { formatCurrency } from '@/utils/currency';
+import { cn } from '@/utils/cn';
+import { columnWidthClass } from '@/utils/columnWidth';
 import { PAGE_SIZE_OPTIONS, type PageSize } from '@/features/admin/transactions/utils/urlState';
 
 interface AdminTransactionTableProps {
@@ -82,6 +86,7 @@ interface SortableHeaderProps {
 
 function SortableHeader({ label, field, sort, align = 'left', onSortChange }: SortableHeaderProps) {
   const current = sort.find((s) => s.split(',')[0] === field);
+  const isActive = current !== undefined;
   const isAsc = current?.split(',')[1] === 'ASC';
   const handleClick = () => {
     // Toggle: none -> DESC -> ASC -> DESC, but to keep the URL stable we replace
@@ -95,16 +100,19 @@ function SortableHeader({ label, field, sort, align = 'left', onSortChange }: So
     const next = field === 'id' ? [`${field},${nextDir}`] : [`${field},${nextDir}`, 'id,DESC'];
     onSortChange(next);
   };
+  const Icon = isActive ? (isAsc ? ArrowUp : ArrowDown) : ArrowUpDown;
   return (
     <Button
       variant="ghost"
       onClick={handleClick}
-      className={
-        align === 'right' ? 'w-full justify-end hover:bg-transparent' : 'hover:bg-transparent'
-      }
+      className={cn(
+        'px-0 hover:bg-transparent',
+        isActive && 'text-foreground',
+        align === 'right' && 'w-full justify-end',
+      )}
     >
       {label}
-      <ArrowUpDown className="ml-2 h-4 w-4" />
+      <Icon className={cn('ml-2 h-4 w-4', !isActive && 'opacity-40')} />
     </Button>
   );
 }
@@ -155,19 +163,26 @@ export function AdminTransactionTable({
         cell: ({ row }) => (
           <span className="whitespace-nowrap">{formatLocalDate(row.original.date)}</span>
         ),
+        size: 120,
+        minSize: 120,
+        maxSize: 120,
       },
       {
         accessorKey: 'description',
         header: 'Description',
-        cell: ({ row }) => (
-          <span className="block max-w-[400px] truncate">{row.original.description}</span>
-        ),
+        cell: ({ row }) => <div className="truncate">{row.original.description}</div>,
+        size: 400,
+        minSize: 200,
       },
       {
         accessorKey: 'bankName',
         header: () => (
           <SortableHeader label="Bank" field="bankName" sort={sort} onSortChange={onSortChange} />
         ),
+        cell: ({ row }) => <div className="truncate">{row.original.bankName}</div>,
+        size: 150,
+        minSize: 120,
+        maxSize: 150,
       },
       {
         accessorKey: 'accountId',
@@ -179,7 +194,18 @@ export function AdminTransactionTable({
             onSortChange={onSortChange}
           />
         ),
-        cell: ({ row }) => <span className="font-mono text-xs">{row.original.accountId}</span>,
+        cell: ({ row }) => {
+          const accountId = row.original.accountId;
+          const truncated = accountId.length > 6 ? `…${accountId.slice(-6)}` : accountId;
+          return (
+            <span className="font-mono text-xs" title={accountId}>
+              {truncated}
+            </span>
+          );
+        },
+        size: 100,
+        minSize: 100,
+        maxSize: 100,
       },
       {
         accessorKey: 'type',
@@ -192,6 +218,9 @@ export function AdminTransactionTable({
           ) : (
             <Badge variant="secondary">DEBIT</Badge>
           ),
+        size: 100,
+        minSize: 100,
+        maxSize: 100,
       },
       {
         accessorKey: 'amount',
@@ -214,31 +243,9 @@ export function AdminTransactionTable({
             )}
           </div>
         ),
-      },
-      {
-        accessorKey: 'ownerId',
-        header: () => (
-          <SortableHeader
-            label="Owner ID"
-            field="ownerId"
-            sort={sort}
-            onSortChange={onSortChange}
-          />
-        ),
-        cell: ({ row }) => (
-          <span className="block max-w-[180px] truncate font-mono text-xs text-muted-foreground">
-            {row.original.ownerId}
-          </span>
-        ),
-      },
-      {
-        accessorKey: 'createdAt',
-        header: 'Created',
-        cell: ({ row }) => (
-          <span className="whitespace-nowrap text-xs text-muted-foreground">
-            {formatTimestamp(row.original.createdAt)}
-          </span>
-        ),
+        size: 150,
+        minSize: 130,
+        maxSize: 150,
       },
     ],
     [sort, onSortChange],
@@ -293,12 +300,15 @@ export function AdminTransactionTable({
         {isFetching && data.length > 0 && (
           <div className="absolute left-0 right-0 top-0 h-0.5 animate-pulse bg-primary" />
         )}
-        <Table>
+        <Table hideScrollbar={false}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-b bg-muted/50 hover:bg-muted/50">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="h-12 font-semibold">
+                  <TableHead
+                    key={header.id}
+                    className={cn('h-12 font-semibold', columnWidthClass(header.getSize()))}
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -311,8 +321,11 @@ export function AdminTransactionTable({
             {showInitialSkeleton ? (
               Array.from({ length: 5 }).map((_, idx) => (
                 <TableRow key={`skeleton-${idx}`}>
-                  {columns.map((_col, colIdx) => (
-                    <TableCell key={`skeleton-${idx}-${colIdx}`} className="py-3">
+                  {table.getAllColumns().map((col) => (
+                    <TableCell
+                      key={`skeleton-${idx}-${col.id}`}
+                      className={cn('py-3', columnWidthClass(col.getSize()))}
+                    >
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
                   ))}
@@ -336,7 +349,10 @@ export function AdminTransactionTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} className="hover:bg-muted/30">
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-3">
+                    <TableCell
+                      key={cell.id}
+                      className={cn('py-3', columnWidthClass(cell.column.getSize()))}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

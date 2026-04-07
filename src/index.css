@@ -55,17 +55,17 @@
 }
 
 @layer base {
-  /* Admin visual identity — amber primary, warm tints */
+  /* Admin visual identity — violet accent on neutral card */
   .admin {
-    --primary: 24.6 95% 53.1%;
-    --primary-foreground: 60 9.1% 97.8%;
-    --ring: 24.6 95% 53.1%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 40% 98%;
+    --ring: 262 83% 58%;
   }
 
   .dark .admin {
-    --primary: 32 95% 58%;
-    --primary-foreground: 24 10% 10%;
-    --ring: 32 95% 58%;
+    --primary: 263 70% 65%;
+    --primary-foreground: 222 47% 11%;
+    --ring: 263 70% 65%;
   }
 
   * {

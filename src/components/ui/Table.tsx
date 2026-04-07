@@ -2,9 +2,18 @@
 import React from 'react';
 import { cn } from '@/utils/cn';
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-x-auto scrollbar-hide">
+interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
+  /**
+   * When true (default), hides the horizontal scrollbar via the `scrollbar-hide`
+   * utility. Set to false to show a native scrollbar — useful when the table is
+   * wide enough to scroll and the scroll affordance needs to be discoverable.
+   */
+  hideScrollbar?: boolean;
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, hideScrollbar = true, ...props }, ref) => (
+    <div className={cn('relative w-full overflow-x-auto', hideScrollbar && 'scrollbar-hide')}>
       <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   ),

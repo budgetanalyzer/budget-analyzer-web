@@ -1,6 +1,6 @@
 // src/features/admin/transactions/components/AdminTransactionFilters.tsx
 import { useCallback, useEffect, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
@@ -14,6 +14,7 @@ import {
 import type { AdminTransactionsQuery } from '@/types/adminTransaction';
 import type { TransactionType } from '@/types/transaction';
 import { hasActiveFilters } from '@/features/admin/transactions/utils/urlState';
+import { cn } from '@/utils/cn';
 
 interface AdminTransactionFiltersProps {
   query: AdminTransactionsQuery;
@@ -25,7 +26,6 @@ type DraftType = 'all' | TransactionType;
 
 interface DraftFilters {
   description: string;
-  ownerId: string;
   bankName: string;
   accountId: string;
   minAmount: string;
@@ -38,7 +38,6 @@ interface DraftFilters {
 function draftFromQuery(query: AdminTransactionsQuery): DraftFilters {
   return {
     description: query.description ?? '',
-    ownerId: query.ownerId ?? '',
     bankName: query.bankName ?? '',
     accountId: query.accountId ?? '',
     minAmount: query.minAmount !== undefined ? String(query.minAmount) : '',
@@ -59,7 +58,6 @@ function parseAmount(value: string): number | undefined {
 function draftToQueryPatch(draft: DraftFilters): Partial<AdminTransactionsQuery> {
   return {
     description: draft.description.trim() || undefined,
-    ownerId: draft.ownerId.trim() || undefined,
     bankName: draft.bankName.trim() || undefined,
     accountId: draft.accountId.trim() || undefined,
     minAmount: parseAmount(draft.minAmount),
@@ -70,17 +68,41 @@ function draftToQueryPatch(draft: DraftFilters): Partial<AdminTransactionsQuery>
   };
 }
 
+/**
+ * Filters tucked behind the "More filters" disclosure. Used both to decide
+ * whether to auto-open the panel on mount/query change and to render a count
+ * badge on the toggle button.
+ */
+function countAdvancedFilters(query: AdminTransactionsQuery): number {
+  let count = 0;
+  if (query.type !== undefined) count += 1;
+  if (query.minAmount !== undefined) count += 1;
+  if (query.maxAmount !== undefined) count += 1;
+  if (query.bankName !== undefined && query.bankName !== '') count += 1;
+  if (query.accountId !== undefined && query.accountId !== '') count += 1;
+  return count;
+}
+
 export function AdminTransactionFilters({
   query,
   onChange,
   onClear,
 }: AdminTransactionFiltersProps) {
   const [draft, setDraft] = useState<DraftFilters>(() => draftFromQuery(query));
+  const [showMore, setShowMore] = useState<boolean>(() => countAdvancedFilters(query) > 0);
 
   // Reset the draft whenever the parent query changes (Clear All, browser
   // back/forward, deep-linked URLs).
   useEffect(() => {
     setDraft(draftFromQuery(query));
+  }, [query]);
+
+  // Auto-open the disclosure when incoming query has hidden filters so the
+  // user can see what's active. Never auto-close — let the user collapse it.
+  useEffect(() => {
+    if (countAdvancedFilters(query) > 0) {
+      setShowMore(true);
+    }
   }, [query]);
 
   const handleSubmit = useCallback(
@@ -100,6 +122,7 @@ export function AdminTransactionFilters({
   }, []);
 
   const filtersActive = hasActiveFilters(query);
+  const advancedCount = countAdvancedFilters(query);
 
   return (
     <form onSubmit={handleSubmit} className="mb-4 space-y-3">
@@ -120,79 +143,99 @@ export function AdminTransactionFilters({
           onChange={handleDateChange}
         />
 
-        <Select value={draft.type} onValueChange={handleTypeChange}>
-          <SelectTrigger className="w-[110px]">
-            <SelectValue placeholder="All Types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="DEBIT">Debit</SelectItem>
-            <SelectItem value="CREDIT">Credit</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div className="flex items-center gap-1">
-          <Input
-            type="number"
-            placeholder="Min"
-            value={draft.minAmount}
-            onChange={(e) => setDraft((d) => ({ ...d, minAmount: e.target.value }))}
-            className="w-[90px]"
-            min="0"
-            step="0.01"
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowMore((s) => !s)}
+          aria-expanded={showMore}
+          aria-controls="admin-txn-more-filters"
+          className="h-9 px-3"
+        >
+          <SlidersHorizontal className="mr-1.5 h-4 w-4" />
+          More filters
+          {advancedCount > 0 && (
+            <span className="ml-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary/15 px-1.5 text-xs font-semibold text-primary">
+              {advancedCount}
+            </span>
+          )}
+          <ChevronDown
+            className={cn('ml-1 h-4 w-4 transition-transform', showMore && 'rotate-180')}
           />
-          <span className="text-muted-foreground">-</span>
+        </Button>
+      </div>
+
+      {showMore && (
+        <div
+          id="admin-txn-more-filters"
+          className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 p-3"
+        >
+          <Select value={draft.type} onValueChange={handleTypeChange}>
+            <SelectTrigger className="w-[110px]">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="DEBIT">Debit</SelectItem>
+              <SelectItem value="CREDIT">Credit</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              placeholder="Min"
+              value={draft.minAmount}
+              onChange={(e) => setDraft((d) => ({ ...d, minAmount: e.target.value }))}
+              className="w-[90px]"
+              min="0"
+              step="0.01"
+            />
+            <span className="text-muted-foreground">-</span>
+            <Input
+              type="number"
+              placeholder="Max"
+              value={draft.maxAmount}
+              onChange={(e) => setDraft((d) => ({ ...d, maxAmount: e.target.value }))}
+              className="w-[90px]"
+              min="0"
+              step="0.01"
+            />
+          </div>
+
           <Input
-            type="number"
-            placeholder="Max"
-            value={draft.maxAmount}
-            onChange={(e) => setDraft((d) => ({ ...d, maxAmount: e.target.value }))}
-            className="w-[90px]"
-            min="0"
-            step="0.01"
+            value={draft.bankName}
+            onChange={(e) => setDraft((d) => ({ ...d, bankName: e.target.value }))}
+            placeholder="Filter by bank name…"
+            className="w-[200px]"
+          />
+          <Input
+            value={draft.accountId}
+            onChange={(e) => setDraft((d) => ({ ...d, accountId: e.target.value }))}
+            placeholder="Filter by account ID…"
+            className="w-[200px]"
           />
         </div>
+      )}
 
+      <div className="flex items-center gap-2">
         <Button type="submit" size="sm" className="h-9 px-3">
           <Search className="mr-1.5 h-4 w-4" />
           Search
         </Button>
 
-        {filtersActive && (
-          <>
-            <div className="mx-1 h-6 w-px bg-border" />
-            <Button type="button" variant="ghost" size="sm" onClick={onClear} className="h-9 px-3">
-              <X className="mr-1.5 h-4 w-4" />
-              Clear all
-            </Button>
-          </>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-start gap-2">
-        <div className="flex flex-col">
-          <Input
-            value={draft.ownerId}
-            onChange={(e) => setDraft((d) => ({ ...d, ownerId: e.target.value }))}
-            placeholder="Filter by owner ID (e.g. usr_test123)"
-            className="w-[280px] font-mono text-xs"
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Owner ID is an opaque identifier. Email-based lookup is not currently supported.
-          </p>
-        </div>
-        <Input
-          value={draft.bankName}
-          onChange={(e) => setDraft((d) => ({ ...d, bankName: e.target.value }))}
-          placeholder="Filter by bank name…"
-          className="w-[200px]"
-        />
-        <Input
-          value={draft.accountId}
-          onChange={(e) => setDraft((d) => ({ ...d, accountId: e.target.value }))}
-          placeholder="Filter by account ID…"
-          className="w-[200px]"
-        />
+        <div className="mx-1 h-6 w-px bg-border" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onClear}
+          disabled={!filtersActive}
+          className="h-9 px-3"
+        >
+          <X className="mr-1.5 h-4 w-4" />
+          Clear all
+        </Button>
       </div>
     </form>
   );
