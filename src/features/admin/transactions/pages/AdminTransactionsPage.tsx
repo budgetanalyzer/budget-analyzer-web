@@ -1,20 +1,22 @@
 // src/features/admin/transactions/pages/AdminTransactionsPage.tsx
 import { useCallback, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router';
+import { Navigate, useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/PageHeader';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { useAdminTransactions } from '@/features/admin/transactions/api/useAdminTransactions';
-import { AdminTransactionFilters } from '@/features/admin/transactions/components/AdminTransactionFilters';
-import { AdminTransactionTable } from '@/features/admin/transactions/components/AdminTransactionTable';
+import { usePermission } from '@/features/auth/hooks/usePermission';
+import { useTransactionSearch } from '@/features/admin/transactions/api/useTransactionSearch';
+import { TransactionSearchFiltersPanel } from '@/features/admin/transactions/components/TransactionSearchFiltersPanel';
+import { TransactionSearchTable } from '@/features/admin/transactions/components/TransactionSearchTable';
 import {
   buildAdminTxnSearchParams,
   clearAdminTxnFilters,
   parseAdminTxnQuery,
   type PageSize,
 } from '@/features/admin/transactions/utils/urlState';
-import type { AdminTransactionsQuery } from '@/types/adminTransaction';
+import type { TransactionSearchQuery } from '@/types/transactionSearch';
 
 export function AdminTransactionsPage() {
+  const canSearchAcrossUsers = usePermission('transactions:read:any');
   const [searchParams, setSearchParams] = useSearchParams();
   const query = useMemo(() => parseAdminTxnQuery(searchParams), [searchParams]);
 
@@ -24,12 +26,14 @@ export function AdminTransactionsPage() {
   const queryRef = useRef(query);
   queryRef.current = query;
 
-  const { data, isLoading, isFetching, error, refetch } = useAdminTransactions(query);
+  const { data, isLoading, isFetching, error, refetch } = useTransactionSearch(query, {
+    enabled: canSearchAcrossUsers,
+  });
 
   const handleQueryChange = useCallback(
-    (next: Partial<AdminTransactionsQuery>) => {
+    (next: Partial<TransactionSearchQuery>) => {
       // Reset page to 0 on filter change unless caller explicitly sets it.
-      const merged: AdminTransactionsQuery = {
+      const merged: TransactionSearchQuery = {
         ...queryRef.current,
         ...next,
         page: 'page' in next && next.page !== undefined ? next.page : 0,
@@ -65,6 +69,10 @@ export function AdminTransactionsPage() {
     setSearchParams(clearAdminTxnFilters(query), { replace: true });
   }, [query, setSearchParams]);
 
+  if (!canSearchAcrossUsers) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
   return (
     <div className="h-full bg-gradient-to-br from-background to-muted/20">
       <div className="container mx-auto px-4 py-6">
@@ -75,12 +83,16 @@ export function AdminTransactionsPage() {
           />
         </div>
 
-        <AdminTransactionFilters query={query} onChange={handleQueryChange} onClear={handleClear} />
+        <TransactionSearchFiltersPanel
+          query={query}
+          onChange={handleQueryChange}
+          onClear={handleClear}
+        />
 
         {error ? (
           <ErrorBanner error={error} onRetry={() => refetch()} />
         ) : (
-          <AdminTransactionTable
+          <TransactionSearchTable
             data={data?.content ?? []}
             metadata={data?.metadata}
             sort={query.sort}

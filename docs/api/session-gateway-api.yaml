@@ -53,8 +53,8 @@ paths:
       tags:
         - User
       summary: Get current user info
-      description: Returns the authenticated user's profile and roles. Returns 200
-        with user info if authenticated, or empty 401 if not.
+      description: Returns the authenticated user's profile, roles, and permissions.
+        Returns 200 with user info if authenticated, or empty 401 if not.
       operationId: getCurrentUser
       responses:
         '200':
@@ -149,6 +149,14 @@ components:
           description: User's roles for UI visibility
           example:
             - USER
+          items:
+            type: string
+        permissions:
+          type: array
+          description: User's resolved permissions for action-level UI gating
+          example:
+            - transactions:read
+            - transactions:read:any
           items:
             type: string
     SessionStatusResponse:

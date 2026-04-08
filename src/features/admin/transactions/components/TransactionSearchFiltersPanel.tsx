@@ -1,4 +1,4 @@
-// src/features/admin/transactions/components/AdminTransactionFilters.tsx
+// src/features/admin/transactions/components/TransactionSearchFiltersPanel.tsx
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -11,14 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select';
-import type { AdminTransactionsQuery } from '@/types/adminTransaction';
+import type { TransactionSearchQuery } from '@/types/transactionSearch';
 import type { TransactionType } from '@/types/transaction';
 import { hasActiveFilters } from '@/features/admin/transactions/utils/urlState';
 import { cn } from '@/utils/cn';
 
-interface AdminTransactionFiltersProps {
-  query: AdminTransactionsQuery;
-  onChange: (next: Partial<AdminTransactionsQuery>) => void;
+interface TransactionSearchFiltersPanelProps {
+  query: TransactionSearchQuery;
+  onChange: (next: Partial<TransactionSearchQuery>) => void;
   onClear: () => void;
 }
 
@@ -35,7 +35,7 @@ interface DraftFilters {
   type: DraftType;
 }
 
-function draftFromQuery(query: AdminTransactionsQuery): DraftFilters {
+function draftFromQuery(query: TransactionSearchQuery): DraftFilters {
   return {
     description: query.description ?? '',
     bankName: query.bankName ?? '',
@@ -55,7 +55,7 @@ function parseAmount(value: string): number | undefined {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function draftToQueryPatch(draft: DraftFilters): Partial<AdminTransactionsQuery> {
+function draftToQueryPatch(draft: DraftFilters): Partial<TransactionSearchQuery> {
   return {
     description: draft.description.trim() || undefined,
     bankName: draft.bankName.trim() || undefined,
@@ -73,7 +73,7 @@ function draftToQueryPatch(draft: DraftFilters): Partial<AdminTransactionsQuery>
  * whether to auto-open the panel on mount/query change and to render a count
  * badge on the toggle button.
  */
-function countAdvancedFilters(query: AdminTransactionsQuery): number {
+function countAdvancedFilters(query: TransactionSearchQuery): number {
   let count = 0;
   if (query.type !== undefined) count += 1;
   if (query.minAmount !== undefined) count += 1;
@@ -83,11 +83,11 @@ function countAdvancedFilters(query: AdminTransactionsQuery): number {
   return count;
 }
 
-export function AdminTransactionFilters({
+export function TransactionSearchFiltersPanel({
   query,
   onChange,
   onClear,
-}: AdminTransactionFiltersProps) {
+}: TransactionSearchFiltersPanelProps) {
   const [draft, setDraft] = useState<DraftFilters>(() => draftFromQuery(query));
   const [showMore, setShowMore] = useState<boolean>(() => countAdvancedFilters(query) > 0);
 

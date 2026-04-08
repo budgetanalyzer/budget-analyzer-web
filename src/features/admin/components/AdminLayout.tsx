@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   toggleAdminSidebar,
@@ -30,40 +31,51 @@ interface NavItem {
   disabled?: boolean;
 }
 
-const navItems: NavItem[] = [
-  {
-    to: '/admin',
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    to: '/admin/currencies',
-    label: 'Currencies',
-    icon: DollarSign,
-  },
-  {
-    to: '/admin/statement-formats',
-    label: 'Statement Formats',
-    icon: FileText,
-  },
-  {
-    to: '/admin/transactions',
-    label: 'Transactions',
-    icon: List,
-  },
-  {
-    to: '/admin/users/deactivate',
-    label: 'Deactivate User',
-    icon: UserMinus,
-  },
-];
-
 export function AdminLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
   const dispatch = useAppDispatch();
   const sidebarOpen = useAppSelector((s) => s.ui.adminSidebarOpen);
   const mobileOpen = useAppSelector((s) => s.ui.adminSidebarMobileOpen);
+
+  const canSearchAcrossUsers = usePermission('transactions:read:any');
+  const canDeactivateUsers = usePermission('users:write');
+
+  const navItems: NavItem[] = [
+    {
+      to: '/admin',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      to: '/admin/currencies',
+      label: 'Currencies',
+      icon: DollarSign,
+    },
+    {
+      to: '/admin/statement-formats',
+      label: 'Statement Formats',
+      icon: FileText,
+    },
+    ...(canSearchAcrossUsers
+      ? [
+          {
+            to: '/admin/transactions',
+            label: 'Transactions',
+            icon: List,
+          },
+        ]
+      : []),
+    ...(canDeactivateUsers
+      ? [
+          {
+            to: '/admin/users/deactivate',
+            label: 'Deactivate User',
+            icon: UserMinus,
+          },
+        ]
+      : []),
+  ];
 
   // Auto-close mobile overlay when crossing up to md (avoids stale-open state)
   useEffect(() => {

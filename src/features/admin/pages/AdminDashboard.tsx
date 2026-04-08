@@ -3,19 +3,24 @@ import { DollarSign, FileText, List, Plus, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { useStatementFormats } from '@/hooks/useStatementFormats';
-import { useAdminTransactions } from '@/features/admin/transactions/api/useAdminTransactions';
+import { useTransactionSearch } from '@/features/admin/transactions/api/useTransactionSearch';
 
 export function AdminDashboard() {
   const { user } = useAuth();
+  const canSearchAcrossUsers = usePermission('transactions:read:any');
   const { data: currencies, isLoading: currenciesLoading } = useCurrencies();
   const { data: formats, isLoading: formatsLoading } = useStatementFormats();
-  const { data: transactionsPage, isLoading: transactionsLoading } = useAdminTransactions({
-    page: 0,
-    size: 1,
-    sort: ['date,DESC', 'id,DESC'],
-  });
+  const { data: transactionsPage, isLoading: transactionsLoading } = useTransactionSearch(
+    {
+      page: 0,
+      size: 1,
+      sort: ['date,DESC', 'id,DESC'],
+    },
+    { enabled: canSearchAcrossUsers },
+  );
 
   const enabledCount = currencies?.filter((c) => c.enabled).length ?? 0;
   const totalCurrencies = currencies?.length ?? 0;
@@ -114,36 +119,38 @@ export function AdminDashboard() {
           </div>
 
           {/* Transactions card */}
-          <div className="rounded-xl border bg-card shadow-sm">
-            <div className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-primary/10 p-2.5">
-                    <List className="h-5 w-5 text-primary" />
+          {canSearchAcrossUsers && (
+            <div className="rounded-xl border bg-card shadow-sm">
+              <div className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-primary/10 p-2.5">
+                      <List className="h-5 w-5 text-primary" />
+                    </div>
+                    <h2 className="text-lg font-semibold">Transactions</h2>
                   </div>
-                  <h2 className="text-lg font-semibold">Transactions</h2>
+                  {transactionsLoading ? (
+                    <Skeleton className="h-8 w-12 rounded-md" />
+                  ) : (
+                    <span className="text-2xl font-bold">{totalTransactions.toLocaleString()}</span>
+                  )}
                 </div>
-                {transactionsLoading ? (
-                  <Skeleton className="h-8 w-12 rounded-md" />
-                ) : (
-                  <span className="text-2xl font-bold">{totalTransactions.toLocaleString()}</span>
+                {!transactionsLoading && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Across all users (read-only view)
+                  </p>
                 )}
               </div>
-              {!transactionsLoading && (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Across all users (read-only view)
-                </p>
-              )}
+              <div className="flex items-center gap-2 border-t px-6 py-3">
+                <Link to="/admin/transactions">
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+                    Browse all
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </Link>
+              </div>
             </div>
-            <div className="flex items-center gap-2 border-t px-6 py-3">
-              <Link to="/admin/transactions">
-                <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
-                  Browse all
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              </Link>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

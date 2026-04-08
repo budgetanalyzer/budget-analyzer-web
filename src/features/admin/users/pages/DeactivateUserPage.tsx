@@ -1,15 +1,17 @@
 import { useState, useCallback, FormEvent } from 'react';
-import { useNavigate } from 'react-router';
+import { Navigate, useNavigate } from 'react-router';
 import { ArrowLeft, UserMinus } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { MessageBanner } from '@/components/MessageBanner';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useDeactivateUser } from '@/hooks/useUsers';
 import { formatApiError } from '@/utils/errorMessages';
 import { UserDeactivationResponse } from '@/types/user';
 
 export function DeactivateUserPage() {
+  const canDeactivateUsers = usePermission('users:write');
   const navigate = useNavigate();
   const { mutate: deactivateUser, isPending } = useDeactivateUser();
   const [userId, setUserId] = useState('');
@@ -43,6 +45,10 @@ export function DeactivateUserPage() {
     },
     [userId, deactivateUser],
   );
+
+  if (!canDeactivateUsers) {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   return (
     <div className="h-full bg-gradient-to-br from-background to-muted/20">

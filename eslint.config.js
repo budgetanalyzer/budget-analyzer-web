@@ -78,15 +78,16 @@ export default [
         {
           zones: [
             // Prevent cross-feature imports
+            // Exception: auth feature is a cross-cutting concern
             {
               target: './src/features/transactions',
               from: './src/features',
-              except: ['./transactions'],
+              except: ['./transactions', './auth'],
             },
             {
               target: './src/features/analytics',
               from: './src/features',
-              except: ['./analytics'],
+              except: ['./analytics', './auth'],
             },
 
             // Prevent shared modules from importing feature code

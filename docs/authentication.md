@@ -215,9 +215,51 @@ interface User {
   name?: string;
   picture?: string;        // Profile picture URL
   authenticated: boolean;
-  roles: UserRole[];       // Resolved by permission-service
+  roles: UserRole[];       // Resolved by permission-service (layout-level)
+  permissions: string[];   // Resolved by permission-service (action-level)
 }
 ```
+
+`roles` drives layout decisions (which chrome surrounds the page).
+`permissions` drives action-level UI gating (which buttons, forms, tiles, and
+queries render).
+
+## Frontend Permission Checks
+
+The frontend follows the bulletproof-react split between **roles** (layout)
+and **permissions** (actions). See the "Authorization: Roles vs Permissions"
+section in `AGENTS.md` for the convention and the full table of gated sites.
+
+**Hooks and helpers:**
+
+- `usePermission('<permission:string>')` —
+  `src/features/auth/hooks/usePermission.ts`. One-line wrapper around `useAuth`
+  that returns `true`/`false` for the given permission string. Use this inside
+  components.
+- `hasPermission(user, permission)` —
+  `src/features/auth/utils/permissions.ts`. Plain function for non-component
+  code paths.
+- `isAdmin(user.roles)` — `src/features/auth/utils/role.ts`. Used only by
+  `AdminRoute`, `Layout`, and `LoginPage` for layout-level decisions. Never
+  use it to gate an action.
+
+**Permission strings** are inline string literals (e.g.,
+`'transactions:read:any'`, `'users:write'`, `'transactions:delete'`). The
+backend (permission-service) owns the catalogue; a typo on the frontend fails
+safe by returning `false`. Permissions are populated from the
+`/auth/v1/user` response and refreshed via React Query — no separate cache.
+
+**Pattern for queries:** sites that render a tile or page conditionally on a
+permission should also pass the permission boolean as React Query's `enabled`
+option to skip the guaranteed-403 request. Example: `AdminDashboard.tsx` uses
+`useTransactionSearch(query, { enabled: canSearchAcrossUsers })`.
+
+**Rules-of-hooks:** `usePermission` is a hook — call it at the top of a
+component, never inside `.filter()` or other callbacks. See
+`AdminLayout.tsx` for the nav-item pattern.
+
+For the migration plan and rationale, see
+[docs/plans/permission-based-authorization-cleanup.md](plans/permission-based-authorization-cleanup.md).
 
 ## Production Deployment
 
@@ -320,6 +362,7 @@ vi.mock('@/features/admin/hooks/useAuth', () => ({
       email: 'test@example.com',
       authenticated: true,
       roles: ['ADMIN'],
+      permissions: ['transactions:read:any', 'users:write'],
     },
     isAuthenticated: true,
     isLoading: false,

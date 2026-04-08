@@ -9,6 +9,20 @@ export const handlers = [
       name: 'Admin User',
       authenticated: true,
       roles: ['ADMIN'],
+      permissions: [
+        'transactions:read',
+        'transactions:read:any',
+        'transactions:write',
+        'transactions:write:any',
+        'transactions:delete',
+        'transactions:delete:any',
+        'currencies:read',
+        'currencies:write',
+        'statementformats:read',
+        'statementformats:write',
+        'users:read',
+        'users:write',
+      ],
     });
   }),
   http.get('/api/v1/transactions', () => {
@@ -27,7 +41,7 @@ export const handlers = [
   http.delete('/api/v1/transactions/:id', () => {
     return new HttpResponse(null, { status: 204 });
   }),
-  http.get('/api/v1/admin/transactions', () => {
+  http.get('/api/v1/transactions/search', () => {
     return HttpResponse.json({
       content: [
         {

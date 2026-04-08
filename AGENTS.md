@@ -150,6 +150,77 @@ Request flow:
 
 **Important**: Access the app via Istio Ingress Gateway, not Vite dev server (port 3000) directly.
 
+### Authorization: Roles vs Permissions
+
+The frontend applies a bulletproof-react split between **roles** (layout chrome)
+and **permissions** (action gating).
+
+**Roles → layout decisions.** Use `isAdmin(user.roles)` from
+`src/features/auth/utils/role.ts` and the `AdminRoute` guard
+(`src/features/admin/components/AdminRoute.tsx`) to decide *which chrome
+surrounds the page*. Today only `AdminRoute`, `Layout.tsx`, and `LoginPage.tsx`
+read roles.
+
+**Permissions → action decisions.** Use
+`usePermission('<permission:string>')` from
+`src/features/auth/hooks/usePermission.ts` (or the plain
+`hasPermission(user, permission)` helper from
+`src/features/auth/utils/permissions.ts` for non-component code) to decide
+*whether a specific button, form, page body, or query renders*.
+
+**Never gate an action on `isAdmin`.** If a button is admin-only it is because
+it requires a specific permission that happens to live in the `ADMIN` bundle —
+name the permission. The permission catalogue is owned by the backend
+(permission-service); the frontend uses inline string literals like
+`'transactions:read:any'`. A typo fails safe (returns `false`).
+
+**Reads are not gated at the table.** Read-only list bodies, detail pages, and
+table cells render unconditionally. If the user reaches a page they cannot read,
+the backend returns 403, React Query surfaces the error, and `ErrorBanner`
+renders it (see `TransactionsPage.tsx` for the pattern). Gating the table itself
+would make the "no rows" and "backend 403" states unreachable behind a third
+"no permission" state, and every authenticated user has the self-scope
+`transactions:read` permission by definition. This matches the bulletproof-react
+reference convention: gate the button, not the table.
+
+**`:any` permissions are feature-level, not read-level.** Strings ending in
+`:any` (`transactions:read:any`, `transactions:write:any`,
+`transactions:delete:any`) expand scope from "my own resources" to "across all
+users." They gate **distinct cross-user features** — the admin transactions
+search page, the dashboard cross-user tile, the admin sidebar nav item — at the
+route / tile / page level. User-facing pages check the **unscoped** permission
+(`transactions:write`, `transactions:delete`) because those are the self-scope
+variants. When adding a new gated site, pick the scope from the question the
+site answers: "same feature but on someone else's data?" → `:any`. "an action
+on the current user's own data?" → unscoped.
+
+**Action-level gating sites today:**
+
+| Site | File | Permission |
+|---|---|---|
+| Cross-user transaction search page body | `src/features/admin/transactions/pages/AdminTransactionsPage.tsx` | `transactions:read:any` |
+| Admin dashboard "Transactions" tile + query | `src/features/admin/pages/AdminDashboard.tsx` | `transactions:read:any` |
+| Sidebar "Transactions" nav item | `src/features/admin/components/AdminLayout.tsx` | `transactions:read:any` |
+| Sidebar "Deactivate User" nav item | `src/features/admin/components/AdminLayout.tsx` | `users:write` |
+| Deactivate user form | `src/features/admin/users/pages/DeactivateUserPage.tsx` | `users:write` |
+| Bulk delete trigger (self-scope) | `src/features/transactions/components/TransactionTable.tsx` | `transactions:delete` |
+| Import transactions button (self-scope) | `src/features/transactions/pages/TransactionsPage.tsx` | `transactions:write` |
+| Per-row Edit (self-scope) | `src/features/transactions/components/EditableTransactionRow.tsx` (prop threaded from `TransactionTable.tsx`) | `transactions:write` |
+| Per-row Delete (self-scope) | `src/features/transactions/components/EditableTransactionRow.tsx` (prop threaded from `TransactionTable.tsx`) | `transactions:delete` |
+| Row selection column and banners (self-scope) | `src/features/transactions/components/TransactionTable.tsx` | `transactions:delete` |
+
+Sites that gate the *query* as well as the UI use the React Query `enabled`
+option so a hidden tile never fires a guaranteed-403 request.
+
+**Rules-of-hooks trap.** `usePermission` is a hook, so do not call it inside a
+`.filter()` callback when filtering nav items. Call it once per item at the top
+of the component (see `AdminLayout.tsx`).
+
+The cross-service plan is at
+`../architecture-conversations/docs/plans/permission-based-authorization-cleanup.md`;
+the frontend half is at
+[docs/plans/permission-based-authorization-cleanup.md](docs/plans/permission-based-authorization-cleanup.md).
+
 ## Component Patterns
 
 ### Separation of Concerns
