@@ -1,4 +1,4 @@
-// src/features/admin/transactions/components/AdminTransactionTable.tsx
+// src/features/admin/transactions/components/TransactionSearchTable.tsx
 import { useCallback, useMemo } from 'react';
 import {
   useReactTable,
@@ -37,15 +37,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select';
-import type { AdminTransaction, PageMetadata } from '@/types/adminTransaction';
+import type { TransactionSearchResult, PageMetadata } from '@/types/transactionSearch';
 import { formatLocalDate } from '@/utils/dates';
 import { formatCurrency } from '@/utils/currency';
 import { cn } from '@/utils/cn';
 import { columnWidthClass } from '@/utils/columnWidth';
 import { PAGE_SIZE_OPTIONS, type PageSize } from '@/features/admin/transactions/utils/urlState';
 
-interface AdminTransactionTableProps {
-  data: AdminTransaction[];
+interface TransactionSearchTableProps {
+  data: TransactionSearchResult[];
   metadata: PageMetadata | undefined;
   sort: string[];
   isLoading: boolean;
@@ -117,7 +117,7 @@ function SortableHeader({ label, field, sort, align = 'left', onSortChange }: So
   );
 }
 
-export function AdminTransactionTable({
+export function TransactionSearchTable({
   data,
   metadata,
   sort,
@@ -126,7 +126,7 @@ export function AdminTransactionTable({
   onPageChange,
   onSizeChange,
   onSortChange,
-}: AdminTransactionTableProps) {
+}: TransactionSearchTableProps) {
   const handleSortingChange = useCallback(
     (updater: Updater<SortingState>) => {
       const current = parseSortStateFromQuery(sort);
@@ -153,7 +153,7 @@ export function AdminTransactionTable({
     [metadata, onPageChange, onSizeChange],
   );
 
-  const columns = useMemo<ColumnDef<AdminTransaction>[]>(
+  const columns = useMemo<ColumnDef<TransactionSearchResult>[]>(
     () => [
       {
         accessorKey: 'date',

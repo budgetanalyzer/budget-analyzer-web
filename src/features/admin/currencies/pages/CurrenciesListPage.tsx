@@ -16,6 +16,7 @@ import {
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatTimestamp } from '@/utils/dates';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 
 interface LocationState {
   message?: {
@@ -31,6 +32,7 @@ export function CurrenciesListPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: currencies, isLoading, error } = useCurrencies();
+  const canWriteCurrencies = usePermission('currencies:write');
   const [message, setMessage] = useState<LocationState['message'] | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -103,12 +105,14 @@ export function CurrenciesListPage() {
               </div>
             </div>
           </div>
-          <Link to="/admin/currencies/new">
-            <Button className="gap-2 shadow-sm" size="lg">
-              <Plus className="h-4 w-4" />
-              Add Currency
-            </Button>
-          </Link>
+          {canWriteCurrencies && (
+            <Link to="/admin/currencies/new">
+              <Button className="gap-2 shadow-sm" size="lg">
+                <Plus className="h-4 w-4" />
+                Add Currency
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Success/Error Banner */}
@@ -206,15 +210,17 @@ export function CurrenciesListPage() {
                         {formatTimestamp(currency.updatedAt)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/admin/currencies/${currency.id}`)}
-                          className="opacity-70 transition-opacity group-hover:opacity-100"
-                        >
-                          <Pencil className="h-4 w-4" />
-                          <span className="ml-2">Edit</span>
-                        </Button>
+                        {canWriteCurrencies && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/admin/currencies/${currency.id}`)}
+                            className="opacity-70 transition-opacity group-hover:opacity-100"
+                          >
+                            <Pencil className="h-4 w-4" />
+                            <span className="ml-2">Edit</span>
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

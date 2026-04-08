@@ -215,9 +215,116 @@ interface User {
   name?: string;
   picture?: string;        // Profile picture URL
   authenticated: boolean;
-  roles: UserRole[];       // Resolved by permission-service
+  roles: UserRole[];       // Resolved by permission-service (layout-level)
+  permissions: string[];   // Resolved by permission-service (action-level)
 }
 ```
+
+`roles` drives layout decisions (which chrome surrounds the page).
+`permissions` drives action-level UI gating (which buttons, forms, tiles, and
+queries render).
+
+## Frontend Permission Checks
+
+The frontend follows the bulletproof-react split between **roles** (layout)
+and **permissions** (actions). See the "Authorization: Roles vs Permissions"
+section in `AGENTS.md` for the convention and the full table of gated sites.
+
+### Gating tools
+
+Three complementary layers, each with a single idiomatic tool:
+
+1. **`AdminRoute`** (`src/features/admin/components/AdminRoute.tsx`) — role-based
+   chrome guard. Decides whether the admin shell even loads. Layout-level only;
+   never use it to gate a specific action.
+2. **`<PermissionGuard permission="...">`**
+   (`src/features/auth/components/PermissionGuard.tsx`) — route/subtree
+   permission guard. Wrap a route `element` (omit `fallback` → redirects to
+   `/unauthorized`) or an inline subtree (pass `fallback={null}` → hides the
+   subtree). Because denied children never mount, their data hooks never fire —
+   no wasted API calls, no `enabled` flag needed on the underlying query.
+3. **`usePermission('<permission:string>')`**
+   (`src/features/auth/hooks/usePermission.ts`) — inline affordance check. Use
+   inside components that render a **single** boolean-gated button/row/nav item,
+   or that build a nav list imperatively (e.g., `AdminLayout.tsx`).
+
+**Rule of thumb:** `<PermissionGuard>` for *"should this page exist for me?"*,
+`usePermission` for *"should this affordance render?"*. For multi-permission
+gates or imperative checks, use `usePermission` directly.
+
+**Helpers:**
+
+- `hasPermission(user, permission)` —
+  `src/features/auth/utils/permissions.ts`. Plain function for non-component
+  code paths.
+- `isAdmin(user.roles)` — `src/features/auth/utils/role.ts`. Used only by
+  `AdminRoute`, `Layout`, and `LoginPage` for layout-level decisions. Never
+  use it to gate an action.
+
+### Permission taxonomy
+
+Backend-owned (permission-service), mirrored in `src/mocks/handlers.ts`. Gating
+sites use inline string literals; a typo fails safe by returning `false`.
+
+| Resource | Read (self) | Read (cross-user) | Write | Delete |
+|---|---|---|---|---|
+| Transactions | `transactions:read` | `transactions:read:any` | `transactions:write` (+ `:any`) | `transactions:delete` (+ `:any`) |
+| Currencies | `currencies:read` | — | `currencies:write` | — (rolled into `:write`) |
+| Statement Formats | `statementformats:read` | — | `statementformats:write` | — (rolled into `:write`) |
+| Users | `users:read` | — | `users:write` | — |
+
+`:any` variants widen scope from "my own resources" to "across all users" and
+gate the admin cross-user features (search page, dashboard tile, sidebar item).
+User-facing self-scope features check the unscoped variants.
+
+#### Permission hierarchy (invariant)
+
+Permissions have an implied `:read` dependency: a grant of `:write` presumes
+`:read` on the same resource, and a grant of `:delete` also presumes `:read`.
+`:write` and `:delete` are independent of each other — neither implies the
+other, and roles that hold one without the other (e.g. an auditor with
+`transactions:delete` but no `transactions:write`) are legitimate and
+supported (see `TransactionTable.test.tsx` for the locked-in combinations).
+The dependency is enforced **at grant time** by the permission-service seed
+data
+(`permission-service/src/main/resources/db/migration/V2__seed_default_data.sql`) —
+every role bundle that includes `:write` or `:delete` on a resource also
+includes `:read` on that resource. There is no runtime expansion anywhere: neither the backend
+(`@PreAuthorize("hasAuthority('…')")` is an exact-string match) nor the
+frontend (`hasPermission` in `src/features/auth/utils/permissions.ts` is a
+literal `Array.includes` check). The invariant is what makes those literal
+checks correct, because invalid subsets (e.g. `:write` without `:read`) are
+never issued.
+
+This has two practical consequences:
+
+1. **Route and component guards encode the minimum permission a site needs,
+   not every permission it happens to touch.** The `/admin/currencies/:id`
+   edit route requires only `currencies:write`, even though the page opens
+   with a `GET` protected by `currencies:read`, because any user holding
+   `:write` is guaranteed to also hold `:read`. Do not double-gate on
+   `:read` + `:write` "defensively".
+2. **Do not add runtime expansion.** No `hasEffectivePermission` helper, no
+   "if write then read" branch in `hasPermission`. If a new resource needs a
+   new permission, add the row to the seed migration above and grant `:read`
+   alongside any `:write` or `:delete`. Drift is a grant-time bug, not a
+   frontend bug.
+
+Permissions are populated from the `/auth/v1/user` response and refreshed via
+React Query — no separate cache.
+
+### Rules-of-hooks trap
+
+`usePermission` is a hook, so it cannot be called inside `.filter()` or other
+callbacks. Two safe patterns:
+
+- **`<PermissionGuard>`** — preferred when the check gates a whole subtree; the
+  hook call lives inside the guard component.
+- **Top-of-component `usePermission` + conditional spread** — use when building
+  a nav list imperatively. See `AdminLayout.tsx` for the pattern.
+
+For the migration plan and rationale, see
+[docs/plans/permission-based-authorization-cleanup.md](plans/permission-based-authorization-cleanup.md).
 
 ## Production Deployment
 
@@ -320,6 +427,7 @@ vi.mock('@/features/admin/hooks/useAuth', () => ({
       email: 'test@example.com',
       authenticated: true,
       roles: ['ADMIN'],
+      permissions: ['transactions:read:any', 'users:write'],
     },
     isAuthenticated: true,
     isLoading: false,

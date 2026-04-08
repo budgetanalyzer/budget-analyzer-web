@@ -26,6 +26,7 @@ import { useAppSelector } from '@/store/hooks';
 import { isDateInRange } from '@/utils/dates';
 import { parseSearchTerms } from '@/utils/parseSearchTerms';
 import { ViewCriteriaApi } from '@/types/view';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 
 export function TransactionsPage() {
   const queryClient = useQueryClient();
@@ -37,6 +38,8 @@ export function TransactionsPage() {
   const accountIdFilter = useAppSelector((state) => state.ui.transactionTable.accountIdFilter);
   const typeFilter = useAppSelector((state) => state.ui.transactionTable.typeFilter);
   const amountFilter = useAppSelector((state) => state.ui.transactionTable.amountFilter);
+
+  const canImportTransactions = usePermission('transactions:write');
 
   // Sync URL params with Redux state for transaction filters
   const {
@@ -215,7 +218,11 @@ export function TransactionsPage() {
       <PageHeader
         title="Transactions"
         description="View and manage transactions"
-        action={<ImportButton onSuccess={handleImportSuccess} onError={handleImportError} />}
+        action={
+          canImportTransactions ? (
+            <ImportButton onSuccess={handleImportSuccess} onError={handleImportError} />
+          ) : undefined
+        }
       />
 
       <LayoutGroup>

@@ -62,6 +62,7 @@ import { useUpdateTransaction } from '@/hooks/useTransactions';
 import { formatApiError } from '@/utils/errorMessages';
 import { toast } from '@/hooks/useToast';
 import { useDebounce } from '@/hooks/useDebounce';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 import { columnWidthClass } from '@/utils/columnWidth';
 
 interface TransactionTableProps {
@@ -118,6 +119,8 @@ export function TransactionTable({
   const [selectAllMatching, setSelectAllMatching] = useState(false);
   const navigate = useNavigate();
   const { mutate: updateTransaction, isPending: isUpdating } = useUpdateTransaction();
+  const canBulkDelete = usePermission('transactions:delete');
+  const canEditTransactions = usePermission('transactions:write');
 
   // Debounce amount filters only (search uses explicit submit)
   const debouncedMinAmount = useDebounce(localMinAmount, 400);
@@ -223,26 +226,27 @@ export function TransactionTable({
   // Define columns for TanStack Table
   // Note: Cell rendering is handled by EditableTransactionRow, not by these column definitions
   // These columns are only used for: headers, sorting configuration, and column widths
-  const columns = useMemo<ColumnDef<Transaction>[]>(
-    () => [
-      {
-        id: 'select',
-        header: ({ table }) => (
-          <Checkbox
-            checked={
-              table.getIsAllPageRowsSelected()
-                ? true
-                : table.getIsSomePageRowsSelected()
-                  ? 'indeterminate'
-                  : false
-            }
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          />
-        ),
-        size: 50,
-        minSize: 50,
-        maxSize: 50,
-      },
+  const columns = useMemo<ColumnDef<Transaction>[]>(() => {
+    const selectColumn: ColumnDef<Transaction> = {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected()
+              ? true
+              : table.getIsSomePageRowsSelected()
+                ? 'indeterminate'
+                : false
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        />
+      ),
+      size: 50,
+      minSize: 50,
+      maxSize: 50,
+    };
+    return [
+      ...(canBulkDelete ? [selectColumn] : []),
       {
         accessorKey: 'date',
         header: ({ column }) => {
@@ -316,9 +320,8 @@ export function TransactionTable({
         minSize: 60,
         maxSize: 60,
       },
-    ],
-    [],
-  );
+    ];
+  }, [canBulkDelete]);
 
   const table = useReactTable({
     data: transactions,
@@ -331,7 +334,7 @@ export function TransactionTable({
       },
       rowSelection,
     },
-    enableRowSelection: true,
+    enableRowSelection: canBulkDelete,
     onRowSelectionChange: (updater) => {
       const newSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
       setRowSelection(newSelection);
@@ -539,22 +542,25 @@ export function TransactionTable({
       </div>
 
       {/* Select all matching banner */}
-      {table.getIsAllPageRowsSelected() && transactions.length > pageSize && !selectAllMatching && (
-        <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
-          <span>
-            All {Math.min(pageSize, transactions.length)} transactions on this page are selected.
-          </span>
-          <button
-            onClick={handleSelectAllMatching}
-            className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            Select all {transactions.length} transactions matching this filter
-          </button>
-        </div>
-      )}
+      {canBulkDelete &&
+        table.getIsAllPageRowsSelected() &&
+        transactions.length > pageSize &&
+        !selectAllMatching && (
+          <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
+            <span>
+              All {Math.min(pageSize, transactions.length)} transactions on this page are selected.
+            </span>
+            <button
+              onClick={handleSelectAllMatching}
+              className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Select all {transactions.length} transactions matching this filter
+            </button>
+          </div>
+        )}
 
       {/* Confirmation banner when all matching are selected */}
-      {selectAllMatching && (
+      {canBulkDelete && selectAllMatching && (
         <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
           <span>All {transactions.length} transactions matching this filter are selected.</span>
           <button
@@ -596,9 +602,12 @@ export function TransactionTable({
                     onDelete={handleDeleteTransaction}
                     onRowClick={handleRowClick}
                     isUpdating={isUpdating}
-                    columnWidthClasses={table
-                      .getAllColumns()
-                      .map((col) => columnWidthClass(col.getSize()))}
+                    columnWidths={Object.fromEntries(
+                      table.getAllColumns().map((col) => [col.id, columnWidthClass(col.getSize())]),
+                    )}
+                    canSelect={canBulkDelete}
+                    canEdit={canEditTransactions}
+                    canDelete={canBulkDelete}
                     isSelected={row.getIsSelected()}
                     onSelectionChange={(checked) => row.toggleSelected(checked)}
                   />
@@ -680,16 +689,18 @@ export function TransactionTable({
         selectedCount={idsToDelete.length}
         onDelete={handleBulkDelete}
         onClearSelection={handleClearSelection}
-        isVisible={selectedIds.length > 0 || selectAllMatching}
+        isVisible={canBulkDelete && (selectedIds.length > 0 || selectAllMatching)}
       />
 
       {/* Bulk Delete Confirmation Dialog */}
-      <BulkDeleteModal
-        selectedIds={idsToDelete}
-        isOpen={bulkDeleteDialogOpen}
-        onOpenChange={setBulkDeleteDialogOpen}
-        onSuccess={handleBulkDeleteSuccess}
-      />
+      {canBulkDelete && (
+        <BulkDeleteModal
+          selectedIds={idsToDelete}
+          isOpen={bulkDeleteDialogOpen}
+          onOpenChange={setBulkDeleteDialogOpen}
+          onSuccess={handleBulkDeleteSuccess}
+        />
+      )}
     </div>
   );
 }

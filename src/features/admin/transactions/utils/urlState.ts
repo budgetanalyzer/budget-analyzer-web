@@ -1,12 +1,12 @@
 // src/features/admin/transactions/utils/urlState.ts
-import type { AdminTransactionsQuery, AdminTransactionFilters } from '@/types/adminTransaction';
+import type { TransactionSearchQuery, TransactionSearchFilters } from '@/types/transactionSearch';
 import type { TransactionType } from '@/types/transaction';
 
 /**
- * Admin transactions URL state management.
+ * Admin transactions search URL state management.
  *
- * Centralizes the URL contract: parsing query params -> AdminTransactionsQuery and
- * serializing AdminTransactionsQuery -> URLSearchParams.
+ * Centralizes the URL contract: parsing query params -> TransactionSearchQuery and
+ * serializing TransactionSearchQuery -> URLSearchParams.
  *
  * Pure module (no React, no router) so it is cheap to unit test.
  */
@@ -32,7 +32,7 @@ export type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 const DEFAULT_PAGE_SIZE: PageSize = 50;
 const DEFAULT_SORT: string[] = ['date,DESC', 'id,DESC'];
 
-// Whitelist matched to backend (docs/api/budget-analyzer-api.yaml:1444-1446)
+// Whitelist matched to backend (GET /v1/transactions/search in docs/api/budget-analyzer-api.yaml)
 export const SORTABLE_FIELDS = [
   'id',
   'ownerId',
@@ -97,9 +97,9 @@ function parseTypeParam(searchParams: URLSearchParams): TransactionType | undefi
 }
 
 /**
- * Parse a URLSearchParams object into a fully-defaulted AdminTransactionsQuery.
+ * Parse a URLSearchParams object into a fully-defaulted TransactionSearchQuery.
  */
-export function parseAdminTxnQuery(searchParams: URLSearchParams): AdminTransactionsQuery {
+export function parseAdminTxnQuery(searchParams: URLSearchParams): TransactionSearchQuery {
   const pageRaw = parseNumberParam(searchParams, ADMIN_TXN_PARAMS.PAGE) ?? 0;
   const page = pageRaw < 0 ? 0 : Math.floor(pageRaw);
 
@@ -133,10 +133,10 @@ function appendIfDefined(params: URLSearchParams, key: string, value: string | n
 }
 
 /**
- * Serialize an AdminTransactionsQuery back to URLSearchParams.
+ * Serialize a TransactionSearchQuery back to URLSearchParams.
  * Defaults are omitted (page=0, size=50, default sort) to keep URLs short.
  */
-export function buildAdminTxnSearchParams(query: AdminTransactionsQuery): URLSearchParams {
+export function buildAdminTxnSearchParams(query: TransactionSearchQuery): URLSearchParams {
   const params = new URLSearchParams();
 
   appendIfDefined(params, ADMIN_TXN_PARAMS.DESCRIPTION, query.description);
@@ -171,8 +171,8 @@ export function buildAdminTxnSearchParams(query: AdminTransactionsQuery): URLSea
 /**
  * Build URLSearchParams that clear all filters but preserve page size and sort.
  */
-export function clearAdminTxnFilters(query: AdminTransactionsQuery): URLSearchParams {
-  const cleared: AdminTransactionsQuery = {
+export function clearAdminTxnFilters(query: TransactionSearchQuery): URLSearchParams {
+  const cleared: TransactionSearchQuery = {
     page: 0,
     size: query.size,
     sort: query.sort,
@@ -183,8 +183,8 @@ export function clearAdminTxnFilters(query: AdminTransactionsQuery): URLSearchPa
 /**
  * Returns true if any filter (not page/size/sort) is currently active.
  */
-export function hasActiveFilters(query: AdminTransactionsQuery): boolean {
-  const filterKeys: (keyof AdminTransactionFilters)[] = [
+export function hasActiveFilters(query: TransactionSearchQuery): boolean {
+  const filterKeys: (keyof TransactionSearchFilters)[] = [
     'ownerId',
     'accountId',
     'bankName',

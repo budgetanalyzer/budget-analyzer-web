@@ -34,7 +34,10 @@ interface EditableTransactionRowProps {
   onDelete: (transaction: Transaction) => void;
   onRowClick: (transaction: Transaction) => void;
   isUpdating: boolean;
-  columnWidthClasses: string[];
+  columnWidths: Record<string, string>;
+  canSelect: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
   isSelected: boolean;
   onSelectionChange: (checked: boolean) => void;
 }
@@ -48,7 +51,10 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
   onDelete,
   onRowClick,
   isUpdating,
-  columnWidthClasses,
+  columnWidths,
+  canSelect,
+  canEdit,
+  canDelete,
   isSelected,
   onSelectionChange,
 }: EditableTransactionRowProps) {
@@ -149,15 +155,17 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       }
     >
       {/* Checkbox */}
-      <TableCell className={columnWidthClasses[0]} onClick={(e) => e.stopPropagation()}>
-        <Checkbox checked={isSelected} onCheckedChange={onSelectionChange} disabled={isEditing} />
-      </TableCell>
+      {canSelect && (
+        <TableCell className={columnWidths.select} onClick={(e) => e.stopPropagation()}>
+          <Checkbox checked={isSelected} onCheckedChange={onSelectionChange} disabled={isEditing} />
+        </TableCell>
+      )}
 
       {/* Date */}
-      <TableCell className={columnWidthClasses[1]}>{formatLocalDate(transaction.date)}</TableCell>
+      <TableCell className={columnWidths.date}>{formatLocalDate(transaction.date)}</TableCell>
 
       {/* Description */}
-      <TableCell className={columnWidthClasses[2]}>
+      <TableCell className={columnWidths.description}>
         {isEditing ? (
           <Input
             value={editingDescription}
@@ -174,12 +182,12 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       </TableCell>
 
       {/* Bank Name */}
-      <TableCell className={columnWidthClasses[3]}>
+      <TableCell className={columnWidths.bankName}>
         <div className="truncate">{transaction.bankName}</div>
       </TableCell>
 
       {/* Account ID */}
-      <TableCell className={columnWidthClasses[4]}>
+      <TableCell className={columnWidths.accountId}>
         {isEditing ? (
           <Input
             value={editingAccountId}
@@ -195,14 +203,14 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       </TableCell>
 
       {/* Type */}
-      <TableCell className={columnWidthClasses[5]}>
+      <TableCell className={columnWidths.type}>
         <Badge variant={transaction.type === 'CREDIT' ? 'success' : 'secondary'}>
           {transaction.type}
         </Badge>
       </TableCell>
 
       {/* Amount */}
-      <TableCell className={columnWidthClasses[6]}>
+      <TableCell className={columnWidths.amount}>
         {isExchangeRatesLoading ? (
           <div className="flex items-center justify-end gap-2">
             <Skeleton className="h-5 w-24" />
@@ -220,7 +228,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       </TableCell>
 
       {/* Actions */}
-      <TableCell className={columnWidthClasses[7]}>
+      <TableCell className={columnWidths.actions}>
         {isEditing ? (
           <div className="flex justify-end gap-2">
             <Button
@@ -267,15 +275,17 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleStartEdit();
-                  }}
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
+                {canEdit && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStartEdit();
+                    }}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger disabled={isLoadingViews || isPinning}>
                     <FolderPlus className="mr-2 h-4 w-4" />
@@ -302,17 +312,21 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
                     )}
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  destructive
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(transaction);
-                  }}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
+                {canDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      destructive
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(transaction);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

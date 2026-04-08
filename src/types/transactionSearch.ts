@@ -1,7 +1,7 @@
-// src/types/adminTransaction.ts
+// src/types/transactionSearch.ts
 import type { TransactionType } from '@/types/transaction';
 
-export interface AdminTransaction {
+export interface TransactionSearchResult {
   id: number;
   ownerId: string; // opaque IdP subject (e.g. "usr_test123")
   accountId: string;
@@ -30,7 +30,7 @@ export interface PagedResponse<T> {
   metadata: PageMetadata;
 }
 
-export interface AdminTransactionFilters {
+export interface TransactionSearchFilters {
   ownerId?: string; // exact string match (no email lookup — deferred)
   accountId?: string;
   bankName?: string;
@@ -43,7 +43,7 @@ export interface AdminTransactionFilters {
   currencyIsoCode?: string;
 }
 
-export interface AdminTransactionsQuery extends AdminTransactionFilters {
+export interface TransactionSearchQuery extends TransactionSearchFilters {
   page: number; // 0-based
   size: number;
   sort: string[]; // e.g. ['date,DESC', 'id,DESC']

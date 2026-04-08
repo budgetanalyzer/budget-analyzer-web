@@ -48,12 +48,4 @@ export const statementFormatApi = {
     );
     return response.data;
   },
-
-  /**
-   * Disable a statement format (soft delete)
-   * DELETE /v1/statement-formats/{formatKey}
-   */
-  disableFormat: async (formatKey: string): Promise<void> => {
-    await apiClient.delete(`/v1/statement-formats/${formatKey}`);
-  },
 };

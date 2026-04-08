@@ -81,19 +81,3 @@ export const useUpdateStatementFormat = () => {
     },
   });
 };
-
-/**
- * Disable a statement format (soft delete)
- * Admin mutation hook
- */
-export const useDisableStatementFormat = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (formatKey: string) => statementFormatApi.disableFormat(formatKey),
-    onSuccess: async () => {
-      // Invalidate all statement format queries
-      await queryClient.invalidateQueries({ queryKey: statementFormatsKeys.all });
-    },
-  });
-};
