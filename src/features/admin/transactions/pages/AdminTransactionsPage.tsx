@@ -1,9 +1,8 @@
 // src/features/admin/transactions/pages/AdminTransactionsPage.tsx
 import { useCallback, useMemo, useRef } from 'react';
-import { Navigate, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/PageHeader';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useTransactionSearch } from '@/features/admin/transactions/api/useTransactionSearch';
 import { TransactionSearchFiltersPanel } from '@/features/admin/transactions/components/TransactionSearchFiltersPanel';
 import { TransactionSearchTable } from '@/features/admin/transactions/components/TransactionSearchTable';
@@ -16,7 +15,6 @@ import {
 import type { TransactionSearchQuery } from '@/types/transactionSearch';
 
 export function AdminTransactionsPage() {
-  const canSearchAcrossUsers = usePermission('transactions:read:any');
   const [searchParams, setSearchParams] = useSearchParams();
   const query = useMemo(() => parseAdminTxnQuery(searchParams), [searchParams]);
 
@@ -26,9 +24,7 @@ export function AdminTransactionsPage() {
   const queryRef = useRef(query);
   queryRef.current = query;
 
-  const { data, isLoading, isFetching, error, refetch } = useTransactionSearch(query, {
-    enabled: canSearchAcrossUsers,
-  });
+  const { data, isLoading, isFetching, error, refetch } = useTransactionSearch(query);
 
   const handleQueryChange = useCallback(
     (next: Partial<TransactionSearchQuery>) => {
@@ -68,10 +64,6 @@ export function AdminTransactionsPage() {
   const handleClear = useCallback(() => {
     setSearchParams(clearAdminTxnFilters(query), { replace: true });
   }, [query, setSearchParams]);
-
-  if (!canSearchAcrossUsers) {
-    return <Navigate to="/unauthorized" replace />;
-  }
 
   return (
     <div className="h-full bg-gradient-to-br from-background to-muted/20">

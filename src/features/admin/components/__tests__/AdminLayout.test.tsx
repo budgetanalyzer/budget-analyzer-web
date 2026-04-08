@@ -47,31 +47,52 @@ describe('AdminLayout nav gating', () => {
   it('shows all gated nav items when the user has every permission', () => {
     mockUsePermission.mockReturnValue(true);
     renderLayout();
+    expect(screen.getByRole('link', { name: /Currencies/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Statement Formats/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Transactions/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Deactivate User/ })).toBeInTheDocument();
+  });
+
+  it('hides the Currencies nav item when currencies:read is missing', () => {
+    mockUsePermission.mockImplementation((permission) => permission !== 'currencies:read');
+    renderLayout();
+    expect(screen.queryByRole('link', { name: /Currencies/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Statement Formats/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Transactions/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Deactivate User/ })).toBeInTheDocument();
+  });
+
+  it('hides the Statement Formats nav item when statementformats:read is missing', () => {
+    mockUsePermission.mockImplementation((permission) => permission !== 'statementformats:read');
+    renderLayout();
+    expect(screen.getByRole('link', { name: /Currencies/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Statement Formats/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Transactions/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Deactivate User/ })).toBeInTheDocument();
   });
 
   it('hides the Transactions nav item when transactions:read:any is missing', () => {
-    mockUsePermission.mockImplementation((permission) => permission === 'users:write');
+    mockUsePermission.mockImplementation((permission) => permission !== 'transactions:read:any');
     renderLayout();
     expect(screen.queryByRole('link', { name: /Transactions/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Deactivate User/ })).toBeInTheDocument();
   });
 
   it('hides the Deactivate User nav item when users:write is missing', () => {
-    mockUsePermission.mockImplementation((permission) => permission === 'transactions:read:any');
+    mockUsePermission.mockImplementation((permission) => permission !== 'users:write');
     renderLayout();
     expect(screen.getByRole('link', { name: /Transactions/ })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Deactivate User/ })).not.toBeInTheDocument();
   });
 
-  it('hides both gated items when no action permissions are granted', () => {
+  it('hides every gated item when no permissions are granted', () => {
     mockUsePermission.mockReturnValue(false);
     renderLayout();
+    expect(screen.queryByRole('link', { name: /Currencies/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Statement Formats/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Transactions/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Deactivate User/ })).not.toBeInTheDocument();
-    // Ungated items still render
-    expect(screen.getByRole('link', { name: /Currencies/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Statement Formats/ })).toBeInTheDocument();
+    // Ungated Dashboard link still renders.
+    expect(screen.getByRole('link', { name: /Dashboard/ })).toBeInTheDocument();
   });
 });

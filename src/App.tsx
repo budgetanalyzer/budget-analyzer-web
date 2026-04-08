@@ -22,6 +22,7 @@ import { StatementFormatCreatePage } from '@/features/admin/statement-formats/pa
 import { StatementFormatEditPage } from '@/features/admin/statement-formats/pages/StatementFormatEditPage';
 import { AdminTransactionsPage } from '@/features/admin/transactions/pages/AdminTransactionsPage';
 import { DeactivateUserPage } from '@/features/admin/users/pages/DeactivateUserPage';
+import { PermissionGuard } from '@/features/auth/components/PermissionGuard';
 
 // Views imports
 import { ViewPage, ViewsPage } from '@/features/views';
@@ -39,14 +40,70 @@ function App() {
         <Route path="/admin" element={<AdminRoute />}>
           <Route element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
-            <Route path="currencies" element={<CurrenciesListPage />} />
-            <Route path="currencies/new" element={<CurrencyCreatePage />} />
-            <Route path="currencies/:id" element={<CurrencyEditPage />} />
-            <Route path="statement-formats" element={<StatementFormatsListPage />} />
-            <Route path="statement-formats/new" element={<StatementFormatCreatePage />} />
-            <Route path="statement-formats/:formatKey" element={<StatementFormatEditPage />} />
-            <Route path="transactions" element={<AdminTransactionsPage />} />
-            <Route path="users/deactivate" element={<DeactivateUserPage />} />
+            <Route
+              path="currencies"
+              element={
+                <PermissionGuard permission="currencies:read">
+                  <CurrenciesListPage />
+                </PermissionGuard>
+              }
+            />
+            <Route
+              path="currencies/new"
+              element={
+                <PermissionGuard permission="currencies:write">
+                  <CurrencyCreatePage />
+                </PermissionGuard>
+              }
+            />
+            <Route
+              path="currencies/:id"
+              element={
+                <PermissionGuard permission="currencies:write">
+                  <CurrencyEditPage />
+                </PermissionGuard>
+              }
+            />
+            <Route
+              path="statement-formats"
+              element={
+                <PermissionGuard permission="statementformats:read">
+                  <StatementFormatsListPage />
+                </PermissionGuard>
+              }
+            />
+            <Route
+              path="statement-formats/new"
+              element={
+                <PermissionGuard permission="statementformats:write">
+                  <StatementFormatCreatePage />
+                </PermissionGuard>
+              }
+            />
+            <Route
+              path="statement-formats/:formatKey"
+              element={
+                <PermissionGuard permission="statementformats:write">
+                  <StatementFormatEditPage />
+                </PermissionGuard>
+              }
+            />
+            <Route
+              path="transactions"
+              element={
+                <PermissionGuard permission="transactions:read:any">
+                  <AdminTransactionsPage />
+                </PermissionGuard>
+              }
+            />
+            <Route
+              path="users/deactivate"
+              element={
+                <PermissionGuard permission="users:write">
+                  <DeactivateUserPage />
+                </PermissionGuard>
+              }
+            />
             <Route path="*" element={<AdminNotFoundPage />} />
           </Route>
         </Route>

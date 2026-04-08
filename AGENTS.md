@@ -161,12 +161,21 @@ and **permissions** (action gating).
 surrounds the page*. Today only `AdminRoute`, `Layout.tsx`, and `LoginPage.tsx`
 read roles.
 
-**Permissions → action decisions.** Use
-`usePermission('<permission:string>')` from
-`src/features/auth/hooks/usePermission.ts` (or the plain
-`hasPermission(user, permission)` helper from
-`src/features/auth/utils/permissions.ts` for non-component code) to decide
-*whether a specific button, form, page body, or query renders*.
+**Permissions → action decisions.** Two complementary tools:
+
+- **`<PermissionGuard permission="...">`** from
+  `src/features/auth/components/PermissionGuard.tsx` — route-level and subtree
+  gates. Wrap a route `element` (omit `fallback` → redirects to
+  `/unauthorized`) or an inline subtree (pass `fallback={null}` → hides it).
+  Denied children never mount, so their data hooks never fire.
+- **`usePermission('<permission:string>')`** from
+  `src/features/auth/hooks/usePermission.ts` (or the plain
+  `hasPermission(user, permission)` helper for non-component code) — inline
+  affordance check. Use for a single boolean-gated button, row, or when
+  building a nav list imperatively.
+
+**Rule:** `<PermissionGuard>` for *"should this page exist for me?"*,
+`usePermission` for *"should this affordance render?"*.
 
 **Never gate an action on `isAdmin`.** If a button is admin-only it is because
 it requires a specific permission that happens to live in the `ADMIN` bundle —
@@ -196,25 +205,45 @@ on the current user's own data?" → unscoped.
 
 **Action-level gating sites today:**
 
-| Site | File | Permission |
-|---|---|---|
-| Cross-user transaction search page body | `src/features/admin/transactions/pages/AdminTransactionsPage.tsx` | `transactions:read:any` |
-| Admin dashboard "Transactions" tile + query | `src/features/admin/pages/AdminDashboard.tsx` | `transactions:read:any` |
-| Sidebar "Transactions" nav item | `src/features/admin/components/AdminLayout.tsx` | `transactions:read:any` |
-| Sidebar "Deactivate User" nav item | `src/features/admin/components/AdminLayout.tsx` | `users:write` |
-| Deactivate user form | `src/features/admin/users/pages/DeactivateUserPage.tsx` | `users:write` |
-| Bulk delete trigger (self-scope) | `src/features/transactions/components/TransactionTable.tsx` | `transactions:delete` |
-| Import transactions button (self-scope) | `src/features/transactions/pages/TransactionsPage.tsx` | `transactions:write` |
-| Per-row Edit (self-scope) | `src/features/transactions/components/EditableTransactionRow.tsx` (prop threaded from `TransactionTable.tsx`) | `transactions:write` |
-| Per-row Delete (self-scope) | `src/features/transactions/components/EditableTransactionRow.tsx` (prop threaded from `TransactionTable.tsx`) | `transactions:delete` |
-| Row selection column and banners (self-scope) | `src/features/transactions/components/TransactionTable.tsx` | `transactions:delete` |
+| Site | File | Permission | Tool |
+|---|---|---|---|
+| Admin currencies list page | `src/App.tsx` route wrap | `currencies:read` | `<PermissionGuard>` |
+| Admin currency create page | `src/App.tsx` route wrap | `currencies:write` | `<PermissionGuard>` |
+| Admin currency edit page | `src/App.tsx` route wrap | `currencies:write` | `<PermissionGuard>` |
+| Admin statement formats list page | `src/App.tsx` route wrap | `statementformats:read` | `<PermissionGuard>` |
+| Admin statement format create page | `src/App.tsx` route wrap | `statementformats:write` | `<PermissionGuard>` |
+| Admin statement format edit page | `src/App.tsx` route wrap | `statementformats:write` | `<PermissionGuard>` |
+| Cross-user transaction search page | `src/App.tsx` route wrap | `transactions:read:any` | `<PermissionGuard>` |
+| Deactivate user page | `src/App.tsx` route wrap | `users:write` | `<PermissionGuard>` |
+| Admin dashboard "Currencies" card | `src/features/admin/pages/AdminDashboard.tsx` | `currencies:read` | `<PermissionGuard fallback={null}>` |
+| Admin dashboard "Currencies" Add new | `src/features/admin/pages/AdminDashboard.tsx` | `currencies:write` | `usePermission` |
+| Admin dashboard "Statement Formats" card | `src/features/admin/pages/AdminDashboard.tsx` | `statementformats:read` | `<PermissionGuard fallback={null}>` |
+| Admin dashboard "Statement Formats" Add new | `src/features/admin/pages/AdminDashboard.tsx` | `statementformats:write` | `usePermission` |
+| Admin dashboard "Transactions" card | `src/features/admin/pages/AdminDashboard.tsx` | `transactions:read:any` | `<PermissionGuard fallback={null}>` |
+| Sidebar "Currencies" nav item | `src/features/admin/components/AdminLayout.tsx` | `currencies:read` | `usePermission` |
+| Sidebar "Statement Formats" nav item | `src/features/admin/components/AdminLayout.tsx` | `statementformats:read` | `usePermission` |
+| Sidebar "Transactions" nav item | `src/features/admin/components/AdminLayout.tsx` | `transactions:read:any` | `usePermission` |
+| Sidebar "Deactivate User" nav item | `src/features/admin/components/AdminLayout.tsx` | `users:write` | `usePermission` |
+| Currencies list "Add Currency" + per-row Edit | `src/features/admin/currencies/pages/CurrenciesListPage.tsx` | `currencies:write` | `usePermission` |
+| Statement Formats list "Add Format" + per-row Edit | `src/features/admin/statement-formats/pages/StatementFormatsListPage.tsx` | `statementformats:write` | `usePermission` |
+| Bulk delete trigger (self-scope) | `src/features/transactions/components/TransactionTable.tsx` | `transactions:delete` | `usePermission` |
+| Import transactions button (self-scope) | `src/features/transactions/pages/TransactionsPage.tsx` | `transactions:write` | `usePermission` |
+| Per-row Edit (self-scope) | `src/features/transactions/components/EditableTransactionRow.tsx` (prop threaded from `TransactionTable.tsx`) | `transactions:write` | `usePermission` |
+| Per-row Delete (self-scope) | `src/features/transactions/components/EditableTransactionRow.tsx` (prop threaded from `TransactionTable.tsx`) | `transactions:delete` | `usePermission` |
+| Row selection column and banners (self-scope) | `src/features/transactions/components/TransactionTable.tsx` | `transactions:delete` | `usePermission` |
 
-Sites that gate the *query* as well as the UI use the React Query `enabled`
-option so a hidden tile never fires a guaranteed-403 request.
+`<PermissionGuard>` prevents denied subtrees from mounting, so the underlying
+data hooks never fire and no `enabled` flag is needed on the query. Only reach
+for React Query's `enabled` option if a single component must run one gated
+query alongside other unconditional ones.
 
-**Rules-of-hooks trap.** `usePermission` is a hook, so do not call it inside a
-`.filter()` callback when filtering nav items. Call it once per item at the top
-of the component (see `AdminLayout.tsx`).
+**Rules-of-hooks trap.** `usePermission` is a hook, so it cannot be called
+inside a `.filter()` callback. Two safe patterns:
+
+- **`<PermissionGuard>`** — preferred when the check gates a whole subtree;
+  the hook call lives inside the guard component.
+- **Top-of-component `usePermission` + conditional spread** — use when
+  building a nav list imperatively (see `AdminLayout.tsx`).
 
 The cross-service plan is at
 `../architecture-conversations/docs/plans/permission-based-authorization-cleanup.md`;

@@ -38,6 +38,8 @@ export function AdminLayout() {
   const sidebarOpen = useAppSelector((s) => s.ui.adminSidebarOpen);
   const mobileOpen = useAppSelector((s) => s.ui.adminSidebarMobileOpen);
 
+  const canReadCurrencies = usePermission('currencies:read');
+  const canReadFormats = usePermission('statementformats:read');
   const canSearchAcrossUsers = usePermission('transactions:read:any');
   const canDeactivateUsers = usePermission('users:write');
 
@@ -47,16 +49,24 @@ export function AdminLayout() {
       label: 'Dashboard',
       icon: LayoutDashboard,
     },
-    {
-      to: '/admin/currencies',
-      label: 'Currencies',
-      icon: DollarSign,
-    },
-    {
-      to: '/admin/statement-formats',
-      label: 'Statement Formats',
-      icon: FileText,
-    },
+    ...(canReadCurrencies
+      ? [
+          {
+            to: '/admin/currencies',
+            label: 'Currencies',
+            icon: DollarSign,
+          },
+        ]
+      : []),
+    ...(canReadFormats
+      ? [
+          {
+            to: '/admin/statement-formats',
+            label: 'Statement Formats',
+            icon: FileText,
+          },
+        ]
+      : []),
     ...(canSearchAcrossUsers
       ? [
           {
