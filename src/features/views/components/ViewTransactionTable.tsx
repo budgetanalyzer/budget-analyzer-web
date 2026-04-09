@@ -30,7 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { TransactionAmountBadge } from '@/features/transactions/components/TransactionAmountBadge';
-import { formatLocalDate, compareDates } from '@/utils/dates';
+import { formatLocalDate, compareLocalDates } from '@/utils/dates';
 import {
   ArrowUpDown,
   ChevronLeft,
@@ -146,7 +146,10 @@ export function ViewTransactionTable({
         },
         cell: ({ row }) => formatLocalDate(row.original.date),
         sortingFn: (rowA, rowB) => {
-          return compareDates(rowA.getValue('date') as string, rowB.getValue('date') as string);
+          return compareLocalDates(
+            rowA.getValue('date') as string,
+            rowB.getValue('date') as string,
+          );
         },
         size: 120,
         minSize: 120,

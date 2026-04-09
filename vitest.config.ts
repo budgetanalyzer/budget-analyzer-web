@@ -10,6 +10,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: true,
+    env: {
+      TZ: 'America/Los_Angeles',
+    },
   },
   resolve: {
     alias: {

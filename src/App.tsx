@@ -21,7 +21,8 @@ import { StatementFormatsListPage } from '@/features/admin/statement-formats/pag
 import { StatementFormatCreatePage } from '@/features/admin/statement-formats/pages/StatementFormatCreatePage';
 import { StatementFormatEditPage } from '@/features/admin/statement-formats/pages/StatementFormatEditPage';
 import { AdminTransactionsPage } from '@/features/admin/transactions/pages/AdminTransactionsPage';
-import { DeactivateUserPage } from '@/features/admin/users/pages/DeactivateUserPage';
+import { UsersListPage } from '@/features/admin/users/pages/UsersListPage';
+import { UserDetailPage } from '@/features/admin/users/pages/UserDetailPage';
 import { PermissionGuard } from '@/features/auth/components/PermissionGuard';
 
 // Views imports
@@ -97,10 +98,18 @@ function App() {
               }
             />
             <Route
-              path="users/deactivate"
+              path="users"
               element={
-                <PermissionGuard permission="users:write">
-                  <DeactivateUserPage />
+                <PermissionGuard permission="users:read">
+                  <UsersListPage />
+                </PermissionGuard>
+              }
+            />
+            <Route
+              path="users/:id"
+              element={
+                <PermissionGuard permission="users:read">
+                  <UserDetailPage />
                 </PermissionGuard>
               }
             />

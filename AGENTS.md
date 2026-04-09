@@ -214,16 +214,19 @@ on the current user's own data?" → unscoped.
 | Admin statement format create page | `src/App.tsx` route wrap | `statementformats:write` | `<PermissionGuard>` |
 | Admin statement format edit page | `src/App.tsx` route wrap | `statementformats:write` | `<PermissionGuard>` |
 | Cross-user transaction search page | `src/App.tsx` route wrap | `transactions:read:any` | `<PermissionGuard>` |
-| Deactivate user page | `src/App.tsx` route wrap | `users:write` | `<PermissionGuard>` |
+| Admin users list page | `src/App.tsx` route wrap | `users:read` | `<PermissionGuard>` |
+| Admin user detail page | `src/App.tsx` route wrap | `users:read` | `<PermissionGuard>` |
 | Admin dashboard "Currencies" card | `src/features/admin/pages/AdminDashboard.tsx` | `currencies:read` | `<PermissionGuard fallback={null}>` |
 | Admin dashboard "Currencies" Add new | `src/features/admin/pages/AdminDashboard.tsx` | `currencies:write` | `usePermission` |
 | Admin dashboard "Statement Formats" card | `src/features/admin/pages/AdminDashboard.tsx` | `statementformats:read` | `<PermissionGuard fallback={null}>` |
 | Admin dashboard "Statement Formats" Add new | `src/features/admin/pages/AdminDashboard.tsx` | `statementformats:write` | `usePermission` |
 | Admin dashboard "Transactions" card | `src/features/admin/pages/AdminDashboard.tsx` | `transactions:read:any` | `<PermissionGuard fallback={null}>` |
+| Admin dashboard "Users" card | `src/features/admin/pages/AdminDashboard.tsx` | `users:read` | `<PermissionGuard fallback={null}>` |
 | Sidebar "Currencies" nav item | `src/features/admin/components/AdminLayout.tsx` | `currencies:read` | `usePermission` |
 | Sidebar "Statement Formats" nav item | `src/features/admin/components/AdminLayout.tsx` | `statementformats:read` | `usePermission` |
 | Sidebar "Transactions" nav item | `src/features/admin/components/AdminLayout.tsx` | `transactions:read:any` | `usePermission` |
-| Sidebar "Deactivate User" nav item | `src/features/admin/components/AdminLayout.tsx` | `users:write` | `usePermission` |
+| Sidebar "Users" nav item | `src/features/admin/components/AdminLayout.tsx` | `users:read` | `usePermission` |
+| User detail page "Deactivate User" button | `src/features/admin/users/pages/UserDetailPage.tsx` | `users:write` | `usePermission` |
 | Currencies list "Add Currency" + per-row Edit | `src/features/admin/currencies/pages/CurrenciesListPage.tsx` | `currencies:write` | `usePermission` |
 | Statement Formats list "Add Format" + per-row Edit | `src/features/admin/statement-formats/pages/StatementFormatsListPage.tsx` | `statementformats:write` | `usePermission` |
 | Bulk delete trigger (self-scope) | `src/features/transactions/components/TransactionTable.tsx` | `transactions:delete` | `usePermission` |

@@ -427,7 +427,7 @@ vi.mock('@/features/admin/hooks/useAuth', () => ({
       email: 'test@example.com',
       authenticated: true,
       roles: ['ADMIN'],
-      permissions: ['transactions:read:any', 'users:write'],
+      permissions: ['transactions:read:any', 'users:read', 'users:write'],
     },
     isAuthenticated: true,
     isLoading: false,

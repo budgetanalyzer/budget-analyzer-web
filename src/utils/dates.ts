@@ -15,6 +15,8 @@
 import {
   format,
   parseISO,
+  startOfDay,
+  endOfDay,
   startOfMonth,
   endOfMonth,
   differenceInDays,
@@ -70,9 +72,9 @@ export function formatLocalDate(dateString: string): string {
  * @returns Negative if a < b, positive if a > b, 0 if equal
  *
  * @example
- * compareDates('2025-07-01', '2025-08-01') // -1 (July comes before August)
+ * compareLocalDates('2025-07-01', '2025-08-01') // -1 (July comes before August)
  */
-export function compareDates(a: string, b: string): number {
+export function compareLocalDates(a: string, b: string): number {
   const dateA = parseLocalDate(a);
   const dateB = parseLocalDate(b);
   return dateA.getTime() - dateB.getTime();
@@ -110,13 +112,18 @@ export function isDateInRange(date: string, from: string, to: string): boolean {
  * Shows full date and time in user's local timezone.
  *
  * @param isoString - ISO 8601 timestamp (e.g., "2025-07-01T12:34:56Z")
- * @returns Formatted timestamp (e.g., "Jul 1, 2025, 12:34:56 PM")
+ * @returns Formatted timestamp (e.g., "Jul 1, 2025, 12:34:56 PM"), or
+ * "Not available" when the timestamp is missing
  *
  * @example
  * formatTimestamp('2025-07-01T12:34:56Z') // "Jul 1, 2025, 12:34:56 PM" (in user's timezone)
  */
-export function formatTimestamp(isoString: string): string {
-  return format(new Date(isoString), 'PPpp');
+export function formatTimestamp(isoString?: string | null): string {
+  if (!isoString) {
+    return 'Not available';
+  }
+
+  return format(parseISOTimestamp(isoString), 'PPpp');
 }
 
 /**
@@ -131,6 +138,49 @@ export function formatTimestamp(isoString: string): string {
  */
 export function parseISOTimestamp(isoString: string): Date {
   return parseISO(isoString);
+}
+
+/**
+ * Format an ISO 8601 timestamp as a date-only label in the user's local timezone.
+ *
+ * @param isoString - ISO 8601 timestamp (e.g., "2025-07-01T12:34:56Z")
+ * @returns Formatted date string (e.g., "Jul 1, 2025")
+ */
+export function formatISOTimestampAsLocalDate(isoString: string): string {
+  return format(parseISOTimestamp(isoString), 'PP');
+}
+
+/**
+ * Convert an ISO 8601 timestamp into a LocalDate string suitable for
+ * `input[type=date]` values in the user's local timezone.
+ *
+ * @param isoString - ISO 8601 timestamp
+ * @returns LocalDate string in YYYY-MM-DD format
+ */
+export function isoTimestampToLocalDateInputValue(isoString: string): string {
+  return format(parseISOTimestamp(isoString), 'yyyy-MM-dd');
+}
+
+/**
+ * Convert a LocalDate into an ISO 8601 timestamp for the start of that day in
+ * the user's local timezone.
+ *
+ * @param dateString - Date in YYYY-MM-DD format
+ * @returns ISO 8601 timestamp
+ */
+export function localDateToStartOfDayISOTimestamp(dateString: string): string {
+  return startOfDay(parseLocalDate(dateString)).toISOString();
+}
+
+/**
+ * Convert a LocalDate into an ISO 8601 timestamp for the end of that day in
+ * the user's local timezone.
+ *
+ * @param dateString - Date in YYYY-MM-DD format
+ * @returns ISO 8601 timestamp
+ */
+export function localDateToEndOfDayISOTimestamp(dateString: string): string {
+  return endOfDay(parseLocalDate(dateString)).toISOString();
 }
 
 // ============================================================================
@@ -261,8 +311,8 @@ export function getDateRange(dates: string[]): { earliest: string; latest: strin
   let latest = dates[0];
 
   for (const date of dates) {
-    if (compareDates(date, earliest) < 0) earliest = date;
-    if (compareDates(date, latest) > 0) latest = date;
+    if (compareLocalDates(date, earliest) < 0) earliest = date;
+    if (compareLocalDates(date, latest) > 0) latest = date;
   }
 
   return { earliest, latest };
