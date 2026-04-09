@@ -28,7 +28,7 @@ import { BulkDeleteModal } from '@/features/transactions/components/BulkDeleteMo
 import { SaveAsViewButton } from '@/components/SaveAsViewButton';
 import { ViewCriteriaApi } from '@/types/view';
 import { Checkbox } from '@/components/ui/Checkbox';
-import { compareDates } from '@/utils/dates';
+import { compareLocalDates } from '@/utils/dates';
 import {
   ArrowUpDown,
   ChevronLeft,
@@ -262,7 +262,10 @@ export function TransactionTable({
           );
         },
         sortingFn: (rowA, rowB) => {
-          return compareDates(rowA.getValue('date') as string, rowB.getValue('date') as string);
+          return compareLocalDates(
+            rowA.getValue('date') as string,
+            rowB.getValue('date') as string,
+          );
         },
         size: 120,
         minSize: 120,

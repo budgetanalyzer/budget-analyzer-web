@@ -70,7 +70,7 @@ export function ViewsPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
         <div className="w-full max-w-md">
-          <ErrorBanner error={error} onRetry={refetch} />
+          <ErrorBanner error={error} onRetry={() => refetch()} />
         </div>
       </div>
     );

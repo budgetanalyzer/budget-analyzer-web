@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { DollarSign, FileText, List, Plus, ArrowRight } from 'lucide-react';
+import { DollarSign, FileText, List, Plus, ArrowRight, Users } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -8,6 +8,7 @@ import { PermissionGuard } from '@/features/auth/components/PermissionGuard';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { useStatementFormats } from '@/hooks/useStatementFormats';
 import { useTransactionSearch } from '@/features/admin/transactions/api/useTransactionSearch';
+import { useUserSearch } from '@/hooks/useUsers';
 
 function CurrenciesCard() {
   const canWriteCurrencies = usePermission('currencies:write');
@@ -144,6 +145,46 @@ function TransactionsCard() {
   );
 }
 
+function UsersCard() {
+  const { data: usersPage, isLoading: usersLoading } = useUserSearch({
+    page: 0,
+    size: 1,
+    sort: ['createdAt,DESC', 'id,DESC'],
+  });
+  const totalUsers = usersPage?.metadata.totalElements ?? 0;
+
+  return (
+    <div className="rounded-xl border bg-card shadow-sm">
+      <div className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2.5">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <h2 className="text-lg font-semibold">Users</h2>
+          </div>
+          {usersLoading ? (
+            <Skeleton className="h-8 w-12 rounded-md" />
+          ) : (
+            <span className="text-2xl font-bold">{totalUsers.toLocaleString()}</span>
+          )}
+        </div>
+        {!usersLoading && (
+          <p className="mt-3 text-sm text-muted-foreground">Browse and inspect users (read-only)</p>
+        )}
+      </div>
+      <div className="flex items-center gap-2 border-t px-6 py-3">
+        <Link to="/admin/users">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+            Browse all
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export function AdminDashboard() {
   const { user } = useAuth();
 
@@ -170,6 +211,9 @@ export function AdminDashboard() {
           </PermissionGuard>
           <PermissionGuard permission="transactions:read:any" fallback={null}>
             <TransactionsCard />
+          </PermissionGuard>
+          <PermissionGuard permission="users:read" fallback={null}>
+            <UsersCard />
           </PermissionGuard>
         </div>
       </div>

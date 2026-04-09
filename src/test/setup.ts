@@ -2,6 +2,7 @@
 import { expect, beforeAll, afterEach, afterAll, vi } from 'vitest';
 import '@testing-library/jest-dom';
 import * as matchers from '@testing-library/jest-dom/matchers';
+import { resetMockHandlerState } from '@/mocks/handlers';
 import { server } from '@/mocks/server';
 
 expect.extend(matchers);
@@ -26,5 +27,8 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
 }
 
 beforeAll(() => server.listen());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  resetMockHandlerState();
+});
 afterAll(() => server.close());

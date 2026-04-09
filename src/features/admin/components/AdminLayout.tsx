@@ -9,7 +9,7 @@ import {
   PanelLeft,
   PanelLeftClose,
   Shield,
-  UserMinus,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -41,7 +41,7 @@ export function AdminLayout() {
   const canReadCurrencies = usePermission('currencies:read');
   const canReadFormats = usePermission('statementformats:read');
   const canSearchAcrossUsers = usePermission('transactions:read:any');
-  const canDeactivateUsers = usePermission('users:write');
+  const canReadUsers = usePermission('users:read');
 
   const navItems: NavItem[] = [
     {
@@ -76,12 +76,12 @@ export function AdminLayout() {
           },
         ]
       : []),
-    ...(canDeactivateUsers
+    ...(canReadUsers
       ? [
           {
-            to: '/admin/users/deactivate',
-            label: 'Deactivate User',
-            icon: UserMinus,
+            to: '/admin/users',
+            label: 'Users',
+            icon: Users,
           },
         ]
       : []),
@@ -217,7 +217,7 @@ export function AdminLayout() {
               const isActive =
                 item.to === '/admin'
                   ? location.pathname === '/admin'
-                  : location.pathname.startsWith(item.to);
+                  : location.pathname === item.to || location.pathname.startsWith(item.to + '/');
 
               if (item.disabled) {
                 return (

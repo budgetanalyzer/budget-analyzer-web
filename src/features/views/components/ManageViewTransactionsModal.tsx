@@ -21,7 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/Table';
 import { Search, Pin, PinOff, EyeOff, Eye, X } from 'lucide-react';
-import { formatLocalDate } from '@/utils/dates';
+import { compareLocalDates, formatLocalDate } from '@/utils/dates';
 import { formatCurrency } from '@/utils/currency';
 import {
   usePinTransaction,
@@ -106,7 +106,7 @@ export function ManageViewTransactionsModal({
       const statusDiff = statusOrder[a.membershipStatus] - statusOrder[b.membershipStatus];
       if (statusDiff !== 0) return statusDiff;
       // Within same status, sort by date descending
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
+      return compareLocalDates(b.date, a.date);
     });
   }, [filteredTransactions]);
 

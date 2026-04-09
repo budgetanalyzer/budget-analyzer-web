@@ -15,11 +15,11 @@ import uiReducer from '@/store/uiSlice';
 const mockUseAuth = vi.mocked(useAuth);
 const mockUsePermission = vi.mocked(usePermission);
 
-function renderLayout() {
+function renderLayout(initialPath: string = '/admin') {
   const store = configureStore({ reducer: { ui: uiReducer } });
   return render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/admin']}>
+      <MemoryRouter initialEntries={[initialPath]}>
         <AdminLayout />
       </MemoryRouter>
     </Provider>,
@@ -50,7 +50,7 @@ describe('AdminLayout nav gating', () => {
     expect(screen.getByRole('link', { name: /Currencies/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Statement Formats/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Transactions/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Deactivate User/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Users/ })).toBeInTheDocument();
   });
 
   it('hides the Currencies nav item when currencies:read is missing', () => {
@@ -59,7 +59,7 @@ describe('AdminLayout nav gating', () => {
     expect(screen.queryByRole('link', { name: /Currencies/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Statement Formats/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Transactions/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Deactivate User/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Users/ })).toBeInTheDocument();
   });
 
   it('hides the Statement Formats nav item when statementformats:read is missing', () => {
@@ -68,21 +68,21 @@ describe('AdminLayout nav gating', () => {
     expect(screen.getByRole('link', { name: /Currencies/ })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Statement Formats/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Transactions/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Deactivate User/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Users/ })).toBeInTheDocument();
   });
 
   it('hides the Transactions nav item when transactions:read:any is missing', () => {
     mockUsePermission.mockImplementation((permission) => permission !== 'transactions:read:any');
     renderLayout();
     expect(screen.queryByRole('link', { name: /Transactions/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Deactivate User/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Users/ })).toBeInTheDocument();
   });
 
-  it('hides the Deactivate User nav item when users:write is missing', () => {
-    mockUsePermission.mockImplementation((permission) => permission !== 'users:write');
+  it('hides the Users nav item when users:read is missing', () => {
+    mockUsePermission.mockImplementation((permission) => permission !== 'users:read');
     renderLayout();
     expect(screen.getByRole('link', { name: /Transactions/ })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Deactivate User/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Users/ })).not.toBeInTheDocument();
   });
 
   it('hides every gated item when no permissions are granted', () => {
@@ -91,8 +91,18 @@ describe('AdminLayout nav gating', () => {
     expect(screen.queryByRole('link', { name: /Currencies/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Statement Formats/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Transactions/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Deactivate User/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Users/ })).not.toBeInTheDocument();
     // Ungated Dashboard link still renders.
     expect(screen.getByRole('link', { name: /Dashboard/ })).toBeInTheDocument();
+  });
+});
+
+describe('AdminLayout nav active state', () => {
+  it('highlights the Users nav link when viewing a nested user detail path', () => {
+    mockUsePermission.mockReturnValue(true);
+    renderLayout('/admin/users/usr_abc123');
+    const usersLink = screen.getByRole('link', { name: /Users/ });
+    expect(usersLink.className).toContain('bg-primary/10');
+    expect(usersLink.className).toContain('text-primary');
   });
 });
