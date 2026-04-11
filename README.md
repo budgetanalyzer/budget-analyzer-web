@@ -54,7 +54,7 @@ cp .env.example .env
 npm run dev
 ```
 
-**IMPORTANT**: Access the app via `https://app.budgetanalyzer.localhost`, NOT directly via Vite (`http://localhost:3000`). Run `orchestration/nginx/scripts/dev/setup-local-https.sh` first to generate SSL certificates.
+**IMPORTANT**: Access the app via `https://app.budgetanalyzer.localhost`, NOT directly via Vite (`http://localhost:3000`). Run `../orchestration/scripts/bootstrap/setup-k8s-tls.sh` on the host first to generate SSL certificates.
 
 The checked-in Docker development runtime now drops root and runs Vite as UID/GID `1001`. Keep container-oriented changes compatible with `npm run dev -- --host 0.0.0.0 --port 3000` under that non-root user because Tilt relies on that path for the Kubernetes HMR workflow.
 
