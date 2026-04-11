@@ -4,6 +4,8 @@
 >
 > — [AGENTS.md](AGENTS.md#tree-position)
 
+[![Build](https://github.com/budgetanalyzer/budget-analyzer-web/actions/workflows/build.yml/badge.svg)](https://github.com/budgetanalyzer/budget-analyzer-web/actions/workflows/build.yml)
+
 Modern React web application for Budget Analyzer - a reference architecture for microservices with a React frontend.
 
 ## Overview
