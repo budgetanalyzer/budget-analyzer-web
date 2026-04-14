@@ -226,6 +226,12 @@ The optimized files will be in `dist/`. Deploy to any static hosting:
 - AWS S3 + CloudFront
 - GitHub Pages
 
+For container releases, keep the checked-in `Dockerfile` on the local
+Vite/HMR path used by Tilt. Tagged GHCR publishes use
+`.github/workflows/publish-release.yml` with `Dockerfile.production`, which
+builds the static bundle and serves it through unprivileged NGINX on port
+`3000`.
+
 ## Integration
 
 This frontend integrates with the Budget Analyzer microservices:
