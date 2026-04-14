@@ -368,6 +368,10 @@ npm run preview      # Preview production build
 
 **IMPORTANT**: NEVER run `npm run dev` automatically. User controls dev server.
 
+`Dockerfile` remains the Tilt/dev Vite image. Tagged GHCR releases use
+`.github/workflows/publish-release.yml` with `Dockerfile.production`, which
+builds the static bundle and serves it with unprivileged NGINX on port `3000`.
+
 **Code Quality:**
 ```bash
 npm run lint:fix     # Auto-fix ESLint issues (ALWAYS use this)
