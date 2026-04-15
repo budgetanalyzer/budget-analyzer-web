@@ -35,9 +35,9 @@ NEVER use Agent/subagent tools for code exploration. Use Grep, Glob, and Read di
 Always keep documentation up to date after any configuration or code change.
 
 Update the nearest affected documentation in the same work:
-- `AGENTS.md` when instructions, guardrails, discovery commands, or repository-specific workflow changes
+- `AGENTS.md` when instructions, guardrails, or discovery commands change
 - `README.md` when setup, usage, or repository purpose changes
-- `docs/` when architecture, configuration, APIs, behaviors, or operational workflows change
+- `docs/` when architecture, configuration, APIs, behaviors, or operating procedures change
 
 Do not leave documentation updates as follow-up work.
 
@@ -368,9 +368,9 @@ npm run preview      # Preview production build
 
 **IMPORTANT**: NEVER run `npm run dev` automatically. User controls dev server.
 
-`Dockerfile` remains the Tilt/dev Vite image. Tagged GHCR releases use
-`.github/workflows/publish-release.yml` with `Dockerfile.production`, which
-builds the static bundle and serves it with unprivileged NGINX on port `3000`.
+`Dockerfile` remains the Tilt/dev Vite image. Tagged GHCR releases build with
+`Dockerfile.production`, which builds the static bundle and serves it with
+unprivileged NGINX on port `3000`.
 
 **Code Quality:**
 ```bash
@@ -489,7 +489,7 @@ If matches appear, the dependency violates CSP and must not be used.
 - User controls dev server (`npm run dev`) manually
 - Always use `npm run lint:fix` (auto-fixes)
 
-**NO GIT WRITE OPERATIONS**: Never run git commands (commit, push, checkout, reset, etc.) without explicit user request. The user controls git workflow entirely. You may suggest what to commit, but don't do it.
+**NO GIT WRITE OPERATIONS**: Never run git commands (commit, push, checkout, reset, etc.) without explicit user request. The user controls git operations entirely. You may suggest what to commit, but don't do it.
 
 ## Honest Discourse
 
