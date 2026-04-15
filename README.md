@@ -230,7 +230,9 @@ For container releases, keep the checked-in `Dockerfile` on the local
 Vite/HMR path used by Tilt. Tagged GHCR publishes use
 `.github/workflows/publish-release.yml` with `Dockerfile.production`, which
 builds the static bundle and serves it through unprivileged NGINX on port
-`3000`.
+`3000`. From the `v0.0.12`-forward contract, manual release-image dispatch
+uses `release_ref` as the existing Git tag to check out and `image_tag` as an
+optional published-tag override; non-`v*` tags default to their raw tag name.
 
 ## Integration
 
