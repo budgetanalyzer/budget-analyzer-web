@@ -5,7 +5,7 @@ import type { User } from '@/types/auth';
  *
  * Permissions drive action-level UI gating (button visibility, page guards).
  * Layout decisions (which chrome surrounds the page) belong to `isAdmin` /
- * `AdminRoute`. See `docs/plans/permission-based-authorization-cleanup.md`.
+ * `AdminRoute`. See `docs/authentication.md`.
  *
  * Returns `false` for an absent user or unknown permission string.
  */

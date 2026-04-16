@@ -6,7 +6,7 @@ import { hasPermission } from '@/features/auth/utils/permissions';
  *
  * Use for action-level gating (button visibility, page guards). For layout
  * decisions, prefer `isAdmin` / `AdminRoute`. See
- * `docs/plans/permission-based-authorization-cleanup.md`.
+ * `docs/authentication.md`.
  */
 export function usePermission(permission: string): boolean {
   const { user } = useAuth();

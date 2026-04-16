@@ -9,7 +9,6 @@
 ### Relationships
 - **Interfaces with**: Users (browser), backend services (via API gateway)
 - **Coordinated by**: orchestration
-- **Observed by**: architecture-conversations
 - **Isolated from**: service-common (different tech stack)
 
 ### Permissions
@@ -248,10 +247,8 @@ inside a `.filter()` callback. Two safe patterns:
 - **Top-of-component `usePermission` + conditional spread** — use when
   building a nav list imperatively (see `AdminLayout.tsx`).
 
-The cross-service plan is at
-`../architecture-conversations/docs/plans/permission-based-authorization-cleanup.md`;
-the frontend half is at
-[docs/plans/permission-based-authorization-cleanup.md](docs/plans/permission-based-authorization-cleanup.md).
+The frontend authorization plan is at
+[docs/authentication.md](docs/authentication.md).
 
 ## Component Patterns
 

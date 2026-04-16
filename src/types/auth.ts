@@ -11,7 +11,7 @@ export type UserRole = 'USER' | 'ADMIN';
  * `roles` drives layout-level decisions (e.g., `AdminRoute`).
  * `permissions` drives action-level UI gating via `usePermission(...)`
  * (bulletproof-react convention). See:
- * `docs/plans/permission-based-authorization-cleanup.md`.
+ * `docs/authentication.md`.
  */
 export interface User {
   sub: string; // User ID (IdP subject)

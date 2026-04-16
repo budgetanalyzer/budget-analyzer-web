@@ -323,8 +323,7 @@ callbacks. Two safe patterns:
 - **Top-of-component `usePermission` + conditional spread** — use when building
   a nav list imperatively. See `AdminLayout.tsx` for the pattern.
 
-For the migration plan and rationale, see
-[docs/plans/permission-based-authorization-cleanup.md](plans/permission-based-authorization-cleanup.md).
+The migration rationale is documented in the sections above.
 
 ## Production Deployment
 
