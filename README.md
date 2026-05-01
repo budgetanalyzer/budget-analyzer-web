@@ -1,5 +1,9 @@
 # Budget Analyzer Web
 
+> "Archetype: interface. Role: React SPA; bridges users to the backend system."
+>
+> — [AGENTS.md](AGENTS.md#tree-position)
+
 [![Build](https://github.com/budgetanalyzer/budget-analyzer-web/actions/workflows/build.yml/badge.svg)](https://github.com/budgetanalyzer/budget-analyzer-web/actions/workflows/build.yml)
 
 React 19 SPA for managing and analyzing financial transactions. Session-based authentication via same-origin cookies — no JWTs in the browser.
