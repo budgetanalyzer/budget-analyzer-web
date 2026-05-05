@@ -30,7 +30,7 @@ Requires backend infrastructure — see [orchestration getting-started](https://
 
 ## Tech Stack
 
-React 19 | TypeScript | Vite | React Router v7 | TanStack Query | Redux Toolkit | TanStack Table | Tailwind CSS | Shadcn/UI | Axios | Vitest
+React 19.2 | TypeScript | Vite | React Router 7.14 | TanStack Query | Redux Toolkit | TanStack Table | Tailwind CSS | Shadcn/UI | Axios | Vitest
 
 ## Documentation
 
