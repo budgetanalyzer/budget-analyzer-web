@@ -1,10 +1,11 @@
 // src/features/transactions/components/PreviewTableRow.tsx
 import { memo, useCallback } from 'react';
-import { Trash2 } from 'lucide-react';
+import { AlertTriangle, Trash2 } from 'lucide-react';
 import { TableRow, TableCell } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { Checkbox } from '@/components/ui/Checkbox';
 import {
   Select,
   SelectContent,
@@ -12,13 +13,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select';
-import { PreviewTransaction, TransactionType } from '@/types/transaction';
+import { PreviewDuplicateReason, TransactionType } from '@/types/transaction';
+import type {
+  EditablePreviewTransaction,
+  EditablePreviewTransactionField,
+  EditablePreviewTransactionValue,
+} from '@/features/transactions/types/preview';
+import { cn } from '@/utils/cn';
 
 interface PreviewTableRowProps {
-  transaction: PreviewTransaction;
+  transaction: EditablePreviewTransaction;
   index: number;
-  onUpdate: (index: number, field: keyof PreviewTransaction, value: string | number) => void;
+  onUpdate: (
+    index: number,
+    field: EditablePreviewTransactionField,
+    value: EditablePreviewTransactionValue,
+  ) => void;
   onRemove: (index: number) => void;
+}
+
+function getDuplicateStatusLabel(reason?: PreviewDuplicateReason | null): string {
+  if (reason === 'IN_BATCH') {
+    return 'Duplicate in file';
+  }
+
+  if (reason === 'EXISTING_TRANSACTION') {
+    return 'Already imported';
+  }
+
+  return 'Possible duplicate';
 }
 
 export const PreviewTableRow = memo(function PreviewTableRow({
@@ -67,8 +90,22 @@ export const PreviewTableRow = memo(function PreviewTableRow({
     onRemove(index);
   }, [index, onRemove]);
 
+  const handleAllowDuplicateChange = useCallback(
+    (checked: boolean | 'indeterminate') => {
+      onUpdate(index, 'allowDuplicate', checked === true);
+    },
+    [index, onUpdate],
+  );
+
+  const importAnywayId = `preview-import-anyway-${index}`;
+  const duplicateStatusLabel = getDuplicateStatusLabel(transaction.duplicateReason);
+
   return (
-    <TableRow>
+    <TableRow
+      className={cn(
+        transaction.duplicate && 'border-l-4 border-l-warning bg-warning/10 hover:bg-warning/15',
+      )}
+    >
       {/* Date */}
       <TableCell className="w-[130px]">
         <div className="relative">
@@ -83,7 +120,7 @@ export const PreviewTableRow = memo(function PreviewTableRow({
 
       {/* Description */}
       <TableCell className="min-w-[200px]">
-        <div className="relative">
+        <div className="relative space-y-2">
           <Input
             type="text"
             value={transaction.description}
@@ -91,6 +128,27 @@ export const PreviewTableRow = memo(function PreviewTableRow({
             maxLength={500}
             className="w-full"
           />
+          {transaction.duplicate && (
+            <div className="flex flex-col gap-2 rounded-md bg-warning/15 px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-warning">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                {duplicateStatusLabel}
+              </span>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={importAnywayId}
+                  checked={transaction.allowDuplicate === true}
+                  onCheckedChange={handleAllowDuplicateChange}
+                />
+                <label
+                  htmlFor={importAnywayId}
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  Import anyway
+                </label>
+              </div>
+            </div>
+          )}
         </div>
       </TableCell>
 

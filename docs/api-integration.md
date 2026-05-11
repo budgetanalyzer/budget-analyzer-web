@@ -27,6 +27,20 @@ All endpoints accessed through the gateway:
 
 **API Documentation**: `https://app.budgetanalyzer.localhost/api/docs`
 
+## Transaction Import Review
+
+Statement imports use a two-step review flow:
+
+1. `POST /api/v1/transactions/preview` uploads the file and returns editable preview rows. The response includes:
+   - `previewImportToken` — opaque token required for the batch request
+   - `fileImport` — file-level re-import status for the current user and uploaded bytes
+   - `transactions[].duplicate` and `transactions[].duplicateReason` — advisory row-level duplicate metadata
+2. `POST /api/v1/transactions/batch` submits the reviewed rows with the same `previewImportToken`.
+
+Duplicate preview rows stay visible in the UI and are skipped by default. A row is imported despite duplicate metadata only when the batch payload sets `allowDuplicate: true` for that row. Preview-only fields such as `duplicate` and `duplicateReason` are never sent in the batch request.
+
+If `fileImport.alreadyImported` is true, the UI shows the previous import metadata but does not block the batch import action.
+
 ## Axios Configuration
 
 ```typescript

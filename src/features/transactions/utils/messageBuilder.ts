@@ -1,13 +1,19 @@
 // src/features/transactions/utils/messageBuilder.ts
 
 export interface ImportSuccessMessageParams {
-  count: number;
+  created: number;
+  duplicatesSkipped: number;
+  duplicatesImported: number;
   filtersActive: boolean;
 }
 
 export interface ImportSuccessMessage {
   type: 'success';
   text: string;
+}
+
+function formatCount(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 /**
@@ -17,10 +23,19 @@ export interface ImportSuccessMessage {
  * @returns An object containing the message type and text
  */
 export function buildImportSuccessMessage({
-  count,
+  created,
+  duplicatesSkipped,
+  duplicatesImported,
   filtersActive,
 }: ImportSuccessMessageParams): ImportSuccessMessage {
-  const baseMessage = `Successfully imported ${count} transaction(s)`;
+  const duplicateImportText =
+    duplicatesImported > 0 ? `, including ${formatCount(duplicatesImported, 'duplicate')}` : '';
+  const skippedDuplicateText =
+    duplicatesSkipped > 0 ? ` Skipped ${formatCount(duplicatesSkipped, 'duplicate')}.` : '';
+  const baseMessage = `Successfully imported ${formatCount(
+    created,
+    'transaction',
+  )}${duplicateImportText}.${skippedDuplicateText}`;
 
   const filterWarning = filtersActive
     ? '  Some may be hidden by your current filters, [Clear filters] to see all.'
@@ -28,6 +43,6 @@ export function buildImportSuccessMessage({
 
   return {
     type: 'success',
-    text: `${baseMessage}.${filterWarning}`,
+    text: `${baseMessage}${filterWarning}`,
   };
 }

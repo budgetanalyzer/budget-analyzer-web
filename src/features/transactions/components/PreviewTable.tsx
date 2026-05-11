@@ -2,14 +2,18 @@
 import { useCallback } from 'react';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { PreviewTableRow } from '@/features/transactions/components/PreviewTableRow';
-import { PreviewTransaction } from '@/types/transaction';
+import type {
+  EditablePreviewTransaction,
+  EditablePreviewTransactionField,
+  EditablePreviewTransactionValue,
+} from '@/features/transactions/types/preview';
 
 interface PreviewTableProps {
-  transactions: PreviewTransaction[];
+  transactions: EditablePreviewTransaction[];
   onUpdateTransaction: (
     index: number,
-    field: keyof PreviewTransaction,
-    value: string | number,
+    field: EditablePreviewTransactionField,
+    value: EditablePreviewTransactionValue,
   ) => void;
   onRemoveTransaction: (index: number) => void;
 }
@@ -20,7 +24,11 @@ export function PreviewTable({
   onRemoveTransaction,
 }: PreviewTableProps) {
   const handleUpdate = useCallback(
-    (index: number, field: keyof PreviewTransaction, value: string | number) => {
+    (
+      index: number,
+      field: EditablePreviewTransactionField,
+      value: EditablePreviewTransactionValue,
+    ) => {
       onUpdateTransaction(index, field, value);
     },
     [onUpdateTransaction],

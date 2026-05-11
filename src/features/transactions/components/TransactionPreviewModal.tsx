@@ -10,8 +10,18 @@ import {
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { PreviewTable } from '@/features/transactions/components/PreviewTable';
+import { PreviewFileImportWarningBanner } from '@/features/transactions/components/PreviewFileImportWarningBanner';
 import { useBatchImport } from '@/features/transactions/hooks/useBatchImport';
-import { PreviewTransaction, PreviewResponse } from '@/types/transaction';
+import {
+  BatchImportTransactionRequest,
+  PreviewResponse,
+  PreviewTransaction,
+} from '@/types/transaction';
+import type {
+  EditablePreviewTransaction,
+  EditablePreviewTransactionField,
+  EditablePreviewTransactionValue,
+} from '@/features/transactions/types/preview';
 import { toast } from '@/hooks/useToast';
 import { formatApiError } from '@/utils/errorMessages';
 
@@ -19,7 +29,80 @@ interface TransactionPreviewModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   previewData: PreviewResponse | null;
-  onImportComplete: (created: number, duplicatesSkipped: number) => void;
+  onImportComplete: (
+    created: number,
+    duplicatesSkipped: number,
+    duplicatesImported: number,
+  ) => void;
+}
+
+const duplicateKeyFields = new Set<EditablePreviewTransactionField>([
+  'date',
+  'description',
+  'amount',
+  'type',
+  'bankName',
+  'currencyIsoCode',
+  'accountId',
+]);
+
+function toEditableTransaction(transaction: PreviewTransaction): EditablePreviewTransaction {
+  return {
+    ...transaction,
+    allowDuplicate: false,
+  };
+}
+
+function toBatchImportTransaction(
+  transaction: EditablePreviewTransaction,
+): BatchImportTransactionRequest {
+  const {
+    date,
+    description,
+    amount,
+    type,
+    category,
+    bankName,
+    currencyIsoCode,
+    accountId,
+    duplicate,
+    allowDuplicate,
+  } = transaction;
+
+  return {
+    date,
+    description,
+    amount,
+    type,
+    category,
+    bankName,
+    currencyIsoCode,
+    accountId,
+    ...(duplicate && allowDuplicate === true ? { allowDuplicate: true } : {}),
+  };
+}
+
+function getSkippedDuplicateCount(transactions: EditablePreviewTransaction[]): number {
+  return transactions.filter(
+    (transaction) => transaction.duplicate && transaction.allowDuplicate !== true,
+  ).length;
+}
+
+function getTransactionLabel(count: number): string {
+  return count === 1 ? 'Transaction' : 'Transactions';
+}
+
+function getDuplicateLabel(count: number): string {
+  return count === 1 ? 'Duplicate' : 'Duplicates';
+}
+
+function buildImportButtonLabel(transactionCount: number, skippedDuplicateCount: number): string {
+  if (skippedDuplicateCount === 0) {
+    return `Import ${transactionCount} ${getTransactionLabel(transactionCount)}`;
+  }
+
+  const importCount = transactionCount - skippedDuplicateCount;
+  return `Import ${importCount} ${getTransactionLabel(importCount)}, Skip ${skippedDuplicateCount} ${getDuplicateLabel(skippedDuplicateCount)}`;
 }
 
 export function TransactionPreviewModal({
@@ -28,7 +111,7 @@ export function TransactionPreviewModal({
   previewData,
   onImportComplete,
 }: TransactionPreviewModalProps) {
-  const [transactions, setTransactions] = useState<PreviewTransaction[]>([]);
+  const [transactions, setTransactions] = useState<EditablePreviewTransaction[]>([]);
   const { mutate: batchImport, isPending: isImporting } = useBatchImport();
 
   // Sync state when modal opens with new data
@@ -36,7 +119,7 @@ export function TransactionPreviewModal({
   // not when the controlled open prop changes programmatically
   useEffect(() => {
     if (isOpen && previewData) {
-      setTransactions([...previewData.transactions]);
+      setTransactions(previewData.transactions.map(toEditableTransaction));
     }
   }, [isOpen, previewData]);
 
@@ -44,7 +127,7 @@ export function TransactionPreviewModal({
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (open && previewData) {
-        setTransactions([...previewData.transactions]);
+        setTransactions(previewData.transactions.map(toEditableTransaction));
       }
       if (!isImporting) {
         onOpenChange(open);
@@ -54,11 +137,30 @@ export function TransactionPreviewModal({
   );
 
   const handleUpdateTransaction = useCallback(
-    (index: number, field: keyof PreviewTransaction, value: string | number) => {
+    (
+      index: number,
+      field: EditablePreviewTransactionField,
+      value: EditablePreviewTransactionValue,
+    ) => {
       setTransactions((prev) => {
-        const updated = [...prev];
-        updated[index] = { ...updated[index], [field]: value };
-        return updated;
+        return prev.map((transaction, transactionIndex) => {
+          if (transactionIndex !== index) {
+            return transaction;
+          }
+
+          const updated = {
+            ...transaction,
+            [field]: value,
+          } as EditablePreviewTransaction;
+
+          if (duplicateKeyFields.has(field) && transaction.duplicate) {
+            updated.duplicate = false;
+            updated.duplicateReason = null;
+            updated.allowDuplicate = false;
+          }
+
+          return updated;
+        });
       });
     },
     [],
@@ -76,12 +178,12 @@ export function TransactionPreviewModal({
     batchImport(
       {
         previewImportToken: previewData.previewImportToken,
-        transactions,
+        transactions: transactions.map(toBatchImportTransaction),
       },
       {
         onSuccess: (data) => {
           onOpenChange(false);
-          onImportComplete(data.created, data.duplicatesSkipped);
+          onImportComplete(data.created, data.duplicatesSkipped, data.duplicatesImported);
         },
         onError: (error) => {
           toast.error(formatApiError(error, 'Failed to import transactions'));
@@ -95,6 +197,9 @@ export function TransactionPreviewModal({
       onOpenChange(false);
     }
   }, [isImporting, onOpenChange]);
+
+  const skippedDuplicateCount = getSkippedDuplicateCount(transactions);
+  const importButtonLabel = buildImportButtonLabel(transactions.length, skippedDuplicateCount);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -112,6 +217,7 @@ export function TransactionPreviewModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
+          {previewData && <PreviewFileImportWarningBanner fileImport={previewData.fileImport} />}
           <div className="flex-1 overflow-y-auto">
             <PreviewTable
               transactions={transactions}
@@ -126,9 +232,7 @@ export function TransactionPreviewModal({
             Cancel
           </Button>
           <Button onClick={handleImport} disabled={isImporting || transactions.length === 0}>
-            {isImporting
-              ? 'Importing...'
-              : `Import ${transactions.length} Transaction${transactions.length !== 1 ? 's' : ''}`}
+            {isImporting ? 'Importing...' : importButtonLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -19,7 +19,7 @@ import { useStatementFormats } from '@/hooks/useStatementFormats';
 import { useCurrencies } from '@/hooks/useCurrencies';
 
 interface ImportButtonProps {
-  onSuccess?: (count: number) => void;
+  onSuccess?: (created: number, duplicatesSkipped: number, duplicatesImported: number) => void;
   onError?: (error: Error) => void;
   onExpandedChange?: (expanded: boolean) => void;
 }
@@ -128,8 +128,8 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
   }, []);
 
   const handlePreviewImportComplete = useCallback(
-    (created: number) => {
-      onSuccess?.(created);
+    (created: number, duplicatesSkipped: number, duplicatesImported: number) => {
+      onSuccess?.(created, duplicatesSkipped, duplicatesImported);
     },
     [onSuccess],
   );
