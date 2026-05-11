@@ -2,11 +2,10 @@
 import { useCallback } from 'react';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { PreviewTableRow } from '@/features/transactions/components/PreviewTableRow';
-import { PreviewTransaction, PreviewWarning } from '@/types/transaction';
+import { PreviewTransaction } from '@/types/transaction';
 
 interface PreviewTableProps {
   transactions: PreviewTransaction[];
-  warnings: PreviewWarning[];
   onUpdateTransaction: (
     index: number,
     field: keyof PreviewTransaction,
@@ -17,7 +16,6 @@ interface PreviewTableProps {
 
 export function PreviewTable({
   transactions,
-  warnings,
   onUpdateTransaction,
   onRemoveTransaction,
 }: PreviewTableProps) {
@@ -62,7 +60,6 @@ export function PreviewTable({
             key={index}
             transaction={transaction}
             index={index}
-            warnings={warnings}
             onUpdate={handleUpdate}
             onRemove={handleRemove}
           />

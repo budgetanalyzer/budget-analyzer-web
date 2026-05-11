@@ -5,9 +5,38 @@ import {
   TransactionUpdateRequest,
   TransactionCountFilter,
   PreviewResponse,
-  PreviewTransaction,
+  BatchImportRequest,
+  BatchImportTransactionRequest,
   BatchImportResponse,
 } from '@/types/transaction';
+
+function toBatchImportTransaction(
+  transaction: BatchImportTransactionRequest,
+): BatchImportTransactionRequest {
+  const {
+    date,
+    description,
+    amount,
+    type,
+    category,
+    bankName,
+    currencyIsoCode,
+    accountId,
+    allowDuplicate,
+  } = transaction;
+
+  return {
+    date,
+    description,
+    amount,
+    type,
+    category,
+    bankName,
+    currencyIsoCode,
+    accountId,
+    ...(allowDuplicate === true ? { allowDuplicate } : {}),
+  };
+}
 
 export const transactionApi = {
   getTransactions: async (): Promise<Transaction[]> => {
@@ -64,11 +93,10 @@ export const transactionApi = {
     return response.data;
   },
 
-  batchImportTransactions: async (
-    transactions: PreviewTransaction[],
-  ): Promise<BatchImportResponse> => {
+  batchImportTransactions: async (request: BatchImportRequest): Promise<BatchImportResponse> => {
     const response = await apiClient.post<BatchImportResponse>('/v1/transactions/batch', {
-      transactions,
+      previewImportToken: request.previewImportToken,
+      transactions: request.transactions.map(toBatchImportTransaction),
     });
     return response.data;
   },

@@ -20,6 +20,23 @@ export interface TransactionUpdateRequest {
 }
 
 // Preview import types
+export type PreviewDuplicateReason = 'EXISTING_TRANSACTION' | 'IN_BATCH';
+export type PreviewFileWarningCode = 'FILE_ALREADY_IMPORTED';
+
+export interface PreviousFileImportResponse {
+  originalFilename: string;
+  importedAt: string;
+  format: string;
+  accountId?: string | null;
+  transactionCount: number;
+}
+
+export interface PreviewFileImportStatusResponse {
+  alreadyImported: boolean;
+  warningCode?: PreviewFileWarningCode | null;
+  previousImport?: PreviousFileImportResponse | null;
+}
+
 export interface PreviewTransaction {
   date: string;
   description: string;
@@ -29,27 +46,39 @@ export interface PreviewTransaction {
   bankName: string;
   currencyIsoCode: string;
   accountId?: string;
-}
-
-export interface PreviewWarning {
-  index: number;
-  field: string;
-  message: string;
+  duplicate: boolean;
+  duplicateReason?: PreviewDuplicateReason | null;
 }
 
 export interface PreviewResponse {
   sourceFile: string;
+  detectedFormat: string;
+  previewImportToken: string;
+  fileImport: PreviewFileImportStatusResponse;
   transactions: PreviewTransaction[];
-  warnings: PreviewWarning[];
+}
+
+export interface BatchImportTransactionRequest {
+  date: string;
+  description: string;
+  amount: number;
+  type: TransactionType;
+  category?: string;
+  bankName: string;
+  currencyIsoCode: string;
+  accountId?: string;
+  allowDuplicate?: boolean;
 }
 
 export interface BatchImportRequest {
-  transactions: PreviewTransaction[];
+  previewImportToken: string;
+  transactions: BatchImportTransactionRequest[];
 }
 
 export interface BatchImportResponse {
   created: number;
   duplicatesSkipped: number;
+  duplicatesImported: number;
   transactions: Transaction[];
 }
 

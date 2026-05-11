@@ -20,6 +20,8 @@ All endpoints accessed through the gateway:
 
 - `GET /api/v1/transactions` — List all transactions
 - `GET /api/v1/transactions/{id}` — Get single transaction
+- `POST /api/v1/transactions/preview` — Preview an uploaded statement file before import. The response includes `previewImportToken`, `fileImport` re-import status, and per-row duplicate metadata (`duplicate`, `duplicateReason`).
+- `POST /api/v1/transactions/batch` — Import reviewed preview rows. The request requires `previewImportToken` and may set per-row `allowDuplicate: true` when the user explicitly imports a duplicate row.
 - `GET /api/v1/currencies` — List currencies
 - `GET /api/v1/exchange-rates` — Get exchange rates
 

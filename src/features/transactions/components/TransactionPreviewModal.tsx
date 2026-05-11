@@ -9,10 +9,9 @@ import {
   DialogTitle,
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
-import { PreviewWarningBanner } from '@/features/transactions/components/PreviewWarningBanner';
 import { PreviewTable } from '@/features/transactions/components/PreviewTable';
 import { useBatchImport } from '@/features/transactions/hooks/useBatchImport';
-import { PreviewTransaction, PreviewWarning, PreviewResponse } from '@/types/transaction';
+import { PreviewTransaction, PreviewResponse } from '@/types/transaction';
 import { toast } from '@/hooks/useToast';
 import { formatApiError } from '@/utils/errorMessages';
 
@@ -30,7 +29,6 @@ export function TransactionPreviewModal({
   onImportComplete,
 }: TransactionPreviewModalProps) {
   const [transactions, setTransactions] = useState<PreviewTransaction[]>([]);
-  const [warnings, setWarnings] = useState<PreviewWarning[]>([]);
   const { mutate: batchImport, isPending: isImporting } = useBatchImport();
 
   // Sync state when modal opens with new data
@@ -39,7 +37,6 @@ export function TransactionPreviewModal({
   useEffect(() => {
     if (isOpen && previewData) {
       setTransactions([...previewData.transactions]);
-      setWarnings([...previewData.warnings]);
     }
   }, [isOpen, previewData]);
 
@@ -48,7 +45,6 @@ export function TransactionPreviewModal({
     (open: boolean) => {
       if (open && previewData) {
         setTransactions([...previewData.transactions]);
-        setWarnings([...previewData.warnings]);
       }
       if (!isImporting) {
         onOpenChange(open);
@@ -64,37 +60,35 @@ export function TransactionPreviewModal({
         updated[index] = { ...updated[index], [field]: value };
         return updated;
       });
-      // Clear warning for this field if it exists
-      setWarnings((prev) => prev.filter((w) => !(w.index === index && w.field === field)));
     },
     [],
   );
 
   const handleRemoveTransaction = useCallback((index: number) => {
     setTransactions((prev) => prev.filter((_, i) => i !== index));
-    // Update warning indices for rows after the removed one
-    setWarnings((prev) =>
-      prev
-        .filter((w) => w.index !== index)
-        .map((w) => (w.index > index ? { ...w, index: w.index - 1 } : w)),
-    );
   }, []);
 
   const handleImport = useCallback(() => {
-    if (transactions.length === 0) {
+    if (transactions.length === 0 || !previewData) {
       return;
     }
 
-    batchImport(transactions, {
-      onSuccess: (data) => {
-        onOpenChange(false);
-        onImportComplete(data.created, data.duplicatesSkipped);
+    batchImport(
+      {
+        previewImportToken: previewData.previewImportToken,
+        transactions,
       },
-      onError: (error) => {
-        toast.error(formatApiError(error, 'Failed to import transactions'));
+      {
+        onSuccess: (data) => {
+          onOpenChange(false);
+          onImportComplete(data.created, data.duplicatesSkipped);
+        },
+        onError: (error) => {
+          toast.error(formatApiError(error, 'Failed to import transactions'));
+        },
       },
-    });
-  }, [transactions, batchImport, onOpenChange, onImportComplete]);
+    );
+  }, [transactions, previewData, batchImport, onOpenChange, onImportComplete]);
 
   const handleCancel = useCallback(() => {
     if (!isImporting) {
@@ -118,12 +112,9 @@ export function TransactionPreviewModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
-          {warnings.length > 0 && <PreviewWarningBanner warnings={warnings} />}
-
           <div className="flex-1 overflow-y-auto">
             <PreviewTable
               transactions={transactions}
-              warnings={warnings}
               onUpdateTransaction={handleUpdateTransaction}
               onRemoveTransaction={handleRemoveTransaction}
             />

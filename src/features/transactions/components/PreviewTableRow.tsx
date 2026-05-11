@@ -1,6 +1,6 @@
 // src/features/transactions/components/PreviewTableRow.tsx
 import { memo, useCallback } from 'react';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { TableRow, TableCell } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -12,13 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select';
-import { PreviewTransaction, PreviewWarning, TransactionType } from '@/types/transaction';
-import { cn } from '@/utils/cn';
+import { PreviewTransaction, TransactionType } from '@/types/transaction';
 
 interface PreviewTableRowProps {
   transaction: PreviewTransaction;
   index: number;
-  warnings: PreviewWarning[];
   onUpdate: (index: number, field: keyof PreviewTransaction, value: string | number) => void;
   onRemove: (index: number) => void;
 }
@@ -26,17 +24,9 @@ interface PreviewTableRowProps {
 export const PreviewTableRow = memo(function PreviewTableRow({
   transaction,
   index,
-  warnings,
   onUpdate,
   onRemove,
 }: PreviewTableRowProps) {
-  const getFieldWarning = useCallback(
-    (field: string): PreviewWarning | undefined => {
-      return warnings.find((w) => w.index === index && w.field === field);
-    },
-    [warnings, index],
-  );
-
   const handleDateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onUpdate(index, 'date', e.target.value);
@@ -77,10 +67,6 @@ export const PreviewTableRow = memo(function PreviewTableRow({
     onRemove(index);
   }, [index, onRemove]);
 
-  const dateWarning = getFieldWarning('date');
-  const descriptionWarning = getFieldWarning('description');
-  const amountWarning = getFieldWarning('amount');
-
   return (
     <TableRow>
       {/* Date */}
@@ -90,17 +76,8 @@ export const PreviewTableRow = memo(function PreviewTableRow({
             type="date"
             value={transaction.date}
             onChange={handleDateChange}
-            className={cn(
-              'w-full',
-              dateWarning && 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
-            )}
+            className="w-full"
           />
-          {dateWarning && (
-            <AlertTriangle
-              className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-yellow-500"
-              aria-label={dateWarning.message}
-            />
-          )}
         </div>
       </TableCell>
 
@@ -112,17 +89,8 @@ export const PreviewTableRow = memo(function PreviewTableRow({
             value={transaction.description}
             onChange={handleDescriptionChange}
             maxLength={500}
-            className={cn(
-              'w-full',
-              descriptionWarning && 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
-            )}
+            className="w-full"
           />
-          {descriptionWarning && (
-            <AlertTriangle
-              className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-yellow-500"
-              aria-label={descriptionWarning.message}
-            />
-          )}
         </div>
       </TableCell>
 
@@ -148,17 +116,8 @@ export const PreviewTableRow = memo(function PreviewTableRow({
             min="0"
             value={transaction.amount}
             onChange={handleAmountChange}
-            className={cn(
-              'w-full text-right',
-              amountWarning && 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
-            )}
+            className="w-full text-right"
           />
-          {amountWarning && (
-            <AlertTriangle
-              className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-yellow-500"
-              aria-label={amountWarning.message}
-            />
-          )}
         </div>
       </TableCell>
 
