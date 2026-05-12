@@ -30,6 +30,7 @@ interface PreviewTableRowProps {
     value: EditablePreviewTransactionValue,
   ) => void;
   onRemove: (index: number) => void;
+  hasDuplicateRows: boolean;
 }
 
 function getDuplicateStatusLabel(reason?: PreviewDuplicateReason | null): string {
@@ -49,6 +50,7 @@ export const PreviewTableRow = memo(function PreviewTableRow({
   index,
   onUpdate,
   onRemove,
+  hasDuplicateRows,
 }: PreviewTableRowProps) {
   const handleDateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,7 +122,7 @@ export const PreviewTableRow = memo(function PreviewTableRow({
 
       {/* Description */}
       <TableCell className="min-w-[200px]">
-        <div className="relative space-y-2">
+        <div className="relative">
           <Input
             type="text"
             value={transaction.description}
@@ -128,27 +130,6 @@ export const PreviewTableRow = memo(function PreviewTableRow({
             maxLength={500}
             className="w-full"
           />
-          {transaction.duplicate && (
-            <div className="flex flex-col gap-2 rounded-md bg-warning/15 px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between">
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-warning">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                {duplicateStatusLabel}
-              </span>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id={importAnywayId}
-                  checked={transaction.allowDuplicate === true}
-                  onCheckedChange={handleAllowDuplicateChange}
-                />
-                <label
-                  htmlFor={importAnywayId}
-                  className="text-xs font-medium text-muted-foreground"
-                >
-                  Import anyway
-                </label>
-              </div>
-            </div>
-          )}
         </div>
       </TableCell>
 
@@ -196,18 +177,40 @@ export const PreviewTableRow = memo(function PreviewTableRow({
         />
       </TableCell>
 
-      {/* Remove */}
-      <TableCell className="w-[60px]">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRemove}
-          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-500 dark:hover:bg-red-950 dark:hover:text-red-400"
-          title="Remove transaction"
-        >
-          <Trash2 className="h-4 w-4" />
-          <span className="sr-only">Remove</span>
-        </Button>
+      {/* Review actions */}
+      <TableCell className={cn(hasDuplicateRows ? 'w-[220px] min-w-[220px]' : 'w-[72px]')}>
+        <div className="flex items-center justify-end gap-3">
+          {transaction.duplicate && (
+            <div className="min-w-0 rounded-md bg-warning/15 px-2 py-1.5">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-warning">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                {duplicateStatusLabel}
+              </span>
+              <div className="mt-1 flex items-center gap-2">
+                <Checkbox
+                  id={importAnywayId}
+                  checked={transaction.allowDuplicate === true}
+                  onCheckedChange={handleAllowDuplicateChange}
+                />
+                <label
+                  htmlFor={importAnywayId}
+                  className="whitespace-nowrap text-xs font-medium text-muted-foreground"
+                >
+                  Import anyway
+                </label>
+              </div>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRemove}
+            className="h-8 w-8 shrink-0 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-500 dark:hover:bg-red-950 dark:hover:text-red-400"
+            aria-label="Remove transaction"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   );

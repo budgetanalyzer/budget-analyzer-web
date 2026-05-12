@@ -7,6 +7,7 @@ import type {
   EditablePreviewTransactionField,
   EditablePreviewTransactionValue,
 } from '@/features/transactions/types/preview';
+import { cn } from '@/utils/cn';
 
 interface PreviewTableProps {
   transactions: EditablePreviewTransaction[];
@@ -40,6 +41,7 @@ export function PreviewTable({
     },
     [onRemoveTransaction],
   );
+  const hasDuplicateRows = transactions.some((transaction) => transaction.duplicate);
 
   if (transactions.length === 0) {
     return (
@@ -50,7 +52,7 @@ export function PreviewTable({
   }
 
   return (
-    <Table>
+    <Table hideScrollbar={false}>
       <TableHeader>
         <TableRow>
           <TableHead className="w-[130px]">Date</TableHead>
@@ -59,7 +61,7 @@ export function PreviewTable({
           <TableHead className="w-[160px] text-right">Amount</TableHead>
           <TableHead className="w-[80px]">Currency</TableHead>
           <TableHead className="w-[150px]">Account ID</TableHead>
-          <TableHead className="w-[60px]"></TableHead>
+          <TableHead className={cn(hasDuplicateRows ? 'w-[220px]' : 'w-[72px]')}>Review</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -70,6 +72,7 @@ export function PreviewTable({
             index={index}
             onUpdate={handleUpdate}
             onRemove={handleRemove}
+            hasDuplicateRows={hasDuplicateRows}
           />
         ))}
       </TableBody>

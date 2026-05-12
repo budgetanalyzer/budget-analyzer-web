@@ -23,6 +23,7 @@ import type {
   EditablePreviewTransactionValue,
 } from '@/features/transactions/types/preview';
 import { toast } from '@/hooks/useToast';
+import { cn } from '@/utils/cn';
 import { formatApiError } from '@/utils/errorMessages';
 
 interface TransactionPreviewModalProps {
@@ -86,6 +87,10 @@ function getSkippedDuplicateCount(transactions: EditablePreviewTransaction[]): n
   return transactions.filter(
     (transaction) => transaction.duplicate && transaction.allowDuplicate !== true,
   ).length;
+}
+
+function getImportableTransactionCount(transactions: EditablePreviewTransaction[]): number {
+  return transactions.length - getSkippedDuplicateCount(transactions);
 }
 
 function getTransactionLabel(count: number): string {
@@ -171,7 +176,7 @@ export function TransactionPreviewModal({
   }, []);
 
   const handleImport = useCallback(() => {
-    if (transactions.length === 0 || !previewData) {
+    if (getImportableTransactionCount(transactions) === 0 || !previewData) {
       return;
     }
 
@@ -199,11 +204,18 @@ export function TransactionPreviewModal({
   }, [isImporting, onOpenChange]);
 
   const skippedDuplicateCount = getSkippedDuplicateCount(transactions);
+  const importableTransactionCount = getImportableTransactionCount(transactions);
   const importButtonLabel = buildImportButtonLabel(transactions.length, skippedDuplicateCount);
+  const hasDuplicateRows = transactions.some((transaction) => transaction.duplicate);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent
+        className={cn(
+          'max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-hidden flex flex-col',
+          hasDuplicateRows ? 'xl:max-w-7xl' : 'xl:max-w-5xl',
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Preview Import</DialogTitle>
           <DialogDescription>
@@ -231,7 +243,7 @@ export function TransactionPreviewModal({
           <Button variant="outline" onClick={handleCancel} disabled={isImporting}>
             Cancel
           </Button>
-          <Button onClick={handleImport} disabled={isImporting || transactions.length === 0}>
+          <Button onClick={handleImport} disabled={isImporting || importableTransactionCount === 0}>
             {isImporting ? 'Importing...' : importButtonLabel}
           </Button>
         </DialogFooter>

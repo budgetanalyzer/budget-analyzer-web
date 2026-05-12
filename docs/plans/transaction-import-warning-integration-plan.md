@@ -109,7 +109,9 @@ Update `src/features/transactions/components/TransactionPreviewModal.tsx`:
   - set `allowDuplicate: true` only for duplicate rows where the user checked
     "Import anyway"
   - omit `allowDuplicate` or send `false` for all other rows
-- Disable Import when there are no rows.
+- Disable Import when there are no rows or when every visible row would be
+  skipped as a duplicate. Keep the `Import 0 Transactions, Skip n Duplicates`
+  label visible so Cancel is the clear way out of the dialog.
 - Update the import button label to reflect skipped duplicate rows, for example:
   `Import 12 Transactions, Skip 3 Duplicates`.
 - On success, pass `created`, `duplicatesSkipped`, and `duplicatesImported` up to
@@ -144,8 +146,11 @@ top-level warning model left in the transaction feature.
 
 Update `PreviewTable.tsx` and `PreviewTableRow.tsx`:
 
-- Add a compact warning/status column or inline status area that does not crowd
-  editable fields on mobile.
+- Add duplicate warning/status controls to the row review actions column with
+  the remove action so editable fields stay compact on smaller screens.
+- Let the preview dialog use available viewport width when duplicate review
+  controls are present, keep horizontal table scrolling visible, and collapse
+  the review column back to remove-action width when no duplicate rows remain.
 - For `duplicateReason === 'EXISTING_TRANSACTION'`, show "Already imported".
 - For `duplicateReason === 'IN_BATCH'`, show "Duplicate in file".
 - Style duplicate rows with a subtle warning background or left border using
@@ -252,4 +257,3 @@ npm run build
 For CSP-sensitive UI changes, do not add runtime style-injecting dependencies,
 inline `style={...}` props, or tooltip-only disclosure. Use Tailwind classes and
 existing UI primitives.
-

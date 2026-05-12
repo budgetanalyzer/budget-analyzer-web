@@ -49,7 +49,7 @@ Duplicate reasons map to UI labels:
 | `EXISTING_TRANSACTION` | Row matches an existing active owner-owned transaction    | Already imported  |
 | `IN_BATCH`             | Row duplicates an earlier row in the same preview payload | Duplicate in file |
 
-Duplicate preview rows stay visible in the UI and are skipped by default. A row is imported despite duplicate metadata only when the batch payload sets `allowDuplicate: true` for that row. Preview-only fields such as `duplicate` and `duplicateReason` are never sent in the batch request.
+Duplicate preview rows stay visible in the UI and are skipped by default. A row is imported despite duplicate metadata only when the batch payload sets `allowDuplicate: true` for that row. If every visible row would be skipped, the UI disables the import action and leaves Cancel as the way out of the review dialog. Preview-only fields such as `duplicate` and `duplicateReason` are never sent in the batch request.
 
 Batch request shape:
 

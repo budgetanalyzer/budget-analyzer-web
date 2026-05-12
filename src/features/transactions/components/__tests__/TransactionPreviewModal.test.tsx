@@ -186,6 +186,23 @@ describe('TransactionPreviewModal', () => {
     expect(onImportComplete).toHaveBeenCalledWith(1, 2, 0);
   });
 
+  it('disables import when every visible row would be skipped as a duplicate', () => {
+    renderModal({
+      ...basePreviewData,
+      transactions: [
+        duplicateTransaction('EXISTING_TRANSACTION', 'Coffee'),
+        duplicateTransaction('IN_BATCH', 'Coffee duplicate'),
+        duplicateTransaction('EXISTING_TRANSACTION', 'Groceries'),
+        duplicateTransaction('IN_BATCH', 'Groceries duplicate'),
+      ],
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Import 0 Transactions, Skip 4 Duplicates' }),
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+  });
+
   it('sends allowDuplicate only when a duplicate row is explicitly selected', async () => {
     let capturedBody: unknown;
     const { onImportComplete } = renderModal({
