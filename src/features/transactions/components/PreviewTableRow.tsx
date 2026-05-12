@@ -1,10 +1,11 @@
 // src/features/transactions/components/PreviewTableRow.tsx
 import { memo, useCallback } from 'react';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Trash2 } from 'lucide-react';
 import { TableRow, TableCell } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { Checkbox } from '@/components/ui/Checkbox';
 import {
   Select,
   SelectContent,
@@ -12,31 +13,45 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select';
-import { PreviewTransaction, PreviewWarning, TransactionType } from '@/types/transaction';
+import { PreviewDuplicateReason, TransactionType } from '@/types/transaction';
+import type {
+  EditablePreviewTransaction,
+  EditablePreviewTransactionField,
+  EditablePreviewTransactionValue,
+} from '@/features/transactions/types/preview';
 import { cn } from '@/utils/cn';
 
 interface PreviewTableRowProps {
-  transaction: PreviewTransaction;
+  transaction: EditablePreviewTransaction;
   index: number;
-  warnings: PreviewWarning[];
-  onUpdate: (index: number, field: keyof PreviewTransaction, value: string | number) => void;
+  onUpdate: (
+    index: number,
+    field: EditablePreviewTransactionField,
+    value: EditablePreviewTransactionValue,
+  ) => void;
   onRemove: (index: number) => void;
+  hasDuplicateRows: boolean;
+}
+
+function getDuplicateStatusLabel(reason?: PreviewDuplicateReason | null): string {
+  if (reason === 'IN_BATCH') {
+    return 'Duplicate in file';
+  }
+
+  if (reason === 'EXISTING_TRANSACTION') {
+    return 'Already imported';
+  }
+
+  return 'Possible duplicate';
 }
 
 export const PreviewTableRow = memo(function PreviewTableRow({
   transaction,
   index,
-  warnings,
   onUpdate,
   onRemove,
+  hasDuplicateRows,
 }: PreviewTableRowProps) {
-  const getFieldWarning = useCallback(
-    (field: string): PreviewWarning | undefined => {
-      return warnings.find((w) => w.index === index && w.field === field);
-    },
-    [warnings, index],
-  );
-
   const handleDateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onUpdate(index, 'date', e.target.value);
@@ -77,12 +92,22 @@ export const PreviewTableRow = memo(function PreviewTableRow({
     onRemove(index);
   }, [index, onRemove]);
 
-  const dateWarning = getFieldWarning('date');
-  const descriptionWarning = getFieldWarning('description');
-  const amountWarning = getFieldWarning('amount');
+  const handleAllowDuplicateChange = useCallback(
+    (checked: boolean | 'indeterminate') => {
+      onUpdate(index, 'allowDuplicate', checked === true);
+    },
+    [index, onUpdate],
+  );
+
+  const importAnywayId = `preview-import-anyway-${index}`;
+  const duplicateStatusLabel = getDuplicateStatusLabel(transaction.duplicateReason);
 
   return (
-    <TableRow>
+    <TableRow
+      className={cn(
+        transaction.duplicate && 'border-l-4 border-l-warning bg-warning/10 hover:bg-warning/15',
+      )}
+    >
       {/* Date */}
       <TableCell className="w-[130px]">
         <div className="relative">
@@ -90,17 +115,8 @@ export const PreviewTableRow = memo(function PreviewTableRow({
             type="date"
             value={transaction.date}
             onChange={handleDateChange}
-            className={cn(
-              'w-full',
-              dateWarning && 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
-            )}
+            className="w-full"
           />
-          {dateWarning && (
-            <AlertTriangle
-              className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-yellow-500"
-              aria-label={dateWarning.message}
-            />
-          )}
         </div>
       </TableCell>
 
@@ -112,17 +128,8 @@ export const PreviewTableRow = memo(function PreviewTableRow({
             value={transaction.description}
             onChange={handleDescriptionChange}
             maxLength={500}
-            className={cn(
-              'w-full',
-              descriptionWarning && 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
-            )}
+            className="w-full"
           />
-          {descriptionWarning && (
-            <AlertTriangle
-              className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-yellow-500"
-              aria-label={descriptionWarning.message}
-            />
-          )}
         </div>
       </TableCell>
 
@@ -148,17 +155,8 @@ export const PreviewTableRow = memo(function PreviewTableRow({
             min="0"
             value={transaction.amount}
             onChange={handleAmountChange}
-            className={cn(
-              'w-full text-right',
-              amountWarning && 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
-            )}
+            className="w-full text-right"
           />
-          {amountWarning && (
-            <AlertTriangle
-              className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-yellow-500"
-              aria-label={amountWarning.message}
-            />
-          )}
         </div>
       </TableCell>
 
@@ -179,18 +177,40 @@ export const PreviewTableRow = memo(function PreviewTableRow({
         />
       </TableCell>
 
-      {/* Remove */}
-      <TableCell className="w-[60px]">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRemove}
-          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-500 dark:hover:bg-red-950 dark:hover:text-red-400"
-          title="Remove transaction"
-        >
-          <Trash2 className="h-4 w-4" />
-          <span className="sr-only">Remove</span>
-        </Button>
+      {/* Review actions */}
+      <TableCell className={cn(hasDuplicateRows ? 'w-[220px] min-w-[220px]' : 'w-[72px]')}>
+        <div className="flex items-center justify-end gap-3">
+          {transaction.duplicate && (
+            <div className="min-w-0 rounded-md bg-warning/15 px-2 py-1.5">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-warning">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                {duplicateStatusLabel}
+              </span>
+              <div className="mt-1 flex items-center gap-2">
+                <Checkbox
+                  id={importAnywayId}
+                  checked={transaction.allowDuplicate === true}
+                  onCheckedChange={handleAllowDuplicateChange}
+                />
+                <label
+                  htmlFor={importAnywayId}
+                  className="whitespace-nowrap text-xs font-medium text-muted-foreground"
+                >
+                  Import anyway
+                </label>
+              </div>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRemove}
+            className="h-8 w-8 shrink-0 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-500 dark:hover:bg-red-950 dark:hover:text-red-400"
+            aria-label="Remove transaction"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   );

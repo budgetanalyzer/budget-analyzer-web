@@ -2,27 +2,34 @@
 import { useCallback } from 'react';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { PreviewTableRow } from '@/features/transactions/components/PreviewTableRow';
-import { PreviewTransaction, PreviewWarning } from '@/types/transaction';
+import type {
+  EditablePreviewTransaction,
+  EditablePreviewTransactionField,
+  EditablePreviewTransactionValue,
+} from '@/features/transactions/types/preview';
+import { cn } from '@/utils/cn';
 
 interface PreviewTableProps {
-  transactions: PreviewTransaction[];
-  warnings: PreviewWarning[];
+  transactions: EditablePreviewTransaction[];
   onUpdateTransaction: (
     index: number,
-    field: keyof PreviewTransaction,
-    value: string | number,
+    field: EditablePreviewTransactionField,
+    value: EditablePreviewTransactionValue,
   ) => void;
   onRemoveTransaction: (index: number) => void;
 }
 
 export function PreviewTable({
   transactions,
-  warnings,
   onUpdateTransaction,
   onRemoveTransaction,
 }: PreviewTableProps) {
   const handleUpdate = useCallback(
-    (index: number, field: keyof PreviewTransaction, value: string | number) => {
+    (
+      index: number,
+      field: EditablePreviewTransactionField,
+      value: EditablePreviewTransactionValue,
+    ) => {
       onUpdateTransaction(index, field, value);
     },
     [onUpdateTransaction],
@@ -34,6 +41,7 @@ export function PreviewTable({
     },
     [onRemoveTransaction],
   );
+  const hasDuplicateRows = transactions.some((transaction) => transaction.duplicate);
 
   if (transactions.length === 0) {
     return (
@@ -44,7 +52,7 @@ export function PreviewTable({
   }
 
   return (
-    <Table>
+    <Table hideScrollbar={false}>
       <TableHeader>
         <TableRow>
           <TableHead className="w-[130px]">Date</TableHead>
@@ -53,7 +61,7 @@ export function PreviewTable({
           <TableHead className="w-[160px] text-right">Amount</TableHead>
           <TableHead className="w-[80px]">Currency</TableHead>
           <TableHead className="w-[150px]">Account ID</TableHead>
-          <TableHead className="w-[60px]"></TableHead>
+          <TableHead className={cn(hasDuplicateRows ? 'w-[220px]' : 'w-[72px]')}>Review</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -62,9 +70,9 @@ export function PreviewTable({
             key={index}
             transaction={transaction}
             index={index}
-            warnings={warnings}
             onUpdate={handleUpdate}
             onRemove={handleRemove}
+            hasDuplicateRows={hasDuplicateRows}
           />
         ))}
       </TableBody>

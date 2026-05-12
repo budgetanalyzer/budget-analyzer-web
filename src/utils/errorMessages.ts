@@ -12,6 +12,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   CSV_FORMAT_NOT_SUPPORTED: 'This CSV format is not supported',
   CSV_PARSING_ERROR: 'Unable to parse the CSV file',
   FORMAT_NOT_SUPPORTED: 'This statement format is not supported',
+  MISSING_ORIGINAL_FILENAME: 'The uploaded file must include a filename.',
+  BATCH_IMPORT_NO_TRANSACTIONS_CREATED: 'All submitted rows were skipped as duplicates.',
+  PREVIEW_IMPORT_TOKEN_INVALID:
+    'This preview has expired or is no longer valid. Please preview the file again.',
+  PREVIEW_IMPORT_TOKEN_EXPIRED: 'This preview has expired. Please preview the file again.',
   TRANSACTION_DATE_TOO_OLD: 'Transaction dates before the year 2000 are not supported',
   TRANSACTION_DATE_TOO_FAR_IN_FUTURE: 'Transaction dates in the future are not supported',
 

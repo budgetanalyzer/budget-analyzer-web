@@ -14,7 +14,11 @@ interface UseImportMessageHandlerParams {
 
 interface UseImportMessageHandlerReturn {
   importMessage: ImportMessage | null;
-  handleImportSuccess: (count: number) => void;
+  handleImportSuccess: (
+    created: number,
+    duplicatesSkipped: number,
+    duplicatesImported: number,
+  ) => void;
   handleImportError: (error: { message?: string }) => void;
   clearImportMessage: () => void;
 }
@@ -49,10 +53,12 @@ export function useImportMessageHandler({
   }, []);
 
   const handleImportSuccess = useCallback(
-    (count: number) => {
+    (created: number, duplicatesSkipped: number, duplicatesImported: number) => {
       // Build the success message
       const message = buildImportSuccessMessage({
-        count,
+        created,
+        duplicatesSkipped,
+        duplicatesImported,
         filtersActive: hasActiveFilters(),
       });
 
