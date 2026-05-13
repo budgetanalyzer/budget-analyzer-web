@@ -21,6 +21,21 @@ import react from '@vitejs/plugin-react';
  */
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          dates: ['date-fns'],
+          http: ['axios'],
+          motion: ['framer-motion'],
+          react: ['react', 'react-dom', 'react-router', 'react-router-dom'],
+          query: ['@tanstack/react-query'],
+          state: ['@reduxjs/toolkit', 'react-redux'],
+          table: ['@tanstack/react-table'],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': '/src',

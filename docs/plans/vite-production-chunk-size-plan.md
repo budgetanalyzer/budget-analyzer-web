@@ -196,6 +196,13 @@ page subtrees or fire their data hooks.
 For the admin area, keep `AdminRoute` and `AdminLayout` eager at first. The page
 behind each admin route can be lazy.
 
+Result recorded 2026-05-13:
+
+- Verified `src/App.tsx` keeps `AdminRoute`, `AdminLayout`, and
+  `<PermissionGuard>` eager/outside the lazy page subtrees.
+- Permission-gated admin pages still wrap `<LazyRoute>` inside the guard, so
+  denied users redirect before protected lazy pages mount or run data hooks.
+
 ### 4. Rebuild And Compare
 
 Run:
@@ -216,6 +223,25 @@ Expected result:
 If the warning remains on one async route chunk but the initial entry is much
 smaller, treat that as a separate measurement question. A large lazy admin chunk
 is less urgent than a large initial entry chunk.
+
+Result recorded 2026-05-13:
+
+| Measurement | Result |
+| --- | --- |
+| Build command | `npm run build` |
+| Build status | Passed |
+| Entry JS asset | `dist/assets/index-D7rpR8VD.js` |
+| Entry JS size reported by Vite | `767.57 kB` minified, `241.48 kB` gzip |
+| Entry JS size on disk | `760K` from `du -h`; `767569` bytes from `wc -c` |
+| Emitted JS chunks | `31` |
+| Largest async route chunk | `dist/assets/ViewPage-DervDk83.js` at `24.23 kB` reported by Vite (`32K` from `du -h`; `24225` bytes from `wc -c`) |
+| CSS asset | `dist/assets/index-CgdmO1Z4.css`, `38.15 kB` minified, `7.53 kB` gzip |
+| Vite chunk-size warning | Still present: the eager entry chunk exceeds `500 kB` |
+
+The expected route-level chunks are emitted for admin, analytics, views, and
+transaction detail pages. Because the remaining warning is on the eager entry
+chunk rather than a lazy route chunk, continue to step 5 before considering a
+warning-limit-only change.
 
 ### 5. Consider Manual Vendor Chunks Only If Needed
 
@@ -242,6 +268,39 @@ Do this only after route splitting and measurement. Manual chunks can improve
 browser caching, but they can also create extra requests and awkward shared
 chunks if chosen too early.
 
+Result recorded 2026-05-13:
+
+- Implemented manual vendor chunks in `vite.config.ts` for stable shared
+  dependencies that remained in the eager production entry:
+  - `react`: `react`, `react-dom`, `react-router`, `react-router-dom`
+  - `query`: `@tanstack/react-query`
+  - `table`: `@tanstack/react-table`
+  - `motion`: `framer-motion`
+  - `http`: `axios`
+  - `state`: `@reduxjs/toolkit`, `react-redux`
+  - `dates`: `date-fns`
+- Tested and rejected a broader `ui` chunk for Radix/lucide dependencies
+  because Rollup reported a circular chunk relationship with the React chunk.
+  Leaving UI/icon code in the entry avoids that extra chunk warning while still
+  keeping the entry below Vite's default threshold.
+- Verification: `npm run lint:fix` passed; `npm run build` passed;
+  `npx vitest --run` passed with `28` files and `135` tests.
+
+Final build result after manual vendor chunking:
+
+| Measurement | Result |
+| --- | --- |
+| Build command | `npm run build` |
+| Build status | Passed |
+| Entry JS asset | `dist/assets/index-BwIW4tCT.js` |
+| Entry JS size reported by Vite | `417.14 kB` minified, `127.75 kB` gzip |
+| Entry JS size on disk | `416K` from `du -h`; `417142` bytes from `wc -c` |
+| Emitted JS chunks | `38` |
+| Largest vendor chunk | `dist/assets/motion-B0XX4Nyr.js` at `115.29 kB` reported by Vite (`124K` from `du -h`; `115291` bytes from `wc -c`) |
+| Largest async route chunk | `dist/assets/ViewPage-B5Mp_USr.js` at `24.43 kB` reported by Vite (`32K` from `du -h`; `24432` bytes from `wc -c`) |
+| CSS asset | `dist/assets/index-CgdmO1Z4.css`, `38.15 kB` minified, `7.53 kB` gzip |
+| Vite chunk-size warning | Resolved; no emitted chunk exceeds the default `500 kB` warning threshold |
+
 ### 6. Avoid Warning-Only Fixes
 
 Do not start by setting:
@@ -255,6 +314,12 @@ build: {
 That is acceptable only if measurement shows the remaining large chunk is
 intentional and not user-impacting. It should be documented with the measured
 reason.
+
+Result recorded 2026-05-13:
+
+- No `chunkSizeWarningLimit` override was added.
+- The warning was resolved by route-level lazy loading plus measured vendor
+  chunking, so there is no warning-only exception to document.
 
 ## Test Plan
 
