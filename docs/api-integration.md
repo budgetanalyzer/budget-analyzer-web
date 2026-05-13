@@ -34,6 +34,8 @@ Statement imports use a two-step review flow:
 1. `POST /api/v1/transactions/preview?format=<format>&accountId=<optional-account-id>` uploads the statement file as multipart form data and returns editable preview rows.
 2. `POST /api/v1/transactions/batch` submits the reviewed rows as JSON with the same `previewImportToken`.
 
+The import format dropdown is populated from `GET /api/v1/statement-formats`. The UI shows enabled formats whose default currency is available, sorted by API-provided `displayName`, and submits the selected `formatKey` as the `format` query parameter.
+
 The preview response includes:
 
 - `previewImportToken` — opaque token required for the batch request. Treat it as client state only; do not parse it.

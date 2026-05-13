@@ -62,12 +62,12 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     return codes;
   }, [enabledCurrencies]);
 
-  // Filter to only enabled formats with enabled currencies
+  // Filter to only enabled formats with enabled currencies, then sort for display
   const enabledFormats = useMemo(() => {
     if (!Array.isArray(statementFormats)) return [];
-    return statementFormats.filter(
-      (f) => f.enabled && enabledCurrencyCodes.has(f.defaultCurrencyIsoCode),
-    );
+    return statementFormats
+      .filter((f) => f.enabled && enabledCurrencyCodes.has(f.defaultCurrencyIsoCode))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
   }, [statementFormats, enabledCurrencyCodes]);
 
   // Get display label for selected format
