@@ -1,11 +1,12 @@
 // src/utils/filterTransactions.ts
 import { Transaction } from '@/types/transaction';
 import { ViewCriteriaApi } from '@/types/view';
-import { isDateInRange } from '@/utils/dates';
+import { compareLocalDates } from '@/utils/dates';
+import { parseSearchTerms } from '@/utils/parseSearchTerms';
 
 /**
  * Filters transactions based on view criteria
- * Uses the same logic as TransactionsPage to ensure consistency
+ * Uses the saved-view API semantics so local view summaries match backend membership.
  */
 export function filterTransactionsByCriteria(
   transactions: Transaction[],
@@ -14,25 +15,26 @@ export function filterTransactionsByCriteria(
   let filtered = transactions;
 
   // Apply date filter
-  if (criteria.startDate && criteria.endDate) {
-    filtered = filtered.filter((transaction) =>
-      isDateInRange(transaction.date, criteria.startDate!, criteria.endDate!),
+  if (criteria.dateFrom) {
+    filtered = filtered.filter(
+      (transaction) => compareLocalDates(transaction.date, criteria.dateFrom!) >= 0,
     );
   }
 
-  // Apply text search filter (supports quoted phrases and OR matching)
+  if (criteria.dateTo) {
+    filtered = filtered.filter(
+      (transaction) => compareLocalDates(transaction.date, criteria.dateTo!) <= 0,
+    );
+  }
+
+  // Saved-view searchText matches transaction descriptions only.
   if (criteria.searchText) {
-    const searchTerms = criteria.searchText
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((term) => term.length > 0);
+    const searchTerms = parseSearchTerms(criteria.searchText);
 
     if (searchTerms.length > 0) {
       filtered = filtered.filter((transaction) => {
         const description = transaction.description.toLowerCase();
-        const bankName = transaction.bankName.toLowerCase();
-        // OR: match if ANY term matches
-        return searchTerms.some((term) => description.includes(term) || bankName.includes(term));
+        return searchTerms.some((term) => description.includes(term));
       });
     }
   }
@@ -54,6 +56,11 @@ export function filterTransactionsByCriteria(
     filtered = filtered.filter((transaction) =>
       criteria.accountIds!.includes(transaction.accountId),
     );
+  }
+
+  // Apply transaction type filter
+  if (criteria.type) {
+    filtered = filtered.filter((transaction) => transaction.type === criteria.type);
   }
 
   // Apply amount filter (min)

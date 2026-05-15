@@ -38,6 +38,9 @@ Update the nearest affected documentation in the same work:
 - `README.md` when setup, usage, or repository purpose changes
 - `docs/` when architecture, configuration, APIs, behaviors, or operating procedures change
 
+Plan files under `docs/plans/` are ephemeral working documents. Never link to
+plan files from non-plan documentation or other non-plan files.
+
 Do not leave documentation updates as follow-up work.
 
 ## Application Purpose

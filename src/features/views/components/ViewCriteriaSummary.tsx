@@ -2,7 +2,16 @@
 import { Badge } from '@/components/ui/Badge';
 import { ViewCriteriaApi } from '@/types/view';
 import { formatLocalDate } from '@/utils/dates';
-import { Calendar, Search, DollarSign, Building2, EyeOff, Landmark, Coins } from 'lucide-react';
+import {
+  Calendar,
+  Search,
+  DollarSign,
+  Building2,
+  EyeOff,
+  Landmark,
+  Coins,
+  ArrowDownUp,
+} from 'lucide-react';
 
 interface ViewCriteriaSummaryProps {
   criteria: ViewCriteriaApi;
@@ -18,9 +27,9 @@ export function ViewCriteriaSummary({
   const badges: { icon: typeof Calendar; label: string; variant?: 'default' | 'secondary' }[] = [];
 
   // Date range
-  if (criteria.startDate || criteria.endDate) {
-    const startFormatted = criteria.startDate ? formatLocalDate(criteria.startDate) : 'Any';
-    const endFormatted = criteria.endDate ? formatLocalDate(criteria.endDate) : 'Ongoing';
+  if (criteria.dateFrom || criteria.dateTo) {
+    const startFormatted = criteria.dateFrom ? formatLocalDate(criteria.dateFrom) : 'Any';
+    const endFormatted = criteria.dateTo ? formatLocalDate(criteria.dateTo) : 'Ongoing';
     badges.push({
       icon: Calendar,
       label: `${startFormatted} - ${endFormatted}`,
@@ -32,6 +41,14 @@ export function ViewCriteriaSummary({
     badges.push({
       icon: Search,
       label: `"${criteria.searchText}"`,
+    });
+  }
+
+  // Transaction type
+  if (criteria.type) {
+    badges.push({
+      icon: ArrowDownUp,
+      label: criteria.type === 'DEBIT' ? 'Debit' : 'Credit',
     });
   }
 

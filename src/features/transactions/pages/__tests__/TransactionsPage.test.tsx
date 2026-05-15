@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
@@ -25,8 +25,18 @@ vi.mock('@/hooks/useCurrencies', () => ({
 vi.mock('@/hooks/useMissingCurrencies', () => ({
   useMissingCurrencies: () => [],
 }));
+const transactionTableMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@/features/transactions/components/TransactionTable', () => ({
-  TransactionTable: () => <div data-testid="transaction-table-stub" />,
+  TransactionTable: (props: { viewCriteria?: unknown }) => {
+    transactionTableMock(props);
+    return (
+      <div
+        data-testid="transaction-table-stub"
+        data-criteria={JSON.stringify(props.viewCriteria)}
+      />
+    );
+  },
 }));
 vi.mock('@/features/transactions/components/ImportButton', () => ({
   ImportButton: () => <button type="button">Import Transactions</button>,
@@ -38,7 +48,7 @@ import uiReducer from '@/store/uiSlice';
 
 const mockUsePermission = vi.mocked(usePermission);
 
-function renderPage() {
+function renderPage(initialEntry = '/transactions') {
   const store = configureStore({ reducer: { ui: uiReducer } });
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -46,7 +56,7 @@ function renderPage() {
   return render(
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/transactions']}>
+        <MemoryRouter initialEntries={[initialEntry]}>
           <TransactionsPage />
         </MemoryRouter>
       </QueryClientProvider>
@@ -56,6 +66,7 @@ function renderPage() {
 
 beforeEach(() => {
   mockUsePermission.mockReset();
+  transactionTableMock.mockReset();
 });
 
 describe('TransactionsPage Import button gating', () => {
@@ -72,5 +83,26 @@ describe('TransactionsPage Import button gating', () => {
     renderPage();
 
     expect(screen.queryByRole('button', { name: /Import Transactions/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('TransactionsPage saved-view criteria', () => {
+  it('builds saved-view criteria with dateFrom, dateTo, and transaction type from active filters', async () => {
+    mockUsePermission.mockReturnValue(false);
+    renderPage('/transactions?dateFrom=2026-01-01&dateTo=2026-01-31&type=DEBIT&q=coffee');
+
+    const table = await screen.findByTestId('transaction-table-stub');
+
+    await waitFor(() => {
+      expect(table).toHaveAttribute(
+        'data-criteria',
+        JSON.stringify({
+          dateFrom: '2026-01-01',
+          dateTo: '2026-01-31',
+          searchText: 'coffee',
+          type: 'DEBIT',
+        }),
+      );
+    });
   });
 });

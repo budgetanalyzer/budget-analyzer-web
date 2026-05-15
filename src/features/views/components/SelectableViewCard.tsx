@@ -12,6 +12,7 @@ import {
   TrendingDown,
   Check,
   ArrowRight,
+  ArrowDownUp,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -135,17 +136,23 @@ export function SelectableViewCard({
         <CardContent className="space-y-3">
           {/* Criteria badges */}
           <div className="flex flex-wrap gap-1.5">
-            {(criteria.startDate || criteria.endDate) && (
+            {(criteria.dateFrom || criteria.dateTo) && (
               <Badge variant="secondary" className="gap-1 text-xs">
                 <Calendar className="h-3 w-3" />
-                {criteria.startDate ? formatLocalDate(criteria.startDate) : 'Any'} -{' '}
-                {criteria.endDate ? formatLocalDate(criteria.endDate) : 'Ongoing'}
+                {criteria.dateFrom ? formatLocalDate(criteria.dateFrom) : 'Any'} -{' '}
+                {criteria.dateTo ? formatLocalDate(criteria.dateTo) : 'Ongoing'}
               </Badge>
             )}
             {criteria.searchText && (
               <Badge variant="secondary" className="gap-1 text-xs">
                 <Search className="h-3 w-3" />
                 &ldquo;{criteria.searchText}&rdquo;
+              </Badge>
+            )}
+            {criteria.type && (
+              <Badge variant="secondary" className="gap-1 text-xs">
+                <ArrowDownUp className="h-3 w-3" />
+                {criteria.type === 'DEBIT' ? 'Debit' : 'Credit'}
               </Badge>
             )}
             {criteria.accountIds && criteria.accountIds.length > 0 && (

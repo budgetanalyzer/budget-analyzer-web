@@ -27,6 +27,12 @@ All endpoints accessed through the gateway:
 
 **API Documentation**: `https://app.budgetanalyzer.localhost/api/docs`
 
+## Saved Views
+
+Saved-view criteria mirror the user-facing transaction filters supported by the backend contract. The frontend sends date bounds as `dateFrom` and `dateTo`, preserves the selected transaction `type` (`DEBIT` or `CREDIT`), and does not send the retired `startDate` or `endDate` fields.
+
+`searchText` is a saved-view description filter. The Transactions and View table search boxes filter the already loaded rows locally with a case-insensitive substring match against transaction descriptions only; use the explicit bank filter when the saved view should persist a bank criterion.
+
 ## Transaction Import Review
 
 Statement imports use a two-step review flow:

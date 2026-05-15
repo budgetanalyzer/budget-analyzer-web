@@ -24,7 +24,7 @@ import {
 } from '@/features/transactions/components/statsConfig';
 import { useAppSelector } from '@/store/hooks';
 import { isDateInRange } from '@/utils/dates';
-import { parseSearchTerms } from '@/utils/parseSearchTerms';
+import { filterTransactionsByTableSearch } from '@/utils/transactionSearch';
 import { ViewCriteriaApi } from '@/types/view';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 
@@ -93,17 +93,9 @@ export function TransactionsPage() {
       );
     }
 
-    // Apply text search filter (supports quoted phrases and OR matching)
+    // Apply local text search against transaction descriptions.
     if (globalFilter) {
-      const searchTerms = parseSearchTerms(globalFilter);
-      if (searchTerms.length > 0) {
-        filtered = filtered.filter((transaction) => {
-          const description = transaction.description.toLowerCase();
-          const bankName = transaction.bankName.toLowerCase();
-          // OR: match if ANY term matches
-          return searchTerms.some((term) => description.includes(term) || bankName.includes(term));
-        });
-      }
+      filtered = filterTransactionsByTableSearch(filtered, globalFilter);
     }
 
     // Apply bank name filter
@@ -172,10 +164,10 @@ export function TransactionsPage() {
   const viewCriteria = useMemo((): ViewCriteriaApi => {
     const criteria: ViewCriteriaApi = {};
     if (dateFilter?.from) {
-      criteria.startDate = dateFilter.from;
+      criteria.dateFrom = dateFilter.from;
     }
     if (dateFilter?.to) {
-      criteria.endDate = dateFilter.to;
+      criteria.dateTo = dateFilter.to;
     }
     if (globalFilter) {
       criteria.searchText = globalFilter;
@@ -186,6 +178,9 @@ export function TransactionsPage() {
     if (accountIdFilter) {
       criteria.accountIds = [accountIdFilter];
     }
+    if (typeFilter) {
+      criteria.type = typeFilter;
+    }
     if (amountFilter.min !== null) {
       criteria.minAmount = amountFilter.min;
     }
@@ -193,7 +188,7 @@ export function TransactionsPage() {
       criteria.maxAmount = amountFilter.max;
     }
     return criteria;
-  }, [dateFilter, globalFilter, bankNameFilter, accountIdFilter, amountFilter]);
+  }, [dateFilter, globalFilter, bankNameFilter, accountIdFilter, typeFilter, amountFilter]);
 
   if (isLoading) {
     return (

@@ -27,12 +27,18 @@ import { StatCardConfig } from '@/features/transactions/components/TransactionSt
 import { fadeInVariants, layoutTransition } from '@/lib/animations';
 import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate, getDateRange } from '@/utils/dates';
+import { filterTransactionsByTableSearch } from '@/utils/transactionSearch';
 import { viewApi } from '@/api/viewApi';
 import { ViewMembershipResponse } from '@/types/view';
 import { ApiError } from '@/types/apiError';
 
 export function ViewPage() {
   const { id } = useParams<{ id: string }>();
+
+  return <ViewPageContent key={id} id={id!} />;
+}
+
+function ViewPageContent({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
 
@@ -40,6 +46,7 @@ export function ViewPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [viewSearchText, setViewSearchText] = useState('');
 
   const handleEditClick = useCallback(() => setIsEditModalOpen(true), []);
   const handleDeleteClick = useCallback(() => setIsDeleteModalOpen(true), []);
@@ -47,6 +54,7 @@ export function ViewPage() {
   const handleEditClose = useCallback(() => setIsEditModalOpen(false), []);
   const handleDeleteClose = useCallback(() => setIsDeleteModalOpen(false), []);
   const handleManageClose = useCallback(() => setIsManageModalOpen(false), []);
+  const handleViewSearchChange = useCallback((query: string) => setViewSearchText(query), []);
 
   const handleRefreshExchangeRates = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
@@ -59,22 +67,22 @@ export function ViewPage() {
     isLoading: isViewLoading,
     error: viewError,
     refetch: refetchView,
-  } = useView(id!);
+  } = useView(id);
 
   const {
     data: transactions,
     isLoading: isTransactionsLoading,
     error: transactionsError,
     refetch: refetchTransactions,
-  } = useViewTransactions(id!);
+  } = useViewTransactions(id);
 
   // Fetch all transactions (for manage modal)
   const { data: allTransactions } = useTransactions();
 
   // Fetch view membership (for manage modal)
   const { data: membership } = useQuery<ViewMembershipResponse, ApiError>({
-    queryKey: viewKeys.transactions(id!),
-    queryFn: () => viewApi.getViewTransactions(id!),
+    queryKey: viewKeys.transactions(id),
+    queryFn: () => viewApi.getViewTransactions(id),
     staleTime: 1000 * 60 * 5,
     retry: 1,
     enabled: !!id,
@@ -91,9 +99,14 @@ export function ViewPage() {
 
   const disabledCurrencies = useMissingCurrencies();
 
+  const filteredTransactions = useMemo(
+    () => filterTransactionsByTableSearch(transactions ?? [], viewSearchText),
+    [transactions, viewSearchText],
+  );
+
   // Calculate stats with proper currency conversion
   const { stats: transactionStats } = useTransactionStats({
-    transactions: transactions ?? [],
+    transactions: filteredTransactions,
     displayCurrency,
     exchangeRatesMap,
   });
@@ -101,10 +114,12 @@ export function ViewPage() {
   const stats = useMemo<StatCardConfig[]>(() => {
     if (!transactions || !view) return [];
 
-    const pinnedTransactions = transactions.filter((t) => t.membershipType === 'PINNED').length;
+    const pinnedTransactions = filteredTransactions.filter(
+      (t) => t.membershipType === 'PINNED',
+    ).length;
 
     // Calculate date range
-    const dateRange = getDateRange(transactions.map((t) => t.date));
+    const dateRange = getDateRange(filteredTransactions.map((t) => t.date));
     let dateRangeDescription = 'No transactions';
     if (dateRange) {
       if (dateRange.earliest === dateRange.latest) {
@@ -146,7 +161,7 @@ export function ViewPage() {
         valueClassName: 'text-green-600 dark:text-green-400',
       },
     ];
-  }, [transactions, view, displayCurrency, transactionStats]);
+  }, [transactions, view, filteredTransactions, displayCurrency, transactionStats]);
 
   const isLoading = isViewLoading || isTransactionsLoading;
   const error = viewError || transactionsError;
@@ -255,8 +270,10 @@ export function ViewPage() {
           <Card>
             <CardContent className="pt-6">
               <ViewTransactionTable
-                transactions={transactions}
-                viewId={id!}
+                transactions={filteredTransactions}
+                viewId={id}
+                searchText={viewSearchText}
+                onSearchChange={handleViewSearchChange}
                 displayCurrency={displayCurrency}
                 exchangeRatesMap={exchangeRatesMap}
                 isExchangeRatesLoading={isExchangeRatesLoading}

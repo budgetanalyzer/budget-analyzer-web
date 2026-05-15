@@ -1,17 +1,18 @@
 // src/types/view.ts
-import { Transaction } from '@/types/transaction';
+import type { Transaction, TransactionType } from '@/types/transaction';
 
 /**
  * Filter criteria for a saved view
  */
 export interface ViewCriteriaApi {
-  startDate?: string;
-  endDate?: string;
+  dateFrom?: string;
+  dateTo?: string;
   accountIds?: string[];
   bankNames?: string[];
   currencyIsoCodes?: string[];
   minAmount?: number;
   maxAmount?: number;
+  type?: TransactionType;
   searchText?: string;
 }
 
