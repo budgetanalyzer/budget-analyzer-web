@@ -1,19 +1,16 @@
-import { Transaction } from '@/types/transaction';
-import { parseSearchTerms } from '@/utils/parseSearchTerms';
+import type { Transaction } from '@/types/transaction';
 
-export function filterTransactionsByTableSearch<
-  T extends Pick<Transaction, 'description' | 'bankName'>,
->(transactions: T[], searchText: string): T[] {
-  const searchTerms = parseSearchTerms(searchText);
+export function filterTransactionsByTableSearch<T extends Pick<Transaction, 'description'>>(
+  transactions: T[],
+  searchText: string,
+): T[] {
+  const query = searchText.trim().toLowerCase();
 
-  if (searchTerms.length === 0) {
+  if (!query) {
     return transactions;
   }
 
-  return transactions.filter((transaction) => {
-    const description = transaction.description.toLowerCase();
-    const bankName = transaction.bankName.toLowerCase();
-
-    return searchTerms.some((term) => description.includes(term) || bankName.includes(term));
-  });
+  return transactions.filter((transaction) =>
+    transaction.description.toLowerCase().includes(query),
+  );
 }

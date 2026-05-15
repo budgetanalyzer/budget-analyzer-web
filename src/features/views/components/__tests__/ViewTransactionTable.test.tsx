@@ -92,7 +92,7 @@ describe('ViewTransactionTable search', () => {
     const onSearchChange = vi.fn();
     renderViewTransactionTable({ onSearchChange });
 
-    const searchInput = screen.getByPlaceholderText('"exact phrase" term1 term2 ↵');
+    const searchInput = screen.getByPlaceholderText('Search descriptions ↵');
     fireEvent.change(searchInput, { target: { value: 'coffee' } });
     fireEvent.keyDown(searchInput, { key: 'Enter' });
 
@@ -122,7 +122,7 @@ describe('ViewTransactionTable search', () => {
       onSearchChange,
     });
 
-    const searchInput = screen.getByPlaceholderText('"exact phrase" term1 term2 ↵');
+    const searchInput = screen.getByPlaceholderText('Search descriptions ↵');
     fireEvent.change(searchInput, { target: { value: 'unsubmitted draft' } });
 
     expect(searchInput).toHaveValue('unsubmitted draft');
@@ -143,6 +143,6 @@ describe('ViewTransactionTable search', () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByPlaceholderText('"exact phrase" term1 term2 ↵')).toHaveValue('');
+    expect(screen.getByPlaceholderText('Search descriptions ↵')).toHaveValue('');
   });
 });

@@ -22,28 +22,41 @@ const transactions = [
     description: 'Whole Foods Market',
     bankName: 'Beta Bank',
   },
+  {
+    id: 5,
+    description: 'Withdrawal from CAPITAL ONE',
+    bankName: 'National Checking',
+  },
+  {
+    id: 6,
+    description: 'Monthly utility bill',
+    bankName: 'Capital One',
+  },
+  {
+    id: 7,
+    description: 'Withdrawal fee',
+    bankName: 'Fee Bank',
+  },
 ];
 
 describe('filterTransactionsByTableSearch', () => {
-  it('matches bare terms against descriptions', () => {
+  it('matches text against descriptions', () => {
     expect(filterTransactionsByTableSearch(transactions, 'train')).toEqual([transactions[2]]);
   });
 
-  it('matches bare terms against bank names', () => {
-    expect(filterTransactionsByTableSearch(transactions, 'credit')).toEqual([transactions[1]]);
+  it('does not match bank names', () => {
+    expect(filterTransactionsByTableSearch(transactions, 'credit')).toEqual([]);
   });
 
-  it('matches quoted phrases', () => {
-    expect(filterTransactionsByTableSearch(transactions, '"whole foods"')).toEqual([
-      transactions[3],
+  it('matches the full search string instead of OR-ing individual words', () => {
+    expect(filterTransactionsByTableSearch(transactions, 'Withdrawal from CAPITAL ONE')).toEqual([
+      transactions[4],
     ]);
   });
 
-  it('ORs multiple terms together', () => {
-    expect(filterTransactionsByTableSearch(transactions, 'train coffee')).toEqual([
-      transactions[0],
-      transactions[1],
-      transactions[2],
+  it('is case insensitive', () => {
+    expect(filterTransactionsByTableSearch(transactions, 'withdrawal from capital one')).toEqual([
+      transactions[4],
     ]);
   });
 

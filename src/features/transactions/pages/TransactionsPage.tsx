@@ -93,7 +93,7 @@ export function TransactionsPage() {
       );
     }
 
-    // Apply text search filter (supports quoted phrases and OR matching)
+    // Apply local text search against transaction descriptions.
     if (globalFilter) {
       filtered = filterTransactionsByTableSearch(filtered, globalFilter);
     }
