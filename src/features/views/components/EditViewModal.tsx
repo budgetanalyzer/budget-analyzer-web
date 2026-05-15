@@ -70,13 +70,16 @@ export function EditViewModal({ open, onClose, view }: EditViewModalProps) {
   // Build criteria summary lines
   const criteria = view.criteria;
   const criteriaLines: string[] = [];
-  if (criteria.startDate || criteria.endDate) {
-    const start = criteria.startDate ? formatLocalDate(criteria.startDate) : 'Any';
-    const end = criteria.endDate ? formatLocalDate(criteria.endDate) : 'Ongoing';
-    criteriaLines.push(`Dates: ${start} - ${end}`);
+  if (criteria.dateFrom || criteria.dateTo) {
+    const start = criteria.dateFrom ? formatLocalDate(criteria.dateFrom) : 'Any';
+    const end = criteria.dateTo ? formatLocalDate(criteria.dateTo) : 'Ongoing';
+    criteriaLines.push(`Date range: ${start} - ${end}`);
   }
   if (criteria.searchText) {
     criteriaLines.push(`Search: "${criteria.searchText}"`);
+  }
+  if (criteria.type) {
+    criteriaLines.push(`Type: ${criteria.type === 'DEBIT' ? 'Debit' : 'Credit'}`);
   }
   if (criteria.minAmount !== undefined || criteria.maxAmount !== undefined) {
     const min = criteria.minAmount !== undefined ? `$${criteria.minAmount}` : '$0';

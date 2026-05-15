@@ -172,10 +172,10 @@ export function TransactionsPage() {
   const viewCriteria = useMemo((): ViewCriteriaApi => {
     const criteria: ViewCriteriaApi = {};
     if (dateFilter?.from) {
-      criteria.startDate = dateFilter.from;
+      criteria.dateFrom = dateFilter.from;
     }
     if (dateFilter?.to) {
-      criteria.endDate = dateFilter.to;
+      criteria.dateTo = dateFilter.to;
     }
     if (globalFilter) {
       criteria.searchText = globalFilter;
@@ -186,6 +186,9 @@ export function TransactionsPage() {
     if (accountIdFilter) {
       criteria.accountIds = [accountIdFilter];
     }
+    if (typeFilter) {
+      criteria.type = typeFilter;
+    }
     if (amountFilter.min !== null) {
       criteria.minAmount = amountFilter.min;
     }
@@ -193,7 +196,7 @@ export function TransactionsPage() {
       criteria.maxAmount = amountFilter.max;
     }
     return criteria;
-  }, [dateFilter, globalFilter, bankNameFilter, accountIdFilter, amountFilter]);
+  }, [dateFilter, globalFilter, bankNameFilter, accountIdFilter, typeFilter, amountFilter]);
 
   if (isLoading) {
     return (
