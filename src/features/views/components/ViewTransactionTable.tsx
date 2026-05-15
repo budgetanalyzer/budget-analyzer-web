@@ -60,7 +60,11 @@ interface ViewTransactionTableProps {
   isExchangeRatesLoading: boolean;
 }
 
-export function ViewTransactionTable({
+export function ViewTransactionTable({ viewId, ...props }: ViewTransactionTableProps) {
+  return <ViewTransactionTableContent key={viewId} viewId={viewId} {...props} />;
+}
+
+function ViewTransactionTableContent({
   transactions,
   viewId,
   searchText,

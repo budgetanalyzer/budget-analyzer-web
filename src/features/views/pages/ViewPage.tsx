@@ -34,6 +34,11 @@ import { ApiError } from '@/types/apiError';
 
 export function ViewPage() {
   const { id } = useParams<{ id: string }>();
+
+  return <ViewPageContent key={id} id={id!} />;
+}
+
+function ViewPageContent({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
 
@@ -62,22 +67,22 @@ export function ViewPage() {
     isLoading: isViewLoading,
     error: viewError,
     refetch: refetchView,
-  } = useView(id!);
+  } = useView(id);
 
   const {
     data: transactions,
     isLoading: isTransactionsLoading,
     error: transactionsError,
     refetch: refetchTransactions,
-  } = useViewTransactions(id!);
+  } = useViewTransactions(id);
 
   // Fetch all transactions (for manage modal)
   const { data: allTransactions } = useTransactions();
 
   // Fetch view membership (for manage modal)
   const { data: membership } = useQuery<ViewMembershipResponse, ApiError>({
-    queryKey: viewKeys.transactions(id!),
-    queryFn: () => viewApi.getViewTransactions(id!),
+    queryKey: viewKeys.transactions(id),
+    queryFn: () => viewApi.getViewTransactions(id),
     staleTime: 1000 * 60 * 5,
     retry: 1,
     enabled: !!id,
@@ -266,7 +271,7 @@ export function ViewPage() {
             <CardContent className="pt-6">
               <ViewTransactionTable
                 transactions={filteredTransactions}
-                viewId={id!}
+                viewId={id}
                 searchText={viewSearchText}
                 onSearchChange={handleViewSearchChange}
                 displayCurrency={displayCurrency}

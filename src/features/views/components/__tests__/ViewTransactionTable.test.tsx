@@ -55,10 +55,12 @@ const transactions: ViewTransaction[] = [
 
 function renderViewTransactionTable({
   rows = transactions,
+  viewId = 'view-1',
   searchText = '',
   onSearchChange = vi.fn(),
 }: {
   rows?: ViewTransaction[];
+  viewId?: string;
   searchText?: string;
   onSearchChange?: (query: string) => void;
 } = {}) {
@@ -66,12 +68,12 @@ function renderViewTransactionTable({
     defaultOptions: { queries: { retry: false } },
   });
 
-  render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/views/view-1']}>
+      <MemoryRouter initialEntries={[`/views/${viewId}`]}>
         <ViewTransactionTable
           transactions={rows}
-          viewId="view-1"
+          viewId={viewId}
           searchText={searchText}
           onSearchChange={onSearchChange}
           displayCurrency="USD"
@@ -82,7 +84,7 @@ function renderViewTransactionTable({
     </QueryClientProvider>,
   );
 
-  return { onSearchChange };
+  return { onSearchChange, queryClient, ...result };
 }
 
 describe('ViewTransactionTable search', () => {
@@ -111,5 +113,36 @@ describe('ViewTransactionTable search', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
 
     expect(onSearchChange).toHaveBeenCalledWith('');
+  });
+
+  it('resets the draft search input when the view changes', () => {
+    const onSearchChange = vi.fn();
+    const { queryClient, rerender } = renderViewTransactionTable({
+      searchText: 'coffee',
+      onSearchChange,
+    });
+
+    const searchInput = screen.getByPlaceholderText('"exact phrase" term1 term2 ↵');
+    fireEvent.change(searchInput, { target: { value: 'unsubmitted draft' } });
+
+    expect(searchInput).toHaveValue('unsubmitted draft');
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/views/view-2']}>
+          <ViewTransactionTable
+            transactions={transactions}
+            viewId="view-2"
+            searchText=""
+            onSearchChange={onSearchChange}
+            displayCurrency="USD"
+            exchangeRatesMap={new Map()}
+            isExchangeRatesLoading={false}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByPlaceholderText('"exact phrase" term1 term2 ↵')).toHaveValue('');
   });
 });
