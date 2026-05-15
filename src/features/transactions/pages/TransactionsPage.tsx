@@ -24,7 +24,7 @@ import {
 } from '@/features/transactions/components/statsConfig';
 import { useAppSelector } from '@/store/hooks';
 import { isDateInRange } from '@/utils/dates';
-import { parseSearchTerms } from '@/utils/parseSearchTerms';
+import { filterTransactionsByTableSearch } from '@/utils/transactionSearch';
 import { ViewCriteriaApi } from '@/types/view';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 
@@ -95,15 +95,7 @@ export function TransactionsPage() {
 
     // Apply text search filter (supports quoted phrases and OR matching)
     if (globalFilter) {
-      const searchTerms = parseSearchTerms(globalFilter);
-      if (searchTerms.length > 0) {
-        filtered = filtered.filter((transaction) => {
-          const description = transaction.description.toLowerCase();
-          const bankName = transaction.bankName.toLowerCase();
-          // OR: match if ANY term matches
-          return searchTerms.some((term) => description.includes(term) || bankName.includes(term));
-        });
-      }
+      filtered = filterTransactionsByTableSearch(filtered, globalFilter);
     }
 
     // Apply bank name filter

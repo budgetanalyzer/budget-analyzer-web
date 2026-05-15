@@ -65,8 +65,6 @@ Complete testing setup and best practices, including:
 - How do I test components with API calls?
 - What should I test vs. what should I skip?
 
----
-
 ## Quick Start
 
 ### For New Developers

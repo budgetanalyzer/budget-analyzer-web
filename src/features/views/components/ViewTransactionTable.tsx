@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import {
   DropdownMenu,
@@ -41,6 +42,8 @@ import {
   PinOff,
   EyeOff,
   MoreHorizontal,
+  Search,
+  X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { cn } from '@/utils/cn';
@@ -50,6 +53,8 @@ import { columnWidthClass } from '@/utils/columnWidth';
 interface ViewTransactionTableProps {
   transactions: ViewTransaction[];
   viewId: string;
+  searchText: string;
+  onSearchChange: (query: string) => void;
   displayCurrency: string;
   exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
   isExchangeRatesLoading: boolean;
@@ -58,6 +63,8 @@ interface ViewTransactionTableProps {
 export function ViewTransactionTable({
   transactions,
   viewId,
+  searchText,
+  onSearchChange,
   displayCurrency,
   exchangeRatesMap,
   isExchangeRatesLoading,
@@ -65,6 +72,7 @@ export function ViewTransactionTable({
   const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
   const [pageIndex, setPageIndex] = useState(0);
+  const [localSearchValue, setLocalSearchValue] = useState(searchText);
   const pageSize = 20;
 
   // Mutations for pin/unpin/exclude
@@ -73,6 +81,26 @@ export function ViewTransactionTable({
   const { mutate: excludeTransaction, isPending: isExcluding } = useExcludeTransaction();
 
   const isMutating = isPinning || isUnpinning || isExcluding;
+
+  const handleSearchSubmit = useCallback(() => {
+    onSearchChange(localSearchValue);
+    setPageIndex(0);
+  }, [localSearchValue, onSearchChange]);
+
+  const handleSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        handleSearchSubmit();
+      }
+    },
+    [handleSearchSubmit],
+  );
+
+  const handleClearSearch = useCallback(() => {
+    setLocalSearchValue('');
+    onSearchChange('');
+    setPageIndex(0);
+  }, [onSearchChange]);
 
   // Handle row click to navigate to transaction detail
   const handleRowClick = useCallback(
@@ -313,8 +341,35 @@ export function ViewTransactionTable({
     autoResetPageIndex: false,
   });
 
+  const emptyMessage = searchText
+    ? 'No transactions match this search.'
+    : 'No transactions in this view.';
+
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={`"exact phrase" term1 term2 ↵`}
+            value={localSearchValue}
+            onChange={(e) => setLocalSearchValue(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            className="pl-9 pr-9"
+          />
+          {localSearchValue && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Clear search</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -352,7 +407,7 @@ export function ViewTransactionTable({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No transactions in this view.
+                  {emptyMessage}
                 </TableCell>
               </TableRow>
             )}
