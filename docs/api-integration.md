@@ -38,6 +38,15 @@ membership: `dateFrom`, `dateTo`, and `q`. Date filters are applied before the
 local description search so the stats and table rows are derived from the same
 filtered transaction list.
 
+Analytics URLs carry an explicit source scope. Missing `scope` still means all
+transactions for backward compatibility, while scoped saved-view analytics use
+`scope=view&viewId=<id>`. Analytics drilldown links route to the operational
+surface for that source: all-transaction analytics link to
+`/?dateFrom=...&dateTo=...`, and saved-view analytics link to
+`/views/<id>?dateFrom=...&dateTo=...`. Both include `returnTo` and
+`breadcrumbLabel` so the filtered operational page can navigate back to the
+same analytics state.
+
 Saved views support bulk membership updates through `POST /api/v1/views/{id}/pin` and `POST /api/v1/views/{id}/exclude`. Both endpoints accept:
 
 ```json

@@ -21,10 +21,9 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { getCurrentYear } from '@/utils/dates';
 import {
   ANALYTICS_PARAMS,
-  VIEW_MODES,
-  TRANSACTION_TYPES,
   ViewMode,
   TransactionTypeParam,
+  parseAnalyticsSearchParams,
 } from '@/features/analytics/utils/urlState';
 
 export function AnalyticsPage() {
@@ -33,11 +32,9 @@ export function AnalyticsPage() {
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get view mode and transaction type from URL params with defaults
-  const viewMode = (searchParams.get(ANALYTICS_PARAMS.VIEW_MODE) as ViewMode) || VIEW_MODES.MONTHLY;
-  const transactionType =
-    (searchParams.get(ANALYTICS_PARAMS.TRANSACTION_TYPE) as TransactionTypeParam) ||
-    TRANSACTION_TYPES.DEBIT;
+  const analyticsUrlState = useMemo(() => parseAnalyticsSearchParams(searchParams), [searchParams]);
+
+  const { scope: analyticsScope, viewId, viewMode, transactionType } = analyticsUrlState;
 
   // Fetch exchange rates for currency conversion
   const {
@@ -58,7 +55,7 @@ export function AnalyticsPage() {
   // Get selected year from URL or default to current year (will be updated to latestYear with data)
   const currentYear = useMemo(() => getCurrentYear(), []);
   const yearParam = searchParams.get(ANALYTICS_PARAMS.YEAR);
-  const selectedYear = yearParam ? parseInt(yearParam, 10) : currentYear;
+  const selectedYear = analyticsUrlState.year ?? currentYear;
 
   // Process analytics data with memoization
   const { monthlySpending, yearlySpending, earliestYear, latestYear, yearsWithTransactions } =
@@ -78,7 +75,7 @@ export function AnalyticsPage() {
     }
 
     // If no year parameter, default to the latest year with actual transactions
-    if (!yearParam) {
+    if (!yearParam || analyticsUrlState.year === undefined) {
       const params = new URLSearchParams(searchParams);
       params.set(ANALYTICS_PARAMS.YEAR, latestYear.toString());
       setSearchParams(params, { replace: true });
@@ -111,6 +108,7 @@ export function AnalyticsPage() {
     currentYear,
     searchParams,
     setSearchParams,
+    analyticsUrlState.year,
   ]);
 
   // Handle year change
@@ -225,6 +223,8 @@ export function AnalyticsPage() {
               currency={displayCurrency}
               viewMode={viewMode}
               transactionType={transactionType}
+              analyticsScope={analyticsScope}
+              viewId={viewId}
             />
           ) : (
             <YearlySpendingGrid
@@ -232,6 +232,8 @@ export function AnalyticsPage() {
               currency={displayCurrency}
               viewMode={viewMode}
               transactionType={transactionType}
+              analyticsScope={analyticsScope}
+              viewId={viewId}
             />
           )}
         </motion.div>
