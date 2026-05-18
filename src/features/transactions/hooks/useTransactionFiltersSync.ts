@@ -1,49 +1,57 @@
 // src/features/transactions/hooks/useTransactionFiltersSync.ts
-import { useEffect, useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { useAppDispatch } from '@/store/hooks';
-import {
-  setTransactionTableDateFilter,
-  setTransactionTableGlobalFilter,
-  setTransactionTableBankNameFilter,
-  setTransactionTableAccountIdFilter,
-  setTransactionTableTypeFilter,
-  setTransactionTableAmountFilter,
-} from '@/store/uiSlice';
 import { TransactionType } from '@/types/transaction';
 
+interface TransactionFilters {
+  globalFilter: string;
+  dateFilter: {
+    from: string | null;
+    to: string | null;
+  };
+  bankNameFilter: string | null;
+  accountIdFilter: string | null;
+  typeFilter: TransactionType | null;
+  amountFilter: {
+    min: number | null;
+    max: number | null;
+  };
+}
+
+function parseAmount(value: string | null): number | null {
+  if (!value) return null;
+
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 /**
- * Custom hook to synchronize transaction filters between URL search params and Redux state
- * URL is the source of truth for filters (enables bookmarkability)
+ * Custom hook for reading and updating URL-backed transaction filters.
+ * The URL is the source of truth so filters stay refreshable and shareable.
  *
  * @returns Object with handlers for updating filters and checking active state
  */
 export function useTransactionFiltersSync() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const dispatch = useAppDispatch();
 
-  // Sync URL params to Redux on mount and when URL changes
-  // URL is the source of truth for filters (for bookmarkability)
-  useEffect(() => {
-    const dateFrom = searchParams.get('dateFrom');
-    const dateTo = searchParams.get('dateTo');
-    const searchQuery = searchParams.get('q');
-    const bankName = searchParams.get('bank');
-    const accountId = searchParams.get('account');
-    const type = searchParams.get('type') as TransactionType | null;
-    const minAmountStr = searchParams.get('minAmount');
-    const maxAmountStr = searchParams.get('maxAmount');
-    const minAmount = minAmountStr ? parseFloat(minAmountStr) : null;
-    const maxAmount = maxAmountStr ? parseFloat(maxAmountStr) : null;
+  const filters = useMemo<TransactionFilters>(() => {
+    const type = searchParams.get('type');
 
-    // Always sync URL to Redux, even if empty (to clear filters when URL is cleared)
-    dispatch(setTransactionTableDateFilter({ from: dateFrom, to: dateTo }));
-    dispatch(setTransactionTableGlobalFilter(searchQuery || ''));
-    dispatch(setTransactionTableBankNameFilter(bankName));
-    dispatch(setTransactionTableAccountIdFilter(accountId));
-    dispatch(setTransactionTableTypeFilter(type));
-    dispatch(setTransactionTableAmountFilter({ min: minAmount, max: maxAmount }));
-  }, [searchParams, dispatch]);
+    return {
+      globalFilter: searchParams.get('q') ?? '',
+      dateFilter: {
+        from: searchParams.get('dateFrom'),
+        to: searchParams.get('dateTo'),
+      },
+      bankNameFilter: searchParams.get('bankName') ?? searchParams.get('bank'),
+      accountIdFilter: searchParams.get('accountId') ?? searchParams.get('account'),
+      typeFilter: type === 'DEBIT' || type === 'CREDIT' ? type : null,
+      amountFilter: {
+        min: parseAmount(searchParams.get('minAmount')),
+        max: parseAmount(searchParams.get('maxAmount')),
+      },
+    };
+  }, [searchParams]);
 
   // Memoized callback for updating URL params when date filter changes
   const handleDateFilterChange = useCallback(
@@ -90,10 +98,11 @@ export function useTransactionFiltersSync() {
     (bankName: string | null) => {
       const params = new URLSearchParams(searchParams);
       if (bankName) {
-        params.set('bank', bankName);
+        params.set('bankName', bankName);
       } else {
-        params.delete('bank');
+        params.delete('bankName');
       }
+      params.delete('bank');
       setSearchParams(params, { replace: true });
     },
     [searchParams, setSearchParams],
@@ -104,10 +113,11 @@ export function useTransactionFiltersSync() {
     (accountId: string | null) => {
       const params = new URLSearchParams(searchParams);
       if (accountId) {
-        params.set('account', accountId);
+        params.set('accountId', accountId);
       } else {
-        params.delete('account');
+        params.delete('accountId');
       }
+      params.delete('account');
       setSearchParams(params, { replace: true });
     },
     [searchParams, setSearchParams],
@@ -152,7 +162,9 @@ export function useTransactionFiltersSync() {
       searchParams.get('dateFrom') ||
       searchParams.get('dateTo') ||
       searchParams.get('q') ||
+      searchParams.get('bankName') ||
       searchParams.get('bank') ||
+      searchParams.get('accountId') ||
       searchParams.get('account') ||
       searchParams.get('type') ||
       searchParams.get('minAmount') ||
@@ -166,7 +178,9 @@ export function useTransactionFiltersSync() {
     params.delete('dateFrom');
     params.delete('dateTo');
     params.delete('q');
+    params.delete('bankName');
     params.delete('bank');
+    params.delete('accountId');
     params.delete('account');
     params.delete('type');
     params.delete('minAmount');
@@ -177,6 +191,7 @@ export function useTransactionFiltersSync() {
   }, [searchParams, setSearchParams]);
 
   return {
+    filters,
     handleDateFilterChange,
     handleSearchChange,
     handleBankNameFilterChange,

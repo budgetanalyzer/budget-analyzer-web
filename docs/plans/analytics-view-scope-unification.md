@@ -198,6 +198,92 @@ Acceptance criteria:
 - Tests no longer assert aggregate stats behavior and cover the remaining view
   list interactions where needed.
 
+## Phase 3b: Minimize Redux UI State
+
+Files likely affected:
+
+- `src/store/uiSlice.ts`
+- `src/features/transactions/pages/TransactionsPage.tsx`
+- `src/features/transactions/components/TransactionTable.tsx`
+- `src/features/transactions/hooks/useTransactionFiltersSync.ts`
+- `src/components/CreateViewModal.tsx`
+- `src/components/Layout.tsx`
+- `src/components/BackButton.tsx`
+- `src/features/admin/components/AdminLayout.tsx`
+- transaction table, transactions page, layout, and store tests
+- `docs/state-architecture.md`
+- `docs/architecture.md`
+
+Target Redux shape:
+
+```ts
+{
+  theme,
+  displayCurrency,
+  adminSidebarOpen,
+}
+```
+
+`adminSidebarMobileOpen` may remain only if there is a concrete cross-component
+control need; otherwise move it into `AdminLayout` local state.
+
+Tasks:
+
+1. Remove unused transaction selection state:
+   - `selectedTransactionId`
+   - `setSelectedTransactionId`
+2. Remove navigation-history state from Redux:
+   - `hasNavigated`
+   - `setHasNavigated`
+3. Replace `hasNavigated` with a route-local or layout-local mechanism for
+   `BackButton`, or simplify `BackButton` to use URL `returnTo` / browser
+   history behavior where available.
+4. Remove `transactionTable` from Redux.
+5. Make URL parameters the source of truth for shareable transaction filters:
+   - `q`
+   - `dateFrom`
+   - `dateTo`
+   - `bankName`
+   - `accountId`
+   - `type`
+   - `minAmount`
+   - `maxAmount`
+6. Keep table-only state local to `TransactionTable`:
+   - sorting
+   - pagination
+   - transient search input text before it is committed to the URL
+7. Delete `useTransactionFiltersSync` if its only remaining purpose is mirroring
+   URL parameters into Redux.
+8. Update `CreateViewModal` so clearing filters updates the URL/source state
+   directly instead of dispatching Redux table-filter actions.
+9. Move `adminSidebarMobileOpen` into `AdminLayout` local state unless another
+   component needs to open/close it.
+10. Keep Redux for true global preferences only:
+    - `theme`
+    - `displayCurrency`
+    - persisted desktop `adminSidebarOpen`
+11. Remove dead actions, selectors, tests, and imports after the state shape is
+    reduced.
+12. Update state architecture docs to describe:
+    - React Query for server state
+    - URL params for shareable route state
+    - local component state for table mechanics
+    - Redux only for global user/layout preferences
+
+Acceptance criteria:
+
+- Redux no longer stores transaction table filters, sorting, pagination, route
+  history, or selected transaction IDs.
+- Transaction filter URLs remain refreshable and shareable.
+- Clearing transaction filters still clears the URL-backed filters.
+- Transaction table sorting and pagination still work within the active page
+  session.
+- `BackButton` behavior is preserved or deliberately simplified and covered by
+  tests.
+- `adminSidebarOpen` remains persisted for desktop admin layout.
+- No new Redux state is introduced for analytics source or view selection.
+- State architecture documentation reflects the minimized Redux scope.
+
 ## Phase 4: URL-Backed Date Filtering On View Detail
 
 Implemented in the view-detail table. The remaining analytics work can assume
@@ -262,6 +348,7 @@ Tasks:
    - view-scoped analytics data resolution
    - view detail date URL sync
    - removal of aggregate view stats UI and selected-view state
+   - minimized Redux state shape
 2. Add integration-style component tests for:
    - analytics month click in all scope
    - analytics month click in view scope
@@ -295,17 +382,22 @@ Recommended order:
    resolution.
 4. Phase 5: View-to-analytics links.
 5. Phase 3: remove aggregate view stats UI/code.
-6. Phase 6: final documentation, full tests, and build.
+6. Phase 3b: minimize Redux UI state.
+7. Phase 6: final documentation, full tests, and build.
 
 This order keeps each pull of behavior verifiable: first URLs, then view landing
 behavior, then analytics source selection, then entry points, then removal of
-the obsolete stats surface.
+the obsolete stats surface, then state cleanup once the URL-backed behavior is
+settled.
 
 ## Risks And Decisions To Confirm
 
 - Removing aggregate stats means the Views page no longer tries to summarize
   selected-view transaction totals. Use Analytics scoped to a single view for
   transaction analysis instead of reintroducing a parallel stats surface.
+- Removing `transactionTable` from Redux must not break the transaction URL
+  contract. Treat URL params as canonical for filters and local state as
+  canonical only for non-shareable table mechanics.
 - `ViewTransactionTable` currently owns local pagination, sorting, and search
   input state. Adding URL-backed date filters should not globalize this state.
 - Analytics cards should not contain route branching directly. Keep destination

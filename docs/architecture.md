@@ -5,9 +5,14 @@
 | Layer | Tool | Purpose |
 |-------|------|---------|
 | Server state | TanStack Query (React Query) | API data, caching, loading/error states |
-| Client state | Redux Toolkit | Theme, UI preferences |
+| Route state | URL search params | Shareable filters, analytics source, drilldown return context |
+| Client state | Redux Toolkit | Global preferences: theme, display currency, desktop admin sidebar |
+| Local state | React component state | Table mechanics, draft inputs, modals, mobile overlays |
 
 This separation keeps server concerns (caching, refetching, optimistic updates) out of the global store.
+Redux intentionally does not store transaction filters, table sorting,
+pagination, selected transaction IDs, navigation history, analytics source, or
+saved-view selection.
 
 ## Component Strategy
 
@@ -27,6 +32,11 @@ Transactions, saved views, and analytics are separate task surfaces:
 | Views (`/views`) | Saved-view directory and entry point to view detail or view-scoped analytics |
 | View detail (`/views/:id`) | Saved-view membership management, including pinned and excluded rows |
 | Analytics (`/analytics`) | Spending analysis for either all transactions or one saved view |
+
+Transaction filters are URL-backed so filtered lists remain refreshable and
+shareable. The supported filter params are `q`, `dateFrom`, `dateTo`,
+`bankName`, `accountId`, `type`, `minAmount`, and `maxAmount`. Table sorting,
+pagination, row selection, and draft filter input text are local table state.
 
 Analytics source selection is explicit in the URL. Missing `scope` defaults to
 all transactions; `scope=view&viewId=<id>` analyzes canonical saved-view

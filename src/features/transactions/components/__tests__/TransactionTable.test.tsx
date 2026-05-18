@@ -81,6 +81,12 @@ function renderTable() {
         <MemoryRouter initialEntries={['/transactions']}>
           <TransactionTable
             transactions={transactions}
+            globalFilter=""
+            dateFilter={{ from: null, to: null }}
+            bankNameFilter={null}
+            accountIdFilter={null}
+            typeFilter={null}
+            amountFilter={{ min: null, max: null }}
             displayCurrency="USD"
             exchangeRatesMap={new Map()}
             isExchangeRatesLoading={false}

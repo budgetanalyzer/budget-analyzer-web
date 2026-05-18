@@ -8,6 +8,7 @@ import {
   ColumnDef,
   flexRender,
   RowSelectionState,
+  SortingState,
 } from '@tanstack/react-table';
 import { Transaction, TransactionType } from '@/types/transaction';
 import { ExchangeRateResponse } from '@/types/currency';
@@ -40,17 +41,6 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import {
-  setTransactionTableSorting,
-  setTransactionTablePageIndex,
-  setTransactionTableGlobalFilter,
-  setTransactionTableDateFilter,
-  setTransactionTableBankNameFilter,
-  setTransactionTableAccountIdFilter,
-  setTransactionTableTypeFilter,
-  setTransactionTableAmountFilter,
-} from '@/store/uiSlice';
 import {
   Select,
   SelectContent,
@@ -65,8 +55,27 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { columnWidthClass } from '@/utils/columnWidth';
 
+function parseAmountInput(value: string): number | null {
+  if (!value) return null;
+
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 interface TransactionTableProps {
   transactions: Transaction[];
+  globalFilter: string;
+  dateFilter: {
+    from: string | null;
+    to: string | null;
+  };
+  bankNameFilter: string | null;
+  accountIdFilter: string | null;
+  typeFilter: TransactionType | null;
+  amountFilter: {
+    min: number | null;
+    max: number | null;
+  };
   onDateFilterChange?: (from: string | null, to: string | null) => void;
   onSearchChange?: (query: string) => void;
   onBankNameFilterChange?: (bankName: string | null) => void;
@@ -84,6 +93,12 @@ interface TransactionTableProps {
 
 export function TransactionTable({
   transactions,
+  globalFilter,
+  dateFilter,
+  bankNameFilter,
+  accountIdFilter,
+  typeFilter,
+  amountFilter,
   onDateFilterChange,
   onSearchChange,
   onBankNameFilterChange,
@@ -98,17 +113,8 @@ export function TransactionTable({
   availableAccountIds,
   viewCriteria,
 }: TransactionTableProps) {
-  const dispatch = useAppDispatch();
-  const sorting = useAppSelector((state) => state.ui.transactionTable.sorting);
-  const pageIndex = useAppSelector((state) => state.ui.transactionTable.pageIndex);
-  const pageSize = useAppSelector((state) => state.ui.transactionTable.pageSize);
-  const globalFilter = useAppSelector((state) => state.ui.transactionTable.globalFilter);
-  const dateFilter = useAppSelector((state) => state.ui.transactionTable.dateFilter);
-  const bankNameFilter = useAppSelector((state) => state.ui.transactionTable.bankNameFilter);
-  const accountIdFilter = useAppSelector((state) => state.ui.transactionTable.accountIdFilter);
-  const typeFilter = useAppSelector((state) => state.ui.transactionTable.typeFilter);
-  const amountFilter = useAppSelector((state) => state.ui.transactionTable.amountFilter);
-
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [localSearchValue, setLocalSearchValue] = useState(globalFilter ?? '');
@@ -126,11 +132,19 @@ export function TransactionTable({
   const debouncedMinAmount = useDebounce(localMinAmount, 400);
   const debouncedMaxAmount = useDebounce(localMaxAmount, 400);
 
+  useEffect(() => {
+    setLocalSearchValue(globalFilter ?? '');
+  }, [globalFilter]);
+
+  useEffect(() => {
+    setLocalMinAmount(amountFilter.min?.toString() ?? '');
+    setLocalMaxAmount(amountFilter.max?.toString() ?? '');
+  }, [amountFilter.min, amountFilter.max]);
+
   // Submit search on Enter key press
   const handleSearchSubmit = useCallback(() => {
-    dispatch(setTransactionTableGlobalFilter(localSearchValue));
     onSearchChange?.(localSearchValue);
-  }, [localSearchValue, dispatch, onSearchChange]);
+  }, [localSearchValue, onSearchChange]);
 
   // Handle search input keydown - submit on Enter
   const handleSearchKeyDown = useCallback(
@@ -145,17 +159,27 @@ export function TransactionTable({
   // Handle clearing search - submit immediately
   const handleClearSearch = useCallback(() => {
     setLocalSearchValue('');
-    dispatch(setTransactionTableGlobalFilter(''));
     onSearchChange?.('');
-  }, [dispatch, onSearchChange]);
+  }, [onSearchChange]);
 
-  // Update Redux and URL when debounced amount values change
+  // Commit debounced draft amount values to the URL-backed filter state.
   useEffect(() => {
-    const min = debouncedMinAmount ? parseFloat(debouncedMinAmount) : null;
-    const max = debouncedMaxAmount ? parseFloat(debouncedMaxAmount) : null;
-    dispatch(setTransactionTableAmountFilter({ min, max }));
+    if (debouncedMinAmount !== localMinAmount || debouncedMaxAmount !== localMaxAmount) return;
+
+    const min = parseAmountInput(debouncedMinAmount);
+    const max = parseAmountInput(debouncedMaxAmount);
+    if (min === amountFilter.min && max === amountFilter.max) return;
+
     onAmountFilterChange?.(min, max);
-  }, [debouncedMinAmount, debouncedMaxAmount, dispatch, onAmountFilterChange]);
+  }, [
+    amountFilter.min,
+    amountFilter.max,
+    debouncedMinAmount,
+    debouncedMaxAmount,
+    localMinAmount,
+    localMaxAmount,
+    onAmountFilterChange,
+  ]);
 
   // Handle save from row component
   const handleSaveTransaction = useCallback(
@@ -331,10 +355,7 @@ export function TransactionTable({
     columns,
     state: {
       sorting,
-      pagination: {
-        pageIndex,
-        pageSize,
-      },
+      pagination,
       rowSelection,
     },
     enableRowSelection: canBulkDelete,
@@ -349,32 +370,18 @@ export function TransactionTable({
     getRowId: (row) => row.id.toString(),
     onSortingChange: (updater) => {
       const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
-      dispatch(setTransactionTableSorting(newSorting));
+      setSorting(newSorting);
     },
     onPaginationChange: (updater) => {
-      const currentPagination = { pageIndex, pageSize };
-      const newPagination = typeof updater === 'function' ? updater(currentPagination) : updater;
-      dispatch(setTransactionTablePageIndex(newPagination.pageIndex));
+      const newPagination = typeof updater === 'function' ? updater(pagination) : updater;
+      setPagination(newPagination);
     },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     manualPagination: false,
-    autoResetPageIndex: false,
+    autoResetPageIndex: true,
   });
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    dispatch(setTransactionTablePageIndex(0));
-  }, [
-    globalFilter,
-    dateFilter,
-    bankNameFilter,
-    accountIdFilter,
-    typeFilter,
-    amountFilter,
-    dispatch,
-  ]);
 
   const hasActiveFilters =
     dateFilter?.from ||
@@ -388,41 +395,35 @@ export function TransactionTable({
 
   const handleDateChange = useCallback(
     (from: string | null, to: string | null) => {
-      // Update Redux for internal state
-      dispatch(setTransactionTableDateFilter({ from, to }));
-      // Update URL for bookmarkability (if callback provided)
       if (onDateFilterChange) {
         onDateFilterChange(from, to);
       }
     },
-    [dispatch, onDateFilterChange],
+    [onDateFilterChange],
   );
 
   const handleBankNameChange = useCallback(
     (bankName: string) => {
       const value = bankName === 'all' ? null : bankName;
-      dispatch(setTransactionTableBankNameFilter(value));
       onBankNameFilterChange?.(value);
     },
-    [dispatch, onBankNameFilterChange],
+    [onBankNameFilterChange],
   );
 
   const handleAccountIdChange = useCallback(
     (accountId: string) => {
       const value = accountId === 'all' ? null : accountId;
-      dispatch(setTransactionTableAccountIdFilter(value));
       onAccountIdFilterChange?.(value);
     },
-    [dispatch, onAccountIdFilterChange],
+    [onAccountIdFilterChange],
   );
 
   const handleTypeChange = useCallback(
     (type: string) => {
       const value = type === 'all' ? null : (type as TransactionType);
-      dispatch(setTransactionTableTypeFilter(value));
       onTypeFilterChange?.(value);
     },
-    [dispatch, onTypeFilterChange],
+    [onTypeFilterChange],
   );
 
   const handleClearFilters = useCallback(() => {
@@ -431,17 +432,8 @@ export function TransactionTable({
     setLocalMinAmount('');
     setLocalMaxAmount('');
 
-    // Clear Redux state
-    dispatch(setTransactionTableGlobalFilter(''));
-    dispatch(setTransactionTableDateFilter({ from: null, to: null }));
-    dispatch(setTransactionTableBankNameFilter(null));
-    dispatch(setTransactionTableAccountIdFilter(null));
-    dispatch(setTransactionTableTypeFilter(null));
-    dispatch(setTransactionTableAmountFilter({ min: null, max: null }));
-
-    // Clear all URL params at once (avoids race conditions)
     onClearAllFilters?.();
-  }, [dispatch, onClearAllFilters]);
+  }, [onClearAllFilters]);
 
   return (
     <div className="space-y-4">
@@ -547,11 +539,12 @@ export function TransactionTable({
       {/* Select all matching banner */}
       {canBulkDelete &&
         table.getIsAllPageRowsSelected() &&
-        transactions.length > pageSize &&
+        transactions.length > pagination.pageSize &&
         !selectAllMatching && (
           <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
             <span>
-              All {Math.min(pageSize, transactions.length)} transactions on this page are selected.
+              All {Math.min(pagination.pageSize, transactions.length)} transactions on this page are
+              selected.
             </span>
             <button
               onClick={handleSelectAllMatching}

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router';
 import {
   DollarSign,
@@ -17,11 +17,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import {
-  toggleAdminSidebar,
-  toggleAdminSidebarMobile,
-  setAdminSidebarMobileOpen,
-} from '@/store/uiSlice';
+import { toggleAdminSidebar } from '@/store/uiSlice';
 import { cn } from '@/utils/cn';
 
 interface NavItem {
@@ -36,7 +32,7 @@ export function AdminLayout() {
   const { user, logout } = useAuth();
   const dispatch = useAppDispatch();
   const sidebarOpen = useAppSelector((s) => s.ui.adminSidebarOpen);
-  const mobileOpen = useAppSelector((s) => s.ui.adminSidebarMobileOpen);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const canReadCurrencies = usePermission('currencies:read');
   const canReadFormats = usePermission('statementformats:read');
@@ -91,21 +87,21 @@ export function AdminLayout() {
   useEffect(() => {
     const mql = window.matchMedia('(min-width: 768px)');
     const handler = (e: MediaQueryListEvent) => {
-      if (e.matches) dispatch(setAdminSidebarMobileOpen(false));
+      if (e.matches) setMobileOpen(false);
     };
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
-  }, [dispatch]);
+  }, []);
 
   // Escape closes mobile overlay
   useEffect(() => {
     if (!mobileOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dispatch(setAdminSidebarMobileOpen(false));
+      if (e.key === 'Escape') setMobileOpen(false);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [mobileOpen, dispatch]);
+  }, [mobileOpen]);
 
   // Body scroll lock while mobile overlay is open
   useEffect(() => {
@@ -117,13 +113,13 @@ export function AdminLayout() {
     }
   }, [mobileOpen]);
 
-  const handleToggle = () => {
+  const handleToggle = useCallback(() => {
     if (window.matchMedia('(min-width: 768px)').matches) {
       dispatch(toggleAdminSidebar());
     } else {
-      dispatch(toggleAdminSidebarMobile());
+      setMobileOpen((open) => !open);
     }
-  };
+  }, [dispatch]);
 
   const fallback = user?.name
     ? user.name
@@ -306,7 +302,7 @@ export function AdminLayout() {
           'transition-opacity duration-300 motion-reduce:transition-none',
           mobileOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
-        onClick={() => dispatch(setAdminSidebarMobileOpen(false))}
+        onClick={() => setMobileOpen(false)}
         aria-hidden="true"
       />
 
@@ -316,7 +312,7 @@ export function AdminLayout() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => dispatch(toggleAdminSidebarMobile())}
+          onClick={() => setMobileOpen((open) => !open)}
           aria-label="Open admin menu"
           aria-controls="admin-sidebar"
           aria-expanded={mobileOpen}

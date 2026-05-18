@@ -89,7 +89,9 @@ describe('TransactionsPage Import button gating', () => {
 describe('TransactionsPage saved-view criteria', () => {
   it('builds saved-view criteria with dateFrom, dateTo, and transaction type from active filters', async () => {
     mockUsePermission.mockReturnValue(false);
-    renderPage('/transactions?dateFrom=2026-01-01&dateTo=2026-01-31&type=DEBIT&q=coffee');
+    renderPage(
+      '/transactions?dateFrom=2026-01-01&dateTo=2026-01-31&type=DEBIT&q=coffee&bankName=Test%20Bank&accountId=checking&minAmount=10&maxAmount=250',
+    );
 
     const table = await screen.findByTestId('transaction-table-stub');
 
@@ -100,7 +102,11 @@ describe('TransactionsPage saved-view criteria', () => {
           dateFrom: '2026-01-01',
           dateTo: '2026-01-31',
           searchText: 'coffee',
+          bankNames: ['Test Bank'],
+          accountIds: ['checking'],
           type: 'DEBIT',
+          minAmount: 10,
+          maxAmount: 250,
         }),
       );
     });
