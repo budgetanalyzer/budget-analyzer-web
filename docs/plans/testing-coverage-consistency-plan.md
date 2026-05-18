@@ -2,21 +2,25 @@
 
 ## Context
 
-This repo currently has two test placement styles:
+Phase 1 and Phase 2 are complete. Shared test infrastructure now lives under
+`src/testing/`, production-code tests are colocated under `__tests__`
+directories, and the old `src/test/` directory has been removed.
 
-- `src/test/` contains global setup plus three production-code tests:
+At plan creation, this repo had two test placement styles:
+
+- `src/test/` contained global setup plus three production-code tests:
   - `setup.ts`
   - `Button.test.tsx`
   - `parseSearchTerms.test.ts`
   - `useTransactions.test.tsx`
 - Most of the suite uses colocated `__tests__` directories next to the code under test.
 
-That split looks historical rather than intentional. `src/test/setup.ts` is legitimate shared test infrastructure because `vitest.config.ts` points to it. The other files in `src/test` look like early examples that predate the current feature-colocated convention. The current `docs/testing-guide.md` still reinforces that older structure and uses `Button.test.tsx` as a primary example, which is now misleading.
+That split looked historical rather than intentional. `src/test/setup.ts` was legitimate shared test infrastructure because `vitest.config.ts` pointed to it. The other files in `src/test` looked like early examples that predated the current feature-colocated convention. The old `docs/testing-guide.md` reinforced that older structure and used `Button.test.tsx` as a primary example, which was misleading.
 
-Current suite snapshot:
+Current suite snapshot after Phase 2:
 
-- 39 test files.
-- 187 tests.
+- 38 test files.
+- 182 tests.
 - `npm test -- --run` passes.
 - No skipped or focused tests were found.
 - `npm test -- --run --coverage` fails because `@vitest/coverage-v8` is not installed.
@@ -96,7 +100,7 @@ The `src/test/Button.test.tsx` file is the clearest example of low-signal covera
    - optional Redux preloaded state or a test-store factory
 7. Update docs and agent guidance references from `src/test` to `src/testing`.
 
-### Phase 2: Move or Remove Stray Tests
+### Phase 2: Move or Remove Stray Tests (Complete)
 
 1. Move `src/test/parseSearchTerms.test.ts` to `src/utils/__tests__/parseSearchTerms.test.ts`.
 2. Move `src/test/useTransactions.test.tsx` to `src/hooks/__tests__/useTransactions.test.tsx`.

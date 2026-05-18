@@ -1,29 +1,21 @@
-// src/test/useTransactions.test.tsx
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useTransactions } from '@/hooks/useTransactions';
-import { ReactNode } from 'react';
+import { createTestQueryClient } from '@/testing/test-utils';
+import { QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 
 describe('useTransactions', () => {
-  let queryClient: QueryClient;
+  function createWrapper() {
+    const queryClient = createTestQueryClient();
 
-  beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-  });
-
-  const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
+    return function Wrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    };
+  }
 
   it('fetches transactions successfully with mock data', async () => {
-    const { result } = renderHook(() => useTransactions(), { wrapper });
+    const { result } = renderHook(() => useTransactions(), { wrapper: createWrapper() });
 
     expect(result.current.isLoading).toBe(true);
 
@@ -35,7 +27,7 @@ describe('useTransactions', () => {
   });
 
   it('returns transaction data with correct structure', async () => {
-    const { result } = renderHook(() => useTransactions(), { wrapper });
+    const { result } = renderHook(() => useTransactions(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
@@ -50,7 +42,7 @@ describe('useTransactions', () => {
   });
 
   it('handles refetch correctly', async () => {
-    const { result } = renderHook(() => useTransactions(), { wrapper });
+    const { result } = renderHook(() => useTransactions(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 

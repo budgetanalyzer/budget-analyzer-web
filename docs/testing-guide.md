@@ -33,9 +33,6 @@ npx vitest src/utils/__tests__/parseSearchTerms.test.ts
 
 # Run tests matching a pattern
 npx vitest --grep "renders correctly"
-
-# Run with coverage
-npm test -- --coverage
 ```
 
 ---
@@ -85,6 +82,24 @@ afterAll(() => server.close());
 - Starts MSW server before any tests run
 - Resets MSW handlers between tests (prevents test pollution)
 - Closes MSW server after all tests complete
+
+---
+
+## Test Placement
+
+Production-code tests live beside the code they verify in `__tests__`
+directories. Shared test infrastructure lives under `src/testing/`.
+
+Use this split consistently:
+
+- `src/utils/parseSearchTerms.ts` -> `src/utils/__tests__/parseSearchTerms.test.ts`
+- `src/hooks/useTransactions.ts` -> `src/hooks/__tests__/useTransactions.test.tsx`
+- `src/testing/setup.ts` for global Vitest setup
+- `src/testing/mocks/` for MSW handlers and server setup
+- `src/testing/test-utils.tsx` for shared provider helpers
+
+Do not add production-code tests under `src/testing/`. The old `src/test/`
+directory is no longer used.
 
 ---
 
@@ -145,18 +160,17 @@ import { handlers } from './handlers';
 export const server = setupServer(...handlers);
 ```
 
-### Why MSW Fixed Your Tests
+### Why Use MSW
 
-**Before MSW:**
-- Tests made real API calls → failed with network errors
+**Without MSW:**
+- Tests can make real API calls and fail with network errors
 - No backend running in test environment
 - Unreliable, slow tests
 
-**After MSW:**
+**With MSW:**
 - API calls intercepted and mocked
 - Fast, reliable responses
 - No network dependency
-- Tests pass! ✅
 
 ---
 
@@ -202,33 +216,24 @@ describe('BackButton', () => {
 
 ```typescript
 // src/hooks/__tests__/useTransactions.test.tsx
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useTransactions } from '@/hooks/useTransactions';
-import { ReactNode } from 'react';
+import { createTestQueryClient } from '@/testing/test-utils';
+import type { ReactNode } from 'react';
 
 describe('useTransactions', () => {
-  let queryClient: QueryClient;
+  function createWrapper() {
+    const queryClient = createTestQueryClient();
 
-  beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false, // Disable retries in tests
-        },
-      },
-    });
-  });
-
-  const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
+    return function Wrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    };
+  }
 
   it('fetches transactions successfully', async () => {
-    const { result } = renderHook(() => useTransactions(), { wrapper });
+    const { result } = renderHook(() => useTransactions(), { wrapper: createWrapper() });
 
     // Initial state: loading
     expect(result.current.isLoading).toBe(true);
@@ -285,17 +290,14 @@ screen.getByTestId('submit-button');
 ### Pattern 2: User Interactions
 
 ```typescript
-import { fireEvent, userEvent } from '@testing-library/react';
+import { fireEvent } from '@testing-library/react';
 
-// fireEvent (lower level)
 fireEvent.click(button);
 fireEvent.change(input, { target: { value: 'test' } });
-
-// userEvent (recommended - simulates real user behavior)
-await userEvent.click(button);
-await userEvent.type(input, 'test');
-await userEvent.clear(input);
 ```
+
+Use `fireEvent` for now. `@testing-library/user-event` is not installed yet;
+add it before documenting or writing `userEvent` workflows.
 
 ### Pattern 3: Async Testing
 
@@ -348,7 +350,7 @@ it('allows user to filter transactions', async () => {
   render(<TransactionsPage />);
 
   const searchBox = screen.getByPlaceholderText('Search transactions...');
-  await userEvent.type(searchBox, 'CREDIT');
+  fireEvent.change(searchBox, { target: { value: 'CREDIT' } });
 
   expect(screen.getByText('Total: 5 transactions')).toBeInTheDocument();
 });
@@ -590,28 +592,6 @@ it('handles API errors gracefully', async () => {
   expect(result.current.error).toBeDefined();
 });
 ```
-
-### 4. Add Coverage Configuration
-
-```typescript
-// vitest.config.ts
-export default defineConfig({
-  test: {
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'src/testing/',
-        '**/*.d.ts',
-        '**/*.config.*',
-      ],
-    },
-  },
-});
-```
-
----
 
 ## Debugging Tests
 

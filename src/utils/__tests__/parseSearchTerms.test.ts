@@ -1,4 +1,3 @@
-// src/test/parseSearchTerms.test.ts
 import { describe, it, expect } from 'vitest';
 import { parseSearchTerms } from '@/utils/parseSearchTerms';
 
@@ -41,7 +40,6 @@ describe('parseSearchTerms', () => {
   });
 
   it('treats unclosed quote as literal characters', () => {
-    // Unclosed quote: garbage in, garbage out
     expect(parseSearchTerms('"whole foods')).toEqual(['"whole', 'foods']);
   });
 
