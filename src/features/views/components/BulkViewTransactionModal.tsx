@@ -42,7 +42,7 @@ const actionCopy = {
     confirmation: 'Exclude',
     success: 'Excluded',
     failure: 'Failed to exclude transactions',
-    description: 'Excluded transactions can be restored from Manage Transactions.',
+    description: 'Excluded transactions can be restored from the Restore Excluded action.',
   },
 } satisfies Record<
   BulkViewTransactionAction,

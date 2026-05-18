@@ -7,3 +7,4 @@ export { ViewsPage } from './pages/ViewsPage';
 // Components
 export { ViewCriteriaSummary } from './components/ViewCriteriaSummary';
 export { ViewTransactionTable } from './components/ViewTransactionTable';
+export { RestoreExcludedTransactionsModal } from './components/RestoreExcludedTransactionsModal';

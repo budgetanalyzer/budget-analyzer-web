@@ -169,6 +169,98 @@ export const useViewTransactions = (id: string): UseQueryResult<ViewTransaction[
 };
 
 /**
+ * Hook to fetch transactions that have been explicitly excluded from a saved view.
+ *
+ * Excluded transactions are not part of useViewTransactions because they are
+ * intentionally absent from the visible view table.
+ */
+export const useExcludedViewTransactions = (
+  id: string,
+): UseQueryResult<Transaction[], ApiError> => {
+  const queryClient = useQueryClient();
+
+  const membershipQuery = useQuery<ViewMembershipResponse, ApiError>({
+    queryKey: viewKeys.transactions(id),
+    queryFn: () => viewApi.getViewTransactions(id),
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+    enabled: !!id,
+  });
+
+  const excludedIds = useMemo(() => membershipQuery.data?.excluded ?? [], [membershipQuery.data]);
+
+  const cachedTransactions = useMemo(() => {
+    return excludedIds.flatMap((txnId) => {
+      const cached = queryClient.getQueryData<Transaction>(['transaction', txnId]);
+      return cached ? [cached] : [];
+    });
+  }, [excludedIds, queryClient]);
+
+  const cachedIds = useMemo(
+    () => new Set(cachedTransactions.map((transaction) => transaction.id)),
+    [cachedTransactions],
+  );
+
+  const missingIds = useMemo(
+    () => excludedIds.filter((txnId) => !cachedIds.has(txnId)),
+    [cachedIds, excludedIds],
+  );
+
+  const missingTransactionsQueries = useQueries({
+    queries: missingIds.map((txnId) => ({
+      queryKey: ['transaction', txnId],
+      queryFn: () => transactionApi.getTransaction(txnId),
+      staleTime: 1000 * 60 * 5,
+      retry: 1,
+      enabled: !!txnId,
+    })),
+    combine: (results) => {
+      const fetchedTransactions: Transaction[] = [];
+      results.forEach((result) => {
+        if (result.data) {
+          fetchedTransactions.push(result.data);
+        }
+      });
+
+      return {
+        data: fetchedTransactions,
+        isLoading: results.some((result) => result.isLoading),
+        error: results.find((result) => result.error)?.error as ApiError | undefined,
+      };
+    },
+  });
+
+  const finalTransactions = useMemo(() => {
+    const transactionMap = new Map<number, Transaction>();
+
+    cachedTransactions.forEach((transaction) => {
+      transactionMap.set(transaction.id, transaction);
+    });
+    missingTransactionsQueries.data.forEach((transaction) => {
+      transactionMap.set(transaction.id, transaction);
+    });
+
+    return excludedIds.flatMap((txnId) => {
+      const transaction = transactionMap.get(txnId);
+      return transaction ? [transaction] : [];
+    });
+  }, [cachedTransactions, excludedIds, missingTransactionsQueries.data]);
+
+  const isLoading = membershipQuery.isLoading || missingTransactionsQueries.isLoading;
+  const error = membershipQuery.error || missingTransactionsQueries.error;
+
+  return {
+    ...membershipQuery,
+    data: finalTransactions,
+    isLoading,
+    isError: !!error,
+    error: error || null,
+    isSuccess: membershipQuery.isSuccess && !missingTransactionsQueries.isLoading && !error,
+    isFetching: membershipQuery.isFetching || missingTransactionsQueries.isLoading,
+  } as unknown as UseQueryResult<Transaction[], ApiError>;
+};
+
+/**
  * Hook to create a new saved view
  */
 export const useCreateView = () => {
@@ -299,10 +391,12 @@ export const useUnexcludeTransaction = () => {
 
   return useMutation<SavedView, ApiError, { viewId: string; txnId: number }>({
     mutationFn: ({ viewId, txnId }) => viewApi.unexcludeTransaction(viewId, txnId),
-    onSuccess: (updatedView) => {
-      queryClient.invalidateQueries({ queryKey: viewKeys.detail(updatedView.id) });
-      queryClient.invalidateQueries({ queryKey: viewKeys.transactions(updatedView.id) });
-      queryClient.invalidateQueries({ queryKey: viewKeys.list() });
+    onSuccess: async (updatedView) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: viewKeys.detail(updatedView.id) }),
+        queryClient.invalidateQueries({ queryKey: viewKeys.transactions(updatedView.id) }),
+        queryClient.invalidateQueries({ queryKey: viewKeys.list() }),
+      ]);
     },
   });
 };

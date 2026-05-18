@@ -193,45 +193,18 @@ Acceptance criteria:
 
 ## Phase 4: URL-Backed Date Filtering On View Detail
 
-Files likely affected:
+Implemented in the view-detail table. The remaining analytics work can assume
+`/views/:id` supports `dateFrom`, `dateTo`, and `q`, applies date filtering
+before local description search, shows the shared `DateRangeFilter`, clears
+analytics breadcrumb params when filters are cleared, and preserves the current
+filtered view URL when drilling into transaction detail.
 
-- `src/features/views/pages/ViewPage.tsx`
-- `src/features/views/components/ViewTransactionTable.tsx`
-- `src/components/DateRangeFilter.tsx`
-- new `src/features/views/hooks/useViewTransactionFiltersSync.ts`
-- view table tests
+Remaining tasks:
 
-Tasks:
-
-1. Add a view-specific filter sync hook using `useSearchParams`.
-2. Support at minimum:
-   - `dateFrom`
-   - `dateTo`
-   - `q`
-   - clearing `returnTo` and `breadcrumbLabel` when date filters are cleared
-3. Keep this state scoped to the View page. Do not reuse the Transactions page
-   Redux table state.
-4. Apply date filtering in `ViewPage` before text search:
-   - source list from `useViewTransactions`
-   - date range filter
-   - text search filter
-5. Add `DateRangeFilter` to `ViewTransactionTable` beside the search input,
-   matching the all-transactions table control placement.
-6. Add a clear-filters action if both search and date filters are present.
-7. Ensure row click breadcrumbs preserve the current view URL, including active
-   date/search filters, when navigating to transaction detail.
-
-Acceptance criteria:
-
-- `/views/:id?dateFrom=...&dateTo=...` filters the view transaction table.
-- Analytics drilldown into a view lands on the view page with the correct date
-  range displayed in the same date selector used by all transactions.
-- Clearing view date filters removes analytics breadcrumb params when
-  appropriate.
-- View table bulk pin/exclude actions operate on the currently filtered view
-  rows.
-- Tests cover date filter initialization, change, clear, and analytics
-  breadcrumb cleanup.
+1. Wire analytics view-scope drilldowns to `/views/:id` with the existing
+   `dateFrom` and `dateTo` parameters.
+2. Add analytics-level tests that verify scoped drilldowns land on the filtered
+   view detail page.
 
 ## Phase 5: View-To-Analytics Entry Points
 

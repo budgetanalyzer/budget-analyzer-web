@@ -70,12 +70,20 @@ function renderViewTransactionTable({
   rows = transactions,
   viewId = 'view-1',
   searchText = '',
+  dateFilter = { from: null, to: null },
+  hasActiveFilters = false,
   onSearchChange = vi.fn(),
+  onDateFilterChange = vi.fn(),
+  onClearAllFilters = vi.fn(),
 }: {
   rows?: ViewTransaction[];
   viewId?: string;
   searchText?: string;
+  dateFilter?: { from: string | null; to: string | null };
+  hasActiveFilters?: boolean;
   onSearchChange?: (query: string) => void;
+  onDateFilterChange?: (from: string | null, to: string | null) => void;
+  onClearAllFilters?: () => void;
 } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -88,7 +96,11 @@ function renderViewTransactionTable({
           transactions={rows}
           viewId={viewId}
           searchText={searchText}
+          dateFilter={dateFilter}
+          hasActiveFilters={hasActiveFilters}
           onSearchChange={onSearchChange}
+          onDateFilterChange={onDateFilterChange}
+          onClearAllFilters={onClearAllFilters}
           displayCurrency="USD"
           exchangeRatesMap={new Map()}
           isExchangeRatesLoading={false}
@@ -97,7 +109,7 @@ function renderViewTransactionTable({
     </QueryClientProvider>,
   );
 
-  return { onSearchChange, queryClient, ...result };
+  return { onSearchChange, onDateFilterChange, onClearAllFilters, queryClient, ...result };
 }
 
 beforeEach(() => {
@@ -117,9 +129,9 @@ describe('ViewTransactionTable search', () => {
   });
 
   it('shows the filtered empty state when an applied search has no rows', () => {
-    renderViewTransactionTable({ rows: [], searchText: 'coffee' });
+    renderViewTransactionTable({ rows: [], searchText: 'coffee', hasActiveFilters: true });
 
-    expect(screen.getByText('No transactions match this search.')).toBeInTheDocument();
+    expect(screen.getByText('No transactions match these filters.')).toBeInTheDocument();
     expect(screen.queryByText('No transactions in this view.')).not.toBeInTheDocument();
   });
 
@@ -151,7 +163,11 @@ describe('ViewTransactionTable search', () => {
             transactions={transactions}
             viewId="view-2"
             searchText=""
+            dateFilter={{ from: null, to: null }}
+            hasActiveFilters={false}
             onSearchChange={onSearchChange}
+            onDateFilterChange={vi.fn()}
+            onClearAllFilters={vi.fn()}
             displayCurrency="USD"
             exchangeRatesMap={new Map()}
             isExchangeRatesLoading={false}
@@ -161,6 +177,43 @@ describe('ViewTransactionTable search', () => {
     );
 
     expect(screen.getByPlaceholderText('Search descriptions ↵')).toHaveValue('');
+  });
+});
+
+describe('ViewTransactionTable date filters', () => {
+  it('renders the active date filters', () => {
+    renderViewTransactionTable({
+      dateFilter: { from: '2026-01-01', to: '2026-01-31' },
+      hasActiveFilters: true,
+    });
+
+    expect(screen.getByDisplayValue('2026-01-01')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('2026-01-31')).toBeInTheDocument();
+  });
+
+  it('calls the date filter callback when a date changes', () => {
+    const onDateFilterChange = vi.fn();
+    renderViewTransactionTable({ onDateFilterChange });
+
+    fireEvent.change(screen.getByPlaceholderText('From date'), {
+      target: { value: '2026-01-01' },
+    });
+
+    expect(onDateFilterChange).toHaveBeenCalledWith('2026-01-01', null);
+  });
+
+  it('clears search and date filters from the clear action', () => {
+    const onClearAllFilters = vi.fn();
+    renderViewTransactionTable({
+      searchText: 'coffee',
+      dateFilter: { from: '2026-01-01', to: '2026-01-31' },
+      hasActiveFilters: true,
+      onClearAllFilters,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+
+    expect(onClearAllFilters).toHaveBeenCalled();
   });
 });
 
@@ -227,7 +280,7 @@ describe('ViewTransactionTable bulk actions', () => {
     expect(screen.getByRole('heading', { name: 'Exclude Transactions' })).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Exclude 1 transaction from this view? Excluded transactions can be restored from Manage Transactions.',
+        'Exclude 1 transaction from this view? Excluded transactions can be restored from the Restore Excluded action.',
       ),
     ).toBeInTheDocument();
   });
