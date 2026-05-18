@@ -49,6 +49,11 @@ to the operational surface for that source: all-transaction analytics link to
 `breadcrumbLabel` so the filtered operational page can navigate back to the
 same analytics state.
 
+View detail and saved-view cards expose normal analytics links built as
+`/analytics?scope=view&viewId=<id>&viewMode=monthly&transactionType=debit`.
+The analytics page fills the year from the latest transaction year when the URL
+does not provide one.
+
 Saved views support bulk membership updates through `POST /api/v1/views/{id}/pin` and `POST /api/v1/views/{id}/exclude`. Both endpoints accept:
 
 ```json

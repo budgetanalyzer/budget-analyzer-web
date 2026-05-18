@@ -79,11 +79,17 @@ is URL-backed:
 /analytics?scope=view&viewId=<view-id>&viewMode=monthly&transactionType=debit&year=2026
 ```
 
+Missing or malformed analytics controls fall back to the default analytics
+surface: all transactions, monthly view, debit transactions, and the latest
+available transaction year when `year` is absent or invalid.
+
 `scope=all` resolves data with `useTransactions()`. `scope=view` resolves saved
 view metadata with `useView(viewId)` and canonical visible membership with
 `useViewTransactions(viewId)`, so pinned transactions are included and excluded
 transactions are omitted. `useAnalyticsData` receives the already resolved
 transaction list and remains unaware of how the source was fetched.
+View detail and saved-view cards navigate to view-scoped analytics with normal
+links; they do not persist selected views or analytics source in Redux.
 
 ## Redux Preferences
 

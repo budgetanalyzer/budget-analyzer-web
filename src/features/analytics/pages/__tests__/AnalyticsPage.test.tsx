@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { MemoryRouter, useLocation } from 'react-router';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Transaction } from '@/types/transaction';
@@ -95,8 +95,19 @@ function renderPage(initialEntry: string) {
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={[initialEntry]}>
-          <AnalyticsPage />
-          <LocationProbe />
+          <Routes>
+            <Route
+              path="/analytics"
+              element={
+                <>
+                  <AnalyticsPage />
+                  <LocationProbe />
+                </>
+              }
+            />
+            <Route path="/" element={<LocationProbe />} />
+            <Route path="/views/:id" element={<LocationProbe />} />
+          </Routes>
         </MemoryRouter>
       </QueryClientProvider>
     </Provider>,
@@ -171,6 +182,32 @@ describe('AnalyticsPage source resolution', () => {
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
         '/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2026',
+      );
+    });
+  });
+
+  it('routes an all-scope monthly drilldown to the filtered transactions page', async () => {
+    renderPage('/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2026');
+
+    fireEvent.click(screen.getByRole('link', { name: /Jan 2026/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/?dateFrom=2026-01-01&dateTo=2026-01-31&returnTo=%2Fanalytics%3Fscope%3Dall%26viewMode%3Dmonthly%26transactionType%3Ddebit%26year%3D2026&breadcrumbLabel=Jan%202026',
+      );
+    });
+  });
+
+  it('routes a view-scoped monthly drilldown to the filtered view detail page', async () => {
+    renderPage(
+      '/analytics?scope=view&viewId=view-1&viewMode=monthly&transactionType=debit&year=2026',
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: /Jan 2026/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/views/view-1?dateFrom=2026-01-01&dateTo=2026-01-31&returnTo=%2Fanalytics%3Fscope%3Dview%26viewId%3Dview-1%26viewMode%3Dmonthly%26transactionType%3Ddebit%26year%3D2026&breadcrumbLabel=Jan%202026',
       );
     });
   });

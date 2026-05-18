@@ -1,5 +1,9 @@
 # Analytics View Scope Unification Plan
 
+Status: Finalized. All implementation phases are complete; this document now
+records the delivered scope contract, verification coverage, and follow-up
+decisions.
+
 ## Goal
 
 Implement the long-term UX model where Transactions, Views, and Analytics remain
@@ -18,21 +22,21 @@ The core product behavior:
 - Analytics drilldowns route to the correct operational page for the active
   source.
 
-## Current State
+## Delivered State
 
-- `AnalyticsPage` calls `useTransactions()` and analyzes the full transaction
-  list only.
+- `AnalyticsPage` resolves its source from URL params and analyzes either all
+  transactions or canonical saved-view membership.
 - `MonthlySpendingCard` and `YearlySpendingCard` build drilldown links through
-  `buildTransactionsUrl`, so every analytics drilldown goes to the all
-  transactions page.
+  `buildAnalyticsDrilldownUrl`, so analytics opens the correct operational
+  page for the active source.
 - `ViewsPage` is a saved-view directory only. The previous aggregate
   selected-view stats surface was removed instead of canonicalized because it
   added complexity that does not belong in the analytics scope-unification work.
 - `ViewPage` and `ViewTransactionTable` use canonical membership through
-  `useViewTransactions`, but the table only supports text search and does not
-  have URL-backed date filters.
-- `ViewSelector` is navigation. It should stay navigation and should not become
-  the global analytics source selector.
+  `useViewTransactions` and support URL-backed `dateFrom`, `dateTo`, and `q`
+  filters.
+- `ViewSelector` remains navigation. `AnalyticsSourceSelector` owns analytics
+  source selection.
 
 ## Non-Goals
 
@@ -60,7 +64,8 @@ Defaults:
 - `scope=view` without a valid `viewId` falls back to `all` or shows a scoped
   error state. Prefer fallback only for malformed URLs and a visible API error
   for missing/deleted views.
-- Existing `viewMode`, `transactionType`, and `year` behavior remains intact.
+- Missing or malformed `viewMode`, `transactionType`, and `year` values fall
+  back to monthly debit analytics and the latest available transaction year.
 
 View drilldown URLs:
 
@@ -75,6 +80,8 @@ All-transaction drilldown URLs:
 ```
 
 ## Phase 1: Shared URL State And Drilldown Builder
+
+Status: Implemented.
 
 Files likely affected:
 
@@ -116,6 +123,8 @@ Acceptance criteria:
 - Unit tests cover URL builder output for both scopes.
 
 ## Phase 2: Analytics Source Resolution
+
+Status: Implemented.
 
 Files likely affected:
 
@@ -199,6 +208,8 @@ Acceptance criteria:
   list interactions where needed.
 
 ## Phase 3b: Minimize Redux UI State
+
+Status: Implemented.
 
 Files likely affected:
 
@@ -301,6 +312,8 @@ Remaining tasks:
 
 ## Phase 5: View-To-Analytics Entry Points
 
+Status: Implemented.
+
 Files likely affected:
 
 - `src/features/views/pages/ViewPage.tsx`
@@ -329,6 +342,15 @@ Acceptance criteria:
 - Analyze links are normal links, not hidden persistent context.
 
 ## Phase 6: Tests, Docs, And Regression Checks
+
+Status: Implemented.
+
+Final verification coverage includes analytics URL parsing/building,
+analytics drilldown URL routing, all-scope and view-scope analytics source
+resolution, analytics source selector URL changes, all-scope and view-scope
+month drilldowns, date-filtered view-detail landing from analytics, clearing
+analytics breadcrumb URL context from view detail, removal of aggregate view
+stats UI, and the minimized Redux state shape.
 
 Files likely affected:
 
@@ -390,7 +412,7 @@ behavior, then analytics source selection, then entry points, then removal of
 the obsolete stats surface, then state cleanup once the URL-backed behavior is
 settled.
 
-## Risks And Decisions To Confirm
+## Final Decisions
 
 - Removing aggregate stats means the Views page no longer tries to summarize
   selected-view transaction totals. Use Analytics scoped to a single view for
@@ -402,5 +424,6 @@ settled.
   input state. Adding URL-backed date filters should not globalize this state.
 - Analytics cards should not contain route branching directly. Keep destination
   branching in `buildAnalyticsDrilldownUrl`.
-- View-scoped analytics should likely show view metadata near the source
-  selector so users can tell pinned/excluded membership is being honored.
+- View-scoped analytics shows the selected view in the page description and
+  source selector so users can tell which canonical membership is being
+  analyzed.

@@ -40,6 +40,20 @@ describe('parseAnalyticsSearchParams', () => {
       viewId: undefined,
     });
   });
+
+  it('defaults invalid analytics controls without partially parsing malformed years', () => {
+    const params = new URLSearchParams(
+      'scope=invalid&viewMode=weekly&transactionType=transfer&year=2026abc',
+    );
+
+    expect(parseAnalyticsSearchParams(params)).toEqual({
+      scope: ANALYTICS_SCOPES.ALL,
+      viewId: undefined,
+      viewMode: VIEW_MODES.MONTHLY,
+      transactionType: TRANSACTION_TYPES.DEBIT,
+      year: undefined,
+    });
+  });
 });
 
 describe('buildAnalyticsReturnUrl', () => {

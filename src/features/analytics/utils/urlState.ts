@@ -64,7 +64,7 @@ function isTransactionType(value: string | null): value is TransactionTypeParam 
 }
 
 function parseYear(value: string | null): number | undefined {
-  if (!value) {
+  if (!value || !/^\d{4}$/.test(value)) {
     return undefined;
   }
 

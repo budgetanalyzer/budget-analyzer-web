@@ -58,6 +58,10 @@ describe('ViewsPage', () => {
       'href',
       '/views/view-groceries',
     );
+    expect(screen.getByRole('link', { name: 'Analyze Groceries' })).toHaveAttribute(
+      'href',
+      '/analytics?scope=view&viewId=view-groceries&viewMode=monthly&transactionType=debit',
+    );
     expect(screen.queryByText('Aggregate Statistics')).not.toBeInTheDocument();
     expect(screen.queryByText(/views selected/i)).not.toBeInTheDocument();
   });

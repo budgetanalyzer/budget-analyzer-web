@@ -1,11 +1,21 @@
 import { Link } from 'react-router';
 import { motion } from 'framer-motion';
-import { ArrowDownUp, ArrowRight, Bookmark, Calendar, EyeOff, Hash, Search } from 'lucide-react';
+import {
+  ArrowDownUp,
+  ArrowRight,
+  BarChart3,
+  Bookmark,
+  Calendar,
+  EyeOff,
+  Hash,
+  Search,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { fadeInVariants } from '@/lib/animations';
 import { SavedView } from '@/types/view';
 import { formatLocalDate } from '@/utils/dates';
+import { buildAnalyticsReturnUrl } from '@/features/analytics/utils/urlState';
 
 interface ViewCardProps {
   view: SavedView;
@@ -13,6 +23,12 @@ interface ViewCardProps {
 
 export function ViewCard({ view }: ViewCardProps) {
   const criteria = view.criteria;
+  const analyzeViewUrl = buildAnalyticsReturnUrl({
+    scope: 'view',
+    viewId: view.id,
+    viewMode: 'monthly',
+    transactionType: 'debit',
+  });
 
   return (
     <motion.div variants={fadeInVariants}>
@@ -82,7 +98,15 @@ export function ViewCard({ view }: ViewCardProps) {
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Link
+              to={analyzeViewUrl}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+              aria-label={`Analyze ${view.name}`}
+            >
+              <BarChart3 className="h-4 w-4" />
+              Analyze
+            </Link>
             <Link
               to={`/views/${view.id}`}
               className="flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
