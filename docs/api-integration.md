@@ -57,6 +57,15 @@ the saved-view detail, saved-view transactions, and saved-view list queries. It
 does not apply optimistic count updates because the bulk response does not
 include an updated saved view.
 
+The saved-view transaction table supports row selection. Its "select all"
+checkbox selects the current page; when all page rows are selected, the table
+can expand selection to every transaction in the current visible/search-filtered
+view result. The floating bulk action bar can pin or exclude the selected
+transactions. Bulk pin sends only selected transactions that are not already
+pinned; bulk exclude sends the selected transaction IDs. Partial successes are
+shown as warning toast feedback with the number of transactions that were not
+found or unavailable.
+
 ## Transaction Import Review
 
 Statement imports use a two-step review flow:
