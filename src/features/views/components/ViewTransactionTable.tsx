@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { DateRangeFilter } from '@/components/DateRangeFilter';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,35 +53,51 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { cn } from '@/utils/cn';
 import { usePinTransaction, useUnpinTransaction, useExcludeTransaction } from '@/hooks/useViews';
 import { columnWidthClass } from '@/utils/columnWidth';
+import type { ViewTransactionDateFilter } from '@/features/views/hooks/useViewTransactionFiltersSync';
 
 interface ViewTransactionTableProps {
   transactions: ViewTransaction[];
   viewId: string;
   searchText: string;
+  dateFilter: ViewTransactionDateFilter;
+  hasActiveFilters: boolean;
   onSearchChange: (query: string) => void;
+  onDateFilterChange: (from: string | null, to: string | null) => void;
+  onClearAllFilters: () => void;
   displayCurrency: string;
   exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
   isExchangeRatesLoading: boolean;
 }
 
 export function ViewTransactionTable({ viewId, ...props }: ViewTransactionTableProps) {
-  return <ViewTransactionTableContent key={viewId} viewId={viewId} {...props} />;
+  return (
+    <ViewTransactionTableContent
+      key={`${viewId}:${props.searchText}:${props.dateFilter.from ?? ''}:${props.dateFilter.to ?? ''}`}
+      viewId={viewId}
+      {...props}
+    />
+  );
 }
 
 function ViewTransactionTableContent({
   transactions,
   viewId,
   searchText,
+  dateFilter,
+  hasActiveFilters,
   onSearchChange,
+  onDateFilterChange,
+  onClearAllFilters,
   displayCurrency,
   exchangeRatesMap,
   isExchangeRatesLoading,
 }: ViewTransactionTableProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
   const [pageIndex, setPageIndex] = useState(0);
   const [localSearchValue, setLocalSearchValue] = useState(searchText);
@@ -117,13 +134,32 @@ function ViewTransactionTableContent({
     setPageIndex(0);
   }, [onSearchChange]);
 
+  const handleDateChange = useCallback(
+    (from: string | null, to: string | null) => {
+      onDateFilterChange(from, to);
+      setPageIndex(0);
+    },
+    [onDateFilterChange],
+  );
+
+  const handleClearFilters = useCallback(() => {
+    setLocalSearchValue('');
+    onClearAllFilters();
+    setPageIndex(0);
+  }, [onClearAllFilters]);
+
   // Handle row click to navigate to transaction detail
   const handleRowClick = useCallback(
     (transaction: ViewTransaction) => {
       // Pass the view context so we can return to the view
-      navigate(`/transactions/${transaction.id}?returnTo=/views/${viewId}&breadcrumbLabel=View`);
+      const returnTo = `${location.pathname}${location.search}`;
+      const params = new URLSearchParams({
+        returnTo,
+        breadcrumbLabel: 'View',
+      });
+      navigate(`/transactions/${transaction.id}?${params.toString()}`);
     },
-    [navigate, viewId],
+    [location.pathname, location.search, navigate],
   );
 
   // Handle pin action
@@ -436,13 +472,13 @@ function ViewTransactionTableContent({
     setSelectAllMatching(false);
   }, []);
 
-  const emptyMessage = searchText
-    ? 'No transactions match this search.'
+  const emptyMessage = hasActiveFilters
+    ? 'No transactions match these filters.'
     : 'No transactions in this view.';
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -463,6 +499,16 @@ function ViewTransactionTableContent({
             </button>
           )}
         </div>
+        <DateRangeFilter from={dateFilter.from} to={dateFilter.to} onChange={handleDateChange} />
+        {hasActiveFilters && (
+          <>
+            <div className="mx-1 h-6 w-px bg-border" />
+            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 px-3">
+              <X className="mr-1.5 h-4 w-4" />
+              Clear
+            </Button>
+          </>
+        )}
       </div>
 
       {table.getIsAllPageRowsSelected() && transactions.length > pageSize && !selectAllMatching && (

@@ -33,6 +33,11 @@ Saved-view criteria mirror the user-facing transaction filters supported by the 
 
 `searchText` is a saved-view description filter. The Transactions and View table search boxes filter the already loaded rows locally with a case-insensitive substring match against transaction descriptions only; use the explicit bank filter when the saved view should persist a bank criterion.
 
+View detail also supports URL-backed table filters for the visible saved-view
+membership: `dateFrom`, `dateTo`, and `q`. Date filters are applied before the
+local description search so the stats and table rows are derived from the same
+filtered transaction list.
+
 Saved views support bulk membership updates through `POST /api/v1/views/{id}/pin` and `POST /api/v1/views/{id}/exclude`. Both endpoints accept:
 
 ```json
@@ -65,6 +70,16 @@ transactions. Bulk pin sends only selected transactions that are not already
 pinned; bulk exclude sends the selected transaction IDs. Partial successes are
 shown as warning toast feedback with the number of transactions that were not
 found or unavailable.
+
+Visible saved-view membership changes happen from the view table: matched rows
+can be pinned or excluded, pinned rows can be unpinned or excluded, and selected
+visible rows can be bulk pinned or bulk excluded. Excluded transactions are
+intentionally absent from the table; when a view has exclusions, the View detail
+header shows a Restore Excluded action that lists only excluded transactions and
+restores them one at a time. Restoring waits for the saved-view detail,
+saved-view transaction membership, and saved-view list queries to refresh before
+the restore action completes, so the background view reflects the restored row
+without a manual page refresh.
 
 ## Transaction Import Review
 
