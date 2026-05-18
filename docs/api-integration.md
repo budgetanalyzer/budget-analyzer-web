@@ -33,6 +33,25 @@ Saved-view criteria mirror the user-facing transaction filters supported by the 
 
 `searchText` is a saved-view description filter. The Transactions and View table search boxes filter the already loaded rows locally with a case-insensitive substring match against transaction descriptions only; use the explicit bank filter when the saved view should persist a bank criterion.
 
+Saved views support bulk membership updates through `POST /api/v1/views/{id}/pin` and `POST /api/v1/views/{id}/exclude`. Both endpoints accept:
+
+```json
+{
+  "ids": [1, 2, 3]
+}
+```
+
+Both endpoints return:
+
+```json
+{
+  "updatedCount": 2,
+  "notFoundIds": [999]
+}
+```
+
+`notFoundIds` are transaction IDs that are missing, deleted, or not owned by the caller.
+
 ## Transaction Import Review
 
 Statement imports use a two-step review flow:
