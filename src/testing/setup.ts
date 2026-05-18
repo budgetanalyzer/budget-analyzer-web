@@ -1,9 +1,9 @@
-// src/test/setup.ts
+// src/testing/setup.ts
 import { expect, beforeAll, afterEach, afterAll, vi } from 'vitest';
 import '@testing-library/jest-dom';
 import * as matchers from '@testing-library/jest-dom/matchers';
-import { resetMockHandlerState } from '@/mocks/handlers';
-import { server } from '@/mocks/server';
+import { resetMockHandlerState } from '@/testing/mocks/handlers';
+import { server } from '@/testing/mocks/server';
 
 expect.extend(matchers);
 

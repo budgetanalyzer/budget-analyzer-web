@@ -7,7 +7,8 @@ A comprehensive guide to the testing setup and best practices for the Budget Ana
 ## Testing Stack
 
 - **Test Runner:** Vitest (fast, Vite-native)
-- **Testing Library:** React Testing Library (`@testing-library/react`)
+- **Testing Library:** React Testing Library (`@testing-library/react`) and
+  `@testing-library/user-event`
 - **Assertions:** Vitest matchers + jest-dom matchers
 - **API Mocking:** MSW (Mock Service Worker)
 - **Environment:** jsdom (simulates browser environment in Node)
@@ -29,13 +30,10 @@ npm test -- --run
 npm run test:ui
 
 # Run a single test file
-npx vitest src/test/Button.test.tsx
+npx vitest src/utils/__tests__/parseSearchTerms.test.ts
 
 # Run tests matching a pattern
 npx vitest --grep "renders correctly"
-
-# Run with coverage
-npm test -- --coverage
 ```
 
 ---
@@ -51,13 +49,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
+    setupFiles: './src/testing/setup.ts',
     // ... path aliases, css handling
   },
 });
 ```
 
-#### 2. src/test/setup.ts
+#### 2. src/testing/setup.ts
 
 This file runs before all tests:
 
@@ -65,14 +63,18 @@ This file runs before all tests:
 import { expect, beforeAll, afterEach, afterAll } from 'vitest';
 import '@testing-library/jest-dom';
 import * as matchers from '@testing-library/jest-dom/matchers';
-import { server } from '../mocks/server';
+import { resetMockHandlerState } from '@/testing/mocks/handlers';
+import { server } from '@/testing/mocks/server';
 
 // Extend Vitest's expect with jest-dom matchers
 expect.extend(matchers);
 
 // MSW server lifecycle
 beforeAll(() => server.listen());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  resetMockHandlerState();
+});
 afterAll(() => server.close());
 ```
 
@@ -81,6 +83,24 @@ afterAll(() => server.close());
 - Starts MSW server before any tests run
 - Resets MSW handlers between tests (prevents test pollution)
 - Closes MSW server after all tests complete
+
+---
+
+## Test Placement
+
+Production-code tests live beside the code they verify in `__tests__`
+directories. Shared test infrastructure lives under `src/testing/`.
+
+Use this split consistently:
+
+- `src/utils/parseSearchTerms.ts` -> `src/utils/__tests__/parseSearchTerms.test.ts`
+- `src/hooks/useTransactions.ts` -> `src/hooks/__tests__/useTransactions.test.tsx`
+- `src/testing/setup.ts` for global Vitest setup
+- `src/testing/mocks/` for MSW handlers and server setup
+- `src/testing/test-utils.tsx` for shared provider helpers
+
+Do not add production-code tests under `src/testing/`. The old `src/test/`
+directory is no longer used.
 
 ---
 
@@ -106,7 +126,7 @@ Test assertions
 
 ### MSW Setup Files
 
-#### src/mocks/handlers.ts
+#### src/testing/mocks/handlers.ts
 
 Define mock API endpoints:
 
@@ -130,7 +150,7 @@ export const handlers = [
 ];
 ```
 
-#### src/mocks/server.ts
+#### src/testing/mocks/server.ts
 
 Set up MSW for Node.js (tests):
 
@@ -141,54 +161,55 @@ import { handlers } from './handlers';
 export const server = setupServer(...handlers);
 ```
 
-### Why MSW Fixed Your Tests
+### Why Use MSW
 
-**Before MSW:**
-- Tests made real API calls → failed with network errors
+**Without MSW:**
+- Tests can make real API calls and fail with network errors
 - No backend running in test environment
 - Unreliable, slow tests
 
-**After MSW:**
+**With MSW:**
 - API calls intercepted and mocked
 - Fast, reliable responses
 - No network dependency
-- Tests pass! ✅
 
 ---
 
 ## Test Examples
 
-### Example 1: Simple Component Test
+### Example 1: Colocated Component Behavior Test
 
 ```typescript
-// src/test/Button.test.tsx
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { Button } from '@/components/ui/Button';
+// src/components/__tests__/BackButton.test.tsx
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Link, MemoryRouter, Route, Routes } from 'react-router';
+import { BackButton } from '@/components/BackButton';
 
-describe('Button', () => {
-  it('renders with text', () => {
-    render(<Button>Click me</Button>);
+function DetailPage() {
+  return <BackButton />;
+}
 
-    const button = screen.getByRole('button', { name: /click me/i });
-    expect(button).toBeInTheDocument();
-  });
+function ListPage() {
+  return <Link to="/transactions/1">Open detail</Link>;
+}
 
-  it('handles click events', () => {
-    const handleClick = vi.fn(); // Mock function
-    render(<Button onClick={handleClick}>Click me</Button>);
+describe('BackButton', () => {
+  it('uses browser history after in-app navigation', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<ListPage />} />
+          <Route path="/transactions/:id" element={<DetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
 
-    const button = screen.getByRole('button');
-    fireEvent.click(button);
+    await userEvent.click(screen.getByRole('link', { name: /Open detail/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Back/ }));
 
-    expect(handleClick).toHaveBeenCalledTimes(1);
-  });
-
-  it('can be disabled', () => {
-    render(<Button disabled>Click me</Button>);
-
-    const button = screen.getByRole('button');
-    expect(button).toBeDisabled();
+    expect(screen.getByRole('link', { name: /Open detail/ })).toBeInTheDocument();
   });
 });
 ```
@@ -196,34 +217,25 @@ describe('Button', () => {
 ### Example 2: Testing Hooks with React Query
 
 ```typescript
-// src/test/useTransactions.test.tsx
-import { describe, it, expect, beforeEach } from 'vitest';
+// src/hooks/__tests__/useTransactions.test.tsx
+import { describe, it, expect } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useTransactions } from '@/hooks/useTransactions';
-import { ReactNode } from 'react';
+import { createTestQueryClient } from '@/testing/test-utils';
+import type { ReactNode } from 'react';
 
 describe('useTransactions', () => {
-  let queryClient: QueryClient;
+  function createWrapper() {
+    const queryClient = createTestQueryClient();
 
-  beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false, // Disable retries in tests
-        },
-      },
-    });
-  });
-
-  const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
+    return function Wrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    };
+  }
 
   it('fetches transactions successfully', async () => {
-    const { result } = renderHook(() => useTransactions(), { wrapper });
+    const { result } = renderHook(() => useTransactions(), { wrapper: createWrapper() });
 
     // Initial state: loading
     expect(result.current.isLoading).toBe(true);
@@ -280,17 +292,18 @@ screen.getByTestId('submit-button');
 ### Pattern 2: User Interactions
 
 ```typescript
-import { fireEvent, userEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
-// fireEvent (lower level)
-fireEvent.click(button);
-fireEvent.change(input, { target: { value: 'test' } });
-
-// userEvent (recommended - simulates real user behavior)
 await userEvent.click(button);
 await userEvent.type(input, 'test');
 await userEvent.clear(input);
 ```
+
+Prefer `userEvent` for workflows users actually perform: clicking, typing,
+selecting options, clearing fields, and keyboard navigation. Keep `fireEvent`
+for lower-level events where `userEvent` is a poor fit, such as synthetic
+window activity, timer-adjacent hooks, focused DOM events like backdrop clicks,
+or rare library-specific keyboard workarounds.
 
 ### Pattern 3: Async Testing
 
@@ -339,6 +352,8 @@ it('displays error message on API failure', async () => {
 
 ```typescript
 // ✅ GOOD: Test what users see and do
+import userEvent from '@testing-library/user-event';
+
 it('allows user to filter transactions', async () => {
   render(<TransactionsPage />);
 
@@ -447,7 +462,7 @@ expect(transactionApi.getTransactions).toHaveBeenCalled();
 
 ```typescript
 // Override handler for specific test
-import { server } from '@/mocks/server';
+import { server } from '@/testing/mocks/server';
 import { http, HttpResponse } from 'msw';
 
 it('handles 404 error', async () => {
@@ -473,14 +488,19 @@ it('handles 404 error', async () => {
 ```
 src/
 ├── components/
-│   └── Button.tsx
-├── test/
+│   ├── BackButton.tsx
+│   └── __tests__/
+│       └── BackButton.test.tsx
+├── testing/
 │   ├── setup.ts              # Global test setup
-│   ├── Button.test.tsx       # Component tests
-│   └── useTransactions.test.tsx  # Hook tests
-└── mocks/
-    ├── handlers.ts           # MSW handlers
-    └── server.ts             # MSW server setup
+│   ├── test-utils.tsx        # Shared provider render helpers
+│   └── mocks/
+│       ├── handlers.ts       # MSW handlers
+│       └── server.ts         # MSW server setup
+└── utils/
+    ├── parseSearchTerms.ts
+    └── __tests__/
+        └── parseSearchTerms.test.ts
 ```
 
 ### Test Naming
@@ -511,14 +531,43 @@ describe('TransactionTable', () => {
 
 ---
 
-## Suggested Improvements
+## Shared Test Utilities
 
-Based on our earlier discussion, here are recommended additions to your test suite:
+Use `src/testing/test-utils.tsx` when a test needs React Query, Redux, or an
+optional memory router. Prefer a local helper only when a page needs custom
+route declarations or unusually specific provider wiring.
+
+```typescript
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '@/testing/test-utils';
+import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage';
+
+it('renders the transactions page', () => {
+  const { queryClient, store } = renderWithProviders(<TransactionsPage />, {
+    initialEntries: ['/transactions'],
+  });
+
+  expect(screen.getByText(/transactions/i)).toBeInTheDocument();
+  queryClient.clear();
+  expect(store.getState().ui.displayCurrency).toBe('USD');
+});
+```
+
+`createTestQueryClient()` creates a Query Client with retries disabled.
+`createTestStore()` creates a fresh Redux store for each test.
+`renderWithProviders()` returns the normal Testing Library render result plus
+the `queryClient` and `store` it used.
+Pass `router: 'dom'` only for components that still import router hooks from
+`react-router-dom`; the default router matches the app's `react-router` usage.
+
+---
+
+## Suggested Improvements
 
 ### 1. Add Handler for Single Transaction
 
 ```typescript
-// Add to src/mocks/handlers.ts
+// Add to src/testing/mocks/handlers.ts
 http.get('/api/transactions/:id', ({ params }) => {
   const { id } = params;
   return HttpResponse.json({
@@ -533,42 +582,10 @@ http.get('/api/transactions/:id', ({ params }) => {
 }),
 ```
 
-### 2. Add Test Utilities
+### 2. Add Error Scenario Tests
 
 ```typescript
-// src/test/testUtils.tsx
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Provider } from 'react-redux';
-import { store } from '@/store';
-import { ReactNode } from 'react';
-
-export function createTestQueryClient() {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        cacheTime: Infinity,
-      },
-    },
-  });
-}
-
-export function AllTheProviders({ children }: { children: ReactNode }) {
-  const queryClient = createTestQueryClient();
-  return (
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
-    </Provider>
-  );
-}
-```
-
-### 3. Add Error Scenario Tests
-
-```typescript
-// src/test/useTransactions.test.tsx
+// src/hooks/__tests__/useTransactions.test.tsx
 it('handles API errors gracefully', async () => {
   server.use(
     http.get('/api/transactions', () => {
@@ -585,28 +602,6 @@ it('handles API errors gracefully', async () => {
   expect(result.current.error).toBeDefined();
 });
 ```
-
-### 4. Add Coverage Configuration
-
-```typescript
-// vitest.config.ts
-export default defineConfig({
-  test: {
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'src/test/',
-        '**/*.d.ts',
-        '**/*.config.*',
-      ],
-    },
-  },
-});
-```
-
----
 
 ## Debugging Tests
 

@@ -1,30 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { Provider } from 'react-redux';
-import { MemoryRouter, Route, Routes } from 'react-router';
-import { configureStore } from '@reduxjs/toolkit';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router';
 import { http, HttpResponse } from 'msw';
 
 import { UserDetailPage } from '@/features/admin/users/pages/UserDetailPage';
-import { server } from '@/mocks/server';
-import uiReducer from '@/store/uiSlice';
+import { server } from '@/testing/mocks/server';
+import { renderWithProviders } from '@/testing/test-utils';
 
 function renderPage(initialPath: string) {
-  const store = configureStore({ reducer: { ui: uiReducer } });
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  return render(
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[initialPath]}>
-          <Routes>
-            <Route path="/admin/users/:id" element={<UserDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    </Provider>,
+  return renderWithProviders(
+    <Routes>
+      <Route path="/admin/users/:id" element={<UserDetailPage />} />
+    </Routes>,
+    { initialEntries: [initialPath] },
   );
 }
 
@@ -73,10 +62,10 @@ describe('UserDetailPage', () => {
   it('deactivates an active user from the detail page and shows inline success feedback', async () => {
     renderPage('/admin/users/usr_abc123');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Deactivate User' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Deactivate User' }));
 
     expect(screen.getByRole('heading', { name: 'Deactivate Admin User?' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Deactivate Account' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Deactivate Account' }));
 
     expect(
       await screen.findByText('User usr_abc123 deactivated successfully.'),
@@ -103,8 +92,8 @@ describe('UserDetailPage', () => {
 
     renderPage('/admin/users/usr_abc123');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Deactivate User' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Deactivate Account' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Deactivate User' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Deactivate Account' }));
 
     expect(await screen.findByText('User deactivation failed')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Deactivate User' })).toBeInTheDocument();

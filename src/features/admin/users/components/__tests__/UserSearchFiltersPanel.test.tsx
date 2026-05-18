@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { UserSearchFiltersPanel } from '@/features/admin/users/components/UserSearchFiltersPanel';
 import type { UserSearchQuery } from '@/types/user';
 
@@ -34,20 +35,20 @@ describe('UserSearchFiltersPanel', () => {
     expect(inputs[1].value).toBe('2026-01-15');
   });
 
-  it('submits selected local dates as local-day ISO timestamp bounds', () => {
+  it('submits selected local dates as local-day ISO timestamp bounds', async () => {
     const handleChange = vi.fn();
     const { container } = render(
       <UserSearchFiltersPanel query={createQuery()} onChange={handleChange} onClear={() => {}} />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /More filters/i }));
+    await userEvent.click(screen.getByRole('button', { name: /More filters/i }));
 
     const inputs = Array.from(
       container.querySelectorAll('input[type="date"]'),
     ) as HTMLInputElement[];
-    fireEvent.change(inputs[0], { target: { value: '2026-01-15' } });
-    fireEvent.change(inputs[1], { target: { value: '2026-01-15' } });
-    fireEvent.click(screen.getByRole('button', { name: /^Search$/ }));
+    await userEvent.type(inputs[0], '2026-01-15');
+    await userEvent.type(inputs[1], '2026-01-15');
+    await userEvent.click(screen.getByRole('button', { name: /^Search$/ }));
 
     expect(handleChange).toHaveBeenCalledWith({
       email: undefined,

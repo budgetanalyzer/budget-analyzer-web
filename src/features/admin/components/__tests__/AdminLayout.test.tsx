@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router';
-import { configureStore } from '@reduxjs/toolkit';
+import { screen } from '@testing-library/react';
 
 vi.mock('@/features/auth/hooks/useAuth');
 vi.mock('@/features/auth/hooks/usePermission');
@@ -10,20 +7,15 @@ vi.mock('@/features/auth/hooks/usePermission');
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { AdminLayout } from '@/features/admin/components/AdminLayout';
-import uiReducer from '@/store/uiSlice';
+import { renderWithProviders } from '@/testing/test-utils';
 
 const mockUseAuth = vi.mocked(useAuth);
 const mockUsePermission = vi.mocked(usePermission);
 
 function renderLayout(initialPath: string = '/admin') {
-  const store = configureStore({ reducer: { ui: uiReducer } });
-  return render(
-    <Provider store={store}>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <AdminLayout />
-      </MemoryRouter>
-    </Provider>,
-  );
+  return renderWithProviders(<AdminLayout />, {
+    initialEntries: [initialPath],
+  });
 }
 
 beforeEach(() => {

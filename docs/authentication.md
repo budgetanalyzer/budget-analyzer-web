@@ -263,7 +263,7 @@ gates or imperative checks, use `usePermission` directly.
 
 ### Permission taxonomy
 
-Backend-owned (permission-service), mirrored in `src/mocks/handlers.ts`. Gating
+Backend-owned (permission-service), mirrored in `src/testing/mocks/handlers.ts`. Gating
 sites use inline string literals; a typo fails safe by returning `false`.
 
 | Resource | Read (self) | Read (cross-user) | Write | Delete |

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { screen } from '@testing-library/react';
 import { UserSearchTable } from '@/features/admin/users/components/UserSearchTable';
+import { renderWithProviders } from '@/testing/test-utils';
 import type { UserSummary } from '@/types/user';
 
 describe('UserSearchTable', () => {
@@ -19,27 +19,26 @@ describe('UserSearchTable', () => {
       },
     ];
 
-    render(
-      <MemoryRouter>
-        <UserSearchTable
-          data={users}
-          metadata={{
-            page: 0,
-            size: 50,
-            numberOfElements: 1,
-            totalElements: 1,
-            totalPages: 1,
-            first: true,
-            last: true,
-          }}
-          sort={['createdAt,DESC', 'id,DESC']}
-          isLoading={false}
-          isFetching={false}
-          onPageChange={() => {}}
-          onSizeChange={() => {}}
-          onSortChange={() => {}}
-        />
-      </MemoryRouter>,
+    renderWithProviders(
+      <UserSearchTable
+        data={users}
+        metadata={{
+          page: 0,
+          size: 50,
+          numberOfElements: 1,
+          totalElements: 1,
+          totalPages: 1,
+          first: true,
+          last: true,
+        }}
+        sort={['createdAt,DESC', 'id,DESC']}
+        isLoading={false}
+        isFetching={false}
+        onPageChange={() => {}}
+        onSizeChange={() => {}}
+        onSortChange={() => {}}
+      />,
+      { initialEntries: ['/admin/users'] },
     );
 
     expect(screen.getByText('Jan 14, 2026')).toBeInTheDocument();

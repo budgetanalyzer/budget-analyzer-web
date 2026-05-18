@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ViewTransactionTable } from '@/features/views/components/ViewTransactionTable';
+import { renderWithProviders } from '@/testing/test-utils';
 import { ViewTransaction } from '@/types/view';
 
 const mutationMocks = vi.hoisted(() => ({
@@ -85,31 +85,24 @@ function renderViewTransactionTable({
   onDateFilterChange?: (from: string | null, to: string | null) => void;
   onClearAllFilters?: () => void;
 } = {}) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-
-  const result = render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/views/${viewId}`]}>
-        <ViewTransactionTable
-          transactions={rows}
-          viewId={viewId}
-          searchText={searchText}
-          dateFilter={dateFilter}
-          hasActiveFilters={hasActiveFilters}
-          onSearchChange={onSearchChange}
-          onDateFilterChange={onDateFilterChange}
-          onClearAllFilters={onClearAllFilters}
-          displayCurrency="USD"
-          exchangeRatesMap={new Map()}
-          isExchangeRatesLoading={false}
-        />
-      </MemoryRouter>
-    </QueryClientProvider>,
+  const result = renderWithProviders(
+    <ViewTransactionTable
+      transactions={rows}
+      viewId={viewId}
+      searchText={searchText}
+      dateFilter={dateFilter}
+      hasActiveFilters={hasActiveFilters}
+      onSearchChange={onSearchChange}
+      onDateFilterChange={onDateFilterChange}
+      onClearAllFilters={onClearAllFilters}
+      displayCurrency="USD"
+      exchangeRatesMap={new Map()}
+      isExchangeRatesLoading={false}
+    />,
+    { initialEntries: [`/views/${viewId}`] },
   );
 
-  return { onSearchChange, onDateFilterChange, onClearAllFilters, queryClient, ...result };
+  return { onSearchChange, onDateFilterChange, onClearAllFilters, ...result };
 }
 
 beforeEach(() => {
@@ -117,13 +110,12 @@ beforeEach(() => {
 });
 
 describe('ViewTransactionTable search', () => {
-  it('submits the typed search text when Enter is pressed', () => {
+  it('submits the typed search text when Enter is pressed', async () => {
     const onSearchChange = vi.fn();
     renderViewTransactionTable({ onSearchChange });
 
     const searchInput = screen.getByPlaceholderText('Search descriptions ↵');
-    fireEvent.change(searchInput, { target: { value: 'coffee' } });
-    fireEvent.keyDown(searchInput, { key: 'Enter' });
+    await userEvent.type(searchInput, 'coffee{Enter}');
 
     expect(onSearchChange).toHaveBeenCalledWith('coffee');
   });
@@ -135,45 +127,42 @@ describe('ViewTransactionTable search', () => {
     expect(screen.queryByText('No transactions in this view.')).not.toBeInTheDocument();
   });
 
-  it('clears the applied search when the clear button is clicked', () => {
+  it('clears the applied search when the clear button is clicked', async () => {
     const onSearchChange = vi.fn();
     renderViewTransactionTable({ searchText: 'coffee', onSearchChange });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
 
     expect(onSearchChange).toHaveBeenCalledWith('');
   });
 
-  it('resets the draft search input when the view changes', () => {
+  it('resets the draft search input when the view changes', async () => {
     const onSearchChange = vi.fn();
-    const { queryClient, rerender } = renderViewTransactionTable({
+    const { rerender } = renderViewTransactionTable({
       searchText: 'coffee',
       onSearchChange,
     });
 
     const searchInput = screen.getByPlaceholderText('Search descriptions ↵');
-    fireEvent.change(searchInput, { target: { value: 'unsubmitted draft' } });
+    await userEvent.clear(searchInput);
+    await userEvent.type(searchInput, 'unsubmitted draft');
 
     expect(searchInput).toHaveValue('unsubmitted draft');
 
     rerender(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/views/view-2']}>
-          <ViewTransactionTable
-            transactions={transactions}
-            viewId="view-2"
-            searchText=""
-            dateFilter={{ from: null, to: null }}
-            hasActiveFilters={false}
-            onSearchChange={onSearchChange}
-            onDateFilterChange={vi.fn()}
-            onClearAllFilters={vi.fn()}
-            displayCurrency="USD"
-            exchangeRatesMap={new Map()}
-            isExchangeRatesLoading={false}
-          />
-        </MemoryRouter>
-      </QueryClientProvider>,
+      <ViewTransactionTable
+        transactions={transactions}
+        viewId="view-2"
+        searchText=""
+        dateFilter={{ from: null, to: null }}
+        hasActiveFilters={false}
+        onSearchChange={onSearchChange}
+        onDateFilterChange={vi.fn()}
+        onClearAllFilters={vi.fn()}
+        displayCurrency="USD"
+        exchangeRatesMap={new Map()}
+        isExchangeRatesLoading={false}
+      />,
     );
 
     expect(screen.getByPlaceholderText('Search descriptions ↵')).toHaveValue('');
@@ -191,18 +180,16 @@ describe('ViewTransactionTable date filters', () => {
     expect(screen.getByDisplayValue('2026-01-31')).toBeInTheDocument();
   });
 
-  it('calls the date filter callback when a date changes', () => {
+  it('calls the date filter callback when a date changes', async () => {
     const onDateFilterChange = vi.fn();
     renderViewTransactionTable({ onDateFilterChange });
 
-    fireEvent.change(screen.getByPlaceholderText('From date'), {
-      target: { value: '2026-01-01' },
-    });
+    await userEvent.type(screen.getByPlaceholderText('From date'), '2026-01-01');
 
     expect(onDateFilterChange).toHaveBeenCalledWith('2026-01-01', null);
   });
 
-  it('clears search and date filters from the clear action', () => {
+  it('clears search and date filters from the clear action', async () => {
     const onClearAllFilters = vi.fn();
     renderViewTransactionTable({
       searchText: 'coffee',
@@ -211,7 +198,7 @@ describe('ViewTransactionTable date filters', () => {
       onClearAllFilters,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
 
     expect(onClearAllFilters).toHaveBeenCalled();
   });
@@ -229,22 +216,22 @@ describe('ViewTransactionTable bulk actions', () => {
   it('shows and clears the bulk action bar when rows are selected', async () => {
     renderViewTransactionTable();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
 
     expect(screen.getByText('1 transaction selected')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
 
     await waitFor(() => {
       expect(screen.queryByText('1 transaction selected')).not.toBeInTheDocument();
     });
   });
 
-  it('opens the bulk pin confirmation modal', () => {
+  it('opens the bulk pin confirmation modal', async () => {
     renderViewTransactionTable();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pin' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Pin' }));
 
     expect(screen.getByRole('heading', { name: 'Pin Transactions' })).toBeInTheDocument();
     expect(
@@ -254,13 +241,13 @@ describe('ViewTransactionTable bulk actions', () => {
     ).toBeInTheDocument();
   });
 
-  it('confirms bulk pin with the view ID and selected IDs', () => {
+  it('confirms bulk pin with the view ID and selected IDs', async () => {
     renderViewTransactionTable();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pin' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Pin' }));
     const pinButtons = screen.getAllByRole('button', { name: 'Pin' });
-    fireEvent.click(pinButtons[pinButtons.length - 1]);
+    await userEvent.click(pinButtons[pinButtons.length - 1]);
 
     expect(mutationMocks.bulkPinMutate).toHaveBeenCalledWith(
       { viewId: 'view-1', ids: [1] },
@@ -271,11 +258,11 @@ describe('ViewTransactionTable bulk actions', () => {
     );
   });
 
-  it('opens the bulk exclude confirmation modal', () => {
+  it('opens the bulk exclude confirmation modal', async () => {
     renderViewTransactionTable();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Exclude' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Exclude' }));
 
     expect(screen.getByRole('heading', { name: 'Exclude Transactions' })).toBeInTheDocument();
     expect(
@@ -285,13 +272,13 @@ describe('ViewTransactionTable bulk actions', () => {
     ).toBeInTheDocument();
   });
 
-  it('confirms bulk exclude with the view ID and selected IDs', () => {
+  it('confirms bulk exclude with the view ID and selected IDs', async () => {
     renderViewTransactionTable();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Exclude' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Exclude' }));
     const excludeButtons = screen.getAllByRole('button', { name: 'Exclude' });
-    fireEvent.click(excludeButtons[excludeButtons.length - 1]);
+    await userEvent.click(excludeButtons[excludeButtons.length - 1]);
 
     expect(mutationMocks.bulkExcludeMutate).toHaveBeenCalledWith(
       { viewId: 'view-1', ids: [1] },
@@ -308,20 +295,20 @@ describe('ViewTransactionTable bulk actions', () => {
     });
     renderViewTransactionTable();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pin' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Pin' }));
     const pinButtons = screen.getAllByRole('button', { name: 'Pin' });
-    fireEvent.click(pinButtons[pinButtons.length - 1]);
+    await userEvent.click(pinButtons[pinButtons.length - 1]);
 
     await waitFor(() => {
       expect(screen.queryByText('1 transaction selected')).not.toBeInTheDocument();
     });
   });
 
-  it('disables bulk pin when only already pinned rows are selected', () => {
+  it('disables bulk pin when only already pinned rows are selected', async () => {
     renderViewTransactionTable();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 3' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 3' }));
 
     expect(screen.getByRole('button', { name: 'Pin' })).toBeDisabled();
   });

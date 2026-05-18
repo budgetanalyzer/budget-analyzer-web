@@ -1,9 +1,9 @@
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useViews } from '@/hooks/useViews';
 import { SavedView } from '@/types/view';
 import { ViewsPage } from '@/features/views/pages/ViewsPage';
+import { renderWithProviders } from '@/testing/test-utils';
 
 vi.mock('@/hooks/useViews', () => ({
   useViews: vi.fn(),
@@ -31,11 +31,9 @@ const savedViews: SavedView[] = [
 ];
 
 function renderPage() {
-  return render(
-    <MemoryRouter>
-      <ViewsPage />
-    </MemoryRouter>,
-  );
+  return renderWithProviders(<ViewsPage />, {
+    initialEntries: ['/views'],
+  });
 }
 
 describe('ViewsPage', () => {

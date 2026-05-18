@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ViewCriteriaSummary } from '@/features/views/components/ViewCriteriaSummary';
 
 describe('ViewCriteriaSummary', () => {
@@ -16,7 +17,7 @@ describe('ViewCriteriaSummary', () => {
     expect(screen.getByText('Debit')).toBeInTheDocument();
   });
 
-  it('calls the restore handler from the excluded badge', () => {
+  it('calls the restore handler from the excluded badge', async () => {
     const handleRestoreExcludedClick = vi.fn();
 
     render(
@@ -28,7 +29,7 @@ describe('ViewCriteriaSummary', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Restore 33 excluded transactions' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Restore 33 excluded transactions' }));
 
     expect(handleRestoreExcludedClick).toHaveBeenCalledTimes(1);
   });

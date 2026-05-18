@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Link, MemoryRouter, Route, Routes } from 'react-router';
 import { BackButton } from '@/components/BackButton';
 
@@ -39,19 +40,19 @@ describe('BackButton', () => {
     expect(screen.queryByRole('button', { name: /Back/ })).not.toBeInTheDocument();
   });
 
-  it('uses explicit returnTo URL context when present', () => {
+  it('uses explicit returnTo URL context when present', async () => {
     renderRoutes(['/transactions/1?returnTo=%2F&breadcrumbLabel=Jan%202026']);
 
-    fireEvent.click(screen.getByRole('button', { name: /Back/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Back/ }));
 
     expect(screen.getByText('List page')).toBeInTheDocument();
   });
 
-  it('uses browser history after in-app navigation', () => {
+  it('uses browser history after in-app navigation', async () => {
     renderRoutes(['/']);
 
-    fireEvent.click(screen.getByRole('link', { name: /Open detail/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Back/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Open detail/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Back/ }));
 
     expect(screen.getByText('List page')).toBeInTheDocument();
   });

@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
-import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router';
-import { configureStore } from '@reduxjs/toolkit';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, fireEvent, within } from '@testing-library/react';
 
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/hooks/useTransactions', async (importOriginal) => {
@@ -26,7 +22,7 @@ vi.mock('@/hooks/useViews', async (importOriginal) => {
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { TransactionTable } from '@/features/transactions/components/TransactionTable';
 import { Transaction } from '@/types/transaction';
-import uiReducer from '@/store/uiSlice';
+import { renderWithProviders } from '@/testing/test-utils';
 
 const mockUsePermission = vi.mocked(usePermission);
 
@@ -71,31 +67,22 @@ beforeAll(() => {
 });
 
 function renderTable() {
-  const store = configureStore({ reducer: { ui: uiReducer } });
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  return render(
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/transactions']}>
-          <TransactionTable
-            transactions={transactions}
-            globalFilter=""
-            dateFilter={{ from: null, to: null }}
-            bankNameFilter={null}
-            accountIdFilter={null}
-            typeFilter={null}
-            amountFilter={{ min: null, max: null }}
-            displayCurrency="USD"
-            exchangeRatesMap={new Map()}
-            isExchangeRatesLoading={false}
-            availableBankNames={['Test Bank']}
-            availableAccountIds={['acct-1']}
-          />
-        </MemoryRouter>
-      </QueryClientProvider>
-    </Provider>,
+  return renderWithProviders(
+    <TransactionTable
+      transactions={transactions}
+      globalFilter=""
+      dateFilter={{ from: null, to: null }}
+      bankNameFilter={null}
+      accountIdFilter={null}
+      typeFilter={null}
+      amountFilter={{ min: null, max: null }}
+      displayCurrency="USD"
+      exchangeRatesMap={new Map()}
+      isExchangeRatesLoading={false}
+      availableBankNames={['Test Bank']}
+      availableAccountIds={['acct-1']}
+    />,
+    { initialEntries: ['/transactions'] },
   );
 }
 
