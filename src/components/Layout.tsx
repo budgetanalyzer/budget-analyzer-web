@@ -1,6 +1,6 @@
 // src/components/Layout.tsx
 import { Outlet, Link, Navigate, useLocation, useSearchParams } from 'react-router';
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Wallet } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CurrencySelector } from '@/components/CurrencySelector';
@@ -11,26 +11,11 @@ import { UserProfileDropdown } from '@/features/auth/components/UserProfileDropd
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { isAdmin } from '@/features/auth/utils/role';
 import { cn } from '@/utils/cn';
-import { useAppDispatch } from '@/store/hooks';
-import { setHasNavigated } from '@/store/uiSlice';
 
 export function Layout() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const dispatch = useAppDispatch();
-  const isInitialMount = useRef(true);
   const { user, isAuthenticated, isLoading, login } = useAuth();
-
-  useEffect(() => {
-    // Skip the initial mount - this is the first page load
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    // Any subsequent location change means user has navigated
-    dispatch(setHasNavigated(true));
-  }, [location.pathname, dispatch]);
 
   // Check if we should show breadcrumbs (only when returnTo and breadcrumbLabel are present)
   const returnTo = searchParams.get('returnTo');

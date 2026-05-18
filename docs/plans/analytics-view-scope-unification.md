@@ -1,5 +1,9 @@
 # Analytics View Scope Unification Plan
 
+Status: Finalized. All implementation phases are complete; this document now
+records the delivered scope contract, verification coverage, and follow-up
+decisions.
+
 ## Goal
 
 Implement the long-term UX model where Transactions, Views, and Analytics remain
@@ -18,20 +22,21 @@ The core product behavior:
 - Analytics drilldowns route to the correct operational page for the active
   source.
 
-## Current State
+## Delivered State
 
-- `AnalyticsPage` calls `useTransactions()` and analyzes the full transaction
-  list only.
+- `AnalyticsPage` resolves its source from URL params and analyzes either all
+  transactions or canonical saved-view membership.
 - `MonthlySpendingCard` and `YearlySpendingCard` build drilldown links through
-  `buildTransactionsUrl`, so every analytics drilldown goes to the all
-  transactions page.
-- `ViewsPage` aggregate stats use `filterTransactionsByCriteria`, which ignores
-  pinned and excluded view membership.
+  `buildAnalyticsDrilldownUrl`, so analytics opens the correct operational
+  page for the active source.
+- `ViewsPage` is a saved-view directory only. The previous aggregate
+  selected-view stats surface was removed instead of canonicalized because it
+  added complexity that does not belong in the analytics scope-unification work.
 - `ViewPage` and `ViewTransactionTable` use canonical membership through
-  `useViewTransactions`, but the table only supports text search and does not
-  have URL-backed date filters.
-- `ViewSelector` is navigation. It should stay navigation and should not become
-  the global analytics source selector.
+  `useViewTransactions` and support URL-backed `dateFrom`, `dateTo`, and `q`
+  filters.
+- `ViewSelector` remains navigation. `AnalyticsSourceSelector` owns analytics
+  source selection.
 
 ## Non-Goals
 
@@ -41,6 +46,8 @@ The core product behavior:
 - Do not make "All transactions" a pseudo saved view in the Views dropdown.
 - Do not use selected view IDs from Redux/localStorage as analytics context.
 - Do not implement multi-view analytics in this pass.
+- Do not preserve or replace the Views page aggregate selected-view stats
+  surface.
 
 ## URL Contract
 
@@ -57,7 +64,8 @@ Defaults:
 - `scope=view` without a valid `viewId` falls back to `all` or shows a scoped
   error state. Prefer fallback only for malformed URLs and a visible API error
   for missing/deleted views.
-- Existing `viewMode`, `transactionType`, and `year` behavior remains intact.
+- Missing or malformed `viewMode`, `transactionType`, and `year` values fall
+  back to monthly debit analytics and the latest available transaction year.
 
 View drilldown URLs:
 
@@ -72,6 +80,8 @@ All-transaction drilldown URLs:
 ```
 
 ## Phase 1: Shared URL State And Drilldown Builder
+
+Status: Implemented.
 
 Files likely affected:
 
@@ -114,6 +124,8 @@ Acceptance criteria:
 
 ## Phase 2: Analytics Source Resolution
 
+Status: Implemented.
+
 Files likely affected:
 
 - `src/features/analytics/pages/AnalyticsPage.tsx`
@@ -155,7 +167,9 @@ Acceptance criteria:
 - No Redux/localStorage state controls analytics source.
 - Tests cover all-scope and view-scope data selection.
 
-## Phase 3: Canonicalize Views Aggregate Stats
+## Phase 3: Remove Views Aggregate Stats
+
+Status: Implemented.
 
 Files likely affected:
 
@@ -164,32 +178,122 @@ Files likely affected:
 - `src/features/views/hooks/useAggregateViewStats.ts`
 - `src/features/views/components/SelectableViewCard.tsx`
 - `src/hooks/useViews.ts`
+- `src/features/views/index.ts`
+- view stats tests, if present
 
 Tasks:
 
-1. Replace criteria-only aggregate stat calculation with canonical membership
-   where feasible.
-2. Decide whether the Views list overview should fetch every selected view's
-   membership:
-   - For current scale, `useQueries` for selected views is acceptable.
-   - If view count becomes large, defer exact aggregate stats behind an explicit
-     "Calculate" action or backend aggregate endpoint.
-3. Preserve deduplication when multiple selected views contain the same
-   transaction.
-4. Ensure pinned transactions are included and excluded transactions are not
-   included.
-5. Update individual view card summary calculations if they currently present
-   criteria-only totals that can diverge from view detail.
-6. Consider a loading skeleton or compact loading state for aggregate stats when
-   memberships are being resolved.
+1. Remove the aggregate stats UI from the Views list page.
+2. Remove the selected-view aggregate state and selection handlers from
+   `ViewsPage`.
+3. Delete `AggregateViewStats.tsx` and `useAggregateViewStats.ts`.
+4. Simplify or replace `SelectableViewCard` so view cards are navigation and
+   management entry points only, not aggregate-stat selectors.
+5. Remove criteria-only aggregate calculations, deduplication code, monthly
+   average helpers, and any query dependencies used only by the aggregate stats
+   feature.
+6. Remove exports, imports, tests, fixtures, and mocks that exist only for
+   aggregate view stats.
+7. Keep the Views list focused on listing saved views and linking to View
+   Detail / Analytics entry points.
 
 Acceptance criteria:
 
-- Aggregate stats on the Views page reconcile with individual View Detail
-  transaction membership.
-- Selected-view deduplication still works.
-- No stats surface presents criteria-only totals as canonical view totals.
-- Tests cover pinned/excluded cases.
+- No aggregate selected-view stats UI remains on the Views page.
+- No aggregate stats hook, component, or view-selection state remains in the
+  views feature.
+- No code path computes criteria-only selected-view totals or monthly averages.
+- Existing view list, view detail, and view-to-analytics flows continue to work.
+- Tests no longer assert aggregate stats behavior and cover the remaining view
+  list interactions where needed.
+
+## Phase 3b: Minimize Redux UI State
+
+Status: Implemented.
+
+Files likely affected:
+
+- `src/store/uiSlice.ts`
+- `src/features/transactions/pages/TransactionsPage.tsx`
+- `src/features/transactions/components/TransactionTable.tsx`
+- `src/features/transactions/hooks/useTransactionFiltersSync.ts`
+- `src/components/CreateViewModal.tsx`
+- `src/components/Layout.tsx`
+- `src/components/BackButton.tsx`
+- `src/features/admin/components/AdminLayout.tsx`
+- transaction table, transactions page, layout, and store tests
+- `docs/state-architecture.md`
+- `docs/architecture.md`
+
+Target Redux shape:
+
+```ts
+{
+  theme,
+  displayCurrency,
+  adminSidebarOpen,
+}
+```
+
+`adminSidebarMobileOpen` may remain only if there is a concrete cross-component
+control need; otherwise move it into `AdminLayout` local state.
+
+Tasks:
+
+1. Remove unused transaction selection state:
+   - `selectedTransactionId`
+   - `setSelectedTransactionId`
+2. Remove navigation-history state from Redux:
+   - `hasNavigated`
+   - `setHasNavigated`
+3. Replace `hasNavigated` with a route-local or layout-local mechanism for
+   `BackButton`, or simplify `BackButton` to use URL `returnTo` / browser
+   history behavior where available.
+4. Remove `transactionTable` from Redux.
+5. Make URL parameters the source of truth for shareable transaction filters:
+   - `q`
+   - `dateFrom`
+   - `dateTo`
+   - `bankName`
+   - `accountId`
+   - `type`
+   - `minAmount`
+   - `maxAmount`
+6. Keep table-only state local to `TransactionTable`:
+   - sorting
+   - pagination
+   - transient search input text before it is committed to the URL
+7. Delete `useTransactionFiltersSync` if its only remaining purpose is mirroring
+   URL parameters into Redux.
+8. Update `CreateViewModal` so clearing filters updates the URL/source state
+   directly instead of dispatching Redux table-filter actions.
+9. Move `adminSidebarMobileOpen` into `AdminLayout` local state unless another
+   component needs to open/close it.
+10. Keep Redux for true global preferences only:
+    - `theme`
+    - `displayCurrency`
+    - persisted desktop `adminSidebarOpen`
+11. Remove dead actions, selectors, tests, and imports after the state shape is
+    reduced.
+12. Update state architecture docs to describe:
+    - React Query for server state
+    - URL params for shareable route state
+    - local component state for table mechanics
+    - Redux only for global user/layout preferences
+
+Acceptance criteria:
+
+- Redux no longer stores transaction table filters, sorting, pagination, route
+  history, or selected transaction IDs.
+- Transaction filter URLs remain refreshable and shareable.
+- Clearing transaction filters still clears the URL-backed filters.
+- Transaction table sorting and pagination still work within the active page
+  session.
+- `BackButton` behavior is preserved or deliberately simplified and covered by
+  tests.
+- `adminSidebarOpen` remains persisted for desktop admin layout.
+- No new Redux state is introduced for analytics source or view selection.
+- State architecture documentation reflects the minimized Redux scope.
 
 ## Phase 4: URL-Backed Date Filtering On View Detail
 
@@ -208,10 +312,12 @@ Remaining tasks:
 
 ## Phase 5: View-To-Analytics Entry Points
 
+Status: Implemented.
+
 Files likely affected:
 
 - `src/features/views/pages/ViewPage.tsx`
-- `src/features/views/components/SelectableViewCard.tsx`
+- `src/features/views/components/ViewCard.tsx`
 - `src/features/views/pages/ViewsPage.tsx`
 - `src/features/analytics/utils/urlState.ts`
 
@@ -219,22 +325,32 @@ Tasks:
 
 1. Add "Analyze View" action on View Detail.
 2. Optionally add a compact analyze action on each view card, separate from
-   selection and "View Details".
+   "View Details".
 3. Build links with the analytics URL builder so scope is always explicit:
    `scope=view&viewId=<id>`.
 4. Preserve the current analytics defaults:
    - monthly
    - debit
    - latest year with transactions
-5. Avoid making view card selection imply analytics source.
+5. Do not add persistent view-card selection state as analytics source.
 
 Acceptance criteria:
 
 - From a view detail page, one click opens Analytics scoped to that view.
-- View card selection remains aggregate-overview state only.
+- The Views list remains a directory; choosing an analytics source is explicit
+  through the analyze link or Analytics source selector.
 - Analyze links are normal links, not hidden persistent context.
 
 ## Phase 6: Tests, Docs, And Regression Checks
+
+Status: Implemented.
+
+Final verification coverage includes analytics URL parsing/building,
+analytics drilldown URL routing, all-scope and view-scope analytics source
+resolution, analytics source selector URL changes, all-scope and view-scope
+month drilldowns, date-filtered view-detail landing from analytics, clearing
+analytics breadcrumb URL context from view detail, removal of aggregate view
+stats UI, and the minimized Redux state shape.
 
 Files likely affected:
 
@@ -253,7 +369,8 @@ Tasks:
    - analytics source selector behavior
    - view-scoped analytics data resolution
    - view detail date URL sync
-   - canonical view aggregate stats
+   - removal of aggregate view stats UI and selected-view state
+   - minimized Redux state shape
 2. Add integration-style component tests for:
    - analytics month click in all scope
    - analytics month click in view scope
@@ -286,21 +403,27 @@ Recommended order:
 3. Phase 2: Analytics source selector and `useViewTransactions` source
    resolution.
 4. Phase 5: View-to-analytics links.
-5. Phase 3: Canonical view aggregate stats.
-6. Phase 6: final documentation, full tests, and build.
+5. Phase 3: remove aggregate view stats UI/code.
+6. Phase 3b: minimize Redux UI state.
+7. Phase 6: final documentation, full tests, and build.
 
 This order keeps each pull of behavior verifiable: first URLs, then view landing
-behavior, then analytics source selection, then entry points, then stats
-reconciliation.
+behavior, then analytics source selection, then entry points, then removal of
+the obsolete stats surface, then state cleanup once the URL-backed behavior is
+settled.
 
-## Risks And Decisions To Confirm
+## Final Decisions
 
-- Fetching canonical membership for many selected views on `ViewsPage` may be
-  noisy if users have many views. Start with selected views only and reassess if
-  latency becomes visible.
+- Removing aggregate stats means the Views page no longer tries to summarize
+  selected-view transaction totals. Use Analytics scoped to a single view for
+  transaction analysis instead of reintroducing a parallel stats surface.
+- Removing `transactionTable` from Redux must not break the transaction URL
+  contract. Treat URL params as canonical for filters and local state as
+  canonical only for non-shareable table mechanics.
 - `ViewTransactionTable` currently owns local pagination, sorting, and search
   input state. Adding URL-backed date filters should not globalize this state.
 - Analytics cards should not contain route branching directly. Keep destination
   branching in `buildAnalyticsDrilldownUrl`.
-- View-scoped analytics should likely show view metadata near the source
-  selector so users can tell pinned/excluded membership is being honored.
+- View-scoped analytics shows the selected view in the page description and
+  source selector so users can tell which canonical membership is being
+  analyzed.

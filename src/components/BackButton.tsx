@@ -1,42 +1,39 @@
 import { ArrowLeft } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router';
+import { useCallback } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/Button';
-import { useAppSelector } from '@/store/hooks';
 
 // Top-level routes where back button should never appear
 // These are primary navigation destinations (list/index pages, navbar items)
 const TOP_LEVEL_ROUTES = ['/', '/analytics'];
 
 /**
- * BackButton component that displays a back navigation button
- * only when there is application navigation history.
+ * BackButton component for detail/drill-down pages.
  *
- * Shows button only when BOTH conditions are true:
- * 1. Current route is NOT a top-level route (reserved for detail/drill-down pages)
- * 2. User has navigated within the app (not a direct/bookmarked load)
- *
- * Navigation tracking is handled by the Layout component to ensure it happens
- * before page components render.
- *
- * This ensures the button only appears on detail pages like transaction detail,
- * and only when the user actually navigated there from another page in the app.
+ * Prefer explicit URL return context from analytics/view drilldowns. Otherwise
+ * fall back to browser history when this route was reached through in-app
+ * navigation.
  */
 export function BackButton() {
   const navigate = useNavigate();
   const location = useLocation();
-  const hasNavigated = useAppSelector((state) => state.ui.hasNavigated);
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
+    if (returnTo) {
+      navigate(returnTo);
+      return;
+    }
+
     navigate(-1);
-  };
+  }, [navigate, returnTo]);
 
   // Check if current route is a top-level route
   const isTopLevel = TOP_LEVEL_ROUTES.includes(location.pathname);
+  const hasBrowserHistory = location.key !== 'default';
 
-  // Don't show button if:
-  // - On a top-level route (list pages, navbar destinations), OR
-  // - User hasn't navigated yet (direct/bookmarked load)
-  if (isTopLevel || !hasNavigated) {
+  if (isTopLevel || (!returnTo && !hasBrowserHistory)) {
     return null;
   }
 

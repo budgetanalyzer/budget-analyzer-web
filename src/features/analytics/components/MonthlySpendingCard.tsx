@@ -6,8 +6,9 @@ import { fadeInVariants, fadeTransition } from '@/lib/animations';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router';
 import { getMonthBounds } from '@/utils/dates';
-import { buildTransactionsUrl } from '@/utils/navigation';
+import { buildAnalyticsDrilldownUrl } from '@/utils/navigation';
 import {
+  AnalyticsScope,
   buildAnalyticsReturnUrl,
   ViewMode,
   TransactionTypeParam,
@@ -22,6 +23,8 @@ interface MonthlySpendingCardProps {
   currency: string;
   viewMode: ViewMode;
   transactionType: TransactionTypeParam;
+  analyticsScope: AnalyticsScope;
+  viewId?: string;
 }
 
 export function MonthlySpendingCard({
@@ -33,6 +36,8 @@ export function MonthlySpendingCard({
   currency,
   viewMode,
   transactionType,
+  analyticsScope,
+  viewId,
 }: MonthlySpendingCardProps) {
   // Calculate first and last day of month (handles leap years correctly)
   const { from: firstDay, to: lastDay } = getMonthBounds(year, month);
@@ -43,10 +48,18 @@ export function MonthlySpendingCard({
   const amountColorClass = isCredit ? 'text-green-600 dark:text-green-400' : 'text-foreground';
 
   // Build return URL with preserved state (include year for monthly view)
-  const returnTo = buildAnalyticsReturnUrl(viewMode, transactionType, year);
+  const returnTo = buildAnalyticsReturnUrl({
+    viewMode,
+    transactionType,
+    year,
+    scope: analyticsScope,
+    viewId,
+  });
 
   // Build URL with date filters, return path, and breadcrumb label
-  const transactionsUrl = buildTransactionsUrl({
+  const drilldownUrl = buildAnalyticsDrilldownUrl({
+    scope: analyticsScope,
+    viewId,
     dateFrom: firstDay,
     dateTo: lastDay,
     returnTo,
@@ -60,7 +73,7 @@ export function MonthlySpendingCard({
       animate="animate"
       transition={fadeTransition}
     >
-      <Link to={transactionsUrl}>
+      <Link to={drilldownUrl}>
         <Card className="h-full transition-shadow hover:shadow-md hover:border-primary cursor-pointer">
           <CardContent className="pt-6">
             <div className="flex flex-col space-y-3">

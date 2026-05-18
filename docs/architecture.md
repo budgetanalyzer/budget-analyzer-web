@@ -5,9 +5,14 @@
 | Layer | Tool | Purpose |
 |-------|------|---------|
 | Server state | TanStack Query (React Query) | API data, caching, loading/error states |
-| Client state | Redux Toolkit | Theme, UI preferences |
+| Route state | URL search params | Shareable filters, analytics source, drilldown return context |
+| Client state | Redux Toolkit | Global preferences: theme, display currency, desktop admin sidebar |
+| Local state | React component state | Table mechanics, draft inputs, modals, mobile overlays |
 
 This separation keeps server concerns (caching, refetching, optimistic updates) out of the global store.
+Redux intentionally does not store transaction filters, table sorting,
+pagination, selected transaction IDs, navigation history, analytics source, or
+saved-view selection.
 
 ## Component Strategy
 
@@ -16,6 +21,33 @@ Using **Shadcn/UI** for components:
 - Full customization control
 - Tailwind CSS integration
 - Built-in accessibility (Radix primitives)
+
+## Page Responsibilities
+
+Transactions, saved views, and analytics are separate task surfaces:
+
+| Page | Responsibility |
+|------|----------------|
+| Transactions (`/`) | All-transaction management and filtering |
+| Views (`/views`) | Saved-view directory and entry point to view detail or view-scoped analytics |
+| View detail (`/views/:id`) | Saved-view membership management, including pinned and excluded rows |
+| Analytics (`/analytics`) | Spending analysis for either all transactions or one saved view |
+
+Transaction filters are URL-backed so filtered lists remain refreshable and
+shareable. The supported filter params are `q`, `dateFrom`, `dateTo`,
+`bankName`, `accountId`, `type`, `minAmount`, and `maxAmount`. Table sorting,
+pagination, row selection, and draft filter input text are local table state.
+
+Analytics source selection is explicit in the URL. Missing `scope` defaults to
+all transactions; `scope=view&viewId=<id>` analyzes canonical saved-view
+membership from `useViewTransactions`, not criteria-only local filtering.
+View detail and saved-view cards link to analytics with an explicit
+`scope=view&viewId=<id>` URL; they do not store selected analytics context.
+Analytics drilldowns route back to the operational surface for the selected
+source: `/` for all transactions and `/views/:id` for saved-view analytics.
+Those drilldowns carry `dateFrom`, `dateTo`, `returnTo`, and `breadcrumbLabel`
+URL parameters so the operational page is filtered to the clicked analytics
+period and can return to the same analytics state.
 
 ## CSP Compliance
 

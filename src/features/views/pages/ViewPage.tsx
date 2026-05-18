@@ -3,7 +3,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, LayoutGroup, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Hash, Pin, Calendar, Eye } from 'lucide-react';
+import { ArrowLeft, Hash, Pin, Calendar, Eye, BarChart3 } from 'lucide-react';
 import { useView, useViewTransactions } from '@/hooks/useViews';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
@@ -28,6 +28,7 @@ import { fadeInVariants, layoutTransition } from '@/lib/animations';
 import { formatCurrency } from '@/utils/currency';
 import { compareLocalDates, formatLocalDate, getDateRange } from '@/utils/dates';
 import { filterTransactionsByTableSearch } from '@/utils/transactionSearch';
+import { buildAnalyticsReturnUrl } from '@/features/analytics/utils/urlState';
 
 export function ViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -208,6 +209,13 @@ function ViewPageContent({ id }: { id: string }) {
     return null;
   }
 
+  const analyzeViewUrl = buildAnalyticsReturnUrl({
+    scope: 'view',
+    viewId: id,
+    viewMode: 'monthly',
+    transactionType: 'debit',
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -221,6 +229,13 @@ function ViewPageContent({ id }: { id: string }) {
                 Restore Excluded
               </Button>
             )}
+            <Link
+              to={analyzeViewUrl}
+              className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Analyze View
+            </Link>
             <ViewSettingsMenu
               view={view}
               onEditClick={handleEditClick}

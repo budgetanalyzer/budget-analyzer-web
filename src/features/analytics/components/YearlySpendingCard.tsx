@@ -6,8 +6,9 @@ import { fadeInVariants, fadeTransition } from '@/lib/animations';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router';
 import { getYearBounds } from '@/utils/dates';
-import { buildTransactionsUrl } from '@/utils/navigation';
+import { buildAnalyticsDrilldownUrl } from '@/utils/navigation';
 import {
+  AnalyticsScope,
   buildAnalyticsReturnUrl,
   ViewMode,
   TransactionTypeParam,
@@ -21,6 +22,8 @@ interface YearlySpendingCardProps {
   currency: string;
   viewMode: ViewMode;
   transactionType: TransactionTypeParam;
+  analyticsScope: AnalyticsScope;
+  viewId?: string;
 }
 
 export function YearlySpendingCard({
@@ -31,6 +34,8 @@ export function YearlySpendingCard({
   currency,
   viewMode,
   transactionType,
+  analyticsScope,
+  viewId,
 }: YearlySpendingCardProps) {
   // Calculate first and last day of year
   const { from: firstDay, to: lastDay } = getYearBounds(year);
@@ -41,10 +46,17 @@ export function YearlySpendingCard({
   const amountColorClass = isCredit ? 'text-green-600 dark:text-green-400' : 'text-foreground';
 
   // Build return URL with preserved state
-  const returnTo = buildAnalyticsReturnUrl(viewMode, transactionType);
+  const returnTo = buildAnalyticsReturnUrl({
+    viewMode,
+    transactionType,
+    scope: analyticsScope,
+    viewId,
+  });
 
   // Build URL with date filters, return path, and breadcrumb label
-  const transactionsUrl = buildTransactionsUrl({
+  const drilldownUrl = buildAnalyticsDrilldownUrl({
+    scope: analyticsScope,
+    viewId,
     dateFrom: firstDay,
     dateTo: lastDay,
     returnTo,
@@ -58,7 +70,7 @@ export function YearlySpendingCard({
       animate="animate"
       transition={fadeTransition}
     >
-      <Link to={transactionsUrl}>
+      <Link to={drilldownUrl}>
         <Card className="h-full transition-shadow hover:shadow-md hover:border-primary cursor-pointer">
           <CardContent className="pt-6">
             <div className="flex flex-col space-y-3">

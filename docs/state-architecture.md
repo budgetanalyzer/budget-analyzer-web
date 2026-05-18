@@ -1,384 +1,137 @@
 # State Architecture Guide
 
-This document explains how state management works in the Budget Analyzer application.
+Budget Analyzer uses separate tools for separate kinds of state. Keep state in
+the narrowest durable place that satisfies the user workflow.
 
-## Overview
+## State Ownership
 
-This app uses **THREE different state management systems** working together:
+| State type | Owner | Examples |
+|---|---|---|
+| Server state | TanStack Query | Transactions, saved views, users, currencies |
+| Shareable route state | URL search params | Transaction filters, analytics source and controls |
+| Global preferences | Redux Toolkit | Theme, display currency, persisted desktop admin sidebar |
+| Local UI mechanics | Component state | Table sorting, pagination, row selection, draft inputs, modal state |
+| Derived data | `useMemo` or plain calculations | Filtered rows, stats, available filter options |
 
-1. **React Query** (Server State) - Transactions, API data
-2. **Redux Toolkit** (Client/UI State) - Theme, selections
-3. **Local Component State** (`useState`) - Temporary UI state
+Redux is intentionally small. The `ui` slice contains only:
 
----
-
-## Complete State Architecture Map
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     YOUR APPLICATION                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  1. REACT QUERY CACHE (Server State)                 │  │
-│  │     - Transactions data ✅ (This is where they live!) │  │
-│  │     - Loading states                                  │  │
-│  │     - Error states                                    │  │
-│  │     - Automatic refetching                            │  │
-│  │     - 5-minute cache (staleTime)                      │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                          ↑                                   │
-│                          │ useTransactions() hook            │
-│                          │                                   │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  2. REDUX STORE (UI State)                           │  │
-│  │     - theme: 'light' | 'dark'                        │  │
-│  │     - selectedTransactionId: number | null           │  │
-│  │     - searchQuery: string                            │  │
-│  │     (NO transaction data!)                           │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                          ↑                                   │
-│                          │ useSelector() / useDispatch()     │
-│                          │                                   │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  3. LOCAL COMPONENT STATE (Temporary)                │  │
-│  │     TransactionsPage:                                │  │
-│  │       - globalFilter: string                         │  │
-│  │       - filteredTransactions: Transaction[]          │  │
-│  │     TransactionTable:                                │  │
-│  │       - sorting: SortingState                        │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 1. React Query - Server State (Where Transactions Live)
-
-**Location:** `src/hooks/useTransactions.ts`
-
-```typescript
-export const useTransactions = () => {
-  return useQuery<Transaction[], ApiError>({
-    queryKey: ['transactions'],  // ← Cache key
-    queryFn: async () => {
-      // Fetch from API
-      return transactionApi.getTransactions();
-    },
-    staleTime: 1000 * 60 * 5,  // Cache for 5 minutes
-    retry: 1,
-  });
-};
-```
-
-### How it works:
-
-1. **First call:** Fetches data from API → stores in cache with key `['transactions']`
-2. **Subsequent calls:** Returns cached data (for 5 minutes)
-3. **After 5 minutes:** Marks data as "stale", refetches in background
-4. **Storage:** In memory (not Redux, not localStorage)
-
-### Usage:
-
-```typescript
-// In TransactionsPage.tsx
-const { data: transactions, isLoading, error, refetch } = useTransactions();
-```
-
-The `transactions` variable contains the array from React Query's cache!
-
-### Why React Query for Transactions?
-
-✅ **Automatic caching** - No manual cache management
-✅ **Background refetching** - Always fresh data
-✅ **Deduplication** - Multiple components can call `useTransactions()`, only 1 request
-✅ **Loading/error states** - Built-in
-✅ **Optimistic updates** - Easy to implement
-✅ **Less boilerplate** - No actions, reducers, sagas
-
----
-
-## 2. Redux - UI State ONLY
-
-**Location:** `src/store/uiSlice.ts`
-
-### What's Stored:
-
-```typescript
-interface UiState {
-  theme: 'light' | 'dark';              // ← Dark mode toggle
-  selectedTransactionId: number | null; // ← Which row is selected
-  searchQuery: string;                  // ← Search box text
+```ts
+{
+  theme,
+  displayCurrency,
+  adminSidebarOpen,
 }
 ```
 
-### What's NOT Stored in Redux:
+Do not add transaction filters, table mechanics, navigation history, selected
+transaction IDs, analytics source, or selected saved views to Redux.
 
-- ❌ Transactions data
-- ❌ Loading states
-- ❌ API errors
+## React Query
 
-### Why Separate UI State from Server State?
+Use React Query for data fetched from backend services. It owns cache lifetime,
+deduplication, loading states, errors, and invalidation.
 
-- **UI state** = Client-only preferences (theme, selections)
-- **Server state** = Data from backend (transactions, users, etc.)
-- React Query is **better** for server state (caching, refetching, deduplication)
+Examples:
 
-### Usage:
+- `useTransactions()` for the authenticated user's transactions.
+- `useView(viewId)` and `useViewTransactions(viewId)` for saved-view metadata
+  and canonical view membership.
+- Admin list/search hooks for users, transactions, currencies, and statement
+  formats.
 
-```typescript
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { toggleTheme } from '@/store/uiSlice';
+Server data should not be copied into Redux. Components receive query data and
+derive display-specific values locally.
 
-function ThemeToggle() {
-  const theme = useAppSelector(state => state.ui.theme);
-  const dispatch = useAppDispatch();
+## URL-Backed Route State
 
-  return (
-    <button onClick={() => dispatch(toggleTheme())}>
-      Toggle Theme
-    </button>
-  );
-}
+Use URL search params when state must survive refreshes, be shareable, or be a
+return target for drilldowns.
+
+### Transaction Filters
+
+The Transactions page treats these URL params as the source of truth:
+
+```text
+/?q=coffee&dateFrom=2026-01-01&dateTo=2026-01-31&bankName=Test%20Bank&accountId=checking&type=DEBIT&minAmount=10&maxAmount=250
 ```
 
-### Why Redux for UI State?
+Supported params:
 
-✅ **Global UI preferences** - Theme accessible everywhere
-✅ **Persisted to localStorage** - Theme survives page refresh
-✅ **Predictable updates** - Clear actions for state changes
-✅ **DevTools** - Time-travel debugging
+- `q`
+- `dateFrom`
+- `dateTo`
+- `bankName`
+- `accountId`
+- `type`
+- `minAmount`
+- `maxAmount`
 
----
+`returnTo` and `breadcrumbLabel` are navigation context from drilldowns, not
+filters. Clearing filters removes them along with the filter params.
 
-## 3. Local Component State - Temporary UI
+### Analytics Source
 
-### TransactionsPage.tsx:
+Analytics does not store its active source in Redux or localStorage. The source
+is URL-backed:
 
-```typescript
-const [globalFilter, setGlobalFilter] = useState('');
-const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+```text
+/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2026
+/analytics?scope=view&viewId=<view-id>&viewMode=monthly&transactionType=debit&year=2026
 ```
 
-### TransactionTable.tsx:
+Missing or malformed analytics controls fall back to the default analytics
+surface: all transactions, monthly view, debit transactions, and the latest
+available transaction year when `year` is absent or invalid.
 
-```typescript
-const [sorting, setSorting] = useState<SortingState>([]);
-```
+`scope=all` resolves data with `useTransactions()`. `scope=view` resolves saved
+view metadata with `useView(viewId)` and canonical visible membership with
+`useViewTransactions(viewId)`, so pinned transactions are included and excluded
+transactions are omitted. `useAnalyticsData` receives the already resolved
+transaction list and remains unaware of how the source was fetched.
+View detail and saved-view cards navigate to view-scoped analytics with normal
+links; they do not persist selected views or analytics source in Redux.
 
-### Why Local State?
+## Redux Preferences
 
-✅ **Component-specific** - Values only matter in one component
-✅ **Automatic cleanup** - Reset when component unmounts
-✅ **Simple** - No boilerplate
+Use Redux only for global user/layout preferences that need cross-tree access or
+localStorage persistence:
 
----
+- `theme`
+- `displayCurrency`
+- `adminSidebarOpen`
 
-## Data Flow: Complete Examples
+The desktop admin sidebar preference is persisted because it is layout chrome.
+The mobile admin sidebar overlay is local state in `AdminLayout` because no
+other component needs to open or close it.
 
-### Initial Page Load
+## Local Component State
 
-```
-1. User navigates to /transactions
-   ↓
-2. TransactionsPage renders
-   ↓
-3. useTransactions() hook called
-   ↓
-4. React Query checks cache for ['transactions']
-   ↓
-5. Cache miss → calls queryFn (API fetch)
-   ↓
-6. API returns data → React Query stores in cache
-   ↓
-7. Component re-renders with data
-   ↓
-8. transactions passed to TransactionTable
-   ↓
-9. Table renders rows
-```
+Use local state for mechanics that matter only while the current component is
+mounted:
 
-### User Types in Search Box
+- Transaction table sorting and pagination.
+- Row selection and bulk-action dialog state.
+- Draft search and amount input values before they are committed to the URL.
+- Modal form fields.
 
-```
-1. User types "CREDIT" in search input
-   ↓
-2. onChange fires → setGlobalFilter('CREDIT')
-   ↓
-3. TransactionsPage state updates
-   ↓
-4. globalFilter prop passed to TransactionTable
-   ↓
-5. TanStack Table filters rows internally
-   ↓
-6. useEffect detects change
-   ↓
-7. Calls onFilteredRowsChange(filteredRows)
-   ↓
-8. TransactionsPage: setFilteredTransactions(filteredRows)
-   ↓
-9. stats useMemo recomputes with filtered data
-   ↓
-10. StatCards re-render with new numbers
-```
+For table filters, keep a distinction between draft input state and committed
+route state. For example, the transaction search box keeps typed text locally
+until Enter commits it to `q`.
 
-### 5 Minutes Later (React Query Refetch)
+## Navigation State
 
-```
-1. React Query detects staleTime exceeded
-   ↓
-2. Automatically refetches in background
-   ↓
-3. New data arrives
-   ↓
-4. Cache updated
-   ↓
-5. Components re-render with fresh data
-```
+Do not store route history in Redux. Detail-page back navigation uses explicit
+`returnTo` URL context when present, otherwise browser history when the route was
+reached through in-app navigation.
 
----
+## Decision Rules
 
-## Key Principles
+Choose React Query when data comes from an API.
 
-### Choose React Query When:
-- Data comes from an API
-- Need caching and automatic refetching
-- Multiple components might need the same data
-- Need loading/error states
+Choose URL params when users should be able to refresh, bookmark, share, or
+return to the exact view.
 
-### Choose Redux When:
-- UI preferences that need to be global
-- State needs to persist across page refreshes
-- Complex UI state shared across many components
+Choose Redux when the value is a true global preference or layout setting.
 
-### Choose Local State When:
-- State is component-specific
-- Temporary UI state (modals, forms, filters)
-- Doesn't need to survive component unmount
-
----
-
-## Common Patterns
-
-### Fetching and Displaying Data
-
-```typescript
-function TransactionsPage() {
-  // ✅ Use React Query for server data
-  const { data, isLoading, error } = useTransactions();
-
-  // ✅ Use local state for UI
-  const [filter, setFilter] = useState('');
-
-  if (isLoading) return <LoadingSpinner />;
-  if (error) return <ErrorBanner error={error} />;
-
-  return <TransactionTable transactions={data} />;
-}
-```
-
-### Sharing Filter State Between Components
-
-```typescript
-function ParentPage() {
-  // ✅ Lift state to parent
-  const [globalFilter, setGlobalFilter] = useState('');
-  const [filteredData, setFilteredData] = useState([]);
-
-  return (
-    <>
-      <StatsCards data={filteredData} />
-      <DataTable
-        globalFilter={globalFilter}
-        onFilterChange={setGlobalFilter}
-        onFilteredDataChange={setFilteredData}
-      />
-    </>
-  );
-}
-```
-
-### Global UI Preferences
-
-```typescript
-function App() {
-  // ✅ Use Redux for global UI state
-  const theme = useAppSelector(state => state.ui.theme);
-
-  return (
-    <div className={theme === 'dark' ? 'dark' : ''}>
-      <YourApp />
-    </div>
-  );
-}
-```
-
----
-
-## Anti-Patterns to Avoid
-
-### ❌ DON'T: Store Server Data in Redux
-
-```typescript
-// ❌ BAD: Managing server data in Redux
-const fetchTransactions = createAsyncThunk('transactions/fetch', async () => {
-  return api.getTransactions();
-});
-
-// ❌ Creates lots of boilerplate
-// ❌ Manual cache management
-// ❌ No automatic refetching
-```
-
-### ✅ DO: Use React Query
-
-```typescript
-// ✅ GOOD: Let React Query handle it
-const { data } = useQuery({
-  queryKey: ['transactions'],
-  queryFn: api.getTransactions,
-});
-```
-
-### ❌ DON'T: Put Temporary UI State in Redux
-
-```typescript
-// ❌ BAD: Search filter in Redux
-const searchFilter = useSelector(state => state.ui.searchFilter);
-
-// ❌ Persists when navigating away
-// ❌ Unnecessary global state
-// ❌ Extra boilerplate
-```
-
-### ✅ DO: Use Local State
-
-```typescript
-// ✅ GOOD: Local state for temporary UI
-const [searchFilter, setSearchFilter] = useState('');
-
-// ✅ Automatically cleaned up
-// ✅ Simple and direct
-```
-
----
-
-## Quick Reference
-
-| State Type | Tool | Example | Persists? |
-|------------|------|---------|-----------|
-| Server data | React Query | Transactions from API | In memory (5 min) |
-| Global UI | Redux | Theme preference | localStorage |
-| Temporary UI | useState | Search filter | No (resets on unmount) |
-| Computed values | useMemo | Filtered/sorted data | No (recalculated) |
-| Side effects | useEffect | Syncing child → parent | No |
-
----
-
-## Further Reading
-
-- [React Query Documentation](https://tanstack.com/query/latest)
-- [Redux Toolkit Documentation](https://redux-toolkit.js.org/)
-- [React Hooks Documentation](https://react.dev/reference/react)
-- See also: `docs/useEffect-guide.md` for detailed useEffect explanations
+Choose local state when the value is transient, component-specific, or table
+mechanics.

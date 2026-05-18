@@ -14,6 +14,13 @@ export interface BuildTransactionsUrlParams {
   breadcrumbLabel: string;
 }
 
+export interface BuildAnalyticsDrilldownUrlParams extends BuildTransactionsUrlParams {
+  /** Active analytics data source */
+  scope: 'all' | 'view';
+  /** Saved view ID when scope is "view" */
+  viewId?: string;
+}
+
 /**
  * Builds a URL for the transactions page with date filters and navigation context.
  *
@@ -40,4 +47,18 @@ export function buildTransactionsUrl(params: BuildTransactionsUrlParams): string
   const { dateFrom, dateTo, returnTo, breadcrumbLabel } = params;
 
   return `/?dateFrom=${dateFrom}&dateTo=${dateTo}&returnTo=${encodeURIComponent(returnTo)}&breadcrumbLabel=${encodeURIComponent(breadcrumbLabel)}`;
+}
+
+/**
+ * Builds the operational drilldown URL for the active analytics source.
+ *
+ * All-transaction analytics drill into the Transactions page. Saved-view
+ * analytics drill into the corresponding View detail page with the same date
+ * bounds and return breadcrumb context.
+ */
+export function buildAnalyticsDrilldownUrl(params: BuildAnalyticsDrilldownUrlParams): string {
+  const { scope, viewId, dateFrom, dateTo, returnTo, breadcrumbLabel } = params;
+  const basePath = scope === 'view' && viewId ? `/views/${encodeURIComponent(viewId)}` : '/';
+
+  return `${basePath}?dateFrom=${dateFrom}&dateTo=${dateTo}&returnTo=${encodeURIComponent(returnTo)}&breadcrumbLabel=${encodeURIComponent(breadcrumbLabel)}`;
 }

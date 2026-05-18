@@ -32,17 +32,18 @@ export function TransactionsPage() {
   const queryClient = useQueryClient();
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
-  const globalFilter = useAppSelector((state) => state.ui.transactionTable.globalFilter);
-  const dateFilter = useAppSelector((state) => state.ui.transactionTable.dateFilter);
-  const bankNameFilter = useAppSelector((state) => state.ui.transactionTable.bankNameFilter);
-  const accountIdFilter = useAppSelector((state) => state.ui.transactionTable.accountIdFilter);
-  const typeFilter = useAppSelector((state) => state.ui.transactionTable.typeFilter);
-  const amountFilter = useAppSelector((state) => state.ui.transactionTable.amountFilter);
 
   const canImportTransactions = usePermission('transactions:write');
 
-  // Sync URL params with Redux state for transaction filters
   const {
+    filters: {
+      globalFilter,
+      dateFilter,
+      bankNameFilter,
+      accountIdFilter,
+      typeFilter,
+      amountFilter,
+    },
     handleDateFilterChange,
     handleSearchChange,
     handleBankNameFilterChange,
@@ -266,6 +267,12 @@ export function TransactionsPage() {
                   onTypeFilterChange={handleTypeFilterChange}
                   onAmountFilterChange={handleAmountFilterChange}
                   onClearAllFilters={clearAllFilters}
+                  globalFilter={globalFilter}
+                  dateFilter={dateFilter}
+                  bankNameFilter={bankNameFilter}
+                  accountIdFilter={accountIdFilter}
+                  typeFilter={typeFilter}
+                  amountFilter={amountFilter}
                   displayCurrency={displayCurrency}
                   exchangeRatesMap={exchangeRatesMap}
                   isExchangeRatesLoading={isExchangeRatesLoading}

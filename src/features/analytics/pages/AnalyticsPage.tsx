@@ -2,6 +2,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useView, useViews, useViewTransactions } from '@/hooks/useViews';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
 import { useAnalyticsData } from '@/features/analytics/hooks/useAnalyticsData';
@@ -15,29 +16,57 @@ import { YearlySpendingGrid } from '@/features/analytics/components/YearlySpendi
 import { YearSelector } from '@/features/analytics/components/YearSelector';
 import { ViewModeSelector } from '@/features/analytics/components/ViewModeSelector';
 import { TransactionTypeSelector } from '@/features/analytics/components/TransactionTypeSelector';
+import { AnalyticsSourceSelector } from '@/features/analytics/components/AnalyticsSourceSelector';
 import { useAppSelector } from '@/store/hooks';
 import { useSearchParams } from 'react-router';
 import { useCallback, useEffect, useMemo } from 'react';
 import { getCurrentYear } from '@/utils/dates';
 import {
   ANALYTICS_PARAMS,
-  VIEW_MODES,
-  TRANSACTION_TYPES,
   ViewMode,
   TransactionTypeParam,
+  AnalyticsScope,
+  parseAnalyticsSearchParams,
 } from '@/features/analytics/utils/urlState';
 
 export function AnalyticsPage() {
   const queryClient = useQueryClient();
-  const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get view mode and transaction type from URL params with defaults
-  const viewMode = (searchParams.get(ANALYTICS_PARAMS.VIEW_MODE) as ViewMode) || VIEW_MODES.MONTHLY;
-  const transactionType =
-    (searchParams.get(ANALYTICS_PARAMS.TRANSACTION_TYPE) as TransactionTypeParam) ||
-    TRANSACTION_TYPES.DEBIT;
+  const analyticsUrlState = useMemo(() => parseAnalyticsSearchParams(searchParams), [searchParams]);
+
+  const { scope: analyticsScope, viewId, viewMode, transactionType } = analyticsUrlState;
+  const activeViewId = analyticsScope === 'view' ? (viewId ?? '') : '';
+
+  const {
+    data: transactions,
+    isLoading: isTransactionsLoading,
+    error: transactionsError,
+    refetch: refetchTransactions,
+  } = useTransactions({ enabled: analyticsScope === 'all' });
+
+  const { data: views, isLoading: isViewsLoading, error: viewsError } = useViews();
+
+  const {
+    data: activeView,
+    isLoading: isViewLoading,
+    error: viewError,
+    refetch: refetchView,
+  } = useView(activeViewId);
+
+  const {
+    data: viewTransactions,
+    isLoading: isViewTransactionsLoading,
+    error: viewTransactionsError,
+    refetch: refetchViewTransactions,
+  } = useViewTransactions(activeViewId);
+
+  const resolvedTransactions = analyticsScope === 'view' ? viewTransactions : transactions;
+  const isSourceLoading =
+    analyticsScope === 'view' ? isViewLoading || isViewTransactionsLoading : isTransactionsLoading;
+  const sourceError =
+    analyticsScope === 'view' ? viewError || viewTransactionsError : transactionsError;
 
   // Fetch exchange rates for currency conversion
   const {
@@ -55,15 +84,25 @@ export function AnalyticsPage() {
     queryClient.invalidateQueries({ queryKey: ['currencies'] });
   }, [queryClient]);
 
+  const handleRetrySource = useCallback(() => {
+    if (analyticsScope === 'view') {
+      refetchView();
+      refetchViewTransactions();
+      return;
+    }
+
+    refetchTransactions();
+  }, [analyticsScope, refetchTransactions, refetchView, refetchViewTransactions]);
+
   // Get selected year from URL or default to current year (will be updated to latestYear with data)
   const currentYear = useMemo(() => getCurrentYear(), []);
   const yearParam = searchParams.get(ANALYTICS_PARAMS.YEAR);
-  const selectedYear = yearParam ? parseInt(yearParam, 10) : currentYear;
+  const selectedYear = analyticsUrlState.year ?? currentYear;
 
   // Process analytics data with memoization
   const { monthlySpending, yearlySpending, earliestYear, latestYear, yearsWithTransactions } =
     useAnalyticsData(
-      transactions,
+      resolvedTransactions,
       displayCurrency,
       exchangeRatesMap,
       selectedYear,
@@ -73,12 +112,12 @@ export function AnalyticsPage() {
   // Initialize to latest year with transactions if no year param exists
   // Or redirect if selected year is out of valid range
   useEffect(() => {
-    if (isLoading || !transactions) {
+    if (isSourceLoading || !resolvedTransactions) {
       return;
     }
 
     // If no year parameter, default to the latest year with actual transactions
-    if (!yearParam) {
+    if (!yearParam || analyticsUrlState.year === undefined) {
       const params = new URLSearchParams(searchParams);
       params.set(ANALYTICS_PARAMS.YEAR, latestYear.toString());
       setSearchParams(params, { replace: true });
@@ -102,8 +141,8 @@ export function AnalyticsPage() {
       }
     }
   }, [
-    isLoading,
-    transactions,
+    isSourceLoading,
+    resolvedTransactions,
     yearParam,
     selectedYear,
     earliestYear,
@@ -111,7 +150,24 @@ export function AnalyticsPage() {
     currentYear,
     searchParams,
     setSearchParams,
+    analyticsUrlState.year,
   ]);
+
+  const handleSourceChange = useCallback(
+    ({ scope, viewId: nextViewId }: { scope: AnalyticsScope; viewId?: string }) => {
+      const params = new URLSearchParams(searchParams);
+      params.set(ANALYTICS_PARAMS.SCOPE, scope);
+
+      if (scope === 'view' && nextViewId) {
+        params.set(ANALYTICS_PARAMS.VIEW_ID, nextViewId);
+      } else {
+        params.delete(ANALYTICS_PARAMS.VIEW_ID);
+      }
+
+      setSearchParams(params);
+    },
+    [searchParams, setSearchParams],
+  );
 
   // Handle year change
   const handleYearChange = useCallback(
@@ -143,7 +199,15 @@ export function AnalyticsPage() {
     [searchParams, setSearchParams],
   );
 
-  if (isLoading) {
+  const pageDescription = useMemo(() => {
+    const sourceSuffix = analyticsScope === 'view' && activeView ? ` in ${activeView.name}` : '';
+
+    return viewMode === 'monthly'
+      ? `Monthly spending breakdown for ${selectedYear}${sourceSuffix}`
+      : `Yearly spending overview${sourceSuffix}`;
+  }, [activeView, analyticsScope, selectedYear, viewMode]);
+
+  if (isSourceLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <LoadingSpinner size="lg" text="Loading analytics..." />
@@ -151,11 +215,11 @@ export function AnalyticsPage() {
     );
   }
 
-  if (error) {
+  if (sourceError) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="w-full max-w-md">
-          <ErrorBanner error={error} onRetry={() => refetch()} />
+          <ErrorBanner error={sourceError} onRetry={handleRetrySource} />
         </div>
       </div>
     );
@@ -163,14 +227,7 @@ export function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Analytics"
-        description={
-          viewMode === 'monthly'
-            ? `Monthly spending breakdown for ${selectedYear}`
-            : 'Yearly spending overview'
-        }
-      />
+      <PageHeader title="Analytics" description={pageDescription} />
 
       <AnimatePresence>
         {(disabledCurrencies.length > 0 || pendingCurrencies.length > 0) && (
@@ -188,18 +245,29 @@ export function AnalyticsPage() {
         initial="initial"
         animate="animate"
         transition={layoutTransition}
-        className="grid grid-cols-3 items-center gap-4"
+        className="grid gap-4 md:grid-cols-[minmax(12rem,1fr)_auto_auto_minmax(12rem,1fr)] md:items-end"
       >
         <div className="flex justify-start">
+          <AnalyticsSourceSelector
+            scope={analyticsScope}
+            viewId={viewId}
+            selectedViewName={activeView?.name}
+            views={views ?? []}
+            isLoadingViews={isViewsLoading}
+            hasViewsError={!!viewsError}
+            onChange={handleSourceChange}
+          />
+        </div>
+        <div className="flex justify-start md:justify-center">
           <ViewModeSelector selectedMode={viewMode} onChange={handleViewModeChange} />
         </div>
-        <div className="flex justify-center">
+        <div className="flex justify-start md:justify-center">
           <TransactionTypeSelector
             selectedType={transactionType}
             onChange={handleTransactionTypeChange}
           />
         </div>
-        <div className="flex justify-end">
+        <div className="flex justify-start md:justify-end">
           {viewMode === 'monthly' && (
             <YearSelector
               selectedYear={selectedYear}
@@ -225,6 +293,8 @@ export function AnalyticsPage() {
               currency={displayCurrency}
               viewMode={viewMode}
               transactionType={transactionType}
+              analyticsScope={analyticsScope}
+              viewId={viewId}
             />
           ) : (
             <YearlySpendingGrid
@@ -232,6 +302,8 @@ export function AnalyticsPage() {
               currency={displayCurrency}
               viewMode={viewMode}
               transactionType={transactionType}
+              analyticsScope={analyticsScope}
+              viewId={viewId}
             />
           )}
         </motion.div>

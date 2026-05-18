@@ -1,6 +1,6 @@
 // src/components/CreateViewModal.tsx
 import { useState, useCallback, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -14,8 +14,6 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { useCreateView } from '@/hooks/useViews';
 import { ViewCriteriaApi } from '@/types/view';
 import { formatLocalDate } from '@/utils/dates';
-import { useAppDispatch } from '@/store/hooks';
-import { setTransactionTableGlobalFilter, setTransactionTableDateFilter } from '@/store/uiSlice';
 
 interface CreateViewModalProps {
   open: boolean;
@@ -25,10 +23,27 @@ interface CreateViewModalProps {
 
 export function CreateViewModal({ open, onClose, criteria }: CreateViewModalProps) {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [name, setName] = useState('');
   const [openEnded, setOpenEnded] = useState(false);
   const { mutate: createView, isPending } = useCreateView();
+
+  const clearTransactionFilterParams = useCallback(() => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('dateFrom');
+    params.delete('dateTo');
+    params.delete('q');
+    params.delete('bankName');
+    params.delete('bank');
+    params.delete('accountId');
+    params.delete('account');
+    params.delete('type');
+    params.delete('minAmount');
+    params.delete('maxAmount');
+    params.delete('returnTo');
+    params.delete('breadcrumbLabel');
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleSubmit = useCallback(
     (e: FormEvent) => {
@@ -44,10 +59,7 @@ export function CreateViewModal({ open, onClose, criteria }: CreateViewModalProp
         },
         {
           onSuccess: (newView) => {
-            // Clear TransactionsPage filters
-            dispatch(setTransactionTableGlobalFilter(''));
-            dispatch(setTransactionTableDateFilter({ from: null, to: null }));
-            // Close modal and navigate to new view
+            clearTransactionFilterParams();
             onClose();
             setName('');
             setOpenEnded(false);
@@ -56,7 +68,7 @@ export function CreateViewModal({ open, onClose, criteria }: CreateViewModalProp
         },
       );
     },
-    [name, criteria, openEnded, createView, onClose, navigate, dispatch],
+    [name, criteria, openEnded, createView, clearTransactionFilterParams, onClose, navigate],
   );
 
   const handleCancel = useCallback(() => {
