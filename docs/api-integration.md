@@ -52,6 +52,11 @@ Both endpoints return:
 
 `notFoundIds` are transaction IDs that are missing, deleted, or not owned by the caller.
 
+After a successful bulk saved-view membership update, the frontend invalidates
+the saved-view detail, saved-view transactions, and saved-view list queries. It
+does not apply optimistic count updates because the bulk response does not
+include an updated saved view.
+
 ## Transaction Import Review
 
 Statement imports use a two-step review flow:
