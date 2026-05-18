@@ -13,6 +13,7 @@ import {
   ViewMembershipResponse,
   CreateSavedViewRequest,
   UpdateSavedViewRequest,
+  BulkViewTransactionResponse,
 } from '@/types/view';
 import { Transaction } from '@/types/transaction';
 import { viewApi } from '@/api/viewApi';
@@ -31,6 +32,11 @@ export const viewKeys = {
   detail: (id: string) => [...viewKeys.details(), id] as const,
   transactions: (id: string) => [...viewKeys.all, 'transactions', id] as const,
 };
+
+interface BulkViewTransactionVariables {
+  viewId: string;
+  ids: number[];
+}
 
 /**
  * Hook to fetch all saved views
@@ -222,6 +228,22 @@ export const usePinTransaction = () => {
 };
 
 /**
+ * Hook to pin multiple transactions to a view
+ */
+export const useBulkPinTransactions = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<BulkViewTransactionResponse, ApiError, BulkViewTransactionVariables>({
+    mutationFn: ({ viewId, ids }) => viewApi.bulkPinTransactions(viewId, ids),
+    onSuccess: (_response, { viewId }) => {
+      queryClient.invalidateQueries({ queryKey: viewKeys.detail(viewId) });
+      queryClient.invalidateQueries({ queryKey: viewKeys.transactions(viewId) });
+      queryClient.invalidateQueries({ queryKey: viewKeys.list() });
+    },
+  });
+};
+
+/**
  * Hook to unpin a transaction from a view
  */
 export const useUnpinTransaction = () => {
@@ -248,6 +270,22 @@ export const useExcludeTransaction = () => {
     onSuccess: (updatedView) => {
       queryClient.invalidateQueries({ queryKey: viewKeys.detail(updatedView.id) });
       queryClient.invalidateQueries({ queryKey: viewKeys.transactions(updatedView.id) });
+      queryClient.invalidateQueries({ queryKey: viewKeys.list() });
+    },
+  });
+};
+
+/**
+ * Hook to exclude multiple transactions from a view
+ */
+export const useBulkExcludeTransactions = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<BulkViewTransactionResponse, ApiError, BulkViewTransactionVariables>({
+    mutationFn: ({ viewId, ids }) => viewApi.bulkExcludeTransactions(viewId, ids),
+    onSuccess: (_response, { viewId }) => {
+      queryClient.invalidateQueries({ queryKey: viewKeys.detail(viewId) });
+      queryClient.invalidateQueries({ queryKey: viewKeys.transactions(viewId) });
       queryClient.invalidateQueries({ queryKey: viewKeys.list() });
     },
   });

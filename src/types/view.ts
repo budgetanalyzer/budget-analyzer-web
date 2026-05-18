@@ -50,6 +50,21 @@ export interface UpdateSavedViewRequest {
 }
 
 /**
+ * Request to bulk pin or exclude transactions in a saved view
+ */
+export interface BulkViewTransactionRequest {
+  ids: number[];
+}
+
+/**
+ * Response from a bulk saved-view transaction update
+ */
+export interface BulkViewTransactionResponse {
+  updatedCount: number;
+  notFoundIds: number[];
+}
+
+/**
  * Response from GET /v1/views/{id}/transactions
  * Contains transaction IDs grouped by membership type
  */

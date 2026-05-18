@@ -33,6 +33,39 @@ Saved-view criteria mirror the user-facing transaction filters supported by the 
 
 `searchText` is a saved-view description filter. The Transactions and View table search boxes filter the already loaded rows locally with a case-insensitive substring match against transaction descriptions only; use the explicit bank filter when the saved view should persist a bank criterion.
 
+Saved views support bulk membership updates through `POST /api/v1/views/{id}/pin` and `POST /api/v1/views/{id}/exclude`. Both endpoints accept:
+
+```json
+{
+  "ids": [1, 2, 3]
+}
+```
+
+Both endpoints return:
+
+```json
+{
+  "updatedCount": 2,
+  "notFoundIds": [999]
+}
+```
+
+`notFoundIds` are transaction IDs that are missing, deleted, or not owned by the caller.
+
+After a successful bulk saved-view membership update, the frontend invalidates
+the saved-view detail, saved-view transactions, and saved-view list queries. It
+does not apply optimistic count updates because the bulk response does not
+include an updated saved view.
+
+The saved-view transaction table supports row selection. Its "select all"
+checkbox selects the current page; when all page rows are selected, the table
+can expand selection to every transaction in the current visible/search-filtered
+view result. The floating bulk action bar can pin or exclude the selected
+transactions. Bulk pin sends only selected transactions that are not already
+pinned; bulk exclude sends the selected transaction IDs. Partial successes are
+shown as warning toast feedback with the number of transactions that were not
+found or unavailable.
+
 ## Transaction Import Review
 
 Statement imports use a two-step review flow:

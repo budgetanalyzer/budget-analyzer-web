@@ -4,6 +4,8 @@ import {
   SavedView,
   CreateSavedViewRequest,
   UpdateSavedViewRequest,
+  BulkViewTransactionRequest,
+  BulkViewTransactionResponse,
   ViewMembershipResponse,
 } from '@/types/view';
 
@@ -65,6 +67,21 @@ export const viewApi = {
   },
 
   /**
+   * Pin multiple transactions to the view
+   */
+  bulkPinTransactions: async (
+    viewId: string,
+    ids: number[],
+  ): Promise<BulkViewTransactionResponse> => {
+    const request: BulkViewTransactionRequest = { ids };
+    const response = await apiClient.post<BulkViewTransactionResponse>(
+      `/v1/views/${viewId}/pin`,
+      request,
+    );
+    return response.data;
+  },
+
+  /**
    * Unpin a transaction from the view
    */
   unpinTransaction: async (viewId: string, txnId: number): Promise<SavedView> => {
@@ -77,6 +94,21 @@ export const viewApi = {
    */
   excludeTransaction: async (viewId: string, txnId: number): Promise<SavedView> => {
     const response = await apiClient.post<SavedView>(`/v1/views/${viewId}/exclude/${txnId}`);
+    return response.data;
+  },
+
+  /**
+   * Exclude multiple transactions from the view
+   */
+  bulkExcludeTransactions: async (
+    viewId: string,
+    ids: number[],
+  ): Promise<BulkViewTransactionResponse> => {
+    const request: BulkViewTransactionRequest = { ids };
+    const response = await apiClient.post<BulkViewTransactionResponse>(
+      `/v1/views/${viewId}/exclude`,
+      request,
+    );
     return response.data;
   },
 

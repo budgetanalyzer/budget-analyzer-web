@@ -8,6 +8,7 @@ import {
   ColumnDef,
   flexRender,
   SortingState,
+  RowSelectionState,
 } from '@tanstack/react-table';
 import { ViewTransaction } from '@/types/view';
 import { ExchangeRateResponse } from '@/types/currency';
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import {
@@ -31,6 +33,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { TransactionAmountBadge } from '@/features/transactions/components/TransactionAmountBadge';
+import { BulkViewTransactionBar } from '@/features/views/components/BulkViewTransactionBar';
+import {
+  BulkViewTransactionAction,
+  BulkViewTransactionModal,
+} from '@/features/views/components/BulkViewTransactionModal';
 import { formatLocalDate, compareLocalDates } from '@/utils/dates';
 import {
   ArrowUpDown,
@@ -77,6 +84,10 @@ function ViewTransactionTableContent({
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
   const [pageIndex, setPageIndex] = useState(0);
   const [localSearchValue, setLocalSearchValue] = useState(searchText);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
+  const [bulkAction, setBulkAction] = useState<BulkViewTransactionAction | null>(null);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const pageSize = 20;
 
   // Mutations for pin/unpin/exclude
@@ -145,6 +156,34 @@ function ViewTransactionTableContent({
   // Define columns for TanStack Table
   const columns = useMemo<ColumnDef<ViewTransaction>[]>(
     () => [
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected()
+                ? true
+                : table.getIsSomePageRowsSelected()
+                  ? 'indeterminate'
+                  : false
+            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all rows on page"
+          />
+        ),
+        cell: ({ row }) => (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={row.getIsSelected()}
+              onCheckedChange={(value) => row.toggleSelected(!!value)}
+              aria-label={`Select transaction ${row.original.id}`}
+            />
+          </div>
+        ),
+        size: 50,
+        minSize: 50,
+        maxSize: 50,
+      },
       {
         id: 'pinned',
         header: '',
@@ -331,7 +370,17 @@ function ViewTransactionTableContent({
         pageIndex,
         pageSize,
       },
+      rowSelection,
     },
+    enableRowSelection: true,
+    onRowSelectionChange: (updater) => {
+      const newSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
+      setRowSelection(newSelection);
+      if (selectAllMatching) {
+        setSelectAllMatching(false);
+      }
+    },
+    getRowId: (row) => row.id.toString(),
     onSortingChange: setSorting,
     onPaginationChange: (updater) => {
       const currentPagination = { pageIndex, pageSize };
@@ -344,6 +393,48 @@ function ViewTransactionTableContent({
     manualPagination: false,
     autoResetPageIndex: false,
   });
+
+  const selectedTransactions = selectAllMatching
+    ? transactions
+    : table.getSelectedRowModel().rows.map((row) => row.original);
+  const selectedIds = selectedTransactions.map((transaction) => transaction.id);
+  const idsToUpdate = selectedIds;
+  const idsToPin = selectedTransactions
+    .filter((transaction) => transaction.membershipType !== 'PINNED')
+    .map((transaction) => transaction.id);
+  const modalSelectedIds = bulkAction === 'pin' ? idsToPin : idsToUpdate;
+
+  const handleClearSelection = useCallback(() => {
+    setRowSelection({});
+    setSelectAllMatching(false);
+  }, []);
+
+  const handleSelectAllMatching = useCallback(() => {
+    setSelectAllMatching(true);
+  }, []);
+
+  const handleBulkPin = useCallback(() => {
+    if (idsToPin.length === 0) return;
+    setBulkAction('pin');
+    setBulkModalOpen(true);
+  }, [idsToPin.length]);
+
+  const handleBulkExclude = useCallback(() => {
+    setBulkAction('exclude');
+    setBulkModalOpen(true);
+  }, []);
+
+  const handleBulkModalOpenChange = useCallback((open: boolean) => {
+    setBulkModalOpen(open);
+    if (!open) {
+      setBulkAction(null);
+    }
+  }, []);
+
+  const handleBulkSuccess = useCallback(() => {
+    setRowSelection({});
+    setSelectAllMatching(false);
+  }, []);
 
   const emptyMessage = searchText
     ? 'No transactions match this search.'
@@ -374,6 +465,34 @@ function ViewTransactionTableContent({
         </div>
       </div>
 
+      {table.getIsAllPageRowsSelected() && transactions.length > pageSize && !selectAllMatching && (
+        <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
+          <span>
+            All {Math.min(pageSize, transactions.length)} transactions on this page are selected.
+          </span>
+          <button
+            type="button"
+            onClick={handleSelectAllMatching}
+            className="font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            Select all {transactions.length} transactions in this view
+          </button>
+        </div>
+      )}
+
+      {selectAllMatching && (
+        <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
+          <span>All {idsToUpdate.length} transactions in this view are selected.</span>
+          <button
+            type="button"
+            onClick={handleClearSelection}
+            className="font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -397,6 +516,7 @@ function ViewTransactionTableContent({
                   onClick={() => handleRowClick(row.original)}
                   className={cn(
                     'cursor-pointer border-b transition-colors hover:bg-muted/50',
+                    row.getIsSelected() && 'bg-muted',
                     row.original.membershipType === 'PINNED' &&
                       'border-l-2 border-l-primary bg-primary/5',
                   )}
@@ -469,6 +589,26 @@ function ViewTransactionTableContent({
             </Button>
           </div>
         </div>
+      )}
+
+      <BulkViewTransactionBar
+        selectedCount={idsToUpdate.length}
+        isPinDisabled={idsToPin.length === 0}
+        isVisible={idsToUpdate.length > 0}
+        onClearSelection={handleClearSelection}
+        onPin={handleBulkPin}
+        onExclude={handleBulkExclude}
+      />
+
+      {bulkAction && (
+        <BulkViewTransactionModal
+          viewId={viewId}
+          selectedIds={modalSelectedIds}
+          action={bulkAction}
+          isOpen={bulkModalOpen}
+          onOpenChange={handleBulkModalOpenChange}
+          onSuccess={handleBulkSuccess}
+        />
       )}
     </div>
   );
