@@ -1,22 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen } from '@testing-library/react';
+import { Route, Routes } from 'react-router';
 
 import { UsersListPage } from '@/features/admin/users/pages/UsersListPage';
+import { renderWithProviders } from '@/testing/test-utils';
 
 function renderPage() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/admin/users']}>
-        <Routes>
-          <Route path="/admin/users" element={<UsersListPage />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
+  return renderWithProviders(
+    <Routes>
+      <Route path="/admin/users" element={<UsersListPage />} />
+    </Routes>,
+    { initialEntries: ['/admin/users'] },
   );
 }
 

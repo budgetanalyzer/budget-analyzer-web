@@ -1,12 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { Provider } from 'react-redux';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
-import { configureStore } from '@reduxjs/toolkit';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Route, Routes, useLocation } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ViewPage } from '@/features/views/pages/ViewPage';
 import { SavedView, ViewTransaction } from '@/types/view';
-import uiReducer from '@/store/uiSlice';
+import { renderWithProviders } from '@/testing/test-utils';
 
 const hookMocks = vi.hoisted(() => ({
   useView: vi.fn(),
@@ -106,30 +104,20 @@ function renderPage(initialEntry = '/views/view-1', viewOverride: Partial<SavedV
   hookMocks.useView.mockReturnValue(queryResult({ ...view, ...viewOverride }));
   hookMocks.useViewTransactions.mockReturnValue(queryResult(transactions));
 
-  const store = configureStore({ reducer: { ui: uiReducer } });
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-
-  return render(
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[initialEntry]}>
-          <Routes>
-            <Route
-              path="/views/:id"
-              element={
-                <>
-                  <ViewPage />
-                  <LocationProbe />
-                </>
-              }
-            />
-            <Route path="/analytics" element={<LocationProbe />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    </Provider>,
+  return renderWithProviders(
+    <Routes>
+      <Route
+        path="/views/:id"
+        element={
+          <>
+            <ViewPage />
+            <LocationProbe />
+          </>
+        }
+      />
+      <Route path="/analytics" element={<LocationProbe />} />
+    </Routes>,
+    { initialEntries: [initialEntry] },
   );
 }
 
@@ -137,7 +125,7 @@ describe('ViewPage analytics entry point', () => {
   it('opens analytics scoped to the active view', async () => {
     renderPage();
 
-    fireEvent.click(screen.getByRole('link', { name: 'Analyze View' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Analyze View' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
@@ -163,7 +151,7 @@ describe('ViewPage analytics entry point', () => {
       '/views/view-1?dateFrom=2026-01-01&dateTo=2026-01-31&returnTo=%2Fanalytics%3Fscope%3Dview%26viewId%3Dview-1%26viewMode%3Dmonthly%26transactionType%3Ddebit%26year%3D2026&breadcrumbLabel=Jan%202026',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1');
@@ -172,10 +160,10 @@ describe('ViewPage analytics entry point', () => {
     expect(screen.getByText('February grocery')).toBeInTheDocument();
   });
 
-  it('opens the restore excluded modal from the criteria excluded badge', () => {
+  it('opens the restore excluded modal from the criteria excluded badge', async () => {
     renderPage('/views/view-1', { excludedCount: 33 });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Restore 33 excluded transactions' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Restore 33 excluded transactions' }));
 
     expect(
       screen.getByRole('heading', { name: 'Restore Excluded Transactions' }),

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { RestoreExcludedTransactionsModal } from '@/features/views/components/RestoreExcludedTransactionsModal';
 import type { SavedView } from '@/types/view';
 import type { Transaction } from '@/types/transaction';
@@ -95,11 +96,11 @@ describe('RestoreExcludedTransactionsModal', () => {
     expect(rows[1]).toHaveTextContent('Older excluded transaction');
   });
 
-  it('restores an excluded transaction', () => {
+  it('restores an excluded transaction', async () => {
     renderRestoreExcludedTransactionsModal();
 
     const restoreButtons = screen.getAllByRole('button', { name: 'Restore' });
-    fireEvent.click(restoreButtons[0]);
+    await userEvent.click(restoreButtons[0]);
 
     expect(hookMocks.restoreMutate).toHaveBeenCalledWith(
       { viewId: 'view-1', txnId: 2 },
@@ -118,16 +119,16 @@ describe('RestoreExcludedTransactionsModal', () => {
     expect(screen.getByText('No excluded transactions.')).toBeInTheDocument();
   });
 
-  it('renders a footer close button', () => {
+  it('renders a footer close button', async () => {
     const onClose = vi.fn();
     renderRestoreExcludedTransactionsModal(onClose);
 
-    fireEvent.click(getFooterCloseButton());
+    await userEvent.click(getFooterCloseButton());
 
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('does not close while a restore is pending', () => {
+  it('does not close while a restore is pending', async () => {
     hookMocks.isRestoring = true;
     const onClose = vi.fn();
     renderRestoreExcludedTransactionsModal(onClose);
@@ -135,7 +136,7 @@ describe('RestoreExcludedTransactionsModal', () => {
     const closeButton = getFooterCloseButton();
     expect(closeButton).toBeDisabled();
 
-    fireEvent.click(closeButton);
+    await userEvent.click(closeButton);
 
     expect(onClose).not.toHaveBeenCalled();
   });

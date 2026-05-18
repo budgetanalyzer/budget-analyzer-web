@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { Provider } from 'react-redux';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
-import { configureStore } from '@reduxjs/toolkit';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Route, Routes, useLocation } from 'react-router';
 import { Transaction } from '@/types/transaction';
 import { SavedView, ViewTransaction } from '@/types/view';
 import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage';
-import uiReducer from '@/store/uiSlice';
+import { renderWithProviders } from '@/testing/test-utils';
 
 Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
   configurable: true,
@@ -86,31 +84,21 @@ function LocationProbe() {
 }
 
 function renderPage(initialEntry: string) {
-  const store = configureStore({ reducer: { ui: uiReducer } });
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-
-  return render(
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[initialEntry]}>
-          <Routes>
-            <Route
-              path="/analytics"
-              element={
-                <>
-                  <AnalyticsPage />
-                  <LocationProbe />
-                </>
-              }
-            />
-            <Route path="/" element={<LocationProbe />} />
-            <Route path="/views/:id" element={<LocationProbe />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    </Provider>,
+  return renderWithProviders(
+    <Routes>
+      <Route
+        path="/analytics"
+        element={
+          <>
+            <AnalyticsPage />
+            <LocationProbe />
+          </>
+        }
+      />
+      <Route path="/" element={<LocationProbe />} />
+      <Route path="/views/:id" element={<LocationProbe />} />
+    </Routes>,
+    { initialEntries: [initialEntry] },
   );
 }
 
@@ -161,8 +149,8 @@ describe('AnalyticsPage source resolution', () => {
   it('updates the analytics URL when a saved view source is selected', async () => {
     renderPage('/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2026');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Source' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Groceries' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Source' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Groceries' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
@@ -176,8 +164,8 @@ describe('AnalyticsPage source resolution', () => {
       '/analytics?scope=view&viewId=view-1&viewMode=monthly&transactionType=debit&year=2026',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Source' }));
-    fireEvent.click(screen.getByRole('button', { name: 'All transactions' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Source' }));
+    await userEvent.click(screen.getByRole('button', { name: 'All transactions' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
@@ -189,7 +177,7 @@ describe('AnalyticsPage source resolution', () => {
   it('routes an all-scope monthly drilldown to the filtered transactions page', async () => {
     renderPage('/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2026');
 
-    fireEvent.click(screen.getByRole('link', { name: /Jan 2026/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Jan 2026/ }));
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
@@ -203,7 +191,7 @@ describe('AnalyticsPage source resolution', () => {
       '/analytics?scope=view&viewId=view-1&viewMode=monthly&transactionType=debit&year=2026',
     );
 
-    fireEvent.click(screen.getByRole('link', { name: /Jan 2026/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Jan 2026/ }));
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(

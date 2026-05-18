@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen } from '@testing-library/react';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 vi.mock('@/features/auth/hooks/usePermission');
@@ -9,6 +8,7 @@ vi.mock('@/hooks/useStatementFormats');
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useStatementFormats } from '@/hooks/useStatementFormats';
 import { StatementFormatsListPage } from '@/features/admin/statement-formats/pages/StatementFormatsListPage';
+import { renderWithProviders } from '@/testing/test-utils';
 import type { StatementFormat } from '@/types/statementFormat';
 import type { ApiError } from '@/types/apiError';
 
@@ -45,11 +45,10 @@ function mockQuerySuccess(data: StatementFormat[]) {
 }
 
 function renderPage() {
-  return render(
-    <MemoryRouter initialEntries={['/admin/statement-formats']}>
-      <StatementFormatsListPage />
-    </MemoryRouter>,
-  );
+  return renderWithProviders(<StatementFormatsListPage />, {
+    initialEntries: ['/admin/statement-formats'],
+    router: 'dom',
+  });
 }
 
 describe('StatementFormatsListPage permission gating', () => {

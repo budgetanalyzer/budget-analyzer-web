@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { screen } from '@testing-library/react';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 vi.mock('@/features/auth/hooks/useAuth');
@@ -15,6 +14,7 @@ import { useCurrencies } from '@/hooks/useCurrencies';
 import { useStatementFormats } from '@/hooks/useStatementFormats';
 import { useTransactionSearch } from '@/features/admin/transactions/api/useTransactionSearch';
 import { AdminDashboard } from '@/features/admin/pages/AdminDashboard';
+import { renderWithProviders } from '@/testing/test-utils';
 import type { CurrencySeriesResponse } from '@/types/currency';
 import type { StatementFormat } from '@/types/statementFormat';
 import type { PagedResponse, TransactionSearchResult } from '@/types/transactionSearch';
@@ -73,11 +73,9 @@ function stubQueries() {
 }
 
 function renderDashboard() {
-  return render(
-    <MemoryRouter initialEntries={['/admin']}>
-      <AdminDashboard />
-    </MemoryRouter>,
-  );
+  return renderWithProviders(<AdminDashboard />, {
+    initialEntries: ['/admin'],
+  });
 }
 
 beforeEach(() => {

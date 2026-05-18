@@ -108,13 +108,19 @@ The `src/test/Button.test.tsx` file is the clearest example of low-signal covera
 4. Remove the empty `src/test/` directory.
 5. Update `docs/testing-guide.md` examples so they show colocated tests and shared infrastructure separately.
 
-### Phase 3: Improve Test Ergonomics
+### Phase 3: Improve Test Ergonomics (Complete)
 
 1. Add `@testing-library/user-event` as a dev dependency.
 2. Prefer `userEvent` for user workflows such as clicking, typing, selecting, and clearing fields.
 3. Keep `fireEvent` for lower-level events where `userEvent` is not a good fit, such as synthetic window activity, timer-adjacent hooks, and rare DOM events.
 4. Replace repeated local `QueryClientProvider`, `Provider`, and `MemoryRouter` setup with `renderWithProviders()` where it reduces noise.
 5. Keep local render helpers only when a test needs route-specific or page-specific wiring that would make the shared helper too clever.
+
+Completion notes:
+- `@testing-library/user-event` is installed.
+- User workflow tests now use `userEvent` across navigation, form, modal, bulk action, and admin page interactions.
+- Remaining `fireEvent` usage is limited to synthetic window activity, timer-adjacent modal behavior, and a Radix keyboard-event workaround.
+- `renderWithProviders()` now supports the repo's mixed router imports with a default `react-router` memory router and an explicit `router: 'dom'` option for components that still import hooks from `react-router-dom`.
 
 ### Phase 4: Add Coverage Reporting Without Gaming It
 

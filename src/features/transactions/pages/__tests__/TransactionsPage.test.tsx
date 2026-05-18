@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router';
-import { configureStore } from '@reduxjs/toolkit';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, waitFor } from '@testing-library/react';
 
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/hooks/useTransactions', () => ({
@@ -44,24 +40,14 @@ vi.mock('@/features/transactions/components/ImportButton', () => ({
 
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage';
-import uiReducer from '@/store/uiSlice';
+import { renderWithProviders } from '@/testing/test-utils';
 
 const mockUsePermission = vi.mocked(usePermission);
 
 function renderPage(initialEntry = '/transactions') {
-  const store = configureStore({ reducer: { ui: uiReducer } });
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+  return renderWithProviders(<TransactionsPage />, {
+    initialEntries: [initialEntry],
   });
-  return render(
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[initialEntry]}>
-          <TransactionsPage />
-        </MemoryRouter>
-      </QueryClientProvider>
-    </Provider>,
-  );
 }
 
 beforeEach(() => {

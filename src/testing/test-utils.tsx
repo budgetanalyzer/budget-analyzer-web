@@ -3,7 +3,8 @@ import { configureStore } from '@reduxjs/toolkit';
 import { render, type RenderOptions } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter as CoreMemoryRouter } from 'react-router';
+import { MemoryRouter as DomMemoryRouter } from 'react-router-dom';
 import uiReducer from '@/store/uiSlice';
 import type { RootState } from '@/store';
 
@@ -50,6 +51,7 @@ interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
   initialEntries?: string[];
   preloadedState?: RootState;
   queryClient?: QueryClient;
+  router?: 'core' | 'dom';
   store?: TestStore;
 }
 
@@ -59,6 +61,7 @@ export function renderWithProviders(
     initialEntries,
     preloadedState,
     queryClient = createTestQueryClient(),
+    router = 'core',
     store = createTestStore(preloadedState),
     ...renderOptions
   }: RenderWithProvidersOptions = {},
@@ -71,6 +74,8 @@ export function renderWithProviders(
     );
 
     if (initialEntries) {
+      const MemoryRouter = router === 'dom' ? DomMemoryRouter : CoreMemoryRouter;
+
       return <MemoryRouter initialEntries={initialEntries}>{providers}</MemoryRouter>;
     }
 

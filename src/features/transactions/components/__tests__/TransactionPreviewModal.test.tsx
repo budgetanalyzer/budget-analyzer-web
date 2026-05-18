@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '@/testing/mocks/server';
+import { renderWithProviders } from '@/testing/test-utils';
 import { TransactionPreviewModal } from '@/features/transactions/components/TransactionPreviewModal';
 import type { BatchImportRequest, PreviewResponse, PreviewTransaction } from '@/types/transaction';
 import { formatTimestamp } from '@/utils/dates';
@@ -31,24 +32,16 @@ const basePreviewData: PreviewResponse = {
 };
 
 function renderModal(previewData: PreviewResponse = basePreviewData) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
   const onOpenChange = vi.fn();
   const onImportComplete = vi.fn();
 
-  render(
-    <QueryClientProvider client={queryClient}>
-      <TransactionPreviewModal
-        isOpen
-        onOpenChange={onOpenChange}
-        previewData={previewData}
-        onImportComplete={onImportComplete}
-      />
-    </QueryClientProvider>,
+  renderWithProviders(
+    <TransactionPreviewModal
+      isOpen
+      onOpenChange={onOpenChange}
+      previewData={previewData}
+      onImportComplete={onImportComplete}
+    />,
   );
 
   return { onOpenChange, onImportComplete };
@@ -142,7 +135,7 @@ describe('TransactionPreviewModal', () => {
       }),
     );
 
-    fireEvent.click(
+    await userEvent.click(
       screen.getByRole('button', { name: 'Import 1 Transaction, Skip 2 Duplicates' }),
     );
 
@@ -229,8 +222,8 @@ describe('TransactionPreviewModal', () => {
       }),
     );
 
-    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Import anyway' })[0]);
-    fireEvent.click(
+    await userEvent.click(screen.getAllByRole('checkbox', { name: 'Import anyway' })[0]);
+    await userEvent.click(
       screen.getByRole('button', { name: 'Import 2 Transactions, Skip 1 Duplicate' }),
     );
 
@@ -275,7 +268,7 @@ describe('TransactionPreviewModal', () => {
     expect(onImportComplete).toHaveBeenCalledWith(2, 1, 1);
   });
 
-  it('clears the visible duplicate warning when a duplicate-key field is edited', () => {
+  it('clears the visible duplicate warning when a duplicate-key field is edited', async () => {
     renderModal({
       ...basePreviewData,
       transactions: [duplicateTransaction('EXISTING_TRANSACTION', 'Coffee')],
@@ -283,9 +276,9 @@ describe('TransactionPreviewModal', () => {
 
     expect(screen.getByText('Already imported')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByDisplayValue('Coffee'), {
-      target: { value: 'Coffee updated' },
-    });
+    const descriptionInput = screen.getByDisplayValue('Coffee');
+    await userEvent.clear(descriptionInput);
+    await userEvent.type(descriptionInput, 'Coffee updated');
 
     expect(screen.queryByText('Already imported')).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Import anyway' })).not.toBeInTheDocument();

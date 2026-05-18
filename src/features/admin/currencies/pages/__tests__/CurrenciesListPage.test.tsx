@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen } from '@testing-library/react';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 vi.mock('@/features/auth/hooks/usePermission');
@@ -9,6 +8,7 @@ vi.mock('@/hooks/useCurrencies');
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { CurrenciesListPage } from '@/features/admin/currencies/pages/CurrenciesListPage';
+import { renderWithProviders } from '@/testing/test-utils';
 import type { CurrencySeriesResponse } from '@/types/currency';
 import type { ApiError } from '@/types/apiError';
 
@@ -43,11 +43,10 @@ function mockQuerySuccess(data: CurrencySeriesResponse[]) {
 }
 
 function renderPage() {
-  return render(
-    <MemoryRouter initialEntries={['/admin/currencies']}>
-      <CurrenciesListPage />
-    </MemoryRouter>,
-  );
+  return renderWithProviders(<CurrenciesListPage />, {
+    initialEntries: ['/admin/currencies'],
+    router: 'dom',
+  });
 }
 
 describe('CurrenciesListPage permission gating', () => {

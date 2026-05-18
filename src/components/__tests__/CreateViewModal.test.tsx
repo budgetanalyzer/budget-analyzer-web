@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router-dom';
-import { configureStore } from '@reduxjs/toolkit';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { CreateViewModal } from '@/components/CreateViewModal';
-import uiReducer from '@/store/uiSlice';
+import { renderWithProviders } from '@/testing/test-utils';
 import type { ViewCriteriaApi } from '@/types/view';
 
 const mockMutate = vi.fn();
@@ -29,20 +26,10 @@ beforeAll(() => {
 });
 
 function renderModal(criteria: ViewCriteriaApi) {
-  const store = configureStore({ reducer: { ui: uiReducer } });
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+  return renderWithProviders(<CreateViewModal open onClose={vi.fn()} criteria={criteria} />, {
+    initialEntries: ['/views'],
+    router: 'dom',
   });
-
-  return render(
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <CreateViewModal open onClose={vi.fn()} criteria={criteria} />
-        </MemoryRouter>
-      </QueryClientProvider>
-    </Provider>,
-  );
 }
 
 beforeEach(() => {
@@ -50,7 +37,7 @@ beforeEach(() => {
 });
 
 describe('CreateViewModal', () => {
-  it('submits saved-view criteria with dateFrom, dateTo, and transaction type', () => {
+  it('submits saved-view criteria with dateFrom, dateTo, and transaction type', async () => {
     const criteria: ViewCriteriaApi = {
       dateFrom: '2026-01-01',
       dateTo: '2026-01-31',
@@ -60,10 +47,8 @@ describe('CreateViewModal', () => {
 
     renderModal(criteria);
 
-    fireEvent.change(screen.getByLabelText(/View Name/i), {
-      target: { value: 'January Debits' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Save View/i }));
+    await userEvent.type(screen.getByLabelText(/View Name/i), 'January Debits');
+    await userEvent.click(screen.getByRole('button', { name: /Save View/i }));
 
     expect(mockMutate).toHaveBeenCalledWith(
       {

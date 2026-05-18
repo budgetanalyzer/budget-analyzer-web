@@ -7,7 +7,8 @@ A comprehensive guide to the testing setup and best practices for the Budget Ana
 ## Testing Stack
 
 - **Test Runner:** Vitest (fast, Vite-native)
-- **Testing Library:** React Testing Library (`@testing-library/react`)
+- **Testing Library:** React Testing Library (`@testing-library/react`) and
+  `@testing-library/user-event`
 - **Assertions:** Vitest matchers + jest-dom matchers
 - **API Mocking:** MSW (Mock Service Worker)
 - **Environment:** jsdom (simulates browser environment in Node)
@@ -181,7 +182,8 @@ export const server = setupServer(...handlers);
 ```typescript
 // src/components/__tests__/BackButton.test.tsx
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Link, MemoryRouter, Route, Routes } from 'react-router';
 import { BackButton } from '@/components/BackButton';
 
@@ -194,7 +196,7 @@ function ListPage() {
 }
 
 describe('BackButton', () => {
-  it('uses browser history after in-app navigation', () => {
+  it('uses browser history after in-app navigation', async () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <Routes>
@@ -204,8 +206,8 @@ describe('BackButton', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('link', { name: /Open detail/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Back/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Open detail/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Back/ }));
 
     expect(screen.getByRole('link', { name: /Open detail/ })).toBeInTheDocument();
   });
@@ -290,14 +292,18 @@ screen.getByTestId('submit-button');
 ### Pattern 2: User Interactions
 
 ```typescript
-import { fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
-fireEvent.click(button);
-fireEvent.change(input, { target: { value: 'test' } });
+await userEvent.click(button);
+await userEvent.type(input, 'test');
+await userEvent.clear(input);
 ```
 
-Use `fireEvent` for now. `@testing-library/user-event` is not installed yet;
-add it before documenting or writing `userEvent` workflows.
+Prefer `userEvent` for workflows users actually perform: clicking, typing,
+selecting options, clearing fields, and keyboard navigation. Keep `fireEvent`
+for lower-level events where `userEvent` is a poor fit, such as synthetic
+window activity, timer-adjacent hooks, focused DOM events like backdrop clicks,
+or rare library-specific keyboard workarounds.
 
 ### Pattern 3: Async Testing
 
@@ -346,11 +352,13 @@ it('displays error message on API failure', async () => {
 
 ```typescript
 // ✅ GOOD: Test what users see and do
+import userEvent from '@testing-library/user-event';
+
 it('allows user to filter transactions', async () => {
   render(<TransactionsPage />);
 
   const searchBox = screen.getByPlaceholderText('Search transactions...');
-  fireEvent.change(searchBox, { target: { value: 'CREDIT' } });
+  await userEvent.type(searchBox, 'CREDIT');
 
   expect(screen.getByText('Total: 5 transactions')).toBeInTheDocument();
 });
@@ -549,6 +557,8 @@ it('renders the transactions page', () => {
 `createTestStore()` creates a fresh Redux store for each test.
 `renderWithProviders()` returns the normal Testing Library render result plus
 the `queryClient` and `store` it used.
+Pass `router: 'dom'` only for components that still import router hooks from
+`react-router-dom`; the default router matches the app's `react-router` usage.
 
 ---
 

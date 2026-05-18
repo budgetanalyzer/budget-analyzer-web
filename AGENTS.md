@@ -399,6 +399,7 @@ npx vitest --grep "renders correctly"
 - MSW handlers: `src/testing/mocks/handlers.ts`
 - Server: `src/testing/mocks/server.ts`
 - Shared render helpers: `src/testing/test-utils.tsx`
+- Prefer `@testing-library/user-event` for user workflows; keep `fireEvent` for low-level synthetic events only
 
 ### Environment Variables
 
