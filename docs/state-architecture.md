@@ -88,6 +88,22 @@ const { data: transactions, isLoading, error, refetch } = useTransactions();
 
 The `transactions` variable contains the array from React Query's cache!
 
+### Analytics source state
+
+Analytics does not store its active source in Redux or localStorage. The source
+is URL-backed:
+
+```text
+/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2026
+/analytics?scope=view&viewId=<view-id>&viewMode=monthly&transactionType=debit&year=2026
+```
+
+`scope=all` resolves data with `useTransactions()`. `scope=view` resolves saved
+view metadata with `useView(viewId)` and canonical visible membership with
+`useViewTransactions(viewId)`, so pinned transactions are included and excluded
+transactions are omitted. `useAnalyticsData` receives the already resolved
+transaction list and remains unaware of how the source was fetched.
+
 ### Why React Query for Transactions?
 
 ✅ **Automatic caching** - No manual cache management

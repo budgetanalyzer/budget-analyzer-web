@@ -17,6 +17,22 @@ Using **Shadcn/UI** for components:
 - Tailwind CSS integration
 - Built-in accessibility (Radix primitives)
 
+## Page Responsibilities
+
+Transactions, saved views, and analytics are separate task surfaces:
+
+| Page | Responsibility |
+|------|----------------|
+| Transactions (`/`) | All-transaction management and filtering |
+| View detail (`/views/:id`) | Saved-view membership management, including pinned and excluded rows |
+| Analytics (`/analytics`) | Spending analysis for either all transactions or one saved view |
+
+Analytics source selection is explicit in the URL. Missing `scope` defaults to
+all transactions; `scope=view&viewId=<id>` analyzes canonical saved-view
+membership from `useViewTransactions`, not criteria-only local filtering.
+Analytics drilldowns route back to the operational surface for the selected
+source: `/` for all transactions and `/views/:id` for saved-view analytics.
+
 ## CSP Compliance
 
 The production build is served with a strict Content Security Policy (`style-src 'self'` — no `unsafe-inline`):

@@ -40,8 +40,10 @@ filtered transaction list.
 
 Analytics URLs carry an explicit source scope. Missing `scope` still means all
 transactions for backward compatibility, while scoped saved-view analytics use
-`scope=view&viewId=<id>`. Analytics drilldown links route to the operational
-surface for that source: all-transaction analytics link to
+`scope=view&viewId=<id>`. Saved-view analytics resolves data through the same
+canonical membership endpoint as view detail, so pinned transactions are
+included and excluded transactions are omitted. Analytics drilldown links route
+to the operational surface for that source: all-transaction analytics link to
 `/?dateFrom=...&dateTo=...`, and saved-view analytics link to
 `/views/<id>?dateFrom=...&dateTo=...`. Both include `returnTo` and
 `breadcrumbLabel` so the filtered operational page can navigate back to the

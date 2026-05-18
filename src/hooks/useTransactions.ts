@@ -4,12 +4,21 @@ import { Transaction, TransactionUpdateRequest } from '@/types/transaction';
 import { transactionApi } from '@/api/transactionApi';
 import { ApiError } from '@/types/apiError';
 
-export const useTransactions = (): UseQueryResult<Transaction[], ApiError> => {
+interface UseTransactionsOptions {
+  enabled?: boolean;
+}
+
+export const useTransactions = (
+  options: UseTransactionsOptions = {},
+): UseQueryResult<Transaction[], ApiError> => {
+  const { enabled = true } = options;
+
   return useQuery<Transaction[], ApiError>({
     queryKey: ['transactions'],
     queryFn: () => transactionApi.getTransactions(),
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: 1,
+    enabled,
   });
 };
 
