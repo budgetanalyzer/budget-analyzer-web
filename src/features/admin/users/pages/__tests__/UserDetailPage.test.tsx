@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 
 import { UserDetailPage } from '@/features/admin/users/pages/UserDetailPage';
-import { server } from '@/mocks/server';
+import { server } from '@/testing/mocks/server';
 import uiReducer from '@/store/uiSlice';
 
 function renderPage(initialPath: string) {

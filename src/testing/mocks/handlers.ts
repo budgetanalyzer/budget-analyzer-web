@@ -1,4 +1,4 @@
-// src/mocks/handlers.ts
+// src/testing/mocks/handlers.ts
 import { http, HttpResponse } from 'msw';
 import type { UserDetail, UserReference } from '@/types/user';
 

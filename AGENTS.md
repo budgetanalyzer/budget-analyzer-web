@@ -386,7 +386,7 @@ npm test             # Run tests in watch mode
 npm run test:ui      # Run tests with Vitest UI
 
 # Single test file
-npx vitest src/test/Button.test.tsx
+npx vitest src/utils/__tests__/parseSearchTerms.test.ts
 
 # Test pattern
 npx vitest --grep "renders correctly"
@@ -395,9 +395,10 @@ npx vitest --grep "renders correctly"
 ### Testing Setup
 
 **Vitest** with jsdom environment:
-- Setup: `src/test/setup.ts` (MSW server, jest-dom matchers)
-- MSW handlers: `src/mocks/handlers.ts`
-- Server: `src/mocks/server.ts`
+- Setup: `src/testing/setup.ts` (MSW server, jest-dom matchers)
+- MSW handlers: `src/testing/mocks/handlers.ts`
+- Server: `src/testing/mocks/server.ts`
+- Shared render helpers: `src/testing/test-utils.tsx`
 
 ### Environment Variables
 

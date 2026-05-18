@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { server } from '@/mocks/server';
+import { server } from '@/testing/mocks/server';
 import { transactionApi } from '@/api/transactionApi';
 import { BatchImportRequest, BatchImportTransactionRequest } from '@/types/transaction';
 

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { server } from '@/mocks/server';
+import { server } from '@/testing/mocks/server';
 import { TransactionPreviewModal } from '@/features/transactions/components/TransactionPreviewModal';
 import type { BatchImportRequest, PreviewResponse, PreviewTransaction } from '@/types/transaction';
 import { formatTimestamp } from '@/utils/dates';
