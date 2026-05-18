@@ -1,62 +1,15 @@
-// src/features/views/pages/ViewsPage.tsx
-import { useEffect, useCallback } from 'react';
-import { motion, LayoutGroup, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Bookmark } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useViews } from '@/hooks/useViews';
-import { useTransactions } from '@/hooks/useTransactions';
-import { useExchangeRatesMap } from '@/hooks/useCurrencies';
-import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { toggleViewSelection, setSelectedViewIds } from '@/store/uiSlice';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { MissingExchangeRatesBanner } from '@/components/MissingExchangeRatesBanner';
 import { fadeInVariants, layoutTransition } from '@/lib/animations';
-import { SelectableViewCard } from '@/features/views/components/SelectableViewCard';
-import { AggregateViewStats } from '@/features/views/components/AggregateViewStats';
+import { ViewCard } from '@/features/views/components/ViewCard';
 
 export function ViewsPage() {
-  const dispatch = useAppDispatch();
-  const queryClient = useQueryClient();
   const { data: views, isLoading, error, refetch } = useViews();
-  const { data: transactions } = useTransactions();
-  const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
-  const selectedViewIds = useAppSelector((state) => state.ui.selectedViewIds);
-  const {
-    exchangeRatesMap,
-    pendingCurrencies,
-    isLoading: isExchangeRatesLoading,
-  } = useExchangeRatesMap({
-    displayCurrency,
-  });
-
-  const disabledCurrencies = useMissingCurrencies();
-
-  const handleRefreshExchangeRates = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
-    queryClient.invalidateQueries({ queryKey: ['currencies'] });
-  }, [queryClient]);
-
-  // Convert selectedViewIds to Set for efficient lookup
-  const selectedViewIdsSet = new Set(selectedViewIds);
-
-  // Initialize selectedViewIds when views are loaded
-  useEffect(() => {
-    if (!views || views.length === 0) {
-      return;
-    }
-
-    // If selectedViewIds is empty OR all IDs are invalid, select all views
-    const validViewIds = new Set(views.map((v) => v.id));
-    const hasValidSelection = selectedViewIds.some((id) => validViewIds.has(id));
-
-    if (selectedViewIds.length === 0 || !hasValidSelection) {
-      dispatch(setSelectedViewIds(views.map((v) => v.id)));
-    }
-  }, [views, selectedViewIds, dispatch]);
 
   if (isLoading) {
     return (
@@ -85,17 +38,6 @@ export function ViewsPage() {
         description={`${viewsList.length} view${viewsList.length !== 1 ? 's' : ''}`}
       />
 
-      <AnimatePresence>
-        {(disabledCurrencies.length > 0 || pendingCurrencies.length > 0) && (
-          <MissingExchangeRatesBanner
-            disabledCurrencies={disabledCurrencies}
-            pendingCurrencies={pendingCurrencies}
-            onRefresh={handleRefreshExchangeRates}
-            isRefreshing={isExchangeRatesLoading}
-          />
-        )}
-      </AnimatePresence>
-
       {viewsList.length === 0 ? (
         <motion.div
           variants={fadeInVariants}
@@ -115,42 +57,17 @@ export function ViewsPage() {
           </Card>
         </motion.div>
       ) : (
-        <LayoutGroup>
-          {/* Aggregate Statistics */}
-          {transactions && exchangeRatesMap && (
-            <AggregateViewStats
-              views={viewsList}
-              selectedViewIds={selectedViewIds}
-              transactions={transactions}
-              displayCurrency={displayCurrency}
-              exchangeRatesMap={exchangeRatesMap}
-              isExchangeRatesLoading={isExchangeRatesLoading}
-            />
-          )}
-
-          {/* View Cards Grid */}
-          <motion.div
-            variants={fadeInVariants}
-            initial="initial"
-            animate="animate"
-            transition={layoutTransition}
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-          >
-            {transactions &&
-              exchangeRatesMap &&
-              viewsList.map((view) => (
-                <SelectableViewCard
-                  key={view.id}
-                  view={view}
-                  isSelected={selectedViewIdsSet.has(view.id)}
-                  onToggleSelection={() => dispatch(toggleViewSelection(view.id))}
-                  transactions={transactions}
-                  exchangeRatesMap={exchangeRatesMap}
-                  displayCurrency={displayCurrency}
-                />
-              ))}
-          </motion.div>
-        </LayoutGroup>
+        <motion.div
+          variants={fadeInVariants}
+          initial="initial"
+          animate="animate"
+          transition={layoutTransition}
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          {viewsList.map((view) => (
+            <ViewCard key={view.id} view={view} />
+          ))}
+        </motion.div>
       )}
     </div>
   );

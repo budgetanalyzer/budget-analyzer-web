@@ -27,7 +27,6 @@ interface UiState {
   displayCurrency: string;
   hasNavigated: boolean;
   transactionTable: TransactionTableState;
-  selectedViewIds: string[];
   adminSidebarOpen: boolean;
   adminSidebarMobileOpen: boolean;
 }
@@ -56,7 +55,6 @@ const initialState: UiState = {
       max: null,
     },
   },
-  selectedViewIds: JSON.parse(localStorage.getItem('selectedViewIds') || '[]'),
   adminSidebarOpen:
     localStorage.getItem('adminSidebarOpen') === null
       ? true
@@ -131,21 +129,6 @@ const uiSlice = createSlice({
     setHasNavigated: (state, action: PayloadAction<boolean>) => {
       state.hasNavigated = action.payload;
     },
-    toggleViewSelection: (state, action: PayloadAction<string>) => {
-      const viewId = action.payload;
-      const currentSet = new Set(state.selectedViewIds);
-      if (currentSet.has(viewId)) {
-        currentSet.delete(viewId);
-      } else {
-        currentSet.add(viewId);
-      }
-      state.selectedViewIds = Array.from(currentSet);
-      localStorage.setItem('selectedViewIds', JSON.stringify(state.selectedViewIds));
-    },
-    setSelectedViewIds: (state, action: PayloadAction<string[]>) => {
-      state.selectedViewIds = action.payload;
-      localStorage.setItem('selectedViewIds', JSON.stringify(action.payload));
-    },
   },
 });
 
@@ -164,8 +147,6 @@ export const {
   setTransactionTableAccountIdFilter,
   setTransactionTableTypeFilter,
   setTransactionTableAmountFilter,
-  toggleViewSelection,
-  setSelectedViewIds,
   toggleAdminSidebar,
   setAdminSidebarMobileOpen,
   toggleAdminSidebarMobile,

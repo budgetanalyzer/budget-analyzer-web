@@ -25,8 +25,9 @@ The core product behavior:
 - `MonthlySpendingCard` and `YearlySpendingCard` build drilldown links through
   `buildTransactionsUrl`, so every analytics drilldown goes to the all
   transactions page.
-- `ViewsPage` aggregate stats use `filterTransactionsByCriteria`, which ignores
-  pinned and excluded view membership.
+- `ViewsPage` is a saved-view directory only. The previous aggregate
+  selected-view stats surface was removed instead of canonicalized because it
+  added complexity that does not belong in the analytics scope-unification work.
 - `ViewPage` and `ViewTransactionTable` use canonical membership through
   `useViewTransactions`, but the table only supports text search and does not
   have URL-backed date filters.
@@ -41,6 +42,8 @@ The core product behavior:
 - Do not make "All transactions" a pseudo saved view in the Views dropdown.
 - Do not use selected view IDs from Redux/localStorage as analytics context.
 - Do not implement multi-view analytics in this pass.
+- Do not preserve or replace the Views page aggregate selected-view stats
+  surface.
 
 ## URL Contract
 
@@ -155,7 +158,9 @@ Acceptance criteria:
 - No Redux/localStorage state controls analytics source.
 - Tests cover all-scope and view-scope data selection.
 
-## Phase 3: Canonicalize Views Aggregate Stats
+## Phase 3: Remove Views Aggregate Stats
+
+Status: Implemented.
 
 Files likely affected:
 
@@ -164,32 +169,34 @@ Files likely affected:
 - `src/features/views/hooks/useAggregateViewStats.ts`
 - `src/features/views/components/SelectableViewCard.tsx`
 - `src/hooks/useViews.ts`
+- `src/features/views/index.ts`
+- view stats tests, if present
 
 Tasks:
 
-1. Replace criteria-only aggregate stat calculation with canonical membership
-   where feasible.
-2. Decide whether the Views list overview should fetch every selected view's
-   membership:
-   - For current scale, `useQueries` for selected views is acceptable.
-   - If view count becomes large, defer exact aggregate stats behind an explicit
-     "Calculate" action or backend aggregate endpoint.
-3. Preserve deduplication when multiple selected views contain the same
-   transaction.
-4. Ensure pinned transactions are included and excluded transactions are not
-   included.
-5. Update individual view card summary calculations if they currently present
-   criteria-only totals that can diverge from view detail.
-6. Consider a loading skeleton or compact loading state for aggregate stats when
-   memberships are being resolved.
+1. Remove the aggregate stats UI from the Views list page.
+2. Remove the selected-view aggregate state and selection handlers from
+   `ViewsPage`.
+3. Delete `AggregateViewStats.tsx` and `useAggregateViewStats.ts`.
+4. Simplify or replace `SelectableViewCard` so view cards are navigation and
+   management entry points only, not aggregate-stat selectors.
+5. Remove criteria-only aggregate calculations, deduplication code, monthly
+   average helpers, and any query dependencies used only by the aggregate stats
+   feature.
+6. Remove exports, imports, tests, fixtures, and mocks that exist only for
+   aggregate view stats.
+7. Keep the Views list focused on listing saved views and linking to View
+   Detail / Analytics entry points.
 
 Acceptance criteria:
 
-- Aggregate stats on the Views page reconcile with individual View Detail
-  transaction membership.
-- Selected-view deduplication still works.
-- No stats surface presents criteria-only totals as canonical view totals.
-- Tests cover pinned/excluded cases.
+- No aggregate selected-view stats UI remains on the Views page.
+- No aggregate stats hook, component, or view-selection state remains in the
+  views feature.
+- No code path computes criteria-only selected-view totals or monthly averages.
+- Existing view list, view detail, and view-to-analytics flows continue to work.
+- Tests no longer assert aggregate stats behavior and cover the remaining view
+  list interactions where needed.
 
 ## Phase 4: URL-Backed Date Filtering On View Detail
 
@@ -211,7 +218,7 @@ Remaining tasks:
 Files likely affected:
 
 - `src/features/views/pages/ViewPage.tsx`
-- `src/features/views/components/SelectableViewCard.tsx`
+- `src/features/views/components/ViewCard.tsx`
 - `src/features/views/pages/ViewsPage.tsx`
 - `src/features/analytics/utils/urlState.ts`
 
@@ -219,19 +226,20 @@ Tasks:
 
 1. Add "Analyze View" action on View Detail.
 2. Optionally add a compact analyze action on each view card, separate from
-   selection and "View Details".
+   "View Details".
 3. Build links with the analytics URL builder so scope is always explicit:
    `scope=view&viewId=<id>`.
 4. Preserve the current analytics defaults:
    - monthly
    - debit
    - latest year with transactions
-5. Avoid making view card selection imply analytics source.
+5. Do not add persistent view-card selection state as analytics source.
 
 Acceptance criteria:
 
 - From a view detail page, one click opens Analytics scoped to that view.
-- View card selection remains aggregate-overview state only.
+- The Views list remains a directory; choosing an analytics source is explicit
+  through the analyze link or Analytics source selector.
 - Analyze links are normal links, not hidden persistent context.
 
 ## Phase 6: Tests, Docs, And Regression Checks
@@ -253,7 +261,7 @@ Tasks:
    - analytics source selector behavior
    - view-scoped analytics data resolution
    - view detail date URL sync
-   - canonical view aggregate stats
+   - removal of aggregate view stats UI and selected-view state
 2. Add integration-style component tests for:
    - analytics month click in all scope
    - analytics month click in view scope
@@ -286,18 +294,18 @@ Recommended order:
 3. Phase 2: Analytics source selector and `useViewTransactions` source
    resolution.
 4. Phase 5: View-to-analytics links.
-5. Phase 3: Canonical view aggregate stats.
+5. Phase 3: remove aggregate view stats UI/code.
 6. Phase 6: final documentation, full tests, and build.
 
 This order keeps each pull of behavior verifiable: first URLs, then view landing
-behavior, then analytics source selection, then entry points, then stats
-reconciliation.
+behavior, then analytics source selection, then entry points, then removal of
+the obsolete stats surface.
 
 ## Risks And Decisions To Confirm
 
-- Fetching canonical membership for many selected views on `ViewsPage` may be
-  noisy if users have many views. Start with selected views only and reassess if
-  latency becomes visible.
+- Removing aggregate stats means the Views page no longer tries to summarize
+  selected-view transaction totals. Use Analytics scoped to a single view for
+  transaction analysis instead of reintroducing a parallel stats surface.
 - `ViewTransactionTable` currently owns local pagination, sorting, and search
   input state. Adding URL-backed date filters should not globalize this state.
 - Analytics cards should not contain route branching directly. Keep destination

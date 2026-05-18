@@ -24,6 +24,7 @@ Transactions, saved views, and analytics are separate task surfaces:
 | Page | Responsibility |
 |------|----------------|
 | Transactions (`/`) | All-transaction management and filtering |
+| Views (`/views`) | Saved-view directory and entry point to view detail or view-scoped analytics |
 | View detail (`/views/:id`) | Saved-view membership management, including pinned and excluded rows |
 | Analytics (`/analytics`) | Spending analysis for either all transactions or one saved view |
 
