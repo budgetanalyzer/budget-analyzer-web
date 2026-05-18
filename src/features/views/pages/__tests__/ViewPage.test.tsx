@@ -25,6 +25,13 @@ vi.mock('@/hooks/useViews', async (importOriginal) => {
     useExcludeTransaction: () => ({ mutate: vi.fn(), isPending: false }),
     useBulkPinTransactions: () => ({ mutate: vi.fn(), isPending: false }),
     useBulkExcludeTransactions: () => ({ mutate: vi.fn(), isPending: false }),
+    useExcludedViewTransactions: () => ({
+      data: [],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    }),
+    useUnexcludeTransaction: () => ({ mutate: vi.fn(), isPending: false }),
   };
 });
 
@@ -95,8 +102,8 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderPage(initialEntry = '/views/view-1') {
-  hookMocks.useView.mockReturnValue(queryResult(view));
+function renderPage(initialEntry = '/views/view-1', viewOverride: Partial<SavedView> = {}) {
+  hookMocks.useView.mockReturnValue(queryResult({ ...view, ...viewOverride }));
   hookMocks.useViewTransactions.mockReturnValue(queryResult(transactions));
 
   const store = configureStore({ reducer: { ui: uiReducer } });
@@ -163,5 +170,15 @@ describe('ViewPage analytics entry point', () => {
     });
     expect(screen.getByText('Pinned grocery')).toBeInTheDocument();
     expect(screen.getByText('February grocery')).toBeInTheDocument();
+  });
+
+  it('opens the restore excluded modal from the criteria excluded badge', () => {
+    renderPage('/views/view-1', { excludedCount: 33 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore 33 excluded transactions' }));
+
+    expect(
+      screen.getByRole('heading', { name: 'Restore Excluded Transactions' }),
+    ).toBeInTheDocument();
   });
 });

@@ -91,7 +91,8 @@ Visible saved-view membership changes happen from the view table: matched rows
 can be pinned or excluded, pinned rows can be unpinned or excluded, and selected
 visible rows can be bulk pinned or bulk excluded. Excluded transactions are
 intentionally absent from the table; when a view has exclusions, the View detail
-header shows a Restore Excluded action that lists only excluded transactions and
+header shows a Restore Excluded action and the criteria summary's excluded badge
+opens the same restore modal. The modal lists only excluded transactions and
 restores them one at a time. Restoring waits for the saved-view detail,
 saved-view transaction membership, and saved-view list queries to refresh before
 the restore action completes, so the background view reflects the restored row

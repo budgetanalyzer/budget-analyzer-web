@@ -1,5 +1,6 @@
 // src/features/views/components/ViewCriteriaSummary.tsx
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { ViewCriteriaApi } from '@/types/view';
 import { formatLocalDate } from '@/utils/dates';
 import {
@@ -17,14 +18,22 @@ interface ViewCriteriaSummaryProps {
   criteria: ViewCriteriaApi;
   excludedCount: number;
   openEnded: boolean;
+  onRestoreExcludedClick?: () => void;
 }
 
 export function ViewCriteriaSummary({
   criteria,
   excludedCount,
   openEnded,
+  onRestoreExcludedClick,
 }: ViewCriteriaSummaryProps) {
-  const badges: { icon: typeof Calendar; label: string; variant?: 'default' | 'secondary' }[] = [];
+  const badges: {
+    icon: typeof Calendar;
+    label: string;
+    variant?: 'default' | 'secondary';
+    onClick?: () => void;
+    ariaLabel?: string;
+  }[] = [];
 
   // Date range
   if (criteria.dateFrom || criteria.dateTo) {
@@ -101,6 +110,8 @@ export function ViewCriteriaSummary({
       icon: EyeOff,
       label: `${excludedCount} excluded`,
       variant: 'secondary',
+      onClick: onRestoreExcludedClick,
+      ariaLabel: `Restore ${excludedCount} excluded transactions`,
     });
   }
 
@@ -113,6 +124,23 @@ export function ViewCriteriaSummary({
       <span className="text-sm font-medium text-muted-foreground">Criteria:</span>
       {badges.map((badge, index) => {
         const Icon = badge.icon;
+        if (badge.onClick) {
+          return (
+            <Button
+              key={index}
+              type="button"
+              variant={badge.variant || 'default'}
+              size="sm"
+              className="h-auto gap-1.5 rounded-full border-transparent px-2.5 py-0.5 text-xs font-semibold"
+              onClick={badge.onClick}
+              aria-label={badge.ariaLabel}
+            >
+              <Icon className="h-3 w-3" />
+              {badge.label}
+            </Button>
+          );
+        }
+
         return (
           <Badge key={index} variant={badge.variant || 'default'} className="gap-1.5">
             <Icon className="h-3 w-3" />

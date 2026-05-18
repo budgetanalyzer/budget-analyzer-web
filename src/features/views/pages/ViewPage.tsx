@@ -269,6 +269,7 @@ function ViewPageContent({ id }: { id: string }) {
               criteria={view.criteria}
               excludedCount={view.excludedCount}
               openEnded={view.openEnded}
+              onRestoreExcludedClick={handleRestoreClick}
             />
           </CardContent>
         </Card>

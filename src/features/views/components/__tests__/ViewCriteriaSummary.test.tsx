@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { ViewCriteriaSummary } from '@/features/views/components/ViewCriteriaSummary';
 
 describe('ViewCriteriaSummary', () => {
@@ -14,5 +14,22 @@ describe('ViewCriteriaSummary', () => {
 
     expect(screen.getByText('Jan 1, 2026 - Jan 31, 2026')).toBeInTheDocument();
     expect(screen.getByText('Debit')).toBeInTheDocument();
+  });
+
+  it('calls the restore handler from the excluded badge', () => {
+    const handleRestoreExcludedClick = vi.fn();
+
+    render(
+      <ViewCriteriaSummary
+        criteria={{}}
+        excludedCount={33}
+        openEnded={false}
+        onRestoreExcludedClick={handleRestoreExcludedClick}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore 33 excluded transactions' }));
+
+    expect(handleRestoreExcludedClick).toHaveBeenCalledTimes(1);
   });
 });
