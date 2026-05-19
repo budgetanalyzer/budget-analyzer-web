@@ -548,6 +548,12 @@ overrides `createTestQueryClient()` defaults, so error-state tests may need a
 longer `findBy*` timeout or a focused hook mock when the retry delay is not part
 of the behavior under test.
 
+Keep routine diagnostic `console.log` output out of production code that runs
+under page tests. If a test must suppress known debug output from a third-party
+or intentionally noisy dependency, use a focused spy for `console.log` in that
+test file. Do not broadly silence `console.error` or `console.warn`; those
+usually reveal React, accessibility, or API-test failures.
+
 For direct API module tests, use MSW to assert paths, methods, query params, and
 payloads at the API boundary. Keep React Query hook tests focused on query keys,
 `enabled` behavior, invalidation, and surfaced error state so they do not

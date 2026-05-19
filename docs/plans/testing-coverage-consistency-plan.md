@@ -550,7 +550,7 @@ Completion notes:
   tests; global coverage is `83.24%` statements, `83.58%` branches, `78.62%`
   functions, and `83.24%` lines.
 
-K. Decide what to do with console noise.
+K. Decide what to do with console noise. (Complete)
 
 1. Investigate the `[Stats] Starting calculation...` output from transaction and
    view page tests.
@@ -559,6 +559,23 @@ K. Decide what to do with console noise.
    test helper that preserves error/warning output.
 4. Do not broadly silence `console.error` or `console.warn`; those often reveal
    React, accessibility, or API-test failures.
+
+Completion notes:
+- Investigated the `[Stats] Starting calculation...` output with focused
+  transaction and view page test runs. The noise came from
+  `src/features/transactions/hooks/useTransactionStats.ts`, which runs during
+  normal page rendering, not from a test-only diagnostic.
+- Removed the routine stats timing `console.log` calls at the source while
+  leaving warning and error output untouched.
+- Updated `docs/testing-guide.md` with the console-output convention: avoid
+  routine `console.log` noise in production code exercised by page tests, use
+  focused `console.log` spies only for known intentional debug output, and do
+  not broadly silence `console.error` or `console.warn`.
+- Verification: the focused transaction/view page tests passed without the
+  `[Stats]` stdout entries, `npm run lint:fix` completed successfully, and
+  `npm run test:coverage` completed successfully. The full suite remains at
+  `65` test files and `332` tests; global coverage is `83.23%` statements,
+  `83.58%` branches, `78.62%` functions, and `83.23%` lines.
 
 L. Verify and document the completed phase work.
 
