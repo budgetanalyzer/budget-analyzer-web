@@ -30,11 +30,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm test -- --run
+      - name: Coverage gate
+        run: npm run test:coverage
 
       - name: Build
-        run: npm run build
+        run: npm run build:bundle
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7

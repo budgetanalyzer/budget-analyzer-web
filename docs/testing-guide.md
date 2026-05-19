@@ -93,6 +93,12 @@ export default defineConfig({
         '*.config.{ts,js}',
         '.*rc.{ts,js}',
       ],
+      thresholds: {
+        statements: 80,
+        branches: 80,
+        functions: 75,
+        lines: 80,
+      },
     },
     // ... path aliases, css handling
   },
@@ -705,11 +711,21 @@ Run `npm run test:coverage` to generate the initial V8 coverage report. The
 text report prints in the terminal, and detailed artifacts are written under
 `coverage/`.
 
-Coverage intentionally has no hard threshold yet. Use the report to find
-meaningful product-risk gaps, especially in auth, transactions, admin flows,
-analytics, saved views, and shared utilities. Do not add tests just to increase
-a percentage for trivial UI primitives, native browser behavior, library
-behavior, or TypeScript-only contracts.
+Coverage has modest global thresholds configured in `vitest.config.ts`:
+`80%` statements, `80%` branches, `75%` functions, and `80%` lines.
+`npm run test:coverage` exits non-zero if any global metric falls below those
+values, so CI/build checks that run coverage will fail on meaningful
+backsliding.
+
+The main local build path, `npm run build`, runs `npm run test:coverage` before
+type-checking and bundling. GitHub Actions uses the same coverage gate in
+`.github/workflows/build.yml` before running the production bundle step. Use
+`npm run build:bundle` only when coverage has already passed in the same flow.
+
+Use the report to find meaningful product-risk gaps, especially in auth,
+transactions, admin flows, analytics, saved views, and shared utilities. Do not
+add tests just to increase a percentage for trivial UI primitives, native
+browser behavior, library behavior, or TypeScript-only contracts.
 
 For analytics coverage, prefer assertions that protect interpretation and
 navigation: URL defaults and redirects, transaction-type filtering, amount
@@ -725,8 +741,8 @@ library wrappers unless they protect a real regression.
 
 Coverage excludes shared test infrastructure, colocated test files,
 declaration files, type-only modules, config files, and the `src/main.tsx`
-bootstrap entrypoint. Add thresholds only after the suite shape is consistent;
-start modestly or target high-value modules, then raise them deliberately.
+bootstrap entrypoint. Raise thresholds deliberately after reviewing the current
+report and adding behavior-focused coverage for real product-risk gaps.
 
 ---
 

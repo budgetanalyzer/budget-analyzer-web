@@ -361,7 +361,8 @@ Configured in:
 ```bash
 npm install          # Install dependencies
 npm run dev          # Start dev server (port 3000)
-npm run build        # Type-check + build for production (served at /)
+npm run build        # Coverage gate + type-check + production bundle (served at /)
+npm run build:bundle # Type-check + production bundle only
 npm run build:prod-smoke  # Build for /_prod-smoke/ (CSP/security verification only)
 npm run preview      # Preview production build
 ```
@@ -370,7 +371,9 @@ npm run preview      # Preview production build
 
 `Dockerfile` remains the Tilt/dev Vite image. Tagged GHCR releases build with
 `Dockerfile.production`, which builds the static bundle and serves it with
-unprivileged NGINX on port `3000`.
+unprivileged NGINX on port `3000`. Because `Dockerfile.production` uses
+`npm run build`, release image builds also enforce coverage thresholds before
+bundling.
 
 **Code Quality:**
 ```bash
@@ -408,7 +411,7 @@ npx vitest --grep "renders correctly"
 - New behavior needs a meaningful test or an explicit reason it does not need one.
 - Do not add tests that only assert native browser, React, TypeScript, or third-party library behavior.
 - New API-facing behavior uses MSW unless a direct module mock is intentionally narrower.
-- Coverage has no global threshold yet; use `npm run test:coverage` to find product-risk gaps, not to game percentages.
+- Coverage thresholds are `80%` statements, `80%` branches, `75%` functions, and `80%` lines. Use `npm run test:coverage` to catch regressions and find product-risk gaps, not to game percentages.
 
 ### Environment Variables
 

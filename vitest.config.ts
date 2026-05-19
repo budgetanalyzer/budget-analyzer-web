@@ -24,6 +24,12 @@ export default defineConfig({
         '*.config.{ts,js}',
         '.*rc.{ts,js}',
       ],
+      thresholds: {
+        statements: 80,
+        branches: 80,
+        functions: 75,
+        lines: 80,
+      },
     },
     env: {
       TZ: 'America/Los_Angeles',

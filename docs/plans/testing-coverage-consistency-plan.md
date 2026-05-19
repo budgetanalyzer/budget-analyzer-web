@@ -644,8 +644,9 @@ Completion notes:
   narrower.
 - Updated `AGENTS.md` with the same operational guardrails for future agents:
   colocated production-code tests, `src/testing` for shared infrastructure
-  only, meaningful-test expectations, MSW preference, and no global coverage
-  threshold yet.
+  only, meaningful-test expectations, MSW preference, and modest global
+  coverage thresholds after the reviewed baseline: `80%` statements, `80%`
+  branches, `75%` functions, and `80%` lines.
 - Updated `docs/README.md` to fix the testing-guide component-test anchor and
   refresh the Testing Guide status date.
 - Confirmed live docs and agent guidance now point at `src/testing/setup.ts`,
@@ -664,4 +665,4 @@ Completion notes:
 - `npm run test:coverage` runs and prints a report.
 - `docs/testing-guide.md` and `AGENTS.md` match the new convention.
 - Low-signal tests are removed or rewritten into behavior-focused tests.
-- The plan does not introduce broad coverage thresholds until the first report has been reviewed.
+- Broad coverage thresholds were added only after the first report was reviewed.
