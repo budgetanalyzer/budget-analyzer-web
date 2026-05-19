@@ -402,6 +402,14 @@ npx vitest --grep "renders correctly"
 - Shared render helpers: `src/testing/test-utils.tsx`
 - Prefer `@testing-library/user-event` for user workflows; keep `fireEvent` for low-level synthetic events only
 
+**Test placement and guardrails:**
+- Production-code tests live beside the code under test in `__tests__` directories.
+- Shared test infrastructure only lives under `src/testing/`; do not add production-code tests there.
+- New behavior needs a meaningful test or an explicit reason it does not need one.
+- Do not add tests that only assert native browser, React, TypeScript, or third-party library behavior.
+- New API-facing behavior uses MSW unless a direct module mock is intentionally narrower.
+- Coverage has no global threshold yet; use `npm run test:coverage` to find product-risk gaps, not to game percentages.
+
 ### Environment Variables
 
 Required (see `.env.example`):

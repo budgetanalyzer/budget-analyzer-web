@@ -1,6 +1,8 @@
 # Testing Guide
 
-A comprehensive guide to the testing setup and best practices for the Budget Analyzer application.
+This is the source of truth for test placement, shared test utilities, API
+mocking, behavior-focused coverage, and review guardrails in the Budget
+Analyzer web application.
 
 ---
 
@@ -12,6 +14,30 @@ A comprehensive guide to the testing setup and best practices for the Budget Ana
 - **Assertions:** Vitest matchers + jest-dom matchers
 - **API Mocking:** MSW (Mock Service Worker)
 - **Environment:** jsdom (simulates browser environment in Node)
+
+---
+
+## Testing Policy
+
+Write tests that would fail for a real product regression. Prefer
+integration-style component or page tests when confidence comes from routing,
+permissions, forms, API calls, URL state, or React Query behavior working
+together. Use focused unit tests for shared utilities, complex hooks, and pure
+logic with meaningful edge cases.
+
+Do not add tests just to assert behavior already guaranteed by React, the
+browser, TypeScript, or a library. Avoid class snapshots, native button click
+behavior, trivial render smoke tests, static label maps, and presentational
+Tailwind details unless they protect an explicit product contract.
+
+Before submitting a change, check:
+
+- New behavior has either a meaningful test or an explicit reason it does not
+  need one.
+- No tests were added only to assert native browser, React, TypeScript, or
+  third-party library behavior.
+- New API-facing behavior uses MSW unless a direct module mock is intentionally
+  narrower and still proves the behavior under test.
 
 ---
 
@@ -55,14 +81,17 @@ export default defineConfig({
     setupFiles: './src/testing/setup.ts',
     coverage: {
       provider: 'v8',
+      reporter: ['text', 'html', 'json-summary'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        'src/testing/**',
+        'src/**/*.d.ts',
         'src/**/__tests__/**',
         'src/features/**/types/**',
-        'src/**/*.d.ts',
         'src/main.tsx',
+        'src/testing/**',
         'src/types/{auth,currency,session,statementFormat,transaction,transactionSearch,user,view}.ts',
+        '*.config.{ts,js}',
+        '.*rc.{ts,js}',
       ],
     },
     // ... path aliases, css handling
@@ -116,6 +145,15 @@ Use this split consistently:
 
 Do not add production-code tests under `src/testing/`. The old `src/test/`
 directory is no longer used.
+
+Use feature ownership as the default placement guide:
+
+- Feature page/component tests belong under the owning feature's `__tests__`
+  directory.
+- Shared component, hook, API, store, and utility tests belong under the
+  nearest shared module's `__tests__` directory.
+- Shared providers, render helpers, mock servers, and reusable fixtures belong
+  under `src/testing/`.
 
 ---
 
@@ -187,6 +225,12 @@ export const server = setupServer(...handlers);
 - API calls intercepted and mocked
 - Fast, reliable responses
 - No network dependency
+
+Use MSW for API-facing behavior by default. It keeps the app code on its real
+HTTP path while letting tests assert request URLs, query params, payloads, and
+response handling. A direct module mock is acceptable when it is intentionally
+narrower than HTTP behavior, such as isolating a page from an already-tested
+hook or avoiding a retry delay that is not part of the behavior under test.
 
 ---
 
@@ -389,6 +433,19 @@ it('displays error message on API failure', async () => {
 ---
 
 ## Testing Best Practices
+
+### When To Choose Test Type
+
+Use page or component integration tests for workflows where the product risk is
+in pieces working together: permission gates, route guards, URL parsing and
+serialization, API request shaping, loading/error/empty states, form
+validation, mutation success or failure, and cache invalidation.
+
+Use hook tests for React Query behavior such as query keys, `enabled` gating,
+surfaced errors, derived hook state, and invalidation. Use direct API module
+tests for request paths, methods, query params, and payload shape. Use utility
+tests for product-owned boundaries such as LocalDate handling, currency
+conversion fallbacks, search/filter semantics, and API error-message mapping.
 
 ### ✅ DO: Test User Behavior
 
@@ -672,47 +729,6 @@ bootstrap entrypoint. Add thresholds only after the suite shape is consistent;
 start modestly or target high-value modules, then raise them deliberately.
 
 ---
-
-## Suggested Improvements
-
-### 1. Add Handler for Single Transaction
-
-```typescript
-// Add to src/testing/mocks/handlers.ts
-http.get('/api/transactions/:id', ({ params }) => {
-  const { id } = params;
-  return HttpResponse.json({
-    id,
-    accountId: 'acc1',
-    bankName: 'Test Bank',
-    date: '2024-01-01',
-    amount: 100.5,
-    type: 'debit',
-    description: `Transaction ${id}`,
-  });
-}),
-```
-
-### 2. Add Error Scenario Tests
-
-```typescript
-// src/hooks/__tests__/useTransactions.test.tsx
-it('handles API errors gracefully', async () => {
-  server.use(
-    http.get('/api/transactions', () => {
-      return HttpResponse.json(
-        { error: 'Server error' },
-        { status: 500 }
-      );
-    })
-  );
-
-  const { result } = renderHook(() => useTransactions(), { wrapper });
-
-  await waitFor(() => expect(result.current.isError).toBe(true));
-  expect(result.current.error).toBeDefined();
-});
-```
 
 ## Debugging Tests
 

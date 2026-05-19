@@ -577,7 +577,7 @@ Completion notes:
   `65` test files and `332` tests; global coverage is `83.23%` statements,
   `83.58%` branches, `78.62%` functions, and `83.23%` lines.
 
-L. Verify and document the completed phase work.
+L. Verify and document the completed phase work. (Complete)
 
 1. Run the focused tests added in the session.
 2. Run `npm run test:coverage`.
@@ -588,7 +588,28 @@ L. Verify and document the completed phase work.
    tests added/removed, remaining known gaps, and the new global coverage
    numbers.
 
-### Phase 6: Documentation And Guardrails
+Completion notes:
+- No new focused tests were added in this documentation-only session. The
+  Phase 5 verification used the full non-watch suite and coverage report.
+- Verification passed: `npm run lint:fix`, `npm test -- --run`, and
+  `npm run test:coverage`.
+- Final Phase 5 suite shape: `65` test files and `332` tests passed. Global
+  coverage is `83.23%` statements, `83.58%` branches, `78.62%` functions, and
+  `83.23%` lines.
+- Phase 5 reduced product risk around authorization and route gates, admin
+  create/edit/search workflows, transaction import/preview/detail flows,
+  saved-view reconciliation and URL state, analytics interpretation and
+  drilldown navigation, shared API request shaping, React Query hook behavior,
+  currency/date/error utility edge cases, and routine console noise.
+- Tests added/expanded during Phase 5 covered admin, transactions, views,
+  analytics, API modules, hooks, and shared utilities. Step K removed runtime
+  diagnostic logs rather than adding test-only console suppression.
+- Remaining known gaps are intentionally lower priority or still future
+  candidates: static/fallback auth pages, simple layout wrappers, some UI
+  primitives, lightweight selector components, and low-signal barrel/bootstrap
+  files such as `src/features/views/index.ts` and `src/store/index.ts`.
+
+### Phase 6: Documentation And Guardrails (Complete)
 
 Update `docs/testing-guide.md` so it becomes the source of truth for:
 
@@ -611,6 +632,27 @@ Add a short PR checklist item:
 - New behavior has either a meaningful test or an explicit reason it does not need one.
 - No tests were added just to assert native/browser/library behavior.
 - New API-facing behavior uses MSW unless a direct module mock is intentionally narrower.
+
+Completion notes:
+- Updated `docs/testing-guide.md` so it is the source of truth for test
+  placement, shared `src/testing` utilities, MSW usage, choosing unit vs
+  integration-style tests, what not to test, `userEvent` vs `fireEvent`,
+  coverage report usage, threshold policy, and console-output handling.
+- Added the PR checklist guardrails to `docs/testing-guide.md`: meaningful test
+  or explicit no-test reason, no native/browser/library-only assertions, and
+  MSW for new API-facing behavior unless a direct module mock is intentionally
+  narrower.
+- Updated `AGENTS.md` with the same operational guardrails for future agents:
+  colocated production-code tests, `src/testing` for shared infrastructure
+  only, meaningful-test expectations, MSW preference, and no global coverage
+  threshold yet.
+- Updated `docs/README.md` to fix the testing-guide component-test anchor and
+  refresh the Testing Guide status date.
+- Confirmed live docs and agent guidance now point at `src/testing/setup.ts`,
+  `src/testing/mocks/handlers.ts`, `src/testing/mocks/server.ts`, and
+  `src/testing/test-utils.tsx`; the only remaining `src/test` mentions are
+  historical context in this plan and the note that the old directory is no
+  longer used.
 
 ## Acceptance Criteria
 
