@@ -12,6 +12,7 @@ import type { UpdateStatementFormatRequest, FormatType } from '@/types/statement
 
 interface FormData {
   formatKey: string;
+  displayName: string;
   formatType: FormatType;
   bankName: string;
   defaultCurrencyIsoCode: string;
@@ -45,6 +46,7 @@ export function StatementFormatEditPage() {
       if (!formatKey) return;
 
       const updateData: UpdateStatementFormatRequest = {
+        displayName: data.displayName,
         bankName: data.bankName,
         defaultCurrencyIsoCode: data.defaultCurrencyIsoCode,
         dateHeader: data.dateHeader,

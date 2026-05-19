@@ -361,7 +361,8 @@ Configured in:
 ```bash
 npm install          # Install dependencies
 npm run dev          # Start dev server (port 3000)
-npm run build        # Type-check + build for production (served at /)
+npm run build        # Coverage gate + type-check + production bundle (served at /)
+npm run build:bundle # Type-check + production bundle only
 npm run build:prod-smoke  # Build for /_prod-smoke/ (CSP/security verification only)
 npm run preview      # Preview production build
 ```
@@ -370,7 +371,9 @@ npm run preview      # Preview production build
 
 `Dockerfile` remains the Tilt/dev Vite image. Tagged GHCR releases build with
 `Dockerfile.production`, which builds the static bundle and serves it with
-unprivileged NGINX on port `3000`.
+unprivileged NGINX on port `3000`. Because `Dockerfile.production` uses
+`npm run build`, release image builds also enforce coverage thresholds before
+bundling.
 
 **Code Quality:**
 ```bash
@@ -383,6 +386,7 @@ npm run format       # Format with Prettier
 **Testing:**
 ```bash
 npm test             # Run tests in watch mode
+npm run test:coverage  # Run tests once and print V8 coverage
 npm run test:ui      # Run tests with Vitest UI
 
 # Single test file
@@ -400,6 +404,14 @@ npx vitest --grep "renders correctly"
 - Server: `src/testing/mocks/server.ts`
 - Shared render helpers: `src/testing/test-utils.tsx`
 - Prefer `@testing-library/user-event` for user workflows; keep `fireEvent` for low-level synthetic events only
+
+**Test placement and guardrails:**
+- Production-code tests live beside the code under test in `__tests__` directories.
+- Shared test infrastructure only lives under `src/testing/`; do not add production-code tests there.
+- New behavior needs a meaningful test or an explicit reason it does not need one.
+- Do not add tests that only assert native browser, React, TypeScript, or third-party library behavior.
+- New API-facing behavior uses MSW unless a direct module mock is intentionally narrower.
+- Coverage thresholds are `80%` statements, `80%` branches, `75%` functions, and `80%` lines. Use `npm run test:coverage` to catch regressions and find product-risk gaps, not to game percentages.
 
 ### Environment Variables
 

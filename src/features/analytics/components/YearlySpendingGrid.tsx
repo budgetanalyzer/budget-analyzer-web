@@ -24,6 +24,16 @@ export function YearlySpendingGrid({
   analyticsScope,
   viewId,
 }: YearlySpendingGridProps) {
+  if (yearlyData.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-border py-12 text-center">
+        <p className="text-sm font-medium text-muted-foreground">
+          No yearly analytics for {transactionType} transactions.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {yearlyData.map((year) => (

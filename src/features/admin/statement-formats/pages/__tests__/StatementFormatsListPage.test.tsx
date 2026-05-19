@@ -44,6 +44,14 @@ function mockQuerySuccess(data: StatementFormat[]) {
   } as unknown as UseQueryResult<StatementFormat[], ApiError>);
 }
 
+function mockQueryError(error: Error) {
+  mockUseStatementFormats.mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    error,
+  } as unknown as UseQueryResult<StatementFormat[], ApiError>);
+}
+
 function renderPage() {
   return renderWithProviders(<StatementFormatsListPage />, {
     initialEntries: ['/admin/statement-formats'],
@@ -79,5 +87,24 @@ describe('StatementFormatsListPage permission gating', () => {
     expect(screen.getByText('Acme Bank')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Add Format/ })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Edit/ })).toHaveLength(formats.length);
+  });
+
+  it('renders the empty state when no statement formats exist', () => {
+    mockUsePermission.mockReturnValue(true);
+    mockQuerySuccess([]);
+    renderPage();
+
+    expect(screen.getByText('No statement formats found')).toBeInTheDocument();
+    expect(screen.getByText('Add your first format to get started')).toBeInTheDocument();
+  });
+
+  it('renders the API error state when statement formats fail to load', () => {
+    mockUsePermission.mockReturnValue(true);
+    mockQueryError(new Error('Statement format service unavailable'));
+    renderPage();
+
+    expect(
+      screen.getByText('Failed to load statement formats: Statement format service unavailable'),
+    ).toBeInTheDocument();
   });
 });

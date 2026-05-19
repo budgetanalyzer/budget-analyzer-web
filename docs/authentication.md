@@ -337,8 +337,11 @@ VITE_API_BASE_URL=/api
 ### Build Process
 
 ```bash
-# Build static files (served at /)
+# Coverage gate + build static files (served at /)
 npm run build
+
+# Build static files only when coverage already passed in this flow
+npm run build:bundle
 
 # Build for production-smoke verification (served at /_prod-smoke/)
 npm run build:prod-smoke
@@ -346,6 +349,10 @@ npm run build:prod-smoke
 # Output: dist/ directory
 # NGINX serves these files in production
 ```
+
+The standard `npm run build` command runs the Vitest coverage gate before
+type-checking and bundling. It fails if global coverage drops below `80%`
+statements, `80%` branches, `75%` functions, or `80%` lines.
 
 The `build:prod-smoke` command produces a bundle whose assets and router basename
 are set to `/_prod-smoke/`. This is used only by orchestration to verify

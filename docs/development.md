@@ -26,11 +26,13 @@ The Docker development runtime runs Vite as UID/GID `1001` (non-root). Keep cont
 
 ```bash
 npm run dev       # Start development server
-npm run build     # Build for production
+npm run build     # Coverage gate + production build
+npm run build:bundle  # Production bundle only
 npm run preview   # Preview production build
 npm run lint      # Run ESLint
 npm run format    # Format with Prettier
 npm test          # Run tests
+npm run test:coverage  # Run tests once with V8 coverage
 npm run test:ui   # Run tests with UI
 ```
 
@@ -83,11 +85,18 @@ src/
 ### Production Build
 
 ```bash
-npm run build         # Standard production build (served at /)
+npm run build         # Coverage gate + standard production build (served at /)
+npm run build:bundle  # Standard production bundle only (served at /)
 npm run build:prod-smoke  # Prod-smoke verification build (served at /_prod-smoke/)
 ```
 
 Output lands in `dist/`. NGINX serves these files in production.
+
+The standard `npm run build` path runs `npm run test:coverage` before
+type-checking and bundling. Coverage thresholds are enforced by Vitest, so the
+build exits non-zero if global coverage drops below `80%` statements, `80%`
+branches, `75%` functions, or `80%` lines. Use `npm run build:bundle` only
+when coverage has already been checked in the same flow.
 
 The `build:prod-smoke` build is used by orchestration to verify production CSP and browser security on the live origin. Auth and API paths remain root-relative regardless of which build is used.
 

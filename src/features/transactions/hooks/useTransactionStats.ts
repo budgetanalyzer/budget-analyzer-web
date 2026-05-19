@@ -37,9 +37,6 @@ export function useTransactionStats({
   // Convert all amounts to display currency before calculating totals
   // Optimization: Single-pass through transactions instead of 4 passes
   const stats = useMemo<TransactionStats>(() => {
-    const startTime = performance.now();
-    console.log('[Stats] Starting calculation for', transactions.length, 'transactions');
-
     if (!transactions.length) {
       return {
         totalTransactions: 0,
@@ -76,9 +73,6 @@ export function useTransactionStats({
 
     // Calculate date range
     const dateRange = getDateRange(transactions.map((t) => t.date));
-
-    const endTime = performance.now();
-    console.log('[Stats] Calculation took', (endTime - startTime).toFixed(2), 'ms');
 
     return {
       totalTransactions: transactions.length,

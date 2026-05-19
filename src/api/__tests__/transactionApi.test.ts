@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/testing/mocks/server';
+import { apiClient } from '@/api/client';
 import { transactionApi } from '@/api/transactionApi';
 import { BatchImportRequest, BatchImportTransactionRequest } from '@/types/transaction';
 
@@ -14,6 +16,44 @@ const baseTransaction: BatchImportTransactionRequest = {
   currencyIsoCode: 'USD',
   accountId: 'checking-123',
 };
+
+const originalAdapter = apiClient.defaults.adapter;
+
+afterEach(() => {
+  apiClient.defaults.adapter = originalAdapter;
+});
+
+describe('transactionApi.previewTransactions', () => {
+  it('uploads the statement file as multipart form data', async () => {
+    const file = new File(['date,description,amount'], 'statement.csv', { type: 'text/csv' });
+    let capturedConfig: InternalAxiosRequestConfig | undefined;
+
+    apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      capturedConfig = config;
+
+      return {
+        data: {
+          previewImportToken: 'preview-token-123',
+          sourceFile: 'statement.csv',
+          fileImport: null,
+          transactions: [],
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      } satisfies AxiosResponse;
+    });
+
+    await transactionApi.previewTransactions(file, 'acme-csv', 'checking-123');
+
+    expect(capturedConfig?.url).toBe(
+      '/v1/transactions/preview?format=acme-csv&accountId=checking-123',
+    );
+    expect(capturedConfig?.headers.getContentType()).toContain('multipart/form-data');
+    expect(capturedConfig?.data).toBeInstanceOf(FormData);
+  });
+});
 
 describe('transactionApi.batchImportTransactions', () => {
   it('posts the preview import token with reviewed transactions', async () => {

@@ -42,6 +42,14 @@ function mockQuerySuccess(data: CurrencySeriesResponse[]) {
   } as unknown as UseQueryResult<CurrencySeriesResponse[], ApiError>);
 }
 
+function mockQueryError(error: Error) {
+  mockUseCurrencies.mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    error,
+  } as unknown as UseQueryResult<CurrencySeriesResponse[], ApiError>);
+}
+
 function renderPage() {
   return renderWithProviders(<CurrenciesListPage />, {
     initialEntries: ['/admin/currencies'],
@@ -78,5 +86,24 @@ describe('CurrenciesListPage permission gating', () => {
     expect(screen.getByRole('button', { name: /Add Currency/ })).toBeInTheDocument();
     // One Edit button per row
     expect(screen.getAllByRole('button', { name: /Edit/ })).toHaveLength(currencies.length);
+  });
+
+  it('renders the empty state when no currencies exist', () => {
+    mockUsePermission.mockReturnValue(true);
+    mockQuerySuccess([]);
+    renderPage();
+
+    expect(screen.getByText('No currencies found')).toBeInTheDocument();
+    expect(screen.getByText('Add your first currency to get started')).toBeInTheDocument();
+  });
+
+  it('renders the API error state when currencies fail to load', () => {
+    mockUsePermission.mockReturnValue(true);
+    mockQueryError(new Error('Currency service unavailable'));
+    renderPage();
+
+    expect(
+      screen.getByText('Failed to load currencies: Currency service unavailable'),
+    ).toBeInTheDocument();
   });
 });

@@ -29,6 +29,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_ISO_4217_CODE: 'Invalid currency code',
   NO_EXCHANGE_RATE_DATA_AVAILABLE: 'No exchange rate data is available for this currency',
   START_DATE_OUT_OF_RANGE: 'The start date is outside the available data range for this provider',
+  CURRENCY_NOT_ENABLED: 'This currency is not enabled for exchange rate data',
 };
 
 /**

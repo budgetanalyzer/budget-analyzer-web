@@ -1,6 +1,8 @@
 # Testing Guide
 
-A comprehensive guide to the testing setup and best practices for the Budget Analyzer application.
+This is the source of truth for test placement, shared test utilities, API
+mocking, behavior-focused coverage, and review guardrails in the Budget
+Analyzer web application.
 
 ---
 
@@ -15,6 +17,30 @@ A comprehensive guide to the testing setup and best practices for the Budget Ana
 
 ---
 
+## Testing Policy
+
+Write tests that would fail for a real product regression. Prefer
+integration-style component or page tests when confidence comes from routing,
+permissions, forms, API calls, URL state, or React Query behavior working
+together. Use focused unit tests for shared utilities, complex hooks, and pure
+logic with meaningful edge cases.
+
+Do not add tests just to assert behavior already guaranteed by React, the
+browser, TypeScript, or a library. Avoid class snapshots, native button click
+behavior, trivial render smoke tests, static label maps, and presentational
+Tailwind details unless they protect an explicit product contract.
+
+Before submitting a change, check:
+
+- New behavior has either a meaningful test or an explicit reason it does not
+  need one.
+- No tests were added only to assert native browser, React, TypeScript, or
+  third-party library behavior.
+- New API-facing behavior uses MSW unless a direct module mock is intentionally
+  narrower and still proves the behavior under test.
+
+---
+
 ## Running Tests
 
 ### Basic Commands
@@ -25,6 +51,9 @@ npm test
 
 # Run tests once (CI/production)
 npm test -- --run
+
+# Generate coverage report
+npm run test:coverage
 
 # Run with UI interface
 npm run test:ui
@@ -50,6 +79,27 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/testing/setup.ts',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json-summary'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.d.ts',
+        'src/**/__tests__/**',
+        'src/features/**/types/**',
+        'src/main.tsx',
+        'src/testing/**',
+        'src/types/{auth,currency,session,statementFormat,transaction,transactionSearch,user,view}.ts',
+        '*.config.{ts,js}',
+        '.*rc.{ts,js}',
+      ],
+      thresholds: {
+        statements: 80,
+        branches: 80,
+        functions: 75,
+        lines: 80,
+      },
+    },
     // ... path aliases, css handling
   },
 });
@@ -101,6 +151,15 @@ Use this split consistently:
 
 Do not add production-code tests under `src/testing/`. The old `src/test/`
 directory is no longer used.
+
+Use feature ownership as the default placement guide:
+
+- Feature page/component tests belong under the owning feature's `__tests__`
+  directory.
+- Shared component, hook, API, store, and utility tests belong under the
+  nearest shared module's `__tests__` directory.
+- Shared providers, render helpers, mock servers, and reusable fixtures belong
+  under `src/testing/`.
 
 ---
 
@@ -172,6 +231,12 @@ export const server = setupServer(...handlers);
 - API calls intercepted and mocked
 - Fast, reliable responses
 - No network dependency
+
+Use MSW for API-facing behavior by default. It keeps the app code on its real
+HTTP path while letting tests assert request URLs, query params, payloads, and
+response handling. A direct module mock is acceptable when it is intentionally
+narrower than HTTP behavior, such as isolating a page from an already-tested
+hook or avoiding a retry delay that is not part of the behavior under test.
 
 ---
 
@@ -305,6 +370,29 @@ for lower-level events where `userEvent` is a poor fit, such as synthetic
 window activity, timer-adjacent hooks, focused DOM events like backdrop clicks,
 or rare library-specific keyboard workarounds.
 
+This repo's custom `Select` primitive currently exposes the trigger and menu
+items as buttons in tests. Use the visible labels with `userEvent.click()`,
+matching the component's rendered roles:
+
+```typescript
+await user.click(screen.getByRole('button', { name: /Status/ }));
+await user.click(screen.getByRole('button', { name: 'Disabled' }));
+```
+
+This repo's custom `Dialog` primitive currently does not expose a semantic
+`role="dialog"`. Query dialogs by the visible heading or body copy, then use the
+visible action buttons.
+
+For URL-backed filter hooks, test parsing and serialization with a small route
+harness that renders `useLocation()` output. Assert the user-visible URL state
+after calling the hook's public handlers, including preserved context params and
+params that must be cleared together.
+
+For saved-view membership utilities, keep tests focused on frontend-owned
+reconciliation semantics: excluded IDs are absent from visible rows and missing
+fetches, visible duplicate IDs render once, restored IDs reappear when they
+leave the excluded set, and missing visible IDs are returned for detail fetches.
+
 ### Pattern 3: Async Testing
 
 ```typescript
@@ -321,6 +409,10 @@ const element = await screen.findByText('Loaded');
 // Wait for element to disappear
 await waitForElementToBeRemoved(() => screen.queryByText('Loading...'));
 ```
+
+When a workflow updates URL state and then renders derived or animated content,
+wait for the final user-visible content with `findBy*` or `waitFor()` instead
+of asserting synchronously after the URL assertion.
 
 ### Pattern 4: Testing Error States
 
@@ -347,6 +439,19 @@ it('displays error message on API failure', async () => {
 ---
 
 ## Testing Best Practices
+
+### When To Choose Test Type
+
+Use page or component integration tests for workflows where the product risk is
+in pieces working together: permission gates, route guards, URL parsing and
+serialization, API request shaping, loading/error/empty states, form
+validation, mutation success or failure, and cache invalidation.
+
+Use hook tests for React Query behavior such as query keys, `enabled` gating,
+surfaced errors, derived hook state, and invalidation. Use direct API module
+tests for request paths, methods, query params, and payload shape. Use utility
+tests for product-owned boundaries such as LocalDate handling, currency
+conversion fallbacks, search/filter semantics, and API error-message mapping.
 
 ### ✅ DO: Test User Behavior
 
@@ -479,6 +584,49 @@ it('handles 404 error', async () => {
 });
 ```
 
+For API-facing workflow tests, assert frontend-owned request shape in the MSW
+handler when the payload or query params are part of the contract:
+
+```typescript
+let requestBody: unknown;
+
+server.use(
+  http.post('/api/v1/currencies', async ({ request }) => {
+    requestBody = await request.json();
+    return HttpResponse.json({ id: 1, currencyCode: 'EUR' }, { status: 201 });
+  }),
+);
+
+// After the user submits the form:
+expect(requestBody).toEqual({ currencyCode: 'EUR', providerSeriesId: 'DEXUSEU' });
+```
+
+For multipart upload workflows, assert the stable frontend-owned pieces: the
+selected filename in the UI, request URL/query params, that a request body was
+sent, and the success/error behavior. In jsdom, Axios + MSW can be unreliable
+for reading the uploaded `File` back out of `request.formData()`.
+
+For direct API module tests that need to verify Axios keeps a `FormData` payload
+as multipart, prefer a temporary Axios adapter mock and inspect the transformed
+config. Avoid sending the real `FormData` upload through MSW just to assert
+headers; that path can stall in jsdom even when the browser behavior is valid.
+
+Some hooks set their own React Query `retry` value. That explicit hook option
+overrides `createTestQueryClient()` defaults, so error-state tests may need a
+longer `findBy*` timeout or a focused hook mock when the retry delay is not part
+of the behavior under test.
+
+Keep routine diagnostic `console.log` output out of production code that runs
+under page tests. If a test must suppress known debug output from a third-party
+or intentionally noisy dependency, use a focused spy for `console.log` in that
+test file. Do not broadly silence `console.error` or `console.warn`; those
+usually reveal React, accessibility, or API-test failures.
+
+For direct API module tests, use MSW to assert paths, methods, query params, and
+payloads at the API boundary. Keep React Query hook tests focused on query keys,
+`enabled` behavior, invalidation, and surfaced error state so they do not
+duplicate every request-shape assertion already covered by the API module tests.
+
 ---
 
 ## Test Organization
@@ -562,46 +710,46 @@ Pass `router: 'dom'` only for components that still import router hooks from
 
 ---
 
-## Suggested Improvements
+## Coverage Reports
 
-### 1. Add Handler for Single Transaction
+Run `npm run test:coverage` to generate the initial V8 coverage report. The
+text report prints in the terminal, and detailed artifacts are written under
+`coverage/`.
 
-```typescript
-// Add to src/testing/mocks/handlers.ts
-http.get('/api/transactions/:id', ({ params }) => {
-  const { id } = params;
-  return HttpResponse.json({
-    id,
-    accountId: 'acc1',
-    bankName: 'Test Bank',
-    date: '2024-01-01',
-    amount: 100.5,
-    type: 'debit',
-    description: `Transaction ${id}`,
-  });
-}),
-```
+Coverage has modest global thresholds configured in `vitest.config.ts`:
+`80%` statements, `80%` branches, `75%` functions, and `80%` lines.
+`npm run test:coverage` exits non-zero if any global metric falls below those
+values, so CI/build checks that run coverage will fail on meaningful
+backsliding.
 
-### 2. Add Error Scenario Tests
+The main local build path, `npm run build`, runs `npm run test:coverage` before
+type-checking and bundling. GitHub Actions uses the same coverage gate in
+`.github/workflows/build.yml` before running the production bundle step. Use
+`npm run build:bundle` only when coverage has already passed in the same flow.
 
-```typescript
-// src/hooks/__tests__/useTransactions.test.tsx
-it('handles API errors gracefully', async () => {
-  server.use(
-    http.get('/api/transactions', () => {
-      return HttpResponse.json(
-        { error: 'Server error' },
-        { status: 500 }
-      );
-    })
-  );
+Use the report to find meaningful product-risk gaps, especially in auth,
+transactions, admin flows, analytics, saved views, and shared utilities. Do not
+add tests just to increase a percentage for trivial UI primitives, native
+browser behavior, library behavior, or TypeScript-only contracts.
 
-  const { result } = renderHook(() => useTransactions(), { wrapper });
+For analytics coverage, prefer assertions that protect interpretation and
+navigation: URL defaults and redirects, transaction-type filtering, amount
+aggregation, date bounds in drilldown links, and source-specific return paths.
+Do not assert chart/card layout or Tailwind classes unless they become part of
+a user-visible behavior contract.
 
-  await waitFor(() => expect(result.current.isError).toBe(true));
-  expect(result.current.error).toBeDefined();
-});
-```
+For shared utility coverage, focus on product semantics and boundary behavior:
+currency formatting/conversion fallbacks, exchange-rate lookup behavior,
+LocalDate and timezone boundaries that affect filters, and OpenAPI-backed API
+error mappings. Avoid tests for static class maps, simple label helpers, or
+library wrappers unless they protect a real regression.
+
+Coverage excludes shared test infrastructure, colocated test files,
+declaration files, type-only modules, config files, and the `src/main.tsx`
+bootstrap entrypoint. Raise thresholds deliberately after reviewing the current
+report and adding behavior-focused coverage for real product-risk gaps.
+
+---
 
 ## Debugging Tests
 

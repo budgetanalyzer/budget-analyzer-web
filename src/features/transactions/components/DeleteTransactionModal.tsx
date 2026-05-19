@@ -1,4 +1,5 @@
 // src/features/transactions/components/DeleteTransactionModal.tsx
+import { useCallback } from 'react';
 import { Transaction } from '@/types/transaction';
 import { ExchangeRateResponse } from '@/types/currency';
 import { convertCurrency, formatCurrency } from '@/utils/currency';
@@ -21,6 +22,7 @@ interface DeleteTransactionModalProps {
   onOpenChange: (open: boolean) => void;
   displayCurrency: string;
   exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
+  onDeleted?: () => void;
 }
 
 export function DeleteTransactionModal({
@@ -29,23 +31,40 @@ export function DeleteTransactionModal({
   onOpenChange,
   displayCurrency,
   exchangeRatesMap,
+  onDeleted,
 }: DeleteTransactionModalProps) {
   const { mutate: deleteTransaction, isPending: isDeleting } = useDeleteTransaction();
 
-  const handleDelete = () => {
+  const convertedAmount = transaction
+    ? convertCurrency(
+        transaction.amount,
+        transaction.date,
+        transaction.currencyIsoCode,
+        displayCurrency,
+        exchangeRatesMap,
+      )
+    : null;
+  const needsOriginalCurrency = transaction?.currencyIsoCode !== displayCurrency;
+
+  const handleCancel = useCallback(() => {
+    onOpenChange(false);
+  }, [onOpenChange]);
+
+  const handleDelete = useCallback(() => {
     if (!transaction) return;
 
     deleteTransaction(transaction.id, {
       onSuccess: () => {
         toast.success('Transaction deleted successfully');
         onOpenChange(false);
+        onDeleted?.();
       },
       onError: (error) => {
         const errorMessage = error.message || 'Failed to delete transaction';
         toast.error(errorMessage);
       },
     });
-  };
+  }, [deleteTransaction, onDeleted, onOpenChange, transaction]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -70,35 +89,20 @@ export function DeleteTransactionModal({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Amount:</span>
                 <span className="font-medium">
-                  {(() => {
-                    const convertedAmount = convertCurrency(
-                      transaction.amount,
-                      transaction.date,
-                      transaction.currencyIsoCode,
-                      displayCurrency,
-                      exchangeRatesMap,
-                    );
-                    const needsOriginalCurrency = transaction.currencyIsoCode !== displayCurrency;
-
-                    return (
-                      <>
-                        {formatCurrency(convertedAmount, displayCurrency)}
-                        {needsOriginalCurrency && (
-                          <span className="text-muted-foreground">
-                            {' '}
-                            ({formatCurrency(transaction.amount, transaction.currencyIsoCode)})
-                          </span>
-                        )}
-                      </>
-                    );
-                  })()}
+                  {formatCurrency(convertedAmount ?? transaction.amount, displayCurrency)}
+                  {needsOriginalCurrency && (
+                    <span className="text-muted-foreground">
+                      {' '}
+                      ({formatCurrency(transaction.amount, transaction.currencyIsoCode)})
+                    </span>
+                  )}
                 </span>
               </div>
             </div>
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isDeleting}>
+          <Button variant="outline" onClick={handleCancel} disabled={isDeleting}>
             Cancel
           </Button>
           <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>

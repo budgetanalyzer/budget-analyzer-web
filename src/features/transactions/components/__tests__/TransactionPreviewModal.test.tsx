@@ -35,7 +35,7 @@ function renderModal(previewData: PreviewResponse = basePreviewData) {
   const onOpenChange = vi.fn();
   const onImportComplete = vi.fn();
 
-  renderWithProviders(
+  const renderResult = renderWithProviders(
     <TransactionPreviewModal
       isOpen
       onOpenChange={onOpenChange}
@@ -44,7 +44,7 @@ function renderModal(previewData: PreviewResponse = basePreviewData) {
     />,
   );
 
-  return { onOpenChange, onImportComplete };
+  return { onOpenChange, onImportComplete, queryClient: renderResult.queryClient };
 }
 
 function duplicateTransaction(
@@ -283,5 +283,77 @@ describe('TransactionPreviewModal', () => {
     expect(screen.queryByText('Already imported')).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Import anyway' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import 1 Transaction' })).toBeInTheDocument();
+  });
+
+  it('sends edited preview field values in the batch import payload', async () => {
+    let capturedBody: unknown;
+    renderModal();
+
+    server.use(
+      http.post('/api/v1/transactions/batch', async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({
+          created: 1,
+          duplicatesSkipped: 0,
+          duplicatesImported: 0,
+          transactions: [],
+        });
+      }),
+    );
+
+    const descriptionInput = screen.getByDisplayValue('Coffee');
+    await userEvent.clear(descriptionInput);
+    await userEvent.type(descriptionInput, 'Coffee updated');
+
+    const accountInput = screen.getByDisplayValue('checking-123');
+    await userEvent.clear(accountInput);
+    await userEvent.type(accountInput, 'savings-987');
+
+    const amountInput = screen.getByDisplayValue('4.5');
+    await userEvent.clear(amountInput);
+    await userEvent.type(amountInput, '12.34');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Import 1 Transaction' }));
+
+    await waitFor(() => {
+      expectBatchRequest(capturedBody, {
+        previewImportToken: 'preview-token-123',
+        transactions: [
+          {
+            date: '2026-05-01',
+            description: 'Coffee updated',
+            amount: 12.34,
+            type: 'DEBIT',
+            category: 'Dining',
+            bankName: 'Test Bank',
+            currencyIsoCode: 'USD',
+            accountId: 'savings-987',
+          },
+        ],
+      });
+    });
+  });
+
+  it('invalidates transaction caches after a successful batch import', async () => {
+    const { queryClient } = renderModal();
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+
+    server.use(
+      http.post('/api/v1/transactions/batch', () =>
+        HttpResponse.json({
+          created: 1,
+          duplicatesSkipped: 0,
+          duplicatesImported: 0,
+          transactions: [],
+        }),
+      ),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Import 1 Transaction' }));
+
+    await waitFor(() => {
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['transactions'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['transactionCount'] });
+    });
   });
 });

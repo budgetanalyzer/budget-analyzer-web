@@ -199,4 +199,80 @@ describe('AnalyticsPage source resolution', () => {
       );
     });
   });
+
+  it('defaults monthly analytics to the latest year with transactions', async () => {
+    hookMocks.useTransactions.mockReturnValue(
+      queryResult([
+        transaction({ id: 1, date: '2024-03-10', amount: 40 }),
+        transaction({ id: 2, date: '2025-05-12', amount: 25 }),
+      ]),
+    );
+
+    renderPage('/analytics?scope=all&viewMode=monthly&transactionType=debit');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2025',
+      );
+    });
+
+    expect(await screen.findByText('Monthly spending breakdown for 2025')).toBeInTheDocument();
+    expect(await screen.findByText('$25.00')).toBeInTheDocument();
+  });
+
+  it('redirects a monthly year before the transaction range to the earliest year', async () => {
+    hookMocks.useTransactions.mockReturnValue(
+      queryResult([
+        transaction({ id: 1, date: '2024-03-10', amount: 40 }),
+        transaction({ id: 2, date: '2025-05-12', amount: 25 }),
+      ]),
+    );
+
+    renderPage('/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2020');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2024',
+      );
+    });
+
+    expect(screen.getByText('Monthly spending breakdown for 2024')).toBeInTheDocument();
+    expect(await screen.findByText('$40.00')).toBeInTheDocument();
+  });
+
+  it('renders yearly debit totals and routes yearly drilldown to year date bounds', async () => {
+    hookMocks.useTransactions.mockReturnValue(
+      queryResult([
+        transaction({ id: 1, date: '2025-02-03', amount: -40 }),
+        transaction({ id: 2, date: '2026-03-04', amount: 100 }),
+        transaction({ id: 3, date: '2026-04-05', amount: 250, type: 'CREDIT' }),
+      ]),
+    );
+
+    renderPage('/analytics?scope=all&viewMode=yearly&transactionType=debit');
+
+    expect(screen.getByText('Yearly spending overview')).toBeInTheDocument();
+    expect(screen.getByText('$40.00')).toBeInTheDocument();
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+    expect(screen.queryByText('$250.00')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('link', { name: /2025/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/?dateFrom=2025-01-01&dateTo=2025-12-31&returnTo=%2Fanalytics%3Fscope%3Dall%26viewMode%3Dyearly%26transactionType%3Ddebit&breadcrumbLabel=2025',
+      );
+    });
+  });
+
+  it('shows the yearly empty state when the selected transaction type has no data', () => {
+    hookMocks.useTransactions.mockReturnValue(
+      queryResult([transaction({ id: 1, date: '2026-03-04', amount: 100 })]),
+    );
+
+    renderPage('/analytics?scope=all&viewMode=yearly&transactionType=credit');
+
+    expect(screen.getByText('No yearly analytics for credit transactions.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /2026/ })).not.toBeInTheDocument();
+  });
 });

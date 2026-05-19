@@ -93,7 +93,7 @@ Complete testing setup and best practices, including:
 | How does filtering update stats? | [State Architecture](./state-architecture.md#user-types-in-search-box) |
 | What is useEffect? | [useEffect Guide](./useEffect-guide.md#what-is-useeffect) |
 | How do I replicate componentDidMount? | [React Hooks Lifecycle](./react-hooks-lifecycle-mental-model.md#1-componentdidmount-run-once-on-mount) |
-| How do I test components? | [Testing Guide](./testing-guide.md#example-1-simple-component-test) |
+| How do I test components? | [Testing Guide](./testing-guide.md#example-1-colocated-component-behavior-test) |
 | How does MSW work? | [Testing Guide](./testing-guide.md#msw-mock-service-worker) |
 | When should I use Redux? | [State Architecture](./state-architecture.md#2-redux---ui-state-only) |
 
@@ -202,7 +202,7 @@ When you make significant code changes:
 | State Architecture | 2025-10-22 | ✅ Complete |
 | useEffect Guide | 2025-10-22 | ✅ Complete |
 | React Hooks Lifecycle Mental Model | 2025-10-22 | ✅ Complete |
-| Testing Guide | 2025-10-22 | ✅ Complete |
+| Testing Guide | 2026-05-19 | ✅ Complete |
 
 ---
 

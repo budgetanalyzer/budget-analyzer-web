@@ -313,3 +313,34 @@ describe('ViewTransactionTable bulk actions', () => {
     expect(screen.getByRole('button', { name: 'Pin' })).toBeDisabled();
   });
 });
+
+describe('ViewTransactionTable row membership actions', () => {
+  it('pins a matched transaction from the row actions menu', async () => {
+    renderViewTransactionTable();
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Actions' })[1]);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Pin to View' }));
+
+    expect(mutationMocks.pinMutate).toHaveBeenCalledWith({ viewId: 'view-1', txnId: 2 });
+    expect(mutationMocks.unpinMutate).not.toHaveBeenCalled();
+  });
+
+  it('unpins a pinned transaction from the row actions menu', async () => {
+    renderViewTransactionTable();
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Unpin' }));
+
+    expect(mutationMocks.unpinMutate).toHaveBeenCalledWith({ viewId: 'view-1', txnId: 3 });
+    expect(mutationMocks.pinMutate).not.toHaveBeenCalled();
+  });
+
+  it('excludes a visible transaction from the row actions menu', async () => {
+    renderViewTransactionTable();
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Actions' })[1]);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Exclude' }));
+
+    expect(mutationMocks.excludeMutate).toHaveBeenCalledWith({ viewId: 'view-1', txnId: 2 });
+  });
+});
