@@ -145,43 +145,168 @@ Completion notes:
 
 ### Phase 5: Coverage Audit And Gap Fill
 
-Audit by product risk, not by file count.
+Audit by product risk, not by file count. Each lettered section below is a
+reasonable independent work session. Do not introduce global coverage thresholds
+in this phase; use the report to choose high-value tests and keep deleting or
+rewriting low-signal tests when they only assert browser, React, or library
+behavior.
 
-High-value areas to verify first:
+Coverage audit snapshot from `npm run test:coverage`:
 
-- Authentication and authorization:
-  - route guards
-  - permission-gated buttons and nav items
-  - 401/403 behavior
-- Transactions:
-  - list loading/error/empty states
-  - self-scope write/delete gates
-  - import preview, duplicate review, and batch payload shaping
-  - edit/delete mutations and cache updates
-- Admin:
-  - users search/detail/deactivation
-  - cross-user transactions search
-  - currencies and statement formats action gates and error states
-- Analytics:
-  - source selection
-  - URL defaults and drilldowns
-  - all transactions vs saved-view scope
-- Views:
-  - criteria display
-  - pin/exclude/restore flows
-  - filter URL synchronization
-- Shared utilities:
-  - dates
-  - currency conversion/rate lookup
-  - error-message mapping
-  - search query parsing/serialization
+- 38 test files and 182 tests passed.
+- Global coverage: 59.96% statements, 69.97% branches, 55.62% functions,
+  59.96% lines.
+- Lowest-risk noise: simple layout wrappers, UI primitives, and static fallback
+  pages with no workflow contract. Test these only when they protect routing,
+  accessibility, session, or error behavior.
+- Highest-risk uncovered or thinly covered areas: admin create/edit workflows,
+  route guards, transaction import/detail flows, shared API modules, shared
+  server-state hooks, view reconciliation/filter logic, and currency utilities.
 
-Likely gaps to inspect during implementation:
+A. Refresh the baseline and create a short target list.
 
-- API modules beyond `transactionApi.batchImportTransactions`.
-- Shared hooks such as `useCurrencies`, `useStatementFormats`, `useUsers`, `useViews`, `useMissingCurrencies`, `useTransactionCount`, and import/preview hooks.
-- Route/page tests that only assert a heading and should either become workflow tests or be deleted.
-- Console noise from stats calculation during tests; decide whether it is useful signal or should be suppressed at the source/test helper level.
+1. Run `npm run test:coverage`.
+2. Confirm the suite is still green before adding tests.
+3. Use `coverage/coverage-summary.json` to identify files below 50% line or
+   function coverage.
+4. Classify each target as one of:
+   - high-value workflow/API/authorization behavior to test now,
+   - low-signal presentational code to leave alone,
+   - code that should be excluded from coverage because it is type-only,
+     generated, or bootstrap glue.
+5. Update this phase's snapshot if the baseline materially changes.
+
+B. Add route, authentication, and authorization coverage.
+
+1. Add focused tests for `src/features/admin/components/AdminRoute.tsx`.
+2. Cover admin-role access, non-admin redirect/denial, unauthenticated behavior,
+   and loading behavior.
+3. Add route-level tests around `src/App.tsx` only where they prove important
+   permission wrappers, redirects, or unauthorized states. Do not test every
+   static route mapping.
+4. Cover `src/features/auth/components/UserProfileDropdown.tsx` for the visible
+   user identity, logout affordance, and missing optional fields.
+5. Add small tests for `src/features/auth/utils/role.ts` if `AdminRoute` tests
+   do not already cover the role contract.
+
+C. Replace heading-only admin tests with workflow tests.
+
+1. Expand `src/features/admin/transactions/pages/__tests__/AdminTransactionsPage.test.tsx`
+   beyond "renders the search UI".
+2. Cover filter submission, URL serialization/default parsing, successful result
+   rendering, empty results, API error rendering, and pagination or sorting if
+   exposed to the user.
+3. Expand `src/features/admin/users/pages/__tests__/UsersListPage.test.tsx`
+   beyond the single smoke assertion.
+4. Cover search filters, URL state, successful table rendering, empty results,
+   and error states.
+5. Keep `UserDetailPage` tests focused on detail loading, permission-gated
+   deactivation, success, and failure; add only missing states found in the
+   coverage report.
+
+D. Cover admin currencies create/edit workflows.
+
+1. Add tests for `CurrencyCreatePage.tsx`, `CurrencyEditPage.tsx`,
+   `CurrencyForm.tsx`, and `ConfirmDisableCurrencyDialog.tsx` as workflow tests
+   under the owning `__tests__` directory.
+2. Cover loading existing currency data, validation constraints matching the
+   OpenAPI contract, submit payload shape, success navigation/feedback, API
+   error banners, and disable confirmation behavior.
+3. Keep `CurrenciesListPage` tests for action gates and list states; add missing
+   error/empty states if not already covered.
+4. Prefer MSW for API-facing create/update/disable behavior unless a narrower
+   hook mock is clearly simpler and still proves the payload contract.
+
+E. Cover admin statement-format create/edit workflows.
+
+1. Add tests for `StatementFormatCreatePage.tsx`,
+   `StatementFormatEditPage.tsx`, and `StatementFormatForm.tsx`.
+2. Cover required fields, field constraints, row/column mapping behavior,
+   submit payload shape, success navigation/feedback, and API error rendering.
+3. Keep `StatementFormatsListPage` tests for action gates and list states; add
+   missing error/empty states if not already covered.
+4. Prefer user-event workflows over direct prop calls.
+
+F. Cover transaction import, preview, and detail flows.
+
+1. Add tests for `ImportButton.tsx` that cover file selection, preview request
+   shaping, disabled/loading states, preview modal opening, and preview errors.
+2. Add hook or integration coverage for `usePreviewTransactions.ts` if the
+   `ImportButton` tests do not exercise its request and error behavior.
+3. Expand transaction preview tests only where product behavior is missing:
+   duplicate resolution, edited-field payloads, batch import payloads, and cache
+   invalidation after successful import.
+4. Add tests for `TransactionDetailPage.tsx` covering loading, successful detail
+   rendering, 404/403/error states, edit success/failure, delete success/failure,
+   and permission-gated write/delete affordances.
+5. Keep existing table permission tests; add mutation/cache-update coverage only
+   if the behavior is not covered by page or detail tests.
+
+G. Cover view list and view-state workflows.
+
+1. Expand `ViewsPage.test.tsx` beyond the current smoke coverage.
+2. Cover list loading, empty state, API error state, create view success/failure,
+   delete view success/failure, pin/unpin, and opening an existing view.
+3. Add focused tests for `useViewTransactionFiltersSync.ts` if page tests do not
+   cover URL parsing and serialization.
+4. Add utility tests for `src/utils/reconcileViewTransactions.ts` covering pinned,
+   excluded, restored, duplicate, and missing transaction cases.
+5. Add utility tests for `src/utils/filterTransactions.ts` if its behavior is
+   still product-owned rather than a duplicate of already tested search helpers.
+
+H. Cover analytics gaps that affect navigation or data interpretation.
+
+1. Keep existing `AnalyticsPage` URL and drilldown tests.
+2. Add tests for yearly spending grid/card behavior only where they prove user
+   navigation, empty-state behavior, or amount/date interpretation.
+3. Cover `YearSelector` edge cases if year defaults, bounds, or unavailable
+   years are product behavior.
+4. Do not add tests that only assert card layout or Tailwind classes.
+
+I. Cover shared API modules and server-state hooks.
+
+1. Add direct API tests for request paths, methods, query params, and payloads in
+   `currencyApi.ts`, `statementFormatApi.ts`, and `viewApi.ts`.
+2. Add error-normalization tests in `client.ts` only for frontend-owned behavior
+   such as `ApiError` mapping and timeout/network failures.
+3. Add hook tests for `useCurrencies.ts`, `useStatementFormats.ts`,
+   `useViews.ts`, `useMissingCurrencies.ts`, and `useTransactionCount.ts`.
+4. For hooks, cover the query key, enabled/disabled behavior when applicable,
+   mutation success invalidation, and surfaced error states.
+5. Do not duplicate every API module assertion in hook tests; use API tests for
+   request shape and hook tests for React Query behavior.
+
+J. Cover shared utilities with meaningful edge cases.
+
+1. Expand `src/utils/currency.ts` tests for formatting, conversion, rate lookup,
+   missing rates, zero/negative amounts, and unknown currency codes.
+2. Expand `src/utils/dates.ts` only for uncovered timezone/local-date edge cases
+   that could regress user-visible filters.
+3. Expand `src/utils/errorMessages.ts` when new 422 codes or API error shapes
+   are present in OpenAPI specs.
+4. Avoid tests for `cn`, static column-width mappings, or trivial labels unless
+   the behavior has already regressed or has a product contract.
+
+K. Decide what to do with console noise.
+
+1. Investigate the `[Stats] Starting calculation...` output from transaction and
+   view page tests.
+2. If it is intentional diagnostic logging, leave it and document why.
+3. If it is not useful during tests, suppress it at the source or with a focused
+   test helper that preserves error/warning output.
+4. Do not broadly silence `console.error` or `console.warn`; those often reveal
+   React, accessibility, or API-test failures.
+
+L. Verify and document the completed phase work.
+
+1. Run the focused tests added in the session.
+2. Run `npm run test:coverage`.
+3. Run `npm run lint:fix`.
+4. Update `docs/testing-guide.md` with any new testing conventions discovered
+   during phase 5.
+5. Update this plan with completion notes: files covered, product risks reduced,
+   tests added/removed, remaining known gaps, and the new global coverage
+   numbers.
 
 ### Phase 6: Documentation And Guardrails
 
