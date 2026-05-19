@@ -606,6 +606,11 @@ selected filename in the UI, request URL/query params, that a request body was
 sent, and the success/error behavior. In jsdom, Axios + MSW can be unreliable
 for reading the uploaded `File` back out of `request.formData()`.
 
+For direct API module tests that need to verify Axios keeps a `FormData` payload
+as multipart, prefer a temporary Axios adapter mock and inspect the transformed
+config. Avoid sending the real `FormData` upload through MSW just to assert
+headers; that path can stall in jsdom even when the browser behavior is valid.
+
 Some hooks set their own React Query `retry` value. That explicit hook option
 overrides `createTestQueryClient()` defaults, so error-state tests may need a
 longer `findBy*` timeout or a focused hook mock when the retry delay is not part

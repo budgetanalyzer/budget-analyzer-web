@@ -1,11 +1,20 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { delay, http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImportButton } from '@/features/transactions/components/ImportButton';
+import { usePreviewTransactions } from '@/features/transactions/hooks/usePreviewTransactions';
 import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
 import type { PreviewResponse } from '@/types/transaction';
+import { ApiError } from '@/types/apiError';
+
+vi.mock('@/features/transactions/hooks/usePreviewTransactions');
+
+const mockUsePreviewTransactions = vi.mocked(usePreviewTransactions);
+type PreviewMutate = ReturnType<typeof usePreviewTransactions>['mutate'];
+type PreviewVariables = Parameters<PreviewMutate>[0];
+type PreviewMutateOptions = Parameters<PreviewMutate>[1];
 
 const previewResponse: PreviewResponse = {
   sourceFile: 'statement.csv',
@@ -58,28 +67,45 @@ function useReferenceDataHandlers() {
   );
 }
 
+function mockPreviewMutation({
+  isPending = false,
+  mutate = vi.fn(),
+}: {
+  isPending?: boolean;
+  mutate?: PreviewMutate;
+} = {}) {
+  mockUsePreviewTransactions.mockReturnValue({
+    mutate,
+    isPending,
+  } as unknown as ReturnType<typeof usePreviewTransactions>);
+
+  return mutate;
+}
+
 async function expandImportForm(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
   await user.click(await screen.findByRole('button', { name: 'Select Format' }));
   await user.click(screen.getByRole('button', { name: 'Acme Checking CSV' }));
 }
 
+beforeEach(() => {
+  mockUsePreviewTransactions.mockReset();
+  mockPreviewMutation();
+});
+
 describe('ImportButton', () => {
   it('previews the selected file with format and account query params, then opens the preview modal', async () => {
     const user = userEvent.setup();
     const file = new File(['date,description,amount'], 'statement.csv', { type: 'text/csv' });
-    let capturedUrl: URL | undefined;
-    let requestHadBody = false;
+    let capturedVariables: PreviewVariables | undefined;
+
+    const previewMutate = vi.fn((variables: PreviewVariables, options?: PreviewMutateOptions) => {
+      capturedVariables = variables;
+      options?.onSuccess?.(previewResponse, variables, undefined, undefined as never);
+    }) as PreviewMutate;
+    mockPreviewMutation({ mutate: previewMutate });
 
     useReferenceDataHandlers();
-    server.use(
-      http.post('/api/v1/transactions/preview', async ({ request }) => {
-        capturedUrl = new URL(request.url);
-        requestHadBody = request.body !== null;
-
-        return HttpResponse.json(previewResponse);
-      }),
-    );
 
     renderWithProviders(<ImportButton />);
 
@@ -91,25 +117,21 @@ describe('ImportButton', () => {
     await user.click(screen.getByRole('button', { name: /Preview Transactions/ }));
 
     await waitFor(() => {
-      expect(capturedUrl?.searchParams.get('format')).toBe('acme-csv');
-      expect(capturedUrl?.searchParams.get('accountId')).toBe('checking-123');
-      expect(requestHadBody).toBe(true);
+      expect(capturedVariables).toEqual({
+        file,
+        format: 'acme-csv',
+        accountId: 'checking-123',
+      });
     });
     expect(await screen.findByRole('heading', { name: 'Preview Import' })).toBeInTheDocument();
     expect(screen.getByText('File: statement.csv | 1 transaction')).toBeInTheDocument();
   });
 
-  it('keeps preview disabled until file and format are selected, then shows the pending state', async () => {
+  it('keeps preview disabled until file and format are selected', async () => {
     const user = userEvent.setup();
     const file = new File(['date,description,amount'], 'statement.csv', { type: 'text/csv' });
 
     useReferenceDataHandlers();
-    server.use(
-      http.post('/api/v1/transactions/preview', async () => {
-        await delay(150);
-        return HttpResponse.json(previewResponse);
-      }),
-    );
 
     renderWithProviders(<ImportButton />);
 
@@ -121,7 +143,20 @@ describe('ImportButton', () => {
     expect(screen.getByRole('button', { name: /Preview Transactions/ })).toBeDisabled();
 
     await user.upload(screen.getByLabelText('Transaction file input'), file);
-    await user.click(screen.getByRole('button', { name: /Preview Transactions/ }));
+    expect(screen.getByRole('button', { name: /Preview Transactions/ })).toBeEnabled();
+  });
+
+  it('shows the pending state while preview is running', async () => {
+    const user = userEvent.setup();
+    const file = new File(['date,description,amount'], 'statement.csv', { type: 'text/csv' });
+
+    mockPreviewMutation({ isPending: true });
+    useReferenceDataHandlers();
+
+    renderWithProviders(<ImportButton />);
+
+    await expandImportForm(user);
+    await user.upload(screen.getByLabelText('Transaction file input'), file);
 
     expect(await screen.findByRole('button', { name: /Loading/ })).toBeDisabled();
   });
@@ -132,14 +167,14 @@ describe('ImportButton', () => {
     const file = new File(['bad csv'], 'bad-statement.csv', { type: 'text/csv' });
 
     useReferenceDataHandlers();
-    server.use(
-      http.post('/api/v1/transactions/preview', () =>
-        HttpResponse.json(
-          { type: 'VALIDATION_ERROR', message: 'Unable to preview statement' },
-          { status: 422 },
-        ),
-      ),
-    );
+    const previewError = new ApiError(422, {
+      type: 'VALIDATION_ERROR',
+      message: 'Unable to preview statement',
+    });
+    const previewMutate = vi.fn((variables: PreviewVariables, options?: PreviewMutateOptions) => {
+      options?.onError?.(previewError, variables, undefined, undefined as never);
+    }) as PreviewMutate;
+    mockPreviewMutation({ mutate: previewMutate });
 
     renderWithProviders(<ImportButton onError={onError} />);
 

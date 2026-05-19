@@ -44,6 +44,16 @@ export const useDeleteTransaction = () => {
         return oldData.filter((transaction) => transaction.id !== deletedId);
       });
 
+      queryClient.invalidateQueries({
+        queryKey: ['transaction', deletedId],
+        exact: true,
+        refetchType: 'none',
+      });
+      queryClient.removeQueries({
+        queryKey: ['transaction', deletedId],
+        exact: true,
+        type: 'inactive',
+      });
       queryClient.invalidateQueries({ queryKey: ['transactionCount'] });
     },
   });

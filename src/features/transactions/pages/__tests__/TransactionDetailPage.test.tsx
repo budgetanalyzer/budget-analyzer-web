@@ -195,9 +195,10 @@ describe('TransactionDetailPage', () => {
       http.delete('/api/v1/transactions/:id', () => new HttpResponse(null, { status: 204 })),
     );
 
-    renderDetailPage();
+    const { queryClient } = renderDetailPage();
 
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
+    expect(queryClient.getQueryData(['transaction', transaction.id])).toEqual(transaction);
     expect(await screen.findByRole('heading', { name: 'Delete Transaction' })).toBeInTheDocument();
     const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
     await user.click(deleteButtons[deleteButtons.length - 1]);
@@ -205,6 +206,7 @@ describe('TransactionDetailPage', () => {
     await waitFor(() => {
       expect(successToast).toHaveBeenCalledWith('Transaction deleted successfully');
     });
+    expect(queryClient.getQueryState(['transaction', transaction.id])?.isInvalidated).toBe(true);
     expect(await screen.findByRole('heading', { name: 'Transaction List' })).toBeInTheDocument();
   });
 
