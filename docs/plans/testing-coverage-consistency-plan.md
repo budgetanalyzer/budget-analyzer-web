@@ -239,7 +239,7 @@ Completion notes:
 - Coverage-exclude candidates because they are barrel or bootstrap glue:
   `src/features/views/index.ts` and `src/store/index.ts`.
 
-B. Add route, authentication, and authorization coverage.
+B. Add route, authentication, and authorization coverage. (Complete)
 
 1. Add focused tests for `src/features/admin/components/AdminRoute.tsx`.
 2. Cover admin-role access, non-admin redirect/denial, unauthenticated behavior,
@@ -251,6 +251,22 @@ B. Add route, authentication, and authorization coverage.
    user identity, logout affordance, and missing optional fields.
 5. Add small tests for `src/features/auth/utils/role.ts` if `AdminRoute` tests
    do not already cover the role contract.
+
+Completion notes:
+- Added focused `AdminRoute` coverage for admin access, unauthenticated redirect
+  to `/login`, authenticated non-admin redirect to `/`, and loading skeleton
+  behavior.
+- Added narrow `App` route tests that prove representative permission wrappers:
+  `currencies:read`, `currencies:write`, and `transactions:read:any`, plus the
+  unauthorized redirect state and the top-level admin-role route gate.
+- Added `UserProfileDropdown` coverage for visible identity, logout activation,
+  null-user rendering, and fallback email identity when optional profile fields
+  are missing.
+- Added `role.ts` coverage for the `ADMIN` role contract.
+- Verification: `npm run lint:fix`, `npm test -- --run`, and
+  `npm run test:coverage` completed successfully. The full suite now has 42
+  test files and 198 tests; global coverage is 62.7% statements, 70.93%
+  branches, 55.95% functions, and 62.7% lines.
 
 C. Replace heading-only admin tests with workflow tests.
 
