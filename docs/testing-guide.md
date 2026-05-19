@@ -26,6 +26,9 @@ npm test
 # Run tests once (CI/production)
 npm test -- --run
 
+# Generate coverage report
+npm run test:coverage
+
 # Run with UI interface
 npm run test:ui
 
@@ -50,6 +53,18 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/testing/setup.ts',
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/testing/**',
+        'src/**/__tests__/**',
+        'src/features/**/types/**',
+        'src/**/*.d.ts',
+        'src/main.tsx',
+        'src/types/{auth,currency,session,statementFormat,transaction,transactionSearch,user,view}.ts',
+      ],
+    },
     // ... path aliases, css handling
   },
 });
@@ -559,6 +574,25 @@ it('renders the transactions page', () => {
 the `queryClient` and `store` it used.
 Pass `router: 'dom'` only for components that still import router hooks from
 `react-router-dom`; the default router matches the app's `react-router` usage.
+
+---
+
+## Coverage Reports
+
+Run `npm run test:coverage` to generate the initial V8 coverage report. The
+text report prints in the terminal, and detailed artifacts are written under
+`coverage/`.
+
+Coverage intentionally has no hard threshold yet. Use the report to find
+meaningful product-risk gaps, especially in auth, transactions, admin flows,
+analytics, saved views, and shared utilities. Do not add tests just to increase
+a percentage for trivial UI primitives, native browser behavior, library
+behavior, or TypeScript-only contracts.
+
+Coverage excludes shared test infrastructure, colocated test files,
+declaration files, type-only modules, config files, and the `src/main.tsx`
+bootstrap entrypoint. Add thresholds only after the suite shape is consistent;
+start modestly or target high-value modules, then raise them deliberately.
 
 ---
 

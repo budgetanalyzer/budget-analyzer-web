@@ -31,6 +31,7 @@ npm run preview   # Preview production build
 npm run lint      # Run ESLint
 npm run format    # Format with Prettier
 npm test          # Run tests
+npm run test:coverage  # Run tests once with V8 coverage
 npm run test:ui   # Run tests with UI
 ```
 

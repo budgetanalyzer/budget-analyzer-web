@@ -383,6 +383,7 @@ npm run format       # Format with Prettier
 **Testing:**
 ```bash
 npm test             # Run tests in watch mode
+npm run test:coverage  # Run tests once and print V8 coverage
 npm run test:ui      # Run tests with Vitest UI
 
 # Single test file

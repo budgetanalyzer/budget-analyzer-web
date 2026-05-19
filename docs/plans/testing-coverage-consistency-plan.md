@@ -122,7 +122,7 @@ Completion notes:
 - Remaining `fireEvent` usage is limited to synthetic window activity, timer-adjacent modal behavior, and a Radix keyboard-event workaround.
 - `renderWithProviders()` now supports the repo's mixed router imports with a default `react-router` memory router and an explicit `router: 'dom'` option for components that still import hooks from `react-router-dom`.
 
-### Phase 4: Add Coverage Reporting Without Gaming It
+### Phase 4: Add Coverage Reporting Without Gaming It (Complete)
 
 1. Add `@vitest/coverage-v8`.
 2. Add a `test:coverage` script rather than relying on a remembered CLI flag.
@@ -134,6 +134,14 @@ Completion notes:
 4. Generate an initial report with no hard threshold.
 5. Use the report to find meaningful blind spots, not to force tests around trivial UI primitives.
 6. Add thresholds only after the suite shape is consistent. Start with modest global thresholds or targeted thresholds around high-value modules, then ratchet upward deliberately.
+
+Completion notes:
+- `@vitest/coverage-v8` is installed.
+- `npm run test:coverage` runs `vitest run --coverage`.
+- Coverage uses the V8 provider with terminal, HTML, and JSON summary reports.
+- Coverage excludes shared test infrastructure, colocated test files, declaration files, type-only modules, config files, and `src/main.tsx`.
+- No coverage thresholds were introduced.
+- Initial report generated successfully: 38 test files and 182 tests passed; global coverage was 59.96% statements, 69.97% branches, 55.62% functions, and 59.96% lines.
 
 ### Phase 5: Coverage Audit And Gap Fill
 
