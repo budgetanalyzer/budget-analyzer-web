@@ -360,6 +360,10 @@ const element = await screen.findByText('Loaded');
 await waitForElementToBeRemoved(() => screen.queryByText('Loading...'));
 ```
 
+When a workflow updates URL state and then renders derived or animated content,
+wait for the final user-visible content with `findBy*` or `waitFor()` instead
+of asserting synchronously after the URL assertion.
+
 ### Pattern 4: Testing Error States
 
 ```typescript
@@ -649,6 +653,12 @@ navigation: URL defaults and redirects, transaction-type filtering, amount
 aggregation, date bounds in drilldown links, and source-specific return paths.
 Do not assert chart/card layout or Tailwind classes unless they become part of
 a user-visible behavior contract.
+
+For shared utility coverage, focus on product semantics and boundary behavior:
+currency formatting/conversion fallbacks, exchange-rate lookup behavior,
+LocalDate and timezone boundaries that affect filters, and OpenAPI-backed API
+error mappings. Avoid tests for static class maps, simple label helpers, or
+library wrappers unless they protect a real regression.
 
 Coverage excludes shared test infrastructure, colocated test files,
 declaration files, type-only modules, config files, and the `src/main.tsx`

@@ -216,8 +216,8 @@ describe('AnalyticsPage source resolution', () => {
       );
     });
 
-    expect(screen.getByText('Monthly spending breakdown for 2025')).toBeInTheDocument();
-    expect(screen.getByText('$25.00')).toBeInTheDocument();
+    expect(await screen.findByText('Monthly spending breakdown for 2025')).toBeInTheDocument();
+    expect(await screen.findByText('$25.00')).toBeInTheDocument();
   });
 
   it('redirects a monthly year before the transaction range to the earliest year', async () => {

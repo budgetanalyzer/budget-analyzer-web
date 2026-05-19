@@ -513,7 +513,7 @@ Completion notes:
   tests; global coverage is `82.36%` statements, `83.17%` branches, `77.91%`
   functions, and `82.36%` lines.
 
-J. Cover shared utilities with meaningful edge cases.
+J. Cover shared utilities with meaningful edge cases. (Complete)
 
 1. Expand `src/utils/currency.ts` tests for formatting, conversion, rate lookup,
    missing rates, zero/negative amounts, and unknown currency codes.
@@ -523,6 +523,32 @@ J. Cover shared utilities with meaningful edge cases.
    are present in OpenAPI specs.
 4. Avoid tests for `cn`, static column-width mappings, or trivial labels unless
    the behavior has already regressed or has a product contract.
+
+Completion notes:
+- Added `src/utils/__tests__/currency.test.ts` with focused coverage for
+  currency formatting, unknown three-letter currency code display,
+  exchange-rate map construction, exact/latest/earliest/in-range fallback rate
+  lookup, missing-rate null behavior, USD and non-USD conversion paths, and
+  zero/negative/original-amount fallback cases.
+- Expanded `src/utils/__tests__/dates.test.ts` for LocalDate parsing without UTC
+  day shifts, DST-sensitive start/end-of-day ISO bounds, inclusive filter
+  ranges, leap-year month bounds, month keys, and calendar-day counts across
+  DST.
+- Added the OpenAPI-backed `CURRENCY_NOT_ENABLED` 422 mapping in
+  `src/utils/errorMessages.ts` and expanded `errorMessages` tests for mapped
+  codes, unknown-code fallbacks, non-422 API errors, non-API errors, and
+  field-level validation error formatting.
+- Stabilized an existing `AnalyticsPage` coverage assertion that raced derived
+  animated content during full-suite coverage runs by waiting for the
+  user-visible monthly total.
+- Updated `docs/testing-guide.md` with the shared utility coverage convention:
+  test product semantics and boundaries, not static maps or simple wrappers,
+  and wait for derived animated content after URL-state transitions.
+- Verification: focused Step J tests passed (`27` tests across `3` files),
+  `npm run lint:fix` completed successfully, and `npm run test:coverage`
+  completed successfully. The full suite now has `65` test files and `332`
+  tests; global coverage is `83.24%` statements, `83.58%` branches, `78.62%`
+  functions, and `83.24%` lines.
 
 K. Decide what to do with console noise.
 
