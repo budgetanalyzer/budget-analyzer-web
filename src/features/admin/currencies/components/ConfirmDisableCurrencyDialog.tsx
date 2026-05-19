@@ -1,7 +1,6 @@
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -32,7 +31,7 @@ export function ConfirmDisableCurrencyDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Disable {currencyCode}?</DialogTitle>
-          <DialogDescription>
+          <div className="text-sm text-muted-foreground">
             {isLoading ? (
               <LoadingSpinner size="sm" text="Checking transactions..." />
             ) : count != null && count > 0 ? (
@@ -44,7 +43,7 @@ export function ConfirmDisableCurrencyDialog({
             ) : (
               <>No active transactions use {currencyCode}.</>
             )}
-          </DialogDescription>
+          </div>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>

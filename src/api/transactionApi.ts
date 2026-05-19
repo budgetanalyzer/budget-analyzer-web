@@ -84,11 +84,6 @@ export const transactionApi = {
     const response = await apiClient.post<PreviewResponse>(
       `/v1/transactions/preview?${params.toString()}`,
       formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      },
     );
     return response.data;
   },

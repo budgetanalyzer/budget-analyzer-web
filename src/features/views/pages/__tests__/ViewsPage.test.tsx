@@ -1,9 +1,11 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useViews } from '@/hooks/useViews';
 import { SavedView } from '@/types/view';
 import { ViewsPage } from '@/features/views/pages/ViewsPage';
 import { renderWithProviders } from '@/testing/test-utils';
+import { ApiError } from '@/types/apiError';
 
 vi.mock('@/hooks/useViews', () => ({
   useViews: vi.fn(),
@@ -37,6 +39,58 @@ function renderPage() {
 }
 
 describe('ViewsPage', () => {
+  it('renders the loading state while views are fetched', () => {
+    mockUseViews.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useViews>);
+
+    renderPage();
+
+    expect(screen.getByText('Loading views...')).toBeInTheDocument();
+  });
+
+  it('renders the empty saved-view state', () => {
+    mockUseViews.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useViews>);
+
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'Saved Views' })).toBeInTheDocument();
+    expect(screen.getByText('0 views')).toBeInTheDocument();
+    expect(screen.getByText('No saved views yet')).toBeInTheDocument();
+    expect(screen.getByText(/Create a view from the Transactions page/)).toBeInTheDocument();
+  });
+
+  it('renders API errors and retries the list request', async () => {
+    const refetch = vi.fn();
+    mockUseViews.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new ApiError(503, {
+        type: 'SERVICE_UNAVAILABLE',
+        message: 'Views are temporarily unavailable',
+        code: 'VIEW_SERVICE_DOWN',
+      }),
+      refetch,
+    } as unknown as ReturnType<typeof useViews>);
+
+    renderPage();
+
+    expect(screen.getByText('Views are temporarily unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Error code: VIEW_SERVICE_DOWN')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
   it('renders saved views as detail links without aggregate stats UI', () => {
     mockUseViews.mockReturnValue({
       data: savedViews,

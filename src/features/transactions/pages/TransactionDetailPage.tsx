@@ -1,7 +1,8 @@
 // src/features/transactions/pages/TransactionDetailPage.tsx
-import { useParams, Link } from 'react-router';
+import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
+import { useParams, Link, useNavigate } from 'react-router';
 import { motion, LayoutGroup } from 'framer-motion';
-import { useTransaction } from '@/hooks/useTransactions';
+import { useTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { fadeInVariants, fadeTransition, layoutTransition } from '@/lib/animations';
 import { ErrorBanner } from '@/components/ErrorBanner';
@@ -9,23 +10,46 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { BackButton } from '@/components/BackButton';
 import { IconLabel } from '@/components/IconLabel';
 import { CurrencyConversionCard } from '@/features/transactions/components/CurrencyConversionCard';
+import { DeleteTransactionModal } from '@/features/transactions/components/DeleteTransactionModal';
 import { TransactionMetadataCard } from '@/features/transactions/components/TransactionMetadataCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate } from '@/utils/dates';
-import { Calendar, Banknote, Building2, CreditCard, FileText, Currency } from 'lucide-react';
+import {
+  Calendar,
+  Banknote,
+  Building2,
+  CreditCard,
+  FileText,
+  Currency,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+} from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';
 import { convertCurrency, findNearestExchangeRate } from '@/utils/currency';
-import { useMemo } from 'react';
+import { usePermission } from '@/features/auth/hooks/usePermission';
+import { toast } from '@/hooks/useToast';
+import { formatApiError } from '@/utils/errorMessages';
 
 export function TransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const transactionId = Number(id);
+  const navigate = useNavigate();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
+  const canEditTransaction = usePermission('transactions:write');
+  const canDeleteTransaction = usePermission('transactions:delete');
 
   const { data: transaction, isLoading, error, refetch } = useTransaction(transactionId);
+  const { mutate: updateTransaction, isPending: isUpdating } = useUpdateTransaction();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingDescription, setEditingDescription] = useState('');
+  const [editingAccountId, setEditingAccountId] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Fetch exchange rates and build map for currency conversion
   const { exchangeRatesMap } = useExchangeRatesMap({
@@ -77,6 +101,75 @@ export function TransactionDetailPage() {
     };
   }, [transaction, displayCurrency, exchangeRatesMap]);
 
+  const handleStartEdit = useCallback(() => {
+    if (!transaction) return;
+
+    setEditingDescription(transaction.description);
+    setEditingAccountId(transaction.accountId || '');
+    setIsEditing(true);
+  }, [transaction]);
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false);
+    setEditingDescription('');
+    setEditingAccountId('');
+  }, []);
+
+  const handleDescriptionChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setEditingDescription(event.target.value);
+  }, []);
+
+  const handleAccountIdChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setEditingAccountId(event.target.value);
+  }, []);
+
+  const handleSaveEdit = useCallback(() => {
+    if (!transaction) return;
+
+    const descriptionChanged = editingDescription !== transaction.description;
+    const accountIdChanged = editingAccountId !== (transaction.accountId || '');
+
+    if (!descriptionChanged && !accountIdChanged) {
+      handleCancelEdit();
+      return;
+    }
+
+    updateTransaction(
+      {
+        id: transaction.id,
+        data: {
+          ...(descriptionChanged ? { description: editingDescription } : {}),
+          ...(accountIdChanged ? { accountId: editingAccountId } : {}),
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success('Transaction updated');
+          handleCancelEdit();
+        },
+        onError: (updateError) => {
+          toast.error(formatApiError(updateError, 'Failed to update transaction'));
+        },
+      },
+    );
+  }, [editingAccountId, editingDescription, handleCancelEdit, transaction, updateTransaction]);
+
+  const handleOpenDeleteDialog = useCallback(() => {
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
+    setDeleteDialogOpen(open);
+  }, []);
+
+  const handleDeleted = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
+
+  const handleRetry = useCallback(() => {
+    void refetch();
+  }, [refetch]);
+
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -91,7 +184,7 @@ export function TransactionDetailPage() {
         <BackButton />
         <div className="flex min-h-[50vh] items-center justify-center">
           <div className="w-full max-w-md">
-            <ErrorBanner error={error} onRetry={() => refetch()} />
+            <ErrorBanner error={error} onRetry={handleRetry} />
           </div>
         </div>
       </div>
@@ -112,9 +205,38 @@ export function TransactionDetailPage() {
     >
       <div className="flex items-center justify-between">
         <BackButton />
-        <Link to="/">
-          <Button variant="outline">View All</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {isEditing ? (
+            <>
+              <Button variant="outline" onClick={handleCancelEdit} disabled={isUpdating}>
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdit} disabled={isUpdating}>
+                <Check className="mr-2 h-4 w-4" />
+                {isUpdating ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </>
+          ) : (
+            <>
+              {canEditTransaction && (
+                <Button variant="outline" onClick={handleStartEdit}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Details
+                </Button>
+              )}
+              {canDeleteTransaction && (
+                <Button variant="destructive" onClick={handleOpenDeleteDialog}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              )}
+              <Link to="/">
+                <Button variant="outline">View All</Button>
+              </Link>
+            </>
+          )}
+        </div>
       </div>
 
       <div>
@@ -153,7 +275,28 @@ export function TransactionDetailPage() {
                 </Badge>
               </div>
 
-              <IconLabel icon={FileText} label="Description" value={transaction.description} />
+              {isEditing ? (
+                <div className="flex items-start gap-3">
+                  <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="flex-1 space-y-1">
+                    <label
+                      htmlFor="transaction-description"
+                      className="text-sm font-medium text-muted-foreground"
+                    >
+                      Description
+                    </label>
+                    <Input
+                      id="transaction-description"
+                      value={editingDescription}
+                      onChange={handleDescriptionChange}
+                      disabled={isUpdating}
+                      maxLength={500}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <IconLabel icon={FileText} label="Description" value={transaction.description} />
+              )}
 
               <IconLabel
                 icon={Calendar}
@@ -178,12 +321,33 @@ export function TransactionDetailPage() {
             <CardContent className="space-y-4">
               <IconLabel icon={Building2} label="Bank Name" value={transaction.bankName} />
 
-              <IconLabel
-                icon={CreditCard}
-                label="Account ID"
-                value={transaction.accountId}
-                valueClassName="text-base font-mono"
-              />
+              {isEditing ? (
+                <div className="flex items-start gap-3">
+                  <CreditCard className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="flex-1 space-y-1">
+                    <label
+                      htmlFor="transaction-account-id"
+                      className="text-sm font-medium text-muted-foreground"
+                    >
+                      Account ID
+                    </label>
+                    <Input
+                      id="transaction-account-id"
+                      value={editingAccountId}
+                      onChange={handleAccountIdChange}
+                      disabled={isUpdating}
+                      maxLength={100}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <IconLabel
+                  icon={CreditCard}
+                  label="Account ID"
+                  value={transaction.accountId}
+                  valueClassName="text-base font-mono"
+                />
+              )}
 
               <IconLabel icon={Currency} label="Currency" value={transaction.currencyIsoCode} />
             </CardContent>
@@ -212,6 +376,15 @@ export function TransactionDetailPage() {
           />
         </motion.div>
       </LayoutGroup>
+
+      <DeleteTransactionModal
+        transaction={transaction}
+        isOpen={deleteDialogOpen}
+        onOpenChange={handleDeleteDialogOpenChange}
+        displayCurrency={displayCurrency}
+        exchangeRatesMap={exchangeRatesMap}
+        onDeleted={handleDeleted}
+      />
     </motion.div>
   );
 }

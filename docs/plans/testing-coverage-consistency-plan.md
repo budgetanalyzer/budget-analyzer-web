@@ -268,7 +268,7 @@ Completion notes:
   test files and 198 tests; global coverage is 62.7% statements, 70.93%
   branches, 55.95% functions, and 62.7% lines.
 
-C. Replace heading-only admin tests with workflow tests.
+C. Replace heading-only admin tests with workflow tests. (Complete)
 
 1. Expand `src/features/admin/transactions/pages/__tests__/AdminTransactionsPage.test.tsx`
    beyond "renders the search UI".
@@ -283,7 +283,25 @@ C. Replace heading-only admin tests with workflow tests.
    deactivation, success, and failure; add only missing states found in the
    coverage report.
 
-D. Cover admin currencies create/edit workflows.
+Completion notes:
+- Replaced the heading-only `AdminTransactionsPage` smoke test with workflow
+  coverage for successful result rendering, filter submission, URL
+  serialization, URL default parsing into API query params, empty results, API
+  error banners after React Query retry, pagination, and sorting.
+- Replaced the heading-only `UsersListPage` smoke test with workflow coverage
+  for successful table rendering, email/status/advanced filter submission, URL
+  serialization, URL default parsing into API query params, empty results, API
+  error banners after React Query retry, and sorting.
+- Added the missing `UserDetailPage` permission-gate case proving the
+  `Deactivate User` action is hidden when `users:write` is absent while
+  keeping the existing detail loading, deactivation success, and failure tests
+  focused.
+- Verification: focused admin page/detail tests passed, `npm run lint:fix`
+  completed successfully, and `npm run test:coverage` completed successfully.
+  The full suite now has 42 test files and 209 tests; global coverage is 65.56%
+  statements, 76.82% branches, 61.64% functions, and 65.56% lines.
+
+D. Cover admin currencies create/edit workflows. (Complete)
 
 1. Add tests for `CurrencyCreatePage.tsx`, `CurrencyEditPage.tsx`,
    `CurrencyForm.tsx`, and `ConfirmDisableCurrencyDialog.tsx` as workflow tests
@@ -296,7 +314,32 @@ D. Cover admin currencies create/edit workflows.
 4. Prefer MSW for API-facing create/update/disable behavior unless a narrower
    hook mock is clearly simpler and still proves the payload contract.
 
-E. Cover admin statement-format create/edit workflows.
+Completion notes:
+- Added `CurrencyForm` component coverage for OpenAPI-backed required,
+  `maxLength`, and pattern constraints; create value normalization; immutable
+  edit fields; selected enabled status; and submit disabled state.
+- Added `ConfirmDisableCurrencyDialog` component coverage for loading,
+  transaction-count warning, no-active-transactions copy, confirm, and cancel
+  behavior. Fixed invalid nested paragraph markup in the dialog body while
+  covering it.
+- Added MSW-backed `CurrencyCreatePage` workflow coverage for create request
+  payload shape, success navigation/feedback, and mapped 422 API error
+  rendering.
+- Added MSW-backed `CurrencyEditPage` workflow coverage for loading existing
+  currency data, immutable fields, disable confirmation with transaction count,
+  update request payload shape, success navigation/feedback, load failure, and
+  update failure.
+- Expanded `CurrenciesListPage` coverage for empty and API error states while
+  keeping existing permission-gate tests.
+- Updated `docs/testing-guide.md` with the convention for asserting API request
+  payload/query shape inside MSW handlers for API-facing workflow tests.
+- Verification: focused currency tests passed (`16` tests across `5` files),
+  `npm run lint:fix` completed successfully, and `npm run test:coverage`
+  completed successfully. The full suite now has 46 test files and 223 tests;
+  global coverage is 69.06% statements, 78.66% branches, 65.04% functions,
+  and 69.06% lines.
+
+E. Cover admin statement-format create/edit workflows. (Complete)
 
 1. Add tests for `StatementFormatCreatePage.tsx`,
    `StatementFormatEditPage.tsx`, and `StatementFormatForm.tsx`.
@@ -305,6 +348,31 @@ E. Cover admin statement-format create/edit workflows.
 3. Keep `StatementFormatsListPage` tests for action gates and list states; add
    missing error/empty states if not already covered.
 4. Prefer user-event workflows over direct prop calls.
+
+Completion notes:
+- Added `StatementFormatForm` component coverage for OpenAPI-backed required,
+  `maxLength`, and pattern constraints; CSV column mapping normalization;
+  non-CSV mapping omission; immutable edit fields; selected enabled status; and
+  submit disabled state.
+- Added MSW-backed `StatementFormatCreatePage` workflow coverage for create
+  request payload shape, success navigation/feedback, and mapped 422 API error
+  rendering.
+- Added MSW-backed `StatementFormatEditPage` workflow coverage for loading
+  existing format data, immutable fields, update request payload shape, success
+  navigation/feedback, load failure, and update failure.
+- Fixed `StatementFormatEditPage` so edited `displayName` values are included
+  in the update request payload; the form already exposed the field as mutable
+  and the OpenAPI schema accepts it.
+- Expanded `StatementFormatsListPage` coverage for empty and API error states
+  while keeping existing permission-gate tests.
+- Updated `docs/testing-guide.md` to document that this repo's custom Select
+  primitive exposes menu items as buttons in tests, matching the current
+  component implementation.
+- Verification: focused statement-format tests passed (`14` tests across `4`
+  files), `npm run lint:fix`, `npm run test:coverage`, and
+  `npm test -- --run` completed successfully. The full suite now has `49` test
+  files and `235` tests; global coverage is 73.61% statements, 80.76%
+  branches, 68.51% functions, and 73.61% lines.
 
 F. Cover transaction import, preview, and detail flows.
 
@@ -321,6 +389,29 @@ F. Cover transaction import, preview, and detail flows.
 5. Keep existing table permission tests; add mutation/cache-update coverage only
    if the behavior is not covered by page or detail tests.
 
+Completion notes:
+- Added `ImportButton` coverage for file selection, format/account preview
+  request shaping, disabled submit state, pending preview state, preview modal
+  opening, and preview error callbacks.
+- Expanded `TransactionPreviewModal` coverage for edited preview-field payloads
+  and React Query invalidation of `['transactions']` and
+  `['transactionCount']` after successful batch import.
+- Added detail-page edit/delete affordances gated by
+  `transactions:write` and `transactions:delete`, using the existing
+  transaction update hook and delete confirmation modal.
+- Added `TransactionDetailPage` workflow coverage for loading, successful detail
+  rendering, 404/403/500 error states, permission-gated action visibility, edit
+  success/failure, and delete success/failure.
+- Adjusted preview upload request construction so Axios sets the multipart
+  boundary instead of forcing a static `Content-Type` header.
+- Updated `docs/testing-guide.md` with current conventions for multipart upload
+  assertions, explicit React Query retry waits, and the custom dialog primitive.
+- Verification: focused transaction import/preview/detail tests passed
+  (`21` tests across `3` files), `npm run lint:fix`, `npx tsc --noEmit`, and
+  `npm run test:coverage` completed successfully. The full suite now has `51`
+  test files and `250` tests; global coverage is `78.76%` statements, `80.8%`
+  branches, `71.04%` functions, and `78.76%` lines.
+
 G. Cover view list and view-state workflows.
 
 1. Expand `ViewsPage.test.tsx` beyond the current smoke coverage.
@@ -333,7 +424,38 @@ G. Cover view list and view-state workflows.
 5. Add utility tests for `src/utils/filterTransactions.ts` if its behavior is
    still product-owned rather than a duplicate of already tested search helpers.
 
-H. Cover analytics gaps that affect navigation or data interpretation.
+Completion notes:
+- Expanded `ViewsPage` coverage for loading, empty, API error with retry, saved
+  view card counts, analytics links, and opening an existing view.
+- Expanded saved-view creation coverage in `CreateViewModal` for success
+  navigation and no-success/no-navigation failure behavior, keeping the existing
+  payload-shape assertions.
+- Added `DeleteViewModal` coverage for delete impact copy, successful close and
+  home navigation, no-success/no-navigation failure behavior, and pending
+  disabled state.
+- Expanded `ViewTransactionTable` coverage for per-row pin, unpin, and exclude
+  actions through the row actions menu while keeping existing bulk membership
+  tests.
+- Added focused `useViewTransactionFiltersSync` tests for URL parsing, search
+  serialization, date clearing with analytics return context removal, and clear
+  all behavior.
+- Added `reconcileViewTransactions` utility tests for pinned, excluded,
+  restored, duplicate, missing, and unavailable-cache cases. Fixed the utility
+  so excluded IDs are not fetched as missing visible rows and duplicate visible
+  membership IDs render once.
+- Added `filterTransactionsByCriteria` tests for inclusive LocalDate bounds,
+  description-only saved-view search, bank/account/currency/type filters,
+  absolute amount ranges, and AND semantics across filter groups.
+- Updated `docs/api-integration.md` with the saved-view reconciliation contract
+  and `docs/testing-guide.md` with URL-backed hook and saved-view membership
+  utility testing conventions.
+- Verification: focused Phase 5G tests passed (`45` tests across `7` files),
+  `npm run lint:fix` completed successfully, and `npm run test:coverage`
+  completed successfully. The full suite now has `55` test files and `277`
+  tests; global coverage is `80.25%` statements, `81.65%` branches, `72.35%`
+  functions, and `80.25%` lines.
+
+H. Cover analytics gaps that affect navigation or data interpretation. (Complete)
 
 1. Keep existing `AnalyticsPage` URL and drilldown tests.
 2. Add tests for yearly spending grid/card behavior only where they prove user
@@ -342,7 +464,25 @@ H. Cover analytics gaps that affect navigation or data interpretation.
    years are product behavior.
 4. Do not add tests that only assert card layout or Tailwind classes.
 
-I. Cover shared API modules and server-state hooks.
+Completion notes:
+- Expanded `AnalyticsPage` coverage for monthly year defaulting to the latest
+  transaction year, redirecting a too-early monthly year to the earliest
+  transaction year, yearly debit amount interpretation with absolute values,
+  yearly drilldown date bounds, and yearly no-data behavior for a selected
+  transaction type.
+- Added an explicit empty state to `YearlySpendingGrid` so yearly analytics do
+  not render a blank content area when no rows match the selected transaction
+  type.
+- Updated `docs/testing-guide.md` with the analytics testing convention:
+  protect URL state, aggregation, transaction-type interpretation, and
+  drilldown date/return paths rather than layout classes.
+- Verification: focused analytics tests passed (`10` tests in
+  `AnalyticsPage.test.tsx`), `npm run lint:fix` completed successfully, and
+  `npm run test:coverage` completed successfully. The full suite remains at
+  `55` test files and now has `281` tests; global coverage is `81.23%`
+  statements, `82.74%` branches, `72.89%` functions, and `81.23%` lines.
+
+I. Cover shared API modules and server-state hooks. (Complete)
 
 1. Add direct API tests for request paths, methods, query params, and payloads in
    `currencyApi.ts`, `statementFormatApi.ts`, and `viewApi.ts`.
@@ -354,6 +494,24 @@ I. Cover shared API modules and server-state hooks.
    mutation success invalidation, and surfaced error states.
 5. Do not duplicate every API module assertion in hook tests; use API tests for
    request shape and hook tests for React Query behavior.
+
+Completion notes:
+- Added direct MSW-backed API module coverage for `currencyApi.ts`,
+  `statementFormatApi.ts`, and `viewApi.ts`, covering request paths, methods,
+  query params, and create/update/bulk payload shapes at the module boundary.
+- Added `client.ts` error-normalization coverage for structured API errors,
+  network failures without responses, and preserved `ApiError` instances.
+- Added server-state hook coverage for `useCurrencies.ts`,
+  `useStatementFormats.ts`, `useViews.ts`, `useMissingCurrencies.ts`, and
+  `useTransactionCount.ts`, covering query keys, disabled queries, surfaced
+  errors, derived disabled-currency behavior, and mutation invalidation.
+- Updated `docs/testing-guide.md` with the split between direct API module
+  request-shape tests and React Query hook behavior tests.
+- Verification: focused Phase 5I tests passed (`34` tests across `9` files),
+  `npm run lint:fix` completed successfully, and `npm run test:coverage`
+  completed successfully. The full suite now has `64` test files and `315`
+  tests; global coverage is `82.36%` statements, `83.17%` branches, `77.91%`
+  functions, and `82.36%` lines.
 
 J. Cover shared utilities with meaningful edge cases.
 

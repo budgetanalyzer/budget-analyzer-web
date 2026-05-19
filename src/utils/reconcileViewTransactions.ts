@@ -16,12 +16,28 @@ export function reconcileViewTransactions(
   viewTransactions: ViewTransaction[];
   missingIds: number[];
 } {
+  const excludedIds = new Set(membership.excluded);
+  const membershipTypeById = new Map<number, 'MATCHED' | 'PINNED'>();
+
+  membership.matched.forEach((id) => {
+    if (!excludedIds.has(id) && !membershipTypeById.has(id)) {
+      membershipTypeById.set(id, 'MATCHED');
+    }
+  });
+
+  membership.pinned.forEach((id) => {
+    if (!excludedIds.has(id)) {
+      membershipTypeById.set(id, 'PINNED');
+    }
+  });
+
+  const visibleIds = Array.from(membershipTypeById.keys());
+
   if (!cachedTransactions) {
-    // Cache not ready - all IDs are missing
-    const allIds = [...membership.matched, ...membership.pinned];
+    // Cache not ready - all visible IDs are missing
     return {
       viewTransactions: [],
-      missingIds: allIds,
+      missingIds: visibleIds,
     };
   }
 
@@ -34,26 +50,14 @@ export function reconcileViewTransactions(
   const viewTransactions: ViewTransaction[] = [];
   const missingIds: number[] = [];
 
-  // Process matched transactions
-  membership.matched.forEach((id) => {
+  visibleIds.forEach((id) => {
     const txn = transactionMap.get(id);
-    if (txn) {
-      viewTransactions.push({
-        ...txn,
-        membershipType: 'MATCHED',
-      });
-    } else {
-      missingIds.push(id);
-    }
-  });
+    const membershipType = membershipTypeById.get(id);
 
-  // Process pinned transactions
-  membership.pinned.forEach((id) => {
-    const txn = transactionMap.get(id);
     if (txn) {
       viewTransactions.push({
         ...txn,
-        membershipType: 'PINNED',
+        membershipType: membershipType!,
       });
     } else {
       missingIds.push(id);

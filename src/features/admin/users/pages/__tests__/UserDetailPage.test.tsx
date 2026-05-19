@@ -27,6 +27,26 @@ describe('UserDetailPage', () => {
     expect(await screen.findByRole('button', { name: 'Deactivate User' })).toBeInTheDocument();
   });
 
+  it('hides the deactivate action when users:write is missing', async () => {
+    server.use(
+      http.get('/auth/v1/user', () =>
+        HttpResponse.json({
+          sub: 'mock-user-id',
+          email: 'readonly-admin@example.com',
+          name: 'Readonly Admin',
+          authenticated: true,
+          roles: ['ADMIN'],
+          permissions: ['users:read'],
+        }),
+      ),
+    );
+
+    renderPage('/admin/users/usr_abc123');
+
+    expect(await screen.findByRole('heading', { name: 'Admin User' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Deactivate User' })).not.toBeInTheDocument();
+  });
+
   it('renders the deactivation section for a deactivated user', async () => {
     renderPage('/admin/users/usr_deactivated');
 

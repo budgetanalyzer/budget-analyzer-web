@@ -320,6 +320,29 @@ for lower-level events where `userEvent` is a poor fit, such as synthetic
 window activity, timer-adjacent hooks, focused DOM events like backdrop clicks,
 or rare library-specific keyboard workarounds.
 
+This repo's custom `Select` primitive currently exposes the trigger and menu
+items as buttons in tests. Use the visible labels with `userEvent.click()`,
+matching the component's rendered roles:
+
+```typescript
+await user.click(screen.getByRole('button', { name: /Status/ }));
+await user.click(screen.getByRole('button', { name: 'Disabled' }));
+```
+
+This repo's custom `Dialog` primitive currently does not expose a semantic
+`role="dialog"`. Query dialogs by the visible heading or body copy, then use the
+visible action buttons.
+
+For URL-backed filter hooks, test parsing and serialization with a small route
+harness that renders `useLocation()` output. Assert the user-visible URL state
+after calling the hook's public handlers, including preserved context params and
+params that must be cleared together.
+
+For saved-view membership utilities, keep tests focused on frontend-owned
+reconciliation semantics: excluded IDs are absent from visible rows and missing
+fetches, visible duplicate IDs render once, restored IDs reappear when they
+leave the excluded set, and missing visible IDs are returned for detail fetches.
+
 ### Pattern 3: Async Testing
 
 ```typescript
@@ -494,6 +517,38 @@ it('handles 404 error', async () => {
 });
 ```
 
+For API-facing workflow tests, assert frontend-owned request shape in the MSW
+handler when the payload or query params are part of the contract:
+
+```typescript
+let requestBody: unknown;
+
+server.use(
+  http.post('/api/v1/currencies', async ({ request }) => {
+    requestBody = await request.json();
+    return HttpResponse.json({ id: 1, currencyCode: 'EUR' }, { status: 201 });
+  }),
+);
+
+// After the user submits the form:
+expect(requestBody).toEqual({ currencyCode: 'EUR', providerSeriesId: 'DEXUSEU' });
+```
+
+For multipart upload workflows, assert the stable frontend-owned pieces: the
+selected filename in the UI, request URL/query params, that a request body was
+sent, and the success/error behavior. In jsdom, Axios + MSW can be unreliable
+for reading the uploaded `File` back out of `request.formData()`.
+
+Some hooks set their own React Query `retry` value. That explicit hook option
+overrides `createTestQueryClient()` defaults, so error-state tests may need a
+longer `findBy*` timeout or a focused hook mock when the retry delay is not part
+of the behavior under test.
+
+For direct API module tests, use MSW to assert paths, methods, query params, and
+payloads at the API boundary. Keep React Query hook tests focused on query keys,
+`enabled` behavior, invalidation, and surfaced error state so they do not
+duplicate every request-shape assertion already covered by the API module tests.
+
 ---
 
 ## Test Organization
@@ -588,6 +643,12 @@ meaningful product-risk gaps, especially in auth, transactions, admin flows,
 analytics, saved views, and shared utilities. Do not add tests just to increase
 a percentage for trivial UI primitives, native browser behavior, library
 behavior, or TypeScript-only contracts.
+
+For analytics coverage, prefer assertions that protect interpretation and
+navigation: URL defaults and redirects, transaction-type filtering, amount
+aggregation, date bounds in drilldown links, and source-specific return paths.
+Do not assert chart/card layout or Tailwind classes unless they become part of
+a user-visible behavior contract.
 
 Coverage excludes shared test infrastructure, colocated test files,
 declaration files, type-only modules, config files, and the `src/main.tsx`
