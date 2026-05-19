@@ -163,7 +163,7 @@ Coverage audit snapshot from `npm run test:coverage`:
   route guards, transaction import/detail flows, shared API modules, shared
   server-state hooks, view reconciliation/filter logic, and currency utilities.
 
-A. Refresh the baseline and create a short target list.
+A. Refresh the baseline and create a short target list. (Complete)
 
 1. Run `npm run test:coverage`.
 2. Confirm the suite is still green before adding tests.
@@ -175,6 +175,69 @@ A. Refresh the baseline and create a short target list.
    - code that should be excluded from coverage because it is type-only,
      generated, or bootstrap glue.
 5. Update this phase's snapshot if the baseline materially changes.
+
+Completion notes:
+- Refreshed with `npm run test:coverage`: 38 test files and 182 tests passed.
+  The global snapshot did not materially change: 59.96% statements, 69.97%
+  branches, 55.62% functions, and 59.96% lines.
+- `coverage/coverage-summary.json` reported these files below 50% line or
+  function coverage.
+- High-value workflow/API/authorization targets to test in later phase-5
+  sessions: route and auth behavior (`src/App.tsx`,
+  `src/features/admin/components/AdminRoute.tsx`,
+  `src/features/auth/components/UserProfileDropdown.tsx`,
+  `src/features/auth/hooks/useAuth.ts`, `src/features/auth/pages/LoginPage.tsx`,
+  `src/features/auth/utils/role.ts`); admin create/edit/search workflows
+  (`src/features/admin/currencies/components/ConfirmDisableCurrencyDialog.tsx`,
+  `src/features/admin/currencies/components/CurrencyForm.tsx`,
+  `src/features/admin/currencies/pages/CurrencyCreatePage.tsx`,
+  `src/features/admin/currencies/pages/CurrencyEditPage.tsx`,
+  `src/features/admin/statement-formats/components/StatementFormatForm.tsx`,
+  `src/features/admin/statement-formats/pages/StatementFormatCreatePage.tsx`,
+  `src/features/admin/statement-formats/pages/StatementFormatEditPage.tsx`,
+  `src/features/admin/transactions/components/TransactionSearchFiltersPanel.tsx`,
+  `src/features/admin/transactions/components/TransactionSearchTable.tsx`);
+  transaction workflows (`src/features/transactions/components/BulkDeleteBar.tsx`,
+  `src/features/transactions/components/BulkDeleteModal.tsx`,
+  `src/features/transactions/components/DeleteTransactionModal.tsx`,
+  `src/features/transactions/components/EditableTransactionRow.tsx`,
+  `src/features/transactions/components/ImportButton.tsx`,
+  `src/features/transactions/components/TransactionTable.tsx`,
+  `src/features/transactions/hooks/usePreviewTransactions.ts`,
+  `src/features/transactions/hooks/useTransactionFiltersSync.ts`,
+  `src/features/transactions/pages/TransactionDetailPage.tsx`,
+  `src/hooks/useBulkDeleteTransactions.ts`, `src/hooks/useTransactions.ts`);
+  view workflows and utilities (`src/components/SaveAsViewButton.tsx`,
+  `src/components/ViewSelector.tsx`, `src/features/views/components/EditViewModal.tsx`,
+  `src/utils/filterTransactions.ts`, `src/utils/reconcileViewTransactions.ts`);
+  shared API and server-state behavior (`src/api/currencyApi.ts`,
+  `src/api/statementFormatApi.ts`, `src/api/transactionApi.ts`,
+  `src/api/viewApi.ts`, `src/hooks/useCurrencies.ts`,
+  `src/hooks/useMissingCurrencies.ts`, `src/hooks/useStatementFormats.ts`,
+  `src/hooks/useTransactionCount.ts`, `src/hooks/useViews.ts`); currency and
+  amount interpretation (`src/components/CurrencySelector.tsx`,
+  `src/components/MissingExchangeRatesBanner.tsx`, `src/utils/currency.ts`);
+  analytics controls where they affect navigation or interpretation
+  (`src/features/analytics/components/TransactionTypeSelector.tsx`,
+  `src/features/analytics/components/ViewModeSelector.tsx`,
+  `src/features/analytics/components/YearlySpendingCard.tsx`,
+  `src/features/analytics/components/YearlySpendingGrid.tsx`); and shared
+  feedback behavior when it protects user-visible error or toast contracts
+  (`src/components/ErrorBanner.tsx`, `src/hooks/useToast.ts`).
+- Low-signal presentational/static targets to leave alone unless they become
+  part of a workflow or accessibility contract: `src/components/Breadcrumbs.tsx`,
+  `src/components/ErrorBoundary.tsx`, `src/components/Layout.tsx`,
+  `src/components/ui/Avatar.tsx`, `src/components/ui/Toast.tsx`,
+  `src/components/ui/Toaster.tsx`, `src/features/admin/components/AdminLayout.tsx`,
+  `src/features/admin/components/UnauthorizedPage.tsx`,
+  `src/features/admin/pages/AdminNotFoundPage.tsx`,
+  `src/features/auth/pages/ErrorPage.tsx`, `src/features/auth/pages/PeacePage.tsx`,
+  `src/features/transactions/components/CurrencyConversionCard.tsx`,
+  `src/features/transactions/components/ExchangeRateInfo.tsx`,
+  `src/features/transactions/components/TransactionMetadataCard.tsx`,
+  and `src/store/uiSlice.ts`.
+- Coverage-exclude candidates because they are barrel or bootstrap glue:
+  `src/features/views/index.ts` and `src/store/index.ts`.
 
 B. Add route, authentication, and authorization coverage.
 
