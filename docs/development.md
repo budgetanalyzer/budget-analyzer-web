@@ -103,6 +103,10 @@ The `build:prod-smoke` build is used by orchestration to verify production CSP a
 ### Container Releases
 
 The local `Dockerfile` powers the Vite/HMR path used by Tilt. Release image publishing (GHCR, tag and dispatch contract) is owned by orchestration — see [CI/CD Workflows](https://github.com/budgetanalyzer/orchestration/blob/main/docs/ci-cd.md).
+`Dockerfile.production` still runs the full `npm run build` coverage gate, but
+its Node build stage uses BuildKit's native build platform. The final NGINX
+runtime image is built for the requested target platform, such as `linux/arm64`,
+without running Vitest under target-architecture emulation.
 
 ### Static Hosting
 

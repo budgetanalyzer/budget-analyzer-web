@@ -373,7 +373,8 @@ npm run preview      # Preview production build
 `Dockerfile.production`, which builds the static bundle and serves it with
 unprivileged NGINX on port `3000`. Because `Dockerfile.production` uses
 `npm run build`, release image builds also enforce coverage thresholds before
-bundling.
+bundling. The Node build stage is pinned to BuildKit's native build platform so
+arm64 release image builds do not run Vitest through QEMU emulation.
 
 **Code Quality:**
 ```bash
