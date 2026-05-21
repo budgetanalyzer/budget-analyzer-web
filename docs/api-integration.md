@@ -112,6 +112,11 @@ Statement imports use a two-step review flow:
 
 The import format dropdown is populated from `GET /api/v1/statement-formats`. The UI shows enabled formats whose default currency is available, sorted by API-provided `displayName`, and submits the selected `formatKey` as the `format` query parameter.
 
+If NGINX rejects the preview upload with HTTP `413`, the response body is not
+the backend JSON error shape. The frontend maps that status on
+`/v1/transactions/preview` to `Sorry, the file exceeds our 25MB limit.` before
+showing the import error banner.
+
 The preview response includes:
 
 - `previewImportToken` — opaque token required for the batch request. Treat it as client state only; do not parse it.

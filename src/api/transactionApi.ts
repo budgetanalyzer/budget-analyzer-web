@@ -1,5 +1,6 @@
 // src/api/transactionApi.ts
 import { apiClient } from '@/api/client';
+import { ApiError } from '@/types/apiError';
 import {
   Transaction,
   TransactionUpdateRequest,
@@ -37,6 +38,8 @@ function toBatchImportTransaction(
     ...(allowDuplicate === true ? { allowDuplicate } : {}),
   };
 }
+
+const PREVIEW_UPLOAD_TOO_LARGE_MESSAGE = 'Sorry, the file exceeds our 25MB limit.';
 
 export const transactionApi = {
   getTransactions: async (): Promise<Transaction[]> => {
@@ -81,15 +84,26 @@ export const transactionApi = {
       params.append('accountId', accountId);
     }
 
-    const response = await apiClient.post<PreviewResponse>(
-      `/v1/transactions/preview?${params.toString()}`,
-      formData,
-      {
-        // Override the API client's JSON default so Axios leaves FormData as multipart.
-        headers: { 'Content-Type': 'multipart/form-data' },
-      },
-    );
-    return response.data;
+    try {
+      const response = await apiClient.post<PreviewResponse>(
+        `/v1/transactions/preview?${params.toString()}`,
+        formData,
+        {
+          // Override the API client's JSON default so Axios leaves FormData as multipart.
+          headers: { 'Content-Type': 'multipart/form-data' },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 413) {
+        throw new ApiError(413, {
+          type: 'INVALID_REQUEST',
+          message: PREVIEW_UPLOAD_TOO_LARGE_MESSAGE,
+        });
+      }
+
+      throw error;
+    }
   },
 
   batchImportTransactions: async (request: BatchImportRequest): Promise<BatchImportResponse> => {

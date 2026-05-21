@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AxiosError } from 'axios';
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/testing/mocks/server';
 import { apiClient } from '@/api/client';
 import { transactionApi } from '@/api/transactionApi';
 import { BatchImportRequest, BatchImportTransactionRequest } from '@/types/transaction';
+import { ApiError } from '@/types/apiError';
 
 const baseTransaction: BatchImportTransactionRequest = {
   date: '2026-05-01',
@@ -52,6 +54,46 @@ describe('transactionApi.previewTransactions', () => {
     );
     expect(capturedConfig?.headers.getContentType()).toContain('multipart/form-data');
     expect(capturedConfig?.data).toBeInstanceOf(FormData);
+  });
+
+  it('maps nginx 413 preview upload responses to a readable file-size error', async () => {
+    const file = new File(['large statement'], 'large-statement.csv', { type: 'text/csv' });
+    let caughtError: unknown;
+
+    apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      const response = {
+        data: '<html><body>413 Request Entity Too Large</body></html>',
+        status: 413,
+        statusText: 'Payload Too Large',
+        headers: { 'Content-Type': 'text/html' },
+        config,
+      } satisfies AxiosResponse<string>;
+
+      throw new AxiosError(
+        'Request failed with status code 413',
+        'ERR_BAD_REQUEST',
+        config,
+        {},
+        response,
+      );
+    });
+
+    try {
+      await transactionApi.previewTransactions(file, 'acme-csv');
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(ApiError);
+    expect(caughtError).toMatchObject({
+      name: 'ApiError',
+      status: 413,
+      message: 'Sorry, the file exceeds our 25MB limit.',
+      response: {
+        type: 'INVALID_REQUEST',
+        message: 'Sorry, the file exceeds our 25MB limit.',
+      },
+    });
   });
 });
 

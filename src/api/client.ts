@@ -16,6 +16,17 @@ import { ApiError, ApiErrorResponse } from '@/types/apiError';
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
 
+function isApiErrorResponse(data: unknown): data is ApiErrorResponse {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'type' in data &&
+    'message' in data &&
+    typeof data.type === 'string' &&
+    typeof data.message === 'string'
+  );
+}
+
 export const apiClient: AxiosInstance = axios.create({
   baseURL,
   headers: {
@@ -36,11 +47,20 @@ apiClient.interceptors.response.use(
       return;
     }
 
-    if (error.response?.data) {
+    if (error.response) {
       // API returned a structured error
-      const apiErrorResponse = error.response.data;
-      throw new ApiError(error.response.status, apiErrorResponse, apiErrorResponse.message);
-    } else if (error.request) {
+      if (isApiErrorResponse(error.response.data)) {
+        const apiErrorResponse = error.response.data;
+        throw new ApiError(error.response.status, apiErrorResponse, apiErrorResponse.message);
+      }
+
+      throw new ApiError(error.response.status, {
+        type: 'INTERNAL_ERROR',
+        message: error.message || `Request failed with status code ${error.response.status}`,
+      });
+    }
+
+    if (error.request) {
       // Request made but no response received
       // Note: BA_SESSION cookie is HttpOnly so document.cookie cannot detect it.
       // A missing document.cookie does NOT mean the user is unauthenticated.
@@ -48,11 +68,11 @@ apiClient.interceptors.response.use(
         type: 'SERVICE_UNAVAILABLE',
         message: 'Unable to reach the server. Please try again later.',
       });
-    } else {
-      throw new ApiError(500, {
-        type: 'INTERNAL_ERROR',
-        message: error.message,
-      });
     }
+
+    throw new ApiError(500, {
+      type: 'INTERNAL_ERROR',
+      message: error.message,
+    });
   },
 );

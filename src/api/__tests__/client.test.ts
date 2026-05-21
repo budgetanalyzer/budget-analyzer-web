@@ -49,6 +49,27 @@ describe('apiClient error normalization', () => {
     });
   });
 
+  it('maps non-json response errors without treating proxy bodies as API errors', async () => {
+    server.use(
+      http.get('/api/v1/client-error/proxy-html', () => {
+        return new HttpResponse('<html><body>Bad Gateway</body></html>', {
+          status: 502,
+          headers: { 'Content-Type': 'text/html' },
+        });
+      }),
+    );
+
+    await expect(apiClient.get('/v1/client-error/proxy-html')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 502,
+      message: 'Request failed with status code 502',
+      response: {
+        type: 'INTERNAL_ERROR',
+        message: 'Request failed with status code 502',
+      },
+    });
+  });
+
   it('preserves the ApiError prototype for normalized errors', async () => {
     server.use(
       http.get('/api/v1/client-error/not-found', () => {
