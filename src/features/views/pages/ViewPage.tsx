@@ -223,12 +223,6 @@ function ViewPageContent({ id }: { id: string }) {
         description={`${transactions.length} transactions`}
         action={
           <div className="flex items-center gap-2">
-            {view.excludedCount > 0 && (
-              <Button variant="outline" onClick={handleRestoreClick}>
-                <Eye className="mr-2 h-4 w-4" />
-                Restore Excluded
-              </Button>
-            )}
             <Link
               to={analyzeViewUrl}
               className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -236,6 +230,12 @@ function ViewPageContent({ id }: { id: string }) {
               <BarChart3 className="mr-2 h-4 w-4" />
               Analyze View
             </Link>
+            {view.excludedCount > 0 && (
+              <Button variant="outline" onClick={handleRestoreClick}>
+                <Eye className="mr-2 h-4 w-4" />
+                Restore Excluded
+              </Button>
+            )}
             <ViewSettingsMenu
               view={view}
               onEditClick={handleEditClick}
