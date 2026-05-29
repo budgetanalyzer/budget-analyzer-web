@@ -1,14 +1,16 @@
 import type { ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   useCreateStatementFormat,
   useStatementFormat,
   useStatementFormats,
   useUpdateStatementFormat,
 } from '@/hooks/useStatementFormats';
+import { useSaveCsvWizardFormat } from '@/components/statement-formats/csv-wizard/hooks/useCsvStatementFormatWizard';
+import { statementFormatApi } from '@/api/statementFormatApi';
 import { server } from '@/testing/mocks/server';
 import { createTestQueryClient } from '@/testing/test-utils';
 import type { StatementFormat } from '@/types/statementFormat';
@@ -26,6 +28,10 @@ const csvFormat: StatementFormat = {
   debitHeader: 'Debit',
   enabled: true,
 };
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function createWrapper(queryClient = createTestQueryClient()) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -142,5 +148,42 @@ describe('statement-format mutation hooks', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['statement-formats', 'detail', 'capital-one-csv'],
     });
+  });
+
+  it('invalidates the statement-format list after CSV wizard save success', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const file = new File(['Date,Description,Amount'], 'sample.csv', { type: 'text/csv' });
+
+    vi.spyOn(statementFormatApi, 'saveCsvWizardFormat').mockResolvedValueOnce({
+      ...csvFormat,
+      id: 99,
+      displayName: 'Custom CSV',
+      scope: 'USER',
+    });
+
+    const { result } = renderHook(() => useSaveCsvWizardFormat(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        file,
+        request: {
+          displayName: 'Custom CSV',
+          bankName: 'Example Bank',
+          defaultCurrencyIsoCode: 'USD',
+          mapping: {
+            dateColumn: 'Date',
+            dateFormat: 'MM/dd/uuuu',
+            descriptionColumn: 'Description',
+            amountMode: 'SINGLE_AMOUNT_WITH_TYPE',
+            amountColumn: 'Amount',
+          },
+        },
+      });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['statement-formats'] });
   });
 });

@@ -23,6 +23,9 @@ const mockUseCurrencies = vi.mocked(useCurrencies);
 const mockUseAnalyzeCsvWizardSample = vi.mocked(useAnalyzeCsvWizardSample);
 const mockUsePreviewCsvWizardMapping = vi.mocked(usePreviewCsvWizardMapping);
 const mockUseSaveCsvWizardFormat = vi.mocked(useSaveCsvWizardFormat);
+type AnalyzeMutate = ReturnType<typeof useAnalyzeCsvWizardSample>['mutate'];
+type PreviewMutate = ReturnType<typeof usePreviewCsvWizardMapping>['mutate'];
+type SaveMutate = ReturnType<typeof useSaveCsvWizardFormat>['mutate'];
 
 const analysisResponse: CsvWizardAnalysisResponse = {
   headers: ['Date', 'Memo', 'Amount', 'Type'],
@@ -79,16 +82,21 @@ function mockCurrencies() {
 }
 
 function mockWizardMutations({
+  analyzeError,
   previewError,
+  saveError,
 }: {
+  analyzeError?: ApiError;
   previewError?: ApiError;
+  saveError?: ApiError;
 } = {}) {
-  type AnalyzeMutate = ReturnType<typeof useAnalyzeCsvWizardSample>['mutate'];
-  type PreviewMutate = ReturnType<typeof usePreviewCsvWizardMapping>['mutate'];
-  type SaveMutate = ReturnType<typeof useSaveCsvWizardFormat>['mutate'];
-
   const analyzeMutate = vi.fn(
     (file: Parameters<AnalyzeMutate>[0], options?: Parameters<AnalyzeMutate>[1]) => {
+      if (analyzeError) {
+        options?.onError?.(analyzeError, file, undefined, undefined as never);
+        return;
+      }
+
       options?.onSuccess?.(analysisResponse, file, undefined, undefined as never);
     },
   ) as AnalyzeMutate;
@@ -104,6 +112,11 @@ function mockWizardMutations({
   ) as PreviewMutate;
   const saveMutate = vi.fn(
     (variables: Parameters<SaveMutate>[0], options?: Parameters<SaveMutate>[1]) => {
+      if (saveError) {
+        options?.onError?.(saveError, variables, undefined, undefined as never);
+        return;
+      }
+
       options?.onSuccess?.(savedFormat, variables, undefined, undefined as never);
     },
   ) as SaveMutate;
@@ -123,11 +136,29 @@ function mockWizardMutations({
     isPending: false,
     reset: vi.fn(),
   } as unknown as ReturnType<typeof useSaveCsvWizardFormat>);
+
+  return { analyzeMutate, previewMutate, saveMutate };
 }
 
 function mockHookDefaults() {
   mockCurrencies();
-  mockWizardMutations();
+  return mockWizardMutations();
+}
+
+async function analyzeSample(user: ReturnType<typeof userEvent.setup>, file: File) {
+  await user.upload(screen.getByLabelText('CSV sample file'), file);
+  await user.click(screen.getByRole('button', { name: /Analyze CSV/ }));
+  await screen.findByText('Sample rows');
+}
+
+async function fillRequiredMapping(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText('Display name'), 'Custom Checking CSV');
+  await user.type(screen.getByLabelText('Bank name'), 'Example Bank');
+}
+
+async function previewMapping(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+  await screen.findByRole('button', { name: /Save Format/ });
 }
 
 describe('CsvStatementFormatWizardDialog', () => {
@@ -136,7 +167,7 @@ describe('CsvStatementFormatWizardDialog', () => {
     const onSaved = vi.fn();
     const file = new File(['Date,Memo,Amount,Type'], 'sample.csv', { type: 'text/csv' });
 
-    mockHookDefaults();
+    const { previewMutate } = mockHookDefaults();
 
     renderWithProviders(
       <CsvStatementFormatWizardDialog
@@ -147,14 +178,10 @@ describe('CsvStatementFormatWizardDialog', () => {
       />,
     );
 
-    await user.upload(screen.getByLabelText('CSV sample file'), file);
-    await user.click(screen.getByRole('button', { name: /Analyze CSV/ }));
-
-    expect(await screen.findByText('Sample rows')).toBeInTheDocument();
+    await analyzeSample(user, file);
     expect(screen.getByText('91%')).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText('Display name'), 'Custom Checking CSV');
-    await user.type(screen.getByLabelText('Bank name'), 'Example Bank');
+    await fillRequiredMapping(user);
     await user.clear(screen.getByLabelText('Date format'));
     await user.type(screen.getByLabelText('Date format'), 'MM/dd/uuuu');
 
@@ -165,6 +192,20 @@ describe('CsvStatementFormatWizardDialog', () => {
     expect(within(table).getByText('$4.50')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Import/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Remove/ })).not.toBeInTheDocument();
+    expect(previewMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file,
+        request: expect.objectContaining({
+          accountId: 'checking-001',
+          mapping: expect.objectContaining({
+            dateColumn: 'Date',
+            dateFormat: 'MM/dd/uuuu',
+            descriptionColumn: 'Memo',
+          }),
+        }),
+      }),
+      expect.any(Object),
+    );
 
     await user.click(screen.getByRole('button', { name: /Save Format/ }));
 
@@ -208,5 +249,237 @@ describe('CsvStatementFormatWizardDialog', () => {
     await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
 
     expect(await screen.findByText('Unsupported date pattern')).toBeInTheDocument();
+  });
+
+  it('renders generic preview 422 errors as dialog-level errors', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Memo,Amount'], 'sample.csv', { type: 'text/csv' });
+
+    mockCurrencies();
+    mockWizardMutations({
+      previewError: new ApiError(422, {
+        type: 'VALIDATION_ERROR',
+        message: 'Unable to preview this mapping',
+      }),
+    });
+
+    renderWithProviders(
+      <CsvStatementFormatWizardDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+
+    await analyzeSample(user, file);
+    await fillRequiredMapping(user);
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+
+    expect(await screen.findByText('Unable to preview this mapping')).toBeInTheDocument();
+  });
+
+  it('returns save field errors to the mapping controls', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Memo,Amount,Type'], 'sample.csv', { type: 'text/csv' });
+
+    mockCurrencies();
+    mockWizardMutations({
+      saveError: new ApiError(422, {
+        type: 'VALIDATION_ERROR',
+        message: 'Invalid format',
+        fieldErrors: [
+          {
+            field: 'displayName',
+            message: 'A statement format with this display name already exists',
+          },
+        ],
+      }),
+    });
+
+    renderWithProviders(
+      <CsvStatementFormatWizardDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+
+    await analyzeSample(user, file);
+    await fillRequiredMapping(user);
+    await previewMapping(user);
+    await user.click(screen.getByRole('button', { name: /Save Format/ }));
+
+    expect(await screen.findByLabelText('Display name')).toBeInTheDocument();
+    expect(
+      screen.getByText('A statement format with this display name already exists'),
+    ).toBeInTheDocument();
+  });
+
+  it('cancels from upload without calling wizard APIs', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    const { analyzeMutate, previewMutate, saveMutate } = mockHookDefaults();
+
+    renderWithProviders(
+      <CsvStatementFormatWizardDialog open onOpenChange={onOpenChange} onSaved={vi.fn()} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(analyzeMutate).not.toHaveBeenCalled();
+    expect(previewMutate).not.toHaveBeenCalled();
+    expect(saveMutate).not.toHaveBeenCalled();
+  });
+
+  it('cancels from mapping without saving', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Memo,Amount,Type'], 'sample.csv', { type: 'text/csv' });
+    const onOpenChange = vi.fn();
+    const { saveMutate } = mockHookDefaults();
+
+    renderWithProviders(
+      <CsvStatementFormatWizardDialog open onOpenChange={onOpenChange} onSaved={vi.fn()} />,
+    );
+
+    await analyzeSample(user, file);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(saveMutate).not.toHaveBeenCalled();
+  });
+
+  it('cancels from parser preview without saving', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Memo,Amount,Type'], 'sample.csv', { type: 'text/csv' });
+    const onOpenChange = vi.fn();
+    const { saveMutate } = mockHookDefaults();
+
+    renderWithProviders(
+      <CsvStatementFormatWizardDialog open onOpenChange={onOpenChange} onSaved={vi.fn()} />,
+    );
+
+    await analyzeSample(user, file);
+    await fillRequiredMapping(user);
+    await previewMapping(user);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(saveMutate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the parser preview read-only', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Memo,Amount,Type'], 'sample.csv', { type: 'text/csv' });
+
+    mockHookDefaults();
+
+    renderWithProviders(
+      <CsvStatementFormatWizardDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+
+    await analyzeSample(user, file);
+    await fillRequiredMapping(user);
+    await previewMapping(user);
+
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Remove/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Duplicate/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Import/ })).not.toBeInTheDocument();
+  });
+
+  it('retries analyze with the current file after an error', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Memo,Amount,Type'], 'sample.csv', { type: 'text/csv' });
+    let attempts = 0;
+    const analyzeMutate = vi.fn(
+      (currentFile: Parameters<AnalyzeMutate>[0], options?: Parameters<AnalyzeMutate>[1]) => {
+        attempts += 1;
+        if (attempts === 1) {
+          options?.onError?.(
+            new ApiError(422, {
+              type: 'VALIDATION_ERROR',
+              message: 'Unable to analyze this file',
+            }),
+            currentFile,
+            undefined,
+            undefined as never,
+          );
+          return;
+        }
+
+        options?.onSuccess?.(analysisResponse, currentFile, undefined, undefined as never);
+      },
+    ) as AnalyzeMutate;
+
+    mockHookDefaults();
+    mockUseAnalyzeCsvWizardSample.mockReturnValue({
+      mutate: analyzeMutate,
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useAnalyzeCsvWizardSample>);
+
+    renderWithProviders(
+      <CsvStatementFormatWizardDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+
+    await user.upload(screen.getByLabelText('CSV sample file'), file);
+    await user.click(screen.getByRole('button', { name: /Analyze CSV/ }));
+    expect(await screen.findByText('Unable to analyze this file')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Analyze CSV/ }));
+
+    expect(await screen.findByText('Sample rows')).toBeInTheDocument();
+    expect(analyzeMutate).toHaveBeenNthCalledWith(1, file, expect.any(Object));
+    expect(analyzeMutate).toHaveBeenNthCalledWith(2, file, expect.any(Object));
+  });
+
+  it('retries preview with the current file and mapping after an error', async () => {
+    const user = userEvent.setup();
+    const file = new File(['Date,Memo,Amount,Type'], 'sample.csv', { type: 'text/csv' });
+    let attempts = 0;
+    const previewMutate = vi.fn(
+      (variables: Parameters<PreviewMutate>[0], options?: Parameters<PreviewMutate>[1]) => {
+        attempts += 1;
+        if (attempts === 1) {
+          options?.onError?.(
+            new ApiError(422, {
+              type: 'VALIDATION_ERROR',
+              message: 'Unable to preview this mapping',
+            }),
+            variables,
+            undefined,
+            undefined as never,
+          );
+          return;
+        }
+
+        options?.onSuccess?.(previewResponse, variables, undefined, undefined as never);
+      },
+    ) as PreviewMutate;
+
+    mockHookDefaults();
+    mockUsePreviewCsvWizardMapping.mockReturnValue({
+      mutate: previewMutate,
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof usePreviewCsvWizardMapping>);
+
+    renderWithProviders(
+      <CsvStatementFormatWizardDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+
+    await analyzeSample(user, file);
+    await fillRequiredMapping(user);
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+    expect(await screen.findByText('Unable to preview this mapping')).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText('Date format'));
+    await user.type(screen.getByLabelText('Date format'), 'yyyy-MM-dd');
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+
+    expect(await screen.findByRole('button', { name: /Save Format/ })).toBeInTheDocument();
+    expect(previewMutate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        file,
+        request: expect.objectContaining({
+          mapping: expect.objectContaining({ dateFormat: 'yyyy-MM-dd' }),
+        }),
+      }),
+      expect.any(Object),
+    );
   });
 });

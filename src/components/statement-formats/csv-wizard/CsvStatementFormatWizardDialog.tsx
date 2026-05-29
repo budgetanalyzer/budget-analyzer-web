@@ -396,6 +396,9 @@ export function CsvStatementFormatWizardDialog({
         },
         onError: (error) => {
           setActiveError(error);
+          if (error.response.fieldErrors?.length) {
+            setStep('mapping');
+          }
         },
       },
     );
