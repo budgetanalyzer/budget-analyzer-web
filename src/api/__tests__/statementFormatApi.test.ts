@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { http, HttpResponse } from 'msw';
 import { statementFormatApi } from '@/api/statementFormatApi';
+import { apiClient } from '@/api/client';
 import { server } from '@/testing/mocks/server';
 import type {
+  CsvWizardMappingPreviewRequest,
+  CsvWizardSaveRequest,
   CreateStatementFormatRequest,
   StatementFormat,
   UpdateStatementFormatRequest,
@@ -22,6 +26,12 @@ const csvFormat: StatementFormat = {
   debitHeader: 'Debit',
   enabled: true,
 };
+
+const originalAdapter = apiClient.defaults.adapter;
+
+afterEach(() => {
+  apiClient.defaults.adapter = originalAdapter;
+});
 
 describe('statementFormatApi', () => {
   it('lists statement formats', async () => {
@@ -95,5 +105,144 @@ describe('statementFormatApi', () => {
 
     expect(capturedMethods).toEqual(['POST', 'PUT']);
     expect(capturedBodies).toEqual([createRequest, updateRequest]);
+  });
+
+  it('posts multipart CSV wizard analyze requests', async () => {
+    const file = new File(['Date,Description,Amount'], 'sample.csv', { type: 'text/csv' });
+    let capturedConfig: InternalAxiosRequestConfig | undefined;
+
+    apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      capturedConfig = config;
+
+      return {
+        data: {
+          headers: ['Date', 'Description', 'Amount'],
+          sampleRows: [{ Date: '2026-05-01', Description: 'Coffee', Amount: '-4.50' }],
+          inferredMapping: {
+            dateColumn: 'Date',
+            dateFormat: 'MM/dd/uuuu',
+            descriptionColumn: 'Description',
+            amountMode: 'SINGLE_AMOUNT_WITH_TYPE',
+            amountColumn: 'Amount',
+          },
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      } satisfies AxiosResponse;
+    });
+
+    const response = await statementFormatApi.analyzeCsvSample(file);
+    const formData = capturedConfig?.data as FormData;
+
+    expect(capturedConfig?.url).toBe('/v1/statement-formats/csv-wizard/analyze');
+    expect(capturedConfig?.headers.getContentType()).toContain('multipart/form-data');
+    expect(formData).toBeInstanceOf(FormData);
+    expect((formData.get('file') as File).name).toBe('sample.csv');
+    expect(response.headers).toEqual(['Date', 'Description', 'Amount']);
+  });
+
+  it('posts multipart CSV wizard preview requests with a JSON request part', async () => {
+    const file = new File(['Date,Description,Amount'], 'sample.csv', { type: 'text/csv' });
+    const previewRequest: CsvWizardMappingPreviewRequest = {
+      bankName: 'Example Bank',
+      defaultCurrencyIsoCode: 'USD',
+      accountId: 'checking-001',
+      mapping: {
+        dateColumn: 'Date',
+        dateFormat: 'MM/dd/uuuu',
+        descriptionColumn: 'Description',
+        amountMode: 'SINGLE_AMOUNT_WITH_TYPE',
+        amountColumn: 'Amount',
+      },
+    };
+    let capturedConfig: InternalAxiosRequestConfig | undefined;
+
+    apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      capturedConfig = config;
+
+      return {
+        data: {
+          transactions: [
+            {
+              date: '2026-05-01',
+              description: 'Coffee',
+              amount: 4.5,
+              type: 'DEBIT',
+              bankName: 'Example Bank',
+              currencyIsoCode: 'USD',
+              accountId: 'checking-001',
+              duplicate: false,
+            },
+          ],
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      } satisfies AxiosResponse;
+    });
+
+    const response = await statementFormatApi.previewCsvMapping(file, previewRequest);
+    const formData = capturedConfig?.data as FormData;
+    const capturedRequestPart = formData.get('request') as Blob;
+
+    expect(capturedConfig?.url).toBe('/v1/statement-formats/csv-wizard/preview');
+    expect((formData.get('file') as File).name).toBe('sample.csv');
+    expect(capturedRequestPart).toBeInstanceOf(Blob);
+    expect(capturedRequestPart.type).toBe('application/json');
+    expect(response.transactions).toHaveLength(1);
+  });
+
+  it('posts multipart CSV wizard save requests and returns the created format', async () => {
+    const file = new File(['Date,Description,Amount'], 'sample.csv', { type: 'text/csv' });
+    const saveRequest: CsvWizardSaveRequest = {
+      displayName: 'Custom CSV',
+      bankName: 'Example Bank',
+      defaultCurrencyIsoCode: 'USD',
+      mapping: {
+        dateColumn: 'Date',
+        dateFormat: 'MM/dd/uuuu',
+        descriptionColumn: 'Description',
+        amountMode: 'SINGLE_AMOUNT_WITH_TYPE',
+        amountColumn: 'Amount',
+      },
+    };
+    let capturedConfig: InternalAxiosRequestConfig | undefined;
+
+    apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      capturedConfig = config;
+
+      return {
+        data: {
+          ...csvFormat,
+          id: 99,
+          displayName: 'Custom CSV',
+          bankName: 'Example Bank',
+          scope: 'USER',
+        },
+        status: 201,
+        statusText: 'Created',
+        headers: {},
+        config,
+      } satisfies AxiosResponse;
+    });
+
+    const response = await statementFormatApi.saveCsvWizardFormat(file, saveRequest);
+    const formData = capturedConfig?.data as FormData;
+    const capturedRequestPart = formData.get('request') as Blob;
+
+    expect(capturedConfig?.url).toBe('/v1/statement-formats/csv-wizard/save');
+    expect((formData.get('file') as File).name).toBe('sample.csv');
+    expect(capturedRequestPart).toBeInstanceOf(Blob);
+    expect(capturedRequestPart.type).toBe('application/json');
+    expect(response).toEqual(
+      expect.objectContaining({
+        id: 99,
+        displayName: 'Custom CSV',
+        scope: 'USER',
+      }),
+    );
   });
 });

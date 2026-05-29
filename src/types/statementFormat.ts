@@ -1,4 +1,5 @@
 // src/types/statementFormat.ts
+import type { PreviewTransaction } from '@/types/transaction';
 export type FormatType = 'CSV' | 'PDF' | 'XLSX';
 export type StatementFormatScope = 'SYSTEM' | 'USER';
 
@@ -53,4 +54,53 @@ export interface UpdateStatementFormatRequest {
   typeHeader?: string;
   categoryHeader?: string;
   enabled?: boolean;
+}
+
+export type CsvWizardAmountMode = 'SINGLE_AMOUNT_WITH_TYPE' | 'DEBIT_CREDIT_COLUMNS';
+
+export interface CsvWizardColumnMappingRequest {
+  dateColumn?: string;
+  dateFormat?: string;
+  descriptionColumn?: string;
+  amountMode: CsvWizardAmountMode;
+  amountColumn?: string;
+  debitColumn?: string;
+  creditColumn?: string;
+  typeColumn?: string;
+  categoryColumn?: string;
+}
+
+export type CsvWizardColumnMappingResponse = CsvWizardColumnMappingRequest;
+
+export interface CsvWizardWarningResponse {
+  field?: string;
+  message?: string;
+}
+
+export interface CsvWizardAnalysisResponse {
+  headers?: string[];
+  sampleRows?: Record<string, string>[];
+  inferredMapping?: CsvWizardColumnMappingResponse;
+  confidence?: number;
+  columnConfidences?: Record<string, number>;
+  warnings?: CsvWizardWarningResponse[];
+}
+
+export interface CsvWizardMappingPreviewRequest {
+  bankName: string;
+  defaultCurrencyIsoCode: string;
+  accountId?: string;
+  mapping: CsvWizardColumnMappingRequest;
+}
+
+export interface CsvWizardSaveRequest {
+  displayName: string;
+  bankName: string;
+  defaultCurrencyIsoCode: string;
+  mapping: CsvWizardColumnMappingRequest;
+}
+
+export interface CsvWizardPreviewResponse {
+  transactions?: PreviewTransaction[];
+  warnings?: CsvWizardWarningResponse[];
 }

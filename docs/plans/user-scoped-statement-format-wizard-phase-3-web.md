@@ -278,6 +278,12 @@ form state.
 
 ## Step 10: CSV Wizard Flow
 
+Implementation note: the web wizard flow is implemented in
+`src/components/statement-formats/csv-wizard/` with a small upload → mapping →
+parser-preview state machine, CSV wizard mutation hooks, and a read-only parser
+preview table. The wizard sends the sample file on analyze, preview, and save,
+and save payloads intentionally omit the import-time `accountId`.
+
 Build the dialog as a small state machine. Suggested states:
 
 ```ts
