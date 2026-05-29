@@ -241,21 +241,21 @@ Update `ImportButton` so the statement-format select uses IDs:
 - Keep filtering out disabled formats and formats whose default currency is not
   enabled.
 
-Add a special select item:
+Add a separate action button beside the select:
 
 ```text
-Create new statement format
+New format
 ```
 
-Selecting it should:
+Clicking it should:
 
 - Open `CsvStatementFormatWizardDialog`.
-- Clear the select value back to the previous real format, or no format if none
-  was selected.
+- Leave the statement-format select unchanged.
 - Leave the import form expanded so the user can continue after saving.
 
-Use a sentinel constant such as `CREATE_FORMAT_SELECT_VALUE =
-'__create_statement_format__'`. Never send the sentinel to APIs.
+Do not put `Create new statement format` inside the select. The select is only
+for existing statement formats; creation is a separate command and must not
+fire from value selection.
 
 ### Wizard Open State
 

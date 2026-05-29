@@ -1,6 +1,6 @@
 // src/features/transactions/components/ImportButton.tsx
 import { useRef, useState, useCallback, useMemo } from 'react';
-import { Upload, X } from 'lucide-react';
+import { Plus, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { MessageBanner } from '@/components/MessageBanner';
@@ -20,8 +20,6 @@ import { useStatementFormats } from '@/hooks/useStatementFormats';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { CsvStatementFormatWizardDialog } from '@/components/statement-formats/csv-wizard/CsvStatementFormatWizardDialog';
 import type { StatementFormat } from '@/types/statementFormat';
-
-const CREATE_FORMAT_SELECT_VALUE = '__create_statement_format__';
 
 interface ImportButtonProps {
   onSuccess?: (created: number, duplicatesSkipped: number, duplicatesImported: number) => void;
@@ -181,13 +179,12 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
   }, [selectedFile, selectedStatementFormatId, accountId, previewTransactions, clearForm, onError]);
 
   const handleFormatValueChange = useCallback((value: string) => {
-    if (value === CREATE_FORMAT_SELECT_VALUE) {
-      setIsCsvWizardOpen(true);
-      return;
-    }
-
     setSelectedStatementFormatId(Number(value));
     setSavedFormatMessage(null);
+  }, []);
+
+  const handleOpenCsvWizard = useCallback(() => {
+    setIsCsvWizardOpen(true);
   }, []);
 
   const handleCsvWizardSaved = useCallback(
@@ -277,7 +274,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
                 transition={collapseTransition}
                 className="flex items-center gap-2"
               >
-                <div className="flex items-center">
+                <div className="flex items-center gap-2">
                   <Select
                     value={
                       selectedStatementFormatId === null ? '' : String(selectedStatementFormatId)
@@ -300,9 +297,6 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={CREATE_FORMAT_SELECT_VALUE}>
-                        Create new statement format
-                      </SelectItem>
                       {enabledFormats.map((f) => (
                         <SelectItem key={f.id} value={String(f.id)}>
                           {renderFormatSelectLabel(f)}
@@ -310,6 +304,17 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
                       ))}
                     </SelectContent>
                   </Select>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="default"
+                    onClick={handleOpenCsvWizard}
+                    className="whitespace-nowrap"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    New format
+                  </Button>
                 </div>
 
                 <div className="flex items-center gap-2 overflow-hidden">
@@ -348,12 +353,13 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
           </AnimatePresence>
 
           {!isExpanded ? (
-            <Button onClick={handleExpand} size="default" variant="default">
+            <Button type="button" onClick={handleExpand} size="default" variant="default">
               <Upload className="mr-2 h-4 w-4" />
               Import Transactions
             </Button>
           ) : (
             <Button
+              type="button"
               onClick={handleSubmit}
               disabled={isPending || !canSubmit}
               size="default"

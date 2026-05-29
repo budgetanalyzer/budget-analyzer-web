@@ -225,7 +225,7 @@ describe('ImportButton', () => {
     expect(screen.queryByRole('heading', { name: 'Preview Import' })).not.toBeInTheDocument();
   });
 
-  it('opens the CSV wizard from the create option and preserves the import form on cancel', async () => {
+  it('opens the CSV wizard from the new format button and preserves the import form on cancel', async () => {
     const user = userEvent.setup();
     const previewMutate = mockPreviewMutation();
 
@@ -234,8 +234,7 @@ describe('ImportButton', () => {
     renderWithProviders(<ImportButton />);
 
     await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
-    await user.click(await screen.findByRole('button', { name: 'Select Format' }));
-    await user.click(screen.getByRole('button', { name: 'Create new statement format' }));
+    await user.click(screen.getByRole('button', { name: 'New format' }));
 
     expect(screen.getByRole('dialog', { name: 'Create statement format' })).toBeInTheDocument();
 
@@ -264,8 +263,7 @@ describe('ImportButton', () => {
 
     await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
     await user.type(screen.getByPlaceholderText('Account ID (optional)'), 'checking-789');
-    await user.click(await screen.findByRole('button', { name: 'Select Format' }));
-    await user.click(screen.getByRole('button', { name: 'Create new statement format' }));
+    await user.click(screen.getByRole('button', { name: 'New format' }));
     await user.click(screen.getByRole('button', { name: 'Save wizard format' }));
 
     expect(

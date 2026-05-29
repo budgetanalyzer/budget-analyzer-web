@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -74,26 +74,16 @@ describe('StatementFormatEditPage', () => {
     expect(await screen.findByDisplayValue('acme-csv')).toBeDisabled();
     expect(screen.getByRole('button', { name: /Format Type/ })).toBeDisabled();
 
-    await user.clear(screen.getByLabelText(/Display Name/));
-    await user.type(screen.getByLabelText(/Display Name/), 'Acme CSV Updated');
-    await user.clear(screen.getByLabelText(/Bank Name/));
-    await user.type(screen.getByLabelText(/Bank Name/), 'Acme Credit');
-    await user.clear(screen.getByLabelText(/Default Currency/));
-    await user.type(screen.getByLabelText(/Default Currency/), 'cad');
-    await user.clear(screen.getByLabelText(/Date Column Header/));
-    await user.type(screen.getByLabelText(/Date Column Header/), 'Posted Date');
-    await user.clear(screen.getByLabelText(/Date Format/));
-    await user.type(screen.getByLabelText(/Date Format/), 'yyyy-MM-dd');
-    await user.clear(screen.getByLabelText(/Description Column Header/));
-    await user.type(screen.getByLabelText(/Description Column Header/), 'Memo');
-    await user.clear(screen.getByLabelText(/Credit\/Amount Column Header/));
-    await user.type(screen.getByLabelText(/Credit\/Amount Column Header/), 'Amount');
-    await user.clear(screen.getByLabelText(/Debit Column Header/));
-    await user.type(screen.getByLabelText(/Debit Column Header/), 'Withdrawal');
-    await user.clear(screen.getByLabelText(/Type Column Header/));
-    await user.type(screen.getByLabelText(/Type Column Header/), 'Kind');
-    await user.clear(screen.getByLabelText(/Category Column Header/));
-    await user.type(screen.getByLabelText(/Category Column Header/), 'Class');
+    changeInput(/Display Name/, 'Acme CSV Updated');
+    changeInput(/Bank Name/, 'Acme Credit');
+    changeInput(/Default Currency/, 'cad');
+    changeInput(/Date Column Header/, 'Posted Date');
+    changeInput(/Date Format/, 'yyyy-MM-dd');
+    changeInput(/Description Column Header/, 'Memo');
+    changeInput(/Credit\/Amount Column Header/, 'Amount');
+    changeInput(/Debit Column Header/, 'Withdrawal');
+    changeInput(/Type Column Header/, 'Kind');
+    changeInput(/Category Column Header/, 'Class');
     await user.click(screen.getByRole('button', { name: /Status/ }));
     await user.click(screen.getByRole('button', { name: 'Disabled' }));
     await user.click(screen.getByRole('button', { name: 'Update Format' }));
@@ -191,4 +181,10 @@ function renderStatementFormatRoutes(initialPath: string) {
     </Routes>,
     { initialEntries: [initialPath], router: 'dom' },
   );
+}
+
+function changeInput(label: RegExp, value: string) {
+  fireEvent.change(screen.getByLabelText(label), {
+    target: { value },
+  });
 }
