@@ -110,7 +110,16 @@ Statement imports use a two-step review flow:
 1. `POST /api/v1/transactions/preview?statementFormatId=<id>&accountId=<optional-account-id>` uploads the statement file as multipart form data and returns editable preview rows.
 2. `POST /api/v1/transactions/batch` submits the reviewed rows as JSON with the same `previewImportToken`.
 
-The import format dropdown is populated from `GET /api/v1/statement-formats`. The UI shows enabled formats whose default currency is available, sorted by API-provided `displayName`, disambiguates duplicate visible names with `System` or `Custom`, and submits the selected `id` as the `statementFormatId` query parameter. The dropdown also exposes `Create new statement format`, which opens the user CSV statement-format wizard entry point without submitting the sentinel option to the preview API.
+The import format dropdown is populated from `GET /api/v1/statement-formats`.
+The UI shows enabled formats whose default currency is available, sorted by
+API-provided `displayName`, disambiguates duplicate visible names with `System`
+or `Custom`, and submits the selected `id` as the `statementFormatId` query
+parameter. The dropdown also exposes `Create new statement format`, which opens
+the user CSV statement-format wizard entry point without submitting the sentinel
+option to the preview API. After the wizard saves a format, the import controls
+stay open, the existing account ID is preserved, the saved format is selected by
+`id`, and inline success feedback prompts the user to choose the actual
+statement file before running normal preview.
 
 If NGINX rejects the preview upload with HTTP `413`, the response body is not
 the backend JSON error shape. The frontend maps that status on

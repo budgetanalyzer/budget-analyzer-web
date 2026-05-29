@@ -263,6 +263,7 @@ describe('ImportButton', () => {
     renderWithProviders(<ImportButton />);
 
     await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
+    await user.type(screen.getByPlaceholderText('Account ID (optional)'), 'checking-789');
     await user.click(await screen.findByRole('button', { name: 'Select Format' }));
     await user.click(screen.getByRole('button', { name: 'Create new statement format' }));
     await user.click(screen.getByRole('button', { name: 'Save wizard format' }));
@@ -271,6 +272,9 @@ describe('ImportButton', () => {
       screen.queryByRole('dialog', { name: 'Create statement format' }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Custom Checking CSV/ })).toBeInTheDocument();
+    expect(screen.getByText(/Custom Checking CSV saved/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Account ID (optional)')).toHaveValue('checking-789');
+    expect(previewMutate).not.toHaveBeenCalled();
 
     await user.upload(screen.getByLabelText('Transaction file input'), file);
     await user.click(screen.getByRole('button', { name: /Preview Transactions/ }));
@@ -279,7 +283,7 @@ describe('ImportButton', () => {
       expect(capturedVariables).toEqual({
         file,
         statementFormatId: 99,
-        accountId: undefined,
+        accountId: 'checking-789',
       });
     });
   });
