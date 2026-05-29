@@ -11,7 +11,7 @@ import { ApiError } from '@/types/apiError';
 /**
  * Query key factory for statement formats
  */
-const statementFormatsKeys = {
+export const statementFormatsKeys = {
   all: ['statement-formats'] as const,
   detail: (formatKey: string) => [...statementFormatsKeys.all, 'detail', formatKey] as const,
 };
@@ -75,9 +75,11 @@ export const useUpdateStatementFormat = () => {
       // Invalidate all statement format queries
       // Also invalidate the specific detail query to ensure fresh data in edit forms
       await queryClient.invalidateQueries({ queryKey: statementFormatsKeys.all });
-      await queryClient.invalidateQueries({
-        queryKey: statementFormatsKeys.detail(updatedFormat.formatKey),
-      });
+      if (updatedFormat.formatKey) {
+        await queryClient.invalidateQueries({
+          queryKey: statementFormatsKeys.detail(updatedFormat.formatKey),
+        });
+      }
     },
   });
 };

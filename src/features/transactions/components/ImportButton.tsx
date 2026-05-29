@@ -17,6 +17,10 @@ import { collapseFromRightVariants, collapseTransition } from '@/lib/animations'
 import { PreviewResponse } from '@/types/transaction';
 import { useStatementFormats } from '@/hooks/useStatementFormats';
 import { useCurrencies } from '@/hooks/useCurrencies';
+import { CsvStatementFormatWizardDialog } from '@/components/statement-formats/csv-wizard/CsvStatementFormatWizardDialog';
+import type { StatementFormat } from '@/types/statementFormat';
+
+const CREATE_FORMAT_SELECT_VALUE = '__create_statement_format__';
 
 interface ImportButtonProps {
   onSuccess?: (created: number, duplicatesSkipped: number, duplicatesImported: number) => void;
@@ -39,6 +43,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
   } = useStatementFormats();
   const { data: enabledCurrencies } = useCurrencies(true);
   const [isExpanded, setIsExpandedState] = useState(false);
+  const [isCsvWizardOpen, setIsCsvWizardOpen] = useState(false);
 
   const setIsExpanded = useCallback(
     (expanded: boolean) => {
@@ -47,7 +52,8 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     },
     [onExpandedChange],
   );
-  const [format, setFormat] = useState<string>('');
+  const [selectedStatementFormatId, setSelectedStatementFormatId] = useState<number | null>(null);
+  const [savedStatementFormat, setSavedStatementFormat] = useState<StatementFormat | null>(null);
   const [accountId, setAccountId] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewModal, setPreviewModal] = useState<PreviewModalState>({
@@ -64,15 +70,66 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
 
   // Filter to only enabled formats with enabled currencies, then sort for display
   const enabledFormats = useMemo(() => {
-    if (!Array.isArray(statementFormats)) return [];
-    return statementFormats
+    const formats = Array.isArray(statementFormats) ? [...statementFormats] : [];
+    if (savedStatementFormat && !formats.some((f) => f.id === savedStatementFormat.id)) {
+      formats.push(savedStatementFormat);
+    }
+
+    return formats
       .filter((f) => f.enabled && enabledCurrencyCodes.has(f.defaultCurrencyIsoCode))
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
-  }, [statementFormats, enabledCurrencyCodes]);
+  }, [statementFormats, savedStatementFormat, enabledCurrencyCodes]);
 
-  // Get display label for selected format
-  const selectedFormat = enabledFormats.find((f) => f.formatKey === format);
-  const selectedLabel = selectedFormat?.displayName ?? null;
+  const duplicateDisplayNames = useMemo(() => {
+    const counts = new Map<string, number>();
+    enabledFormats.forEach((statementFormat) => {
+      counts.set(statementFormat.displayName, (counts.get(statementFormat.displayName) ?? 0) + 1);
+    });
+
+    return new Set(
+      [...counts.entries()].filter(([, count]) => count > 1).map(([displayName]) => displayName),
+    );
+  }, [enabledFormats]);
+
+  const getFormatSourceLabel = useCallback((statementFormat: StatementFormat) => {
+    if (statementFormat.scope === 'USER') return 'Custom';
+    if (statementFormat.scope === 'SYSTEM') return 'System';
+    return null;
+  }, []);
+
+  const getFormatDisplayLabel = useCallback(
+    (statementFormat: StatementFormat) => {
+      const sourceLabel = duplicateDisplayNames.has(statementFormat.displayName)
+        ? getFormatSourceLabel(statementFormat)
+        : null;
+
+      return sourceLabel
+        ? `${statementFormat.displayName} ${sourceLabel}`
+        : statementFormat.displayName;
+    },
+    [duplicateDisplayNames, getFormatSourceLabel],
+  );
+
+  const renderFormatSelectLabel = useCallback(
+    (statementFormat: StatementFormat) => {
+      const sourceLabel = duplicateDisplayNames.has(statementFormat.displayName)
+        ? getFormatSourceLabel(statementFormat)
+        : null;
+
+      return (
+        <span className="flex w-full items-center justify-between gap-3">
+          <span>{statementFormat.displayName}</span>
+          {sourceLabel ? (
+            <span className="text-xs text-muted-foreground">{sourceLabel}</span>
+          ) : null}
+        </span>
+      );
+    },
+    [duplicateDisplayNames, getFormatSourceLabel],
+  );
+
+  const selectedFormat = enabledFormats.find((f) => f.id === selectedStatementFormatId);
+  const selectedLabel = selectedFormat ? getFormatDisplayLabel(selectedFormat) : null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -86,13 +143,13 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
       fileInputRef.current.value = '';
     }
     setSelectedFile(null);
-    setFormat('');
+    setSelectedStatementFormatId(null);
     setAccountId('');
     setIsExpanded(false);
   }, [setIsExpanded]);
 
   const handleSubmit = useCallback(() => {
-    if (!selectedFile || !format) {
+    if (!selectedFile || selectedStatementFormatId === null) {
       return;
     }
 
@@ -100,7 +157,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     previewTransactions(
       {
         file: selectedFile,
-        format,
+        statementFormatId: selectedStatementFormatId,
         accountId: accountId || undefined,
       },
       {
@@ -116,7 +173,26 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
         },
       },
     );
-  }, [selectedFile, format, accountId, previewTransactions, clearForm, onError]);
+  }, [selectedFile, selectedStatementFormatId, accountId, previewTransactions, clearForm, onError]);
+
+  const handleFormatValueChange = useCallback((value: string) => {
+    if (value === CREATE_FORMAT_SELECT_VALUE) {
+      setIsCsvWizardOpen(true);
+      return;
+    }
+
+    setSelectedStatementFormatId(Number(value));
+  }, []);
+
+  const handleCsvWizardSaved = useCallback(
+    (createdFormat: StatementFormat) => {
+      setSavedStatementFormat(createdFormat);
+      setSelectedStatementFormatId(createdFormat.id);
+      setIsCsvWizardOpen(false);
+      setIsExpanded(true);
+    },
+    [setIsExpanded],
+  );
 
   const handlePreviewModalOpenChange = useCallback((open: boolean) => {
     if (open) {
@@ -140,7 +216,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
 
   const handleCancel = useCallback(() => {
     setIsExpanded(false);
-    setFormat('');
+    setSelectedStatementFormatId(null);
     setAccountId('');
     setSelectedFile(null);
     if (fileInputRef.current) {
@@ -148,7 +224,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     }
   }, [setIsExpanded]);
 
-  const canSubmit = selectedFile && format;
+  const canSubmit = selectedFile && selectedStatementFormatId !== null;
 
   // All formats now use preview workflow
   const getButtonText = () => {
@@ -179,11 +255,13 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
               className="flex items-center gap-2"
             >
               <div className="flex items-center">
-                <Select value={format} onValueChange={setFormat}>
-                  <SelectTrigger
-                    className="w-auto min-w-[180px]"
-                    disabled={isLoadingFormats || isFormatsError || enabledFormats.length === 0}
-                  >
+                <Select
+                  value={
+                    selectedStatementFormatId === null ? '' : String(selectedStatementFormatId)
+                  }
+                  onValueChange={handleFormatValueChange}
+                >
+                  <SelectTrigger className="w-auto min-w-[180px]" disabled={isLoadingFormats}>
                     <SelectValue
                       placeholder={
                         isLoadingFormats
@@ -199,9 +277,12 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value={CREATE_FORMAT_SELECT_VALUE}>
+                      Create new statement format
+                    </SelectItem>
                     {enabledFormats.map((f) => (
-                      <SelectItem key={f.formatKey} value={f.formatKey}>
-                        {f.displayName}
+                      <SelectItem key={f.id} value={String(f.id)}>
+                        {renderFormatSelectLabel(f)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -266,6 +347,12 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
         onOpenChange={handlePreviewModalOpenChange}
         previewData={previewModal.previewData}
         onImportComplete={handlePreviewImportComplete}
+      />
+      <CsvStatementFormatWizardDialog
+        open={isCsvWizardOpen}
+        onOpenChange={setIsCsvWizardOpen}
+        initialAccountId={accountId || undefined}
+        onSaved={handleCsvWizardSaved}
       />
     </>
   );
