@@ -41,6 +41,12 @@ function toBatchImportTransaction(
 
 const PREVIEW_UPLOAD_TOO_LARGE_MESSAGE = 'Sorry, the file exceeds our 25MB limit.';
 
+export interface PreviewTransactionsRequest {
+  file: File;
+  statementFormatId: number;
+  accountId?: string;
+}
+
 export const transactionApi = {
   getTransactions: async (): Promise<Transaction[]> => {
     const response = await apiClient.get<Transaction[]>('/v1/transactions');
@@ -71,15 +77,15 @@ export const transactionApi = {
     return response.data;
   },
 
-  previewTransactions: async (
-    file: File,
-    format: string,
-    accountId?: string,
-  ): Promise<PreviewResponse> => {
+  previewTransactions: async ({
+    file,
+    statementFormatId,
+    accountId,
+  }: PreviewTransactionsRequest): Promise<PreviewResponse> => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const params = new URLSearchParams({ format });
+    const params = new URLSearchParams({ statementFormatId: String(statementFormatId) });
     if (accountId) {
       params.append('accountId', accountId);
     }

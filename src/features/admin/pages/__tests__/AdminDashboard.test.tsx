@@ -50,7 +50,6 @@ function stubQueries() {
     data: [
       {
         id: 1,
-        formatKey: 'acme-csv',
         displayName: 'Acme CSV',
         formatType: 'CSV',
         bankName: 'Acme Bank',

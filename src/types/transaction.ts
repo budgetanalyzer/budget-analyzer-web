@@ -26,7 +26,7 @@ export type PreviewFileWarningCode = 'FILE_ALREADY_IMPORTED';
 export interface PreviousFileImportResponse {
   originalFilename: string;
   importedAt: string;
-  format: string;
+  statementFormatId: number;
   accountId?: string | null;
   transactionCount: number;
 }

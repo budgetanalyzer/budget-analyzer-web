@@ -11,9 +11,9 @@ import { ApiError } from '@/types/apiError';
 /**
  * Query key factory for statement formats
  */
-const statementFormatsKeys = {
+export const statementFormatsKeys = {
   all: ['statement-formats'] as const,
-  detail: (formatKey: string) => [...statementFormatsKeys.all, 'detail', formatKey] as const,
+  detail: (id: number) => [...statementFormatsKeys.all, 'detail', id] as const,
 };
 
 /**
@@ -30,18 +30,22 @@ export const useStatementFormats = (): UseQueryResult<StatementFormat[], ApiErro
 };
 
 /**
- * Fetch a single statement format by formatKey
+ * Fetch a single statement format by ID
  * Used in admin edit forms
  */
-export const useStatementFormat = (
-  formatKey: string,
-): UseQueryResult<StatementFormat, ApiError> => {
+export const useStatementFormat = (id?: number): UseQueryResult<StatementFormat, ApiError> => {
   return useQuery<StatementFormat, ApiError>({
-    queryKey: statementFormatsKeys.detail(formatKey),
-    queryFn: () => statementFormatApi.getFormat(formatKey),
+    queryKey:
+      id === undefined ? [...statementFormatsKeys.all, 'detail'] : statementFormatsKeys.detail(id),
+    queryFn: () => {
+      if (id === undefined) {
+        throw new Error('Statement format ID is required');
+      }
+      return statementFormatApi.getFormat(id);
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
-    enabled: !!formatKey,
+    enabled: id !== undefined,
   });
 };
 
@@ -69,14 +73,14 @@ export const useUpdateStatementFormat = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ formatKey, data }: { formatKey: string; data: UpdateStatementFormatRequest }) =>
-      statementFormatApi.updateFormat(formatKey, data),
+    mutationFn: ({ id, data }: { id: number; data: UpdateStatementFormatRequest }) =>
+      statementFormatApi.updateFormat(id, data),
     onSuccess: async (updatedFormat) => {
       // Invalidate all statement format queries
       // Also invalidate the specific detail query to ensure fresh data in edit forms
       await queryClient.invalidateQueries({ queryKey: statementFormatsKeys.all });
       await queryClient.invalidateQueries({
-        queryKey: statementFormatsKeys.detail(updatedFormat.formatKey),
+        queryKey: statementFormatsKeys.detail(updatedFormat.id),
       });
     },
   });

@@ -179,7 +179,7 @@ function App() {
               }
             />
             <Route
-              path="statement-formats/:formatKey"
+              path="statement-formats/:id"
               element={
                 <PermissionGuard permission="statementformats:write">
                   <LazyRoute>

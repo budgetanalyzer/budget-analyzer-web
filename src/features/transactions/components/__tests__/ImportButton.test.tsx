@@ -8,8 +8,46 @@ import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
 import type { PreviewResponse } from '@/types/transaction';
 import { ApiError } from '@/types/apiError';
+import type { StatementFormat } from '@/types/statementFormat';
 
 vi.mock('@/features/transactions/hooks/usePreviewTransactions');
+vi.mock('@/components/statement-formats/csv-wizard/CsvStatementFormatWizardDialog', () => ({
+  CsvStatementFormatWizardDialog: ({
+    open,
+    onOpenChange,
+    initialAccountId,
+    onSaved,
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    initialAccountId?: string;
+    onSaved: (format: StatementFormat) => void;
+  }) =>
+    open ? (
+      <div role="dialog" aria-label="Create statement format">
+        <div>Initial account ID: {initialAccountId ?? ''}</div>
+        <button type="button" onClick={() => onOpenChange(false)}>
+          Cancel wizard
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onSaved({
+              id: 99,
+              displayName: 'Custom Checking CSV',
+              formatType: 'CSV',
+              bankName: 'Custom Bank',
+              defaultCurrencyIsoCode: 'USD',
+              scope: 'USER',
+              enabled: true,
+            })
+          }
+        >
+          Save wizard format
+        </button>
+      </div>
+    ) : null,
+}));
 
 const mockUsePreviewTransactions = vi.mocked(usePreviewTransactions);
 type PreviewMutate = ReturnType<typeof usePreviewTransactions>['mutate'];
@@ -39,30 +77,30 @@ const previewResponse: PreviewResponse = {
   ],
 };
 
-function useReferenceDataHandlers() {
+const defaultFormats: StatementFormat[] = [
+  {
+    id: 1,
+    displayName: 'Acme Checking CSV',
+    formatType: 'CSV',
+    bankName: 'Acme Bank',
+    defaultCurrencyIsoCode: 'USD',
+    scope: 'SYSTEM',
+    enabled: true,
+  },
+  {
+    id: 2,
+    displayName: 'Disabled CSV',
+    formatType: 'CSV',
+    bankName: 'Disabled Bank',
+    defaultCurrencyIsoCode: 'USD',
+    scope: 'SYSTEM',
+    enabled: false,
+  },
+];
+
+function useReferenceDataHandlers(formats: StatementFormat[] = defaultFormats) {
   server.use(
-    http.get('/api/v1/statement-formats', () =>
-      HttpResponse.json([
-        {
-          id: 1,
-          formatKey: 'acme-csv',
-          displayName: 'Acme Checking CSV',
-          formatType: 'CSV',
-          bankName: 'Acme Bank',
-          defaultCurrencyIsoCode: 'USD',
-          enabled: true,
-        },
-        {
-          id: 2,
-          formatKey: 'disabled-csv',
-          displayName: 'Disabled CSV',
-          formatType: 'CSV',
-          bankName: 'Disabled Bank',
-          defaultCurrencyIsoCode: 'USD',
-          enabled: false,
-        },
-      ]),
-    ),
+    http.get('/api/v1/statement-formats', () => HttpResponse.json(formats)),
     http.get('/api/v1/currencies', () => HttpResponse.json([])),
   );
 }
@@ -94,7 +132,7 @@ beforeEach(() => {
 });
 
 describe('ImportButton', () => {
-  it('previews the selected file with format and account query params, then opens the preview modal', async () => {
+  it('previews the selected file with statement format ID and account query params, then opens the preview modal', async () => {
     const user = userEvent.setup();
     const file = new File(['date,description,amount'], 'statement.csv', { type: 'text/csv' });
     let capturedVariables: PreviewVariables | undefined;
@@ -119,7 +157,7 @@ describe('ImportButton', () => {
     await waitFor(() => {
       expect(capturedVariables).toEqual({
         file,
-        format: 'acme-csv',
+        statementFormatId: 1,
         accountId: 'checking-123',
       });
     });
@@ -186,5 +224,103 @@ describe('ImportButton', () => {
       expect(onError).toHaveBeenCalledWith(expect.any(Error));
     });
     expect(screen.queryByRole('heading', { name: 'Preview Import' })).not.toBeInTheDocument();
+  });
+
+  it('opens the CSV wizard from the new format button and preserves the import form on cancel', async () => {
+    const user = userEvent.setup();
+    const previewMutate = mockPreviewMutation();
+
+    useReferenceDataHandlers();
+
+    renderWithProviders(<ImportButton />);
+
+    await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
+    await user.click(screen.getByRole('button', { name: 'New format' }));
+
+    expect(screen.getByRole('dialog', { name: 'Create statement format' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel wizard' }));
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Create statement format' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Preview Transactions/ })).toBeDisabled();
+    expect(previewMutate).not.toHaveBeenCalled();
+  });
+
+  it('selects a saved wizard format and submits its statement format ID', async () => {
+    const user = userEvent.setup();
+    const file = new File(['date,description,amount'], 'statement.csv', { type: 'text/csv' });
+    let capturedVariables: PreviewVariables | undefined;
+
+    const previewMutate = vi.fn((variables: PreviewVariables) => {
+      capturedVariables = variables;
+    }) as PreviewMutate;
+    mockPreviewMutation({ mutate: previewMutate });
+
+    useReferenceDataHandlers();
+
+    renderWithProviders(<ImportButton />);
+
+    await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
+    await user.type(screen.getByPlaceholderText('Account ID (optional)'), 'checking-789');
+    await user.click(screen.getByRole('button', { name: 'New format' }));
+
+    expect(screen.getByText('Initial account ID: checking-789')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save wizard format' }));
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Create statement format' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Custom Checking CSV/ })).toBeInTheDocument();
+    expect(screen.getByText(/Custom Checking CSV saved/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Account ID (optional)')).toHaveValue('checking-789');
+    expect(previewMutate).not.toHaveBeenCalled();
+
+    await user.upload(screen.getByLabelText('Transaction file input'), file);
+    await user.click(screen.getByRole('button', { name: /Preview Transactions/ }));
+
+    await waitFor(() => {
+      expect(capturedVariables).toEqual({
+        file,
+        statementFormatId: 99,
+        accountId: 'checking-789',
+      });
+    });
+  });
+
+  it('disambiguates duplicate display names by source without showing parser revisions', async () => {
+    const user = userEvent.setup();
+
+    useReferenceDataHandlers([
+      {
+        id: 10,
+        displayName: 'Shared CSV',
+        formatType: 'CSV',
+        bankName: 'Acme Bank',
+        defaultCurrencyIsoCode: 'USD',
+        scope: 'SYSTEM',
+        enabled: true,
+      },
+      {
+        id: 11,
+        displayName: 'Shared CSV',
+        formatType: 'CSV',
+        bankName: 'Acme Bank',
+        defaultCurrencyIsoCode: 'USD',
+        scope: 'USER',
+        enabled: true,
+      },
+    ]);
+
+    renderWithProviders(<ImportButton />);
+
+    await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
+    await user.click(await screen.findByRole('button', { name: 'Select Format' }));
+
+    expect(screen.getByRole('button', { name: 'Shared CSV System' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Shared CSV Custom' })).toBeInTheDocument();
+    expect(screen.queryByText(/revision/i)).not.toBeInTheDocument();
   });
 });

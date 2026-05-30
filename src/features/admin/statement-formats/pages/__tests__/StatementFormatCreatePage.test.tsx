@@ -21,7 +21,6 @@ describe('StatementFormatCreatePage', () => {
         return HttpResponse.json(
           {
             id: 21,
-            formatKey: 'acme-csv',
             displayName: 'Acme CSV',
             formatType: 'CSV',
             bankName: 'Acme Bank',
@@ -42,7 +41,6 @@ describe('StatementFormatCreatePage', () => {
         HttpResponse.json([
           {
             id: 21,
-            formatKey: 'acme-csv',
             displayName: 'Acme CSV',
             formatType: 'CSV',
             bankName: 'Acme Bank',
@@ -55,7 +53,6 @@ describe('StatementFormatCreatePage', () => {
 
     renderStatementFormatRoutes('/admin/statement-formats/new');
 
-    await user.type(screen.getByLabelText(/Format Key/), 'acme-csv');
     await user.type(screen.getByLabelText(/Display Name/), 'Acme CSV');
     await user.type(screen.getByLabelText(/Bank Name/), 'Acme Bank');
     await user.type(screen.getByLabelText(/Default Currency/), 'usd');
@@ -69,7 +66,6 @@ describe('StatementFormatCreatePage', () => {
     await user.click(screen.getByRole('button', { name: 'Create Format' }));
 
     expect(requestBody).toEqual({
-      formatKey: 'acme-csv',
       displayName: 'Acme CSV',
       formatType: 'CSV',
       bankName: 'Acme Bank',
@@ -94,8 +90,7 @@ describe('StatementFormatCreatePage', () => {
         HttpResponse.json(
           {
             type: 'VALIDATION_ERROR',
-            code: 'FORMAT_KEY_ALREADY_EXISTS',
-            message: 'Format key already exists',
+            message: 'Statement format already exists',
           },
           { status: 422 },
         ),
@@ -104,7 +99,6 @@ describe('StatementFormatCreatePage', () => {
 
     renderStatementFormatRoutes('/admin/statement-formats/new');
 
-    await user.type(screen.getByLabelText(/Format Key/), 'duplicate-csv');
     await user.type(screen.getByLabelText(/Display Name/), 'Duplicate CSV');
     await user.type(screen.getByLabelText(/Bank Name/), 'Duplicate Bank');
     await user.type(screen.getByLabelText(/Default Currency/), 'usd');
@@ -113,7 +107,7 @@ describe('StatementFormatCreatePage', () => {
     await user.type(screen.getByLabelText(/Credit\/Amount Column Header/), 'Amount');
     await user.click(screen.getByRole('button', { name: 'Create Format' }));
 
-    expect(await screen.findByText('A format with this key already exists')).toBeInTheDocument();
+    expect(await screen.findByText('Statement format already exists')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Add New Format' })).toBeInTheDocument();
   });
 });

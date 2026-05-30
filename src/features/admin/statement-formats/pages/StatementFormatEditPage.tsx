@@ -11,7 +11,6 @@ import { formatApiError } from '@/utils/errorMessages';
 import type { UpdateStatementFormatRequest, FormatType } from '@/types/statementFormat';
 
 interface FormData {
-  formatKey: string;
   displayName: string;
   formatType: FormatType;
   bankName: string;
@@ -30,10 +29,16 @@ interface FormData {
  * Edit existing statement format page
  */
 export function StatementFormatEditPage() {
-  const { formatKey } = useParams<{ formatKey: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const statementFormatId = id ? Number(id) : NaN;
+  const hasStatementFormatId = Number.isInteger(statementFormatId);
 
-  const { data: format, isLoading, error } = useStatementFormat(formatKey || '');
+  const {
+    data: format,
+    isLoading,
+    error,
+  } = useStatementFormat(hasStatementFormatId ? statementFormatId : undefined);
   const { mutate: updateFormat, isPending } = useUpdateStatementFormat();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -43,7 +48,7 @@ export function StatementFormatEditPage() {
 
   const handleSubmit = useCallback(
     (data: FormData) => {
-      if (!formatKey) return;
+      if (!hasStatementFormatId) return;
 
       const updateData: UpdateStatementFormatRequest = {
         displayName: data.displayName,
@@ -60,7 +65,7 @@ export function StatementFormatEditPage() {
       };
 
       updateFormat(
-        { formatKey, data: updateData },
+        { id: statementFormatId, data: updateData },
         {
           onSuccess: (updatedFormat) => {
             navigate('/admin/statement-formats', {
@@ -79,7 +84,7 @@ export function StatementFormatEditPage() {
         },
       );
     },
-    [formatKey, updateFormat, navigate],
+    [hasStatementFormatId, statementFormatId, updateFormat, navigate],
   );
 
   return (
@@ -101,13 +106,21 @@ export function StatementFormatEditPage() {
           <div>
             <h1 className="text-4xl font-bold tracking-tight">Edit Format</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {format ? `Update ${format.bankName} (${format.formatKey})` : `Format: ${formatKey}`}
+              {format ? `Update ${format.displayName}` : `Format ID: ${id}`}
             </p>
           </div>
         </div>
 
         {/* Error state */}
-        {error && (
+        {!hasStatementFormatId && (
+          <div className="max-w-2xl rounded-xl border border-destructive bg-destructive/10 p-6 shadow-sm">
+            <p className="text-center text-sm font-medium text-destructive">
+              Invalid statement format ID.
+            </p>
+          </div>
+        )}
+
+        {hasStatementFormatId && error && (
           <div className="max-w-2xl rounded-xl border border-destructive bg-destructive/10 p-6 shadow-sm">
             <p className="text-center text-sm font-medium text-destructive">
               Failed to load statement format: {error.message}
@@ -116,7 +129,7 @@ export function StatementFormatEditPage() {
         )}
 
         {/* Loading state */}
-        {isLoading && (
+        {hasStatementFormatId && isLoading && (
           <div className="max-w-2xl space-y-6 rounded-xl border bg-card p-8 shadow-sm">
             <Skeleton className="h-20 w-full rounded-lg" />
             <Skeleton className="h-20 w-full rounded-lg" />
@@ -125,7 +138,7 @@ export function StatementFormatEditPage() {
         )}
 
         {/* Form */}
-        {!isLoading && !error && format && (
+        {hasStatementFormatId && !isLoading && !error && format && (
           <div className="max-w-2xl space-y-4">
             {/* Error Banner */}
             <AnimatePresence mode="wait">

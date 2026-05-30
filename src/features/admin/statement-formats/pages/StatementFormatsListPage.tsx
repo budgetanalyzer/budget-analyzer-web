@@ -148,7 +148,7 @@ export function StatementFormatsListPage() {
             <Table>
               <TableHeader>
                 <TableRow className="border-b bg-muted/50 hover:bg-muted/50">
-                  <TableHead className="h-14 font-semibold">Format Key</TableHead>
+                  <TableHead className="h-14 font-semibold">Display Name</TableHead>
                   <TableHead className="font-semibold">Bank Name</TableHead>
                   <TableHead className="font-semibold">Type</TableHead>
                   <TableHead className="font-semibold">Currency</TableHead>
@@ -173,11 +173,8 @@ export function StatementFormatsListPage() {
                   </TableRow>
                 ) : (
                   sortedFormats.map((format) => (
-                    <TableRow
-                      key={format.formatKey}
-                      className="group transition-colors hover:bg-muted/50"
-                    >
-                      <TableCell className="h-16 font-mono text-sm">{format.formatKey}</TableCell>
+                    <TableRow key={format.id} className="group transition-colors hover:bg-muted/50">
+                      <TableCell className="h-16 font-semibold">{format.displayName}</TableCell>
                       <TableCell className="font-semibold">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 font-bold text-primary">
@@ -213,7 +210,7 @@ export function StatementFormatsListPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => navigate(`/admin/statement-formats/${format.formatKey}`)}
+                            onClick={() => navigate(`/admin/statement-formats/${format.id}`)}
                             className="opacity-70 transition-opacity group-hover:opacity-100"
                           >
                             <Pencil className="h-4 w-4" />

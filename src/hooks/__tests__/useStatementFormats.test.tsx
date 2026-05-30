@@ -1,21 +1,22 @@
 import type { ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   useCreateStatementFormat,
   useStatementFormat,
   useStatementFormats,
   useUpdateStatementFormat,
 } from '@/hooks/useStatementFormats';
+import { useSaveCsvWizardFormat } from '@/components/statement-formats/csv-wizard/hooks/useCsvStatementFormatWizard';
+import { statementFormatApi } from '@/api/statementFormatApi';
 import { server } from '@/testing/mocks/server';
 import { createTestQueryClient } from '@/testing/test-utils';
 import type { StatementFormat } from '@/types/statementFormat';
 
 const csvFormat: StatementFormat = {
   id: 1,
-  formatKey: 'capital-one-csv',
   displayName: 'Capital One CSV',
   formatType: 'CSV',
   bankName: 'Capital One',
@@ -26,6 +27,10 @@ const csvFormat: StatementFormat = {
   debitHeader: 'Debit',
   enabled: true,
 };
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function createWrapper(queryClient = createTestQueryClient()) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -52,17 +57,17 @@ describe('useStatementFormats', () => {
     expect(queryClient.getQueryData(['statement-formats'])).toEqual([csvFormat]);
   });
 
-  it('does not request a statement format detail when the key is empty', async () => {
+  it('does not request a statement format detail when the ID is missing', async () => {
     let requestCount = 0;
 
     server.use(
-      http.get('/api/v1/statement-formats/:formatKey', () => {
+      http.get('/api/v1/statement-formats/:id', () => {
         requestCount += 1;
         return HttpResponse.json(csvFormat);
       }),
     );
 
-    const { result } = renderHook(() => useStatementFormat(''), {
+    const { result } = renderHook(() => useStatementFormat(undefined), {
       wrapper: createWrapper(),
     });
 
@@ -100,7 +105,7 @@ describe('statement-format mutation hooks', () => {
 
     server.use(
       http.post('/api/v1/statement-formats', () => {
-        return HttpResponse.json({ ...csvFormat, id: 2, formatKey: 'amex-csv' });
+        return HttpResponse.json({ ...csvFormat, id: 2, displayName: 'Amex CSV' });
       }),
     );
 
@@ -109,7 +114,6 @@ describe('statement-format mutation hooks', () => {
     });
 
     await result.current.mutateAsync({
-      formatKey: 'amex-csv',
       displayName: 'Amex CSV',
       formatType: 'CSV',
       bankName: 'Amex',
@@ -124,7 +128,7 @@ describe('statement-format mutation hooks', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     server.use(
-      http.put('/api/v1/statement-formats/:formatKey', () => {
+      http.put('/api/v1/statement-formats/:id', () => {
         return HttpResponse.json({ ...csvFormat, displayName: 'Capital One Export' });
       }),
     );
@@ -134,13 +138,50 @@ describe('statement-format mutation hooks', () => {
     });
 
     await result.current.mutateAsync({
-      formatKey: 'capital-one-csv',
+      id: 1,
       data: { displayName: 'Capital One Export' },
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['statement-formats'] });
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['statement-formats', 'detail', 'capital-one-csv'],
+      queryKey: ['statement-formats', 'detail', 1],
     });
+  });
+
+  it('invalidates the statement-format list after CSV wizard save success', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const file = new File(['Date,Description,Amount'], 'sample.csv', { type: 'text/csv' });
+
+    vi.spyOn(statementFormatApi, 'saveCsvWizardFormat').mockResolvedValueOnce({
+      ...csvFormat,
+      id: 99,
+      displayName: 'Custom CSV',
+      scope: 'USER',
+    });
+
+    const { result } = renderHook(() => useSaveCsvWizardFormat(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        file,
+        request: {
+          displayName: 'Custom CSV',
+          bankName: 'Example Bank',
+          defaultCurrencyIsoCode: 'USD',
+          mapping: {
+            dateColumn: 'Date',
+            dateFormat: 'MM/dd/uuuu',
+            descriptionColumn: 'Description',
+            amountMode: 'SINGLE_AMOUNT_WITH_TYPE',
+            amountColumn: 'Amount',
+          },
+        },
+      });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['statement-formats'] });
   });
 });

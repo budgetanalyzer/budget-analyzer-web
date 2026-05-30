@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -15,10 +15,10 @@ describe('StatementFormatEditPage', () => {
     let requestBody: unknown;
 
     server.use(
-      http.get('/api/v1/statement-formats/:formatKey', () =>
-        HttpResponse.json({
+      http.get('/api/v1/statement-formats/:id', ({ params }) => {
+        expect(params.id).toBe('31');
+        return HttpResponse.json({
           id: 31,
-          formatKey: 'acme-csv',
           displayName: 'Acme CSV',
           formatType: 'CSV',
           bankName: 'Acme Bank',
@@ -31,15 +31,14 @@ describe('StatementFormatEditPage', () => {
           typeHeader: 'Type',
           categoryHeader: 'Category',
           enabled: true,
-        }),
-      ),
-      http.put('/api/v1/statement-formats/:formatKey', async ({ params, request }) => {
-        expect(params.formatKey).toBe('acme-csv');
+        });
+      }),
+      http.put('/api/v1/statement-formats/:id', async ({ params, request }) => {
+        expect(params.id).toBe('31');
         requestBody = await request.json();
 
         return HttpResponse.json({
           id: 31,
-          formatKey: 'acme-csv',
           displayName: 'Acme CSV Updated',
           formatType: 'CSV',
           bankName: 'Acme Credit',
@@ -58,7 +57,6 @@ describe('StatementFormatEditPage', () => {
         HttpResponse.json([
           {
             id: 31,
-            formatKey: 'acme-csv',
             displayName: 'Acme CSV Updated',
             formatType: 'CSV',
             bankName: 'Acme Credit',
@@ -69,31 +67,21 @@ describe('StatementFormatEditPage', () => {
       ),
     );
 
-    renderStatementFormatRoutes('/admin/statement-formats/acme-csv');
+    renderStatementFormatRoutes('/admin/statement-formats/31');
 
-    expect(await screen.findByDisplayValue('acme-csv')).toBeDisabled();
+    expect(await screen.findByDisplayValue('Acme CSV')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Format Type/ })).toBeDisabled();
 
-    await user.clear(screen.getByLabelText(/Display Name/));
-    await user.type(screen.getByLabelText(/Display Name/), 'Acme CSV Updated');
-    await user.clear(screen.getByLabelText(/Bank Name/));
-    await user.type(screen.getByLabelText(/Bank Name/), 'Acme Credit');
-    await user.clear(screen.getByLabelText(/Default Currency/));
-    await user.type(screen.getByLabelText(/Default Currency/), 'cad');
-    await user.clear(screen.getByLabelText(/Date Column Header/));
-    await user.type(screen.getByLabelText(/Date Column Header/), 'Posted Date');
-    await user.clear(screen.getByLabelText(/Date Format/));
-    await user.type(screen.getByLabelText(/Date Format/), 'yyyy-MM-dd');
-    await user.clear(screen.getByLabelText(/Description Column Header/));
-    await user.type(screen.getByLabelText(/Description Column Header/), 'Memo');
-    await user.clear(screen.getByLabelText(/Credit\/Amount Column Header/));
-    await user.type(screen.getByLabelText(/Credit\/Amount Column Header/), 'Amount');
-    await user.clear(screen.getByLabelText(/Debit Column Header/));
-    await user.type(screen.getByLabelText(/Debit Column Header/), 'Withdrawal');
-    await user.clear(screen.getByLabelText(/Type Column Header/));
-    await user.type(screen.getByLabelText(/Type Column Header/), 'Kind');
-    await user.clear(screen.getByLabelText(/Category Column Header/));
-    await user.type(screen.getByLabelText(/Category Column Header/), 'Class');
+    changeInput(/Display Name/, 'Acme CSV Updated');
+    changeInput(/Bank Name/, 'Acme Credit');
+    changeInput(/Default Currency/, 'cad');
+    changeInput(/Date Column Header/, 'Posted Date');
+    changeInput(/Date Format/, 'yyyy-MM-dd');
+    changeInput(/Description Column Header/, 'Memo');
+    changeInput(/Credit\/Amount Column Header/, 'Amount');
+    changeInput(/Debit Column Header/, 'Withdrawal');
+    changeInput(/Type Column Header/, 'Kind');
+    changeInput(/Category Column Header/, 'Class');
     await user.click(screen.getByRole('button', { name: /Status/ }));
     await user.click(screen.getByRole('button', { name: 'Disabled' }));
     await user.click(screen.getByRole('button', { name: 'Update Format' }));
@@ -119,7 +107,7 @@ describe('StatementFormatEditPage', () => {
 
   it('renders an inline load error when the statement format cannot be found', async () => {
     server.use(
-      http.get('/api/v1/statement-formats/:formatKey', () =>
+      http.get('/api/v1/statement-formats/:id', () =>
         HttpResponse.json(
           {
             type: 'NOT_FOUND',
@@ -130,7 +118,7 @@ describe('StatementFormatEditPage', () => {
       ),
     );
 
-    renderStatementFormatRoutes('/admin/statement-formats/missing-csv');
+    renderStatementFormatRoutes('/admin/statement-formats/404');
 
     expect(
       await screen.findByText(
@@ -145,10 +133,9 @@ describe('StatementFormatEditPage', () => {
     const user = userEvent.setup();
 
     server.use(
-      http.get('/api/v1/statement-formats/:formatKey', () =>
+      http.get('/api/v1/statement-formats/:id', () =>
         HttpResponse.json({
           id: 33,
-          formatKey: 'beta-csv',
           displayName: 'Beta CSV',
           formatType: 'CSV',
           bankName: 'Beta Bank',
@@ -159,7 +146,7 @@ describe('StatementFormatEditPage', () => {
           enabled: true,
         }),
       ),
-      http.put('/api/v1/statement-formats/:formatKey', () =>
+      http.put('/api/v1/statement-formats/:id', () =>
         HttpResponse.json(
           {
             type: 'APPLICATION_ERROR',
@@ -170,9 +157,9 @@ describe('StatementFormatEditPage', () => {
       ),
     );
 
-    renderStatementFormatRoutes('/admin/statement-formats/beta-csv');
+    renderStatementFormatRoutes('/admin/statement-formats/33');
 
-    expect(await screen.findByDisplayValue('beta-csv')).toBeDisabled();
+    expect(await screen.findByDisplayValue('Beta CSV')).toBeInTheDocument();
 
     await user.clear(screen.getByLabelText(/Bank Name/));
     await user.type(screen.getByLabelText(/Bank Name/), 'Beta Credit');
@@ -186,9 +173,15 @@ describe('StatementFormatEditPage', () => {
 function renderStatementFormatRoutes(initialPath: string) {
   return renderWithProviders(
     <Routes>
-      <Route path="/admin/statement-formats/:formatKey" element={<StatementFormatEditPage />} />
+      <Route path="/admin/statement-formats/:id" element={<StatementFormatEditPage />} />
       <Route path="/admin/statement-formats" element={<StatementFormatsListPage />} />
     </Routes>,
     { initialEntries: [initialPath], router: 'dom' },
   );
+}
+
+function changeInput(label: RegExp, value: string) {
+  fireEvent.change(screen.getByLabelText(label), {
+    target: { value },
+  });
 }

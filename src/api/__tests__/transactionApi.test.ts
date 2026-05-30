@@ -47,10 +47,14 @@ describe('transactionApi.previewTransactions', () => {
       } satisfies AxiosResponse;
     });
 
-    await transactionApi.previewTransactions(file, 'acme-csv', 'checking-123');
+    await transactionApi.previewTransactions({
+      file,
+      statementFormatId: 42,
+      accountId: 'checking-123',
+    });
 
     expect(capturedConfig?.url).toBe(
-      '/v1/transactions/preview?format=acme-csv&accountId=checking-123',
+      '/v1/transactions/preview?statementFormatId=42&accountId=checking-123',
     );
     expect(capturedConfig?.headers.getContentType()).toContain('multipart/form-data');
     expect(capturedConfig?.data).toBeInstanceOf(FormData);
@@ -79,7 +83,7 @@ describe('transactionApi.previewTransactions', () => {
     });
 
     try {
-      await transactionApi.previewTransactions(file, 'acme-csv');
+      await transactionApi.previewTransactions({ file, statementFormatId: 42 });
     } catch (error) {
       caughtError = error;
     }

@@ -11,7 +11,6 @@ import {
 import type { StatementFormat, FormatType } from '@/types/statementFormat';
 
 interface StatementFormatFormData {
-  formatKey: string;
   displayName: string;
   formatType: FormatType;
   bankName: string;
@@ -48,7 +47,6 @@ export function StatementFormatForm({
   isSubmitting,
   mode,
 }: StatementFormatFormProps) {
-  const [formatKey, setFormatKey] = useState(initialData?.formatKey || '');
   const [displayName, setDisplayName] = useState(initialData?.displayName || '');
   const [formatType, setFormatType] = useState<FormatType>(initialData?.formatType || 'CSV');
   const [bankName, setBankName] = useState(initialData?.bankName || '');
@@ -70,7 +68,6 @@ export function StatementFormatForm({
     (e: FormEvent) => {
       e.preventDefault();
       onSubmit({
-        formatKey: formatKey.trim().toLowerCase(),
         displayName: displayName.trim(),
         formatType,
         bankName: bankName.trim(),
@@ -86,7 +83,6 @@ export function StatementFormatForm({
       });
     },
     [
-      formatKey,
       displayName,
       formatType,
       bankName,
@@ -106,28 +102,6 @@ export function StatementFormatForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Format Key */}
-      <div className="space-y-2">
-        <label htmlFor="formatKey" className="text-sm font-medium">
-          Format Key *
-        </label>
-        <Input
-          id="formatKey"
-          value={formatKey}
-          onChange={(e) => setFormatKey(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-          placeholder="chase-csv"
-          maxLength={50}
-          pattern="^[a-z0-9-]+$"
-          disabled={mode === 'edit'}
-          required
-        />
-        <p className="text-xs text-muted-foreground">
-          {mode === 'edit'
-            ? 'Format key cannot be changed after creation'
-            : 'Unique identifier using lowercase letters, numbers, and hyphens only'}
-        </p>
-      </div>
-
       {/* Display Name */}
       <div className="space-y-2">
         <label htmlFor="displayName" className="text-sm font-medium">

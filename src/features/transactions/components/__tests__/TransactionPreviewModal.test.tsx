@@ -6,6 +6,7 @@ import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
 import { TransactionPreviewModal } from '@/features/transactions/components/TransactionPreviewModal';
 import type { BatchImportRequest, PreviewResponse, PreviewTransaction } from '@/types/transaction';
+import type { StatementFormat } from '@/types/statementFormat';
 import { formatTimestamp } from '@/utils/dates';
 
 const basePreviewTransaction: PreviewTransaction = {
@@ -31,7 +32,10 @@ const basePreviewData: PreviewResponse = {
   transactions: [basePreviewTransaction],
 };
 
-function renderModal(previewData: PreviewResponse = basePreviewData) {
+function renderModal(
+  previewData: PreviewResponse = basePreviewData,
+  statementFormats?: StatementFormat[],
+) {
   const onOpenChange = vi.fn();
   const onImportComplete = vi.fn();
 
@@ -40,6 +44,7 @@ function renderModal(previewData: PreviewResponse = basePreviewData) {
       isOpen
       onOpenChange={onOpenChange}
       previewData={previewData}
+      statementFormats={statementFormats}
       onImportComplete={onImportComplete}
     />,
   );
@@ -67,26 +72,38 @@ describe('TransactionPreviewModal', () => {
   it('renders the file-level reupload warning with previous import metadata', () => {
     const importedAt = '2026-05-01T12:34:56Z';
 
-    renderModal({
-      ...basePreviewData,
-      fileImport: {
-        alreadyImported: true,
-        warningCode: 'FILE_ALREADY_IMPORTED',
-        previousImport: {
-          originalFilename: 'previous-statement.csv',
-          importedAt,
-          format: 'capital-one',
-          accountId: 'checking-123',
-          transactionCount: 42,
+    renderModal(
+      {
+        ...basePreviewData,
+        fileImport: {
+          alreadyImported: true,
+          warningCode: 'FILE_ALREADY_IMPORTED',
+          previousImport: {
+            originalFilename: 'previous-statement.csv',
+            importedAt,
+            statementFormatId: 7,
+            accountId: 'checking-123',
+            transactionCount: 42,
+          },
         },
       },
-    });
+      [
+        {
+          id: 7,
+          displayName: 'Capital One CSV',
+          formatType: 'CSV',
+          bankName: 'Capital One',
+          defaultCurrencyIsoCode: 'USD',
+          enabled: true,
+        },
+      ],
+    );
 
     const warning = screen.getByRole('alert');
     expect(warning).toHaveTextContent('This uploaded file has already been imported.');
     expect(warning).toHaveTextContent('previous-statement.csv');
     expect(warning).toHaveTextContent(formatTimestamp(importedAt));
-    expect(warning).toHaveTextContent('capital-one');
+    expect(warning).toHaveTextContent('Capital One CSV');
     expect(warning).toHaveTextContent('checking-123');
     expect(warning).toHaveTextContent('42');
   });

@@ -8,7 +8,6 @@ describe('StatementFormatForm', () => {
   it('applies the OpenAPI-backed constraints for creating a CSV statement format', () => {
     render(<StatementFormatForm onSubmit={vi.fn()} isSubmitting={false} mode="create" />);
 
-    const formatKeyInput = screen.getByLabelText(/Format Key/);
     const displayNameInput = screen.getByLabelText(/Display Name/);
     const bankNameInput = screen.getByLabelText(/Bank Name/);
     const currencyInput = screen.getByLabelText(/Default Currency/);
@@ -20,9 +19,7 @@ describe('StatementFormatForm', () => {
     const typeHeaderInput = screen.getByLabelText(/Type Column Header/);
     const categoryHeaderInput = screen.getByLabelText(/Category Column Header/);
 
-    expect(formatKeyInput).toHaveAttribute('required');
-    expect(formatKeyInput).toHaveAttribute('maxLength', '50');
-    expect(formatKeyInput).toHaveAttribute('pattern', '^[a-z0-9-]+$');
+    expect(screen.queryByLabelText(/Format Key/)).not.toBeInTheDocument();
     expect(displayNameInput).toHaveAttribute('required');
     expect(displayNameInput).toHaveAttribute('maxLength', '100');
     expect(bankNameInput).toHaveAttribute('required');
@@ -49,7 +46,6 @@ describe('StatementFormatForm', () => {
 
     render(<StatementFormatForm onSubmit={onSubmit} isSubmitting={false} mode="create" />);
 
-    await user.type(screen.getByLabelText(/Format Key/), 'Acme_CSV!');
     await user.type(screen.getByLabelText(/Display Name/), '  Acme CSV  ');
     await user.type(screen.getByLabelText(/Bank Name/), '  Acme Bank  ');
     await user.type(screen.getByLabelText(/Default Currency/), 'usd');
@@ -63,7 +59,6 @@ describe('StatementFormatForm', () => {
     await user.click(screen.getByRole('button', { name: 'Create Format' }));
 
     expect(onSubmit).toHaveBeenCalledWith({
-      formatKey: 'acmecsv',
       displayName: 'Acme CSV',
       formatType: 'CSV',
       bankName: 'Acme Bank',
@@ -85,7 +80,6 @@ describe('StatementFormatForm', () => {
 
     render(<StatementFormatForm onSubmit={onSubmit} isSubmitting={false} mode="create" />);
 
-    await user.type(screen.getByLabelText(/Format Key/), 'statement-pdf');
     await user.type(screen.getByLabelText(/Display Name/), 'Statement PDF');
     await user.click(screen.getByRole('button', { name: /Format Type/ }));
     await user.click(screen.getByRole('button', { name: 'PDF' }));
@@ -97,7 +91,6 @@ describe('StatementFormatForm', () => {
     await user.click(screen.getByRole('button', { name: 'Create Format' }));
 
     expect(onSubmit).toHaveBeenCalledWith({
-      formatKey: 'statement-pdf',
       displayName: 'Statement PDF',
       formatType: 'PDF',
       bankName: 'Acme Bank',
@@ -121,7 +114,6 @@ describe('StatementFormatForm', () => {
       <StatementFormatForm
         initialData={{
           id: 7,
-          formatKey: 'acme-csv',
           displayName: 'Acme CSV',
           formatType: 'CSV',
           bankName: 'Acme Bank',
@@ -141,8 +133,7 @@ describe('StatementFormatForm', () => {
       />,
     );
 
-    expect(screen.getByLabelText(/Format Key/)).toHaveValue('acme-csv');
-    expect(screen.getByLabelText(/Format Key/)).toBeDisabled();
+    expect(screen.queryByLabelText(/Format Key/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Format Type/ })).toBeDisabled();
 
     await user.clear(screen.getByLabelText(/Display Name/));
@@ -154,7 +145,6 @@ describe('StatementFormatForm', () => {
     await user.click(screen.getByRole('button', { name: 'Update Format' }));
 
     expect(onSubmit).toHaveBeenCalledWith({
-      formatKey: 'acme-csv',
       displayName: 'Acme CSV Updated',
       formatType: 'CSV',
       bankName: 'Acme Credit',

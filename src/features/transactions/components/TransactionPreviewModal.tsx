@@ -17,6 +17,7 @@ import {
   PreviewResponse,
   PreviewTransaction,
 } from '@/types/transaction';
+import type { StatementFormat } from '@/types/statementFormat';
 import type {
   EditablePreviewTransaction,
   EditablePreviewTransactionField,
@@ -30,6 +31,7 @@ interface TransactionPreviewModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   previewData: PreviewResponse | null;
+  statementFormats?: StatementFormat[];
   onImportComplete: (
     created: number,
     duplicatesSkipped: number,
@@ -114,6 +116,7 @@ export function TransactionPreviewModal({
   isOpen,
   onOpenChange,
   previewData,
+  statementFormats,
   onImportComplete,
 }: TransactionPreviewModalProps) {
   const [transactions, setTransactions] = useState<EditablePreviewTransaction[]>([]);
@@ -229,7 +232,12 @@ export function TransactionPreviewModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
-          {previewData && <PreviewFileImportWarningBanner fileImport={previewData.fileImport} />}
+          {previewData && (
+            <PreviewFileImportWarningBanner
+              fileImport={previewData.fileImport}
+              statementFormats={statementFormats}
+            />
+          )}
           <div className="flex-1 overflow-y-auto">
             <PreviewTable
               transactions={transactions}

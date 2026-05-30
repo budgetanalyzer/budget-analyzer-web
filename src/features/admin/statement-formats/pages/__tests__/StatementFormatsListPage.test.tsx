@@ -18,7 +18,6 @@ const mockUseStatementFormats = vi.mocked(useStatementFormats);
 const formats: StatementFormat[] = [
   {
     id: 1,
-    formatKey: 'acme-csv',
     displayName: 'Acme CSV',
     formatType: 'CSV',
     bankName: 'Acme Bank',
@@ -27,7 +26,6 @@ const formats: StatementFormat[] = [
   },
   {
     id: 2,
-    formatKey: 'beta-csv',
     displayName: 'Beta CSV',
     formatType: 'CSV',
     bankName: 'Beta Bank',
