@@ -32,11 +32,11 @@ export const statementFormatApi = {
   },
 
   /**
-   * Get a single statement format by key
-   * GET /v1/statement-formats/{formatKey}
+   * Get a single statement format by ID
+   * GET /v1/statement-formats/{id}
    */
-  getFormat: async (formatKey: string): Promise<StatementFormat> => {
-    const response = await apiClient.get<StatementFormat>(`/v1/statement-formats/${formatKey}`);
+  getFormat: async (id: number): Promise<StatementFormat> => {
+    const response = await apiClient.get<StatementFormat>(`/v1/statement-formats/${id}`);
     return response.data;
   },
 
@@ -51,16 +51,13 @@ export const statementFormatApi = {
 
   /**
    * Update an existing statement format
-   * PUT /v1/statement-formats/{formatKey}
+   * PUT /v1/statement-formats/{id}
    */
   updateFormat: async (
-    formatKey: string,
+    id: number,
     data: UpdateStatementFormatRequest,
   ): Promise<StatementFormat> => {
-    const response = await apiClient.put<StatementFormat>(
-      `/v1/statement-formats/${formatKey}`,
-      data,
-    );
+    const response = await apiClient.put<StatementFormat>(`/v1/statement-formats/${id}`, data);
     return response.data;
   },
 

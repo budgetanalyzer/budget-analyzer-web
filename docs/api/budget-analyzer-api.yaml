@@ -2999,8 +2999,8 @@ components:
           minLength: 1
         accountId:
           type: string
-          description: Account identifier. Null and empty values are equivalent for
-            duplicate detection.
+          description: Account identifier. This value is included in the preview row
+            but is not used for duplicate detection.
           example: checking-12345
         duplicate:
           type: boolean
@@ -3153,8 +3153,8 @@ components:
           minLength: 1
         accountId:
           type: string
-          description: Account identifier. Null and empty values are equivalent for
-            duplicate detection.
+          description: Account identifier. This value is stored with the transaction
+            but is not used for duplicate detection.
           example: checking-12345
         allowDuplicate:
           type: boolean

@@ -14,7 +14,6 @@ import type {
 
 const csvFormat: StatementFormat = {
   id: 1,
-  formatKey: 'capital-one-csv',
   displayName: 'Capital One CSV',
   formatType: 'CSV',
   bankName: 'Capital One',
@@ -50,26 +49,25 @@ describe('statementFormatApi', () => {
     expect(response).toEqual([csvFormat]);
   });
 
-  it('requests a statement format by format key', async () => {
+  it('requests a statement format by ID', async () => {
     let capturedUrl: URL | undefined;
 
     server.use(
-      http.get('/api/v1/statement-formats/:formatKey', ({ request, params }) => {
+      http.get('/api/v1/statement-formats/:id', ({ request, params }) => {
         capturedUrl = new URL(request.url);
-        expect(params.formatKey).toBe('capital-one-csv');
+        expect(params.id).toBe('1');
         return HttpResponse.json(csvFormat);
       }),
     );
 
-    const response = await statementFormatApi.getFormat('capital-one-csv');
+    const response = await statementFormatApi.getFormat(1);
 
-    expect(capturedUrl?.pathname).toBe('/api/v1/statement-formats/capital-one-csv');
-    expect(response.formatKey).toBe('capital-one-csv');
+    expect(capturedUrl?.pathname).toBe('/api/v1/statement-formats/1');
+    expect(response.id).toBe(1);
   });
 
   it('posts create payloads and puts update payloads to the format resource', async () => {
     const createRequest: CreateStatementFormatRequest = {
-      formatKey: 'amex-csv',
       displayName: 'Amex CSV',
       formatType: 'CSV',
       bankName: 'Amex',
@@ -92,8 +90,8 @@ describe('statementFormatApi', () => {
         capturedBodies.push(await request.json());
         return HttpResponse.json({ ...csvFormat, ...createRequest, id: 2 });
       }),
-      http.put('/api/v1/statement-formats/:formatKey', async ({ request, params }) => {
-        expect(params.formatKey).toBe('amex-csv');
+      http.put('/api/v1/statement-formats/:id', async ({ request, params }) => {
+        expect(params.id).toBe('2');
         capturedMethods.push(request.method);
         capturedBodies.push(await request.json());
         return HttpResponse.json({ ...csvFormat, ...createRequest, ...updateRequest, id: 2 });
@@ -101,7 +99,7 @@ describe('statementFormatApi', () => {
     );
 
     await statementFormatApi.createFormat(createRequest);
-    await statementFormatApi.updateFormat('amex-csv', updateRequest);
+    await statementFormatApi.updateFormat(2, updateRequest);
 
     expect(capturedMethods).toEqual(['POST', 'PUT']);
     expect(capturedBodies).toEqual([createRequest, updateRequest]);

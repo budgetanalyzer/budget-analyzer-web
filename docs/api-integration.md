@@ -114,7 +114,7 @@ The import format dropdown is populated from `GET /api/v1/statement-formats`.
 The UI shows enabled formats whose default currency is available, sorted by
 API-provided `displayName`, disambiguates duplicate visible names with `System`
 or `Custom`, and submits the selected `id` as the `statementFormatId` query
-parameter. The dropdown also exposes `Create new statement format`, which opens
+parameter. The dropdown also exposes `New format`, which opens
 the user CSV statement-format wizard entry point without submitting the sentinel
 option to the preview API. After the wizard saves a format, the import controls
 stay open, the existing account ID is preserved, the saved format is selected by
@@ -132,7 +132,10 @@ The preview response includes:
 - `fileImport` — file-level re-import status for the current user and uploaded bytes.
 - `transactions[].duplicate` and `transactions[].duplicateReason` — advisory row-level duplicate metadata.
 
-`fileImport.alreadyImported` means the exact uploaded file was imported before. The UI shows previous import metadata from `fileImport.previousImport` but does not block the batch import action.
+`fileImport.alreadyImported` means the exact uploaded file was imported before.
+The UI shows previous import metadata from `fileImport.previousImport`, resolves
+`previousImport.statementFormatId` to a visible format label when the format is
+loaded, and does not block the batch import action.
 
 Duplicate reasons map to UI labels:
 

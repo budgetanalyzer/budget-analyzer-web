@@ -1,19 +1,30 @@
 import { AlertTriangle } from 'lucide-react';
 import type { PreviewFileImportStatusResponse } from '@/types/transaction';
+import type { StatementFormat } from '@/types/statementFormat';
 import { formatTimestamp } from '@/utils/dates';
 
 interface PreviewFileImportWarningBannerProps {
   fileImport: PreviewFileImportStatusResponse;
+  statementFormats?: StatementFormat[];
 }
 
 export function PreviewFileImportWarningBanner({
   fileImport,
+  statementFormats,
 }: PreviewFileImportWarningBannerProps) {
   if (!fileImport.alreadyImported) {
     return null;
   }
 
   const previousImport = fileImport.previousImport;
+  const previousImportFormat = previousImport
+    ? statementFormats?.find((format) => format.id === previousImport.statementFormatId)
+    : undefined;
+  const formatLabel = previousImportFormat
+    ? previousImportFormat.displayName
+    : previousImport
+      ? `ID ${previousImport.statementFormatId}`
+      : null;
 
   return (
     <div
@@ -38,7 +49,7 @@ export function PreviewFileImportWarningBanner({
               </div>
               <div>
                 <dt className="font-medium text-foreground">Format</dt>
-                <dd>{previousImport.format}</dd>
+                <dd>{formatLabel}</dd>
               </div>
               {previousImport.accountId && (
                 <div>

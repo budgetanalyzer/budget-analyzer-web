@@ -5,7 +5,6 @@ export type StatementFormatScope = 'SYSTEM' | 'USER';
 
 export interface StatementFormat {
   id: number;
-  formatKey?: string;
   displayName: string;
   formatType: FormatType;
   bankName: string;
@@ -27,7 +26,6 @@ export interface StatementFormat {
 }
 
 export interface CreateStatementFormatRequest {
-  formatKey?: string;
   displayName: string;
   formatType: FormatType;
   bankName: string;

@@ -15,14 +15,17 @@ vi.mock('@/components/statement-formats/csv-wizard/CsvStatementFormatWizardDialo
   CsvStatementFormatWizardDialog: ({
     open,
     onOpenChange,
+    initialAccountId,
     onSaved,
   }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    initialAccountId?: string;
     onSaved: (format: StatementFormat) => void;
   }) =>
     open ? (
       <div role="dialog" aria-label="Create statement format">
+        <div>Initial account ID: {initialAccountId ?? ''}</div>
         <button type="button" onClick={() => onOpenChange(false)}>
           Cancel wizard
         </button>
@@ -77,7 +80,6 @@ const previewResponse: PreviewResponse = {
 const defaultFormats: StatementFormat[] = [
   {
     id: 1,
-    formatKey: 'acme-csv',
     displayName: 'Acme Checking CSV',
     formatType: 'CSV',
     bankName: 'Acme Bank',
@@ -87,7 +89,6 @@ const defaultFormats: StatementFormat[] = [
   },
   {
     id: 2,
-    formatKey: 'disabled-csv',
     displayName: 'Disabled CSV',
     formatType: 'CSV',
     bankName: 'Disabled Bank',
@@ -264,6 +265,9 @@ describe('ImportButton', () => {
     await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
     await user.type(screen.getByPlaceholderText('Account ID (optional)'), 'checking-789');
     await user.click(screen.getByRole('button', { name: 'New format' }));
+
+    expect(screen.getByText('Initial account ID: checking-789')).toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: 'Save wizard format' }));
 
     expect(

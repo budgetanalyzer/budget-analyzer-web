@@ -91,6 +91,14 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     );
   }, [enabledFormats]);
 
+  const importHistoryStatementFormats = useMemo(() => {
+    const formats = Array.isArray(statementFormats) ? [...statementFormats] : [];
+    if (savedStatementFormat && !formats.some((f) => f.id === savedStatementFormat.id)) {
+      formats.push(savedStatementFormat);
+    }
+    return formats;
+  }, [statementFormats, savedStatementFormat]);
+
   const getFormatSourceLabel = useCallback((statementFormat: StatementFormat) => {
     if (statementFormat.scope === 'USER') return 'Custom';
     if (statementFormat.scope === 'SYSTEM') return 'System';
@@ -386,14 +394,17 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
         isOpen={previewModal.isOpen}
         onOpenChange={handlePreviewModalOpenChange}
         previewData={previewModal.previewData}
+        statementFormats={importHistoryStatementFormats}
         onImportComplete={handlePreviewImportComplete}
       />
-      <CsvStatementFormatWizardDialog
-        open={isCsvWizardOpen}
-        onOpenChange={setIsCsvWizardOpen}
-        initialAccountId={accountId || undefined}
-        onSaved={handleCsvWizardSaved}
-      />
+      {isCsvWizardOpen && (
+        <CsvStatementFormatWizardDialog
+          open={isCsvWizardOpen}
+          onOpenChange={setIsCsvWizardOpen}
+          initialAccountId={accountId || undefined}
+          onSaved={handleCsvWizardSaved}
+        />
+      )}
     </>
   );
 }
