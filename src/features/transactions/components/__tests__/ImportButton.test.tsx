@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImportButton } from '@/features/transactions/components/ImportButton';
 import { usePreviewTransactions } from '@/features/transactions/hooks/usePreviewTransactions';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
 import type { PreviewResponse } from '@/types/transaction';
@@ -11,6 +12,7 @@ import { ApiError } from '@/types/apiError';
 import type { StatementFormat } from '@/types/statementFormat';
 
 vi.mock('@/features/transactions/hooks/usePreviewTransactions');
+vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/components/statement-formats/StatementFormatWizardDialog', () => ({
   StatementFormatWizardDialog: ({
     open,
@@ -66,6 +68,7 @@ vi.mock('@/components/statement-formats/StatementFormatWizardDialog', () => ({
 }));
 
 const mockUsePreviewTransactions = vi.mocked(usePreviewTransactions);
+const mockUsePermission = vi.mocked(usePermission);
 type PreviewMutate = ReturnType<typeof usePreviewTransactions>['mutate'];
 type PreviewVariables = Parameters<PreviewMutate>[0];
 type PreviewMutateOptions = Parameters<PreviewMutate>[1];
@@ -144,6 +147,8 @@ async function expandImportForm(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   mockUsePreviewTransactions.mockReset();
+  mockUsePermission.mockReset();
+  mockUsePermission.mockReturnValue(true);
   mockPreviewMutation();
 });
 
@@ -262,6 +267,33 @@ describe('ImportButton', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Preview Transactions/ })).toBeDisabled();
     expect(previewMutate).not.toHaveBeenCalled();
+  });
+
+  it('shows the new-format button when the user can write statement formats', async () => {
+    const user = userEvent.setup();
+
+    useReferenceDataHandlers();
+
+    renderWithProviders(<ImportButton />);
+
+    await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
+
+    expect(screen.getByRole('button', { name: 'New format' })).toBeInTheDocument();
+    expect(mockUsePermission).toHaveBeenCalledWith('statementformats:write');
+  });
+
+  it('hides the new-format button when the user cannot write statement formats', async () => {
+    const user = userEvent.setup();
+
+    mockUsePermission.mockReturnValue(false);
+    useReferenceDataHandlers();
+
+    renderWithProviders(<ImportButton />);
+
+    await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
+
+    expect(screen.queryByRole('button', { name: 'New format' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Preview Transactions/ })).toBeDisabled();
   });
 
   it('selects a saved wizard format and submits its statement format ID', async () => {

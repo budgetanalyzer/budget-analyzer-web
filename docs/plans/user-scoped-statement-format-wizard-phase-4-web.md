@@ -1,6 +1,6 @@
 # User-Scoped Statement Format Wizard: Phase 4 Web Plan
 
-**Status:** Draft
+**Status:** Implemented
 **Scope:** budget-analyzer-web
 **Upstream plan:** `/workspace/transaction-service/docs/plans/user-scoped-statement-format-wizard.md`
 **Phase covered:** Phase 4, steps 10-13

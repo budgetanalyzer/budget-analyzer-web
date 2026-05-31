@@ -19,6 +19,7 @@ import { PreviewResponse } from '@/types/transaction';
 import { useStatementFormats } from '@/hooks/useStatementFormats';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { StatementFormatWizardDialog } from '@/components/statement-formats/StatementFormatWizardDialog';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 import type { StatementFormat } from '@/types/statementFormat';
 
 interface ImportButtonProps {
@@ -41,6 +42,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     isError: isFormatsError,
   } = useStatementFormats();
   const { data: enabledCurrencies } = useCurrencies(true);
+  const canCreateStatementFormats = usePermission('statementformats:write');
   const [isExpanded, setIsExpandedState] = useState(false);
   const [isStatementFormatWizardOpen, setIsStatementFormatWizardOpen] = useState(false);
 
@@ -313,16 +315,18 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
                     </SelectContent>
                   </Select>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="default"
-                    onClick={handleOpenStatementFormatWizard}
-                    className="whitespace-nowrap"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    New format
-                  </Button>
+                  {canCreateStatementFormats ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="default"
+                      onClick={handleOpenStatementFormatWizard}
+                      className="whitespace-nowrap"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      New format
+                    </Button>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center gap-2 overflow-hidden">

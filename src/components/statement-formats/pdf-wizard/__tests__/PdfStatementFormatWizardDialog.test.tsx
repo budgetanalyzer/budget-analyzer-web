@@ -138,6 +138,12 @@ function mockHookDefaults(
   return mockWizardMutations(analysis, preview);
 }
 
+async function analyzeAndOpenMapping(user: ReturnType<typeof userEvent.setup>, file: File) {
+  await user.upload(screen.getByLabelText('PDF sample file'), file);
+  await user.click(screen.getByRole('button', { name: /Analyze PDF/ }));
+  await user.click(await screen.findByRole('button', { name: /Continue Mapping/ }));
+}
+
 describe('PdfStatementFormatWizardDialog', () => {
   it('analyzes a sample, reviews a candidate, previews a read-only parse, and saves the created format', async () => {
     const user = userEvent.setup();
@@ -324,6 +330,300 @@ describe('PdfStatementFormatWizardDialog', () => {
       screen.getByText('Choose how negative amounts should be treated before previewing.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Preview Mapping/ })).toBeDisabled();
+  });
+
+  it('sends debit and credit headers after switching away from signed amount mode', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+    const { previewMutate } = mockHookDefaults({
+      candidates: [
+        {
+          ...analysisResponse.candidates![0],
+          headers: ['Date', 'Memo', 'Amount', 'Debit', 'Credit'],
+          sampleRows: [['05/01', 'Coffee', '-4.50', '4.50', '']],
+          inferredMapping: {
+            dateHeader: 'Date',
+            dateFormat: 'MM/dd',
+            descriptionHeader: 'Memo',
+            amountMode: 'SIGNED_AMOUNT',
+            amountHeader: 'Amount',
+            debitHeader: 'Debit',
+            creditHeader: 'Credit',
+            negativeMeans: 'CREDIT',
+          },
+        },
+      ],
+    });
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await analyzeAndOpenMapping(user, file);
+    await user.type(screen.getByLabelText('Display name'), 'Custom Checking PDF');
+    await user.type(screen.getByLabelText('Bank name'), 'Example Bank');
+    await user.clear(screen.getByLabelText('Date format'));
+    await user.type(screen.getByLabelText('Date format'), 'MM/dd/uuuu');
+    await user.click(screen.getByRole('button', { name: 'Debit and credit columns' }));
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+
+    expect(previewMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: expect.objectContaining({
+          mapping: {
+            dateHeader: 'Date',
+            dateFormat: 'MM/dd/uuuu',
+            descriptionHeader: 'Memo',
+            amountMode: 'DEBIT_CREDIT_COLUMNS',
+            typeHeader: undefined,
+            debitHeader: 'Debit',
+            creditHeader: 'Credit',
+          },
+        }),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('renders negative-direction field errors beside the direction question', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+    const previewError = new ApiError(422, {
+      type: 'VALIDATION_ERROR',
+      message: 'Fix the highlighted fields.',
+      fieldErrors: [
+        {
+          field: 'mapping.negativeMeans',
+          message: 'Choose how negative values should be interpreted.',
+        },
+      ],
+    });
+    const analyzeMutate = vi.fn(
+      (uploadedFile: Parameters<AnalyzeMutate>[0], options?: Parameters<AnalyzeMutate>[1]) => {
+        options?.onSuccess?.(analysisResponse, uploadedFile, undefined, undefined as never);
+      },
+    ) as AnalyzeMutate;
+    const previewMutate = vi.fn(
+      (variables: Parameters<PreviewMutate>[0], options?: Parameters<PreviewMutate>[1]) => {
+        options?.onError?.(previewError, variables, undefined, undefined as never);
+      },
+    ) as PreviewMutate;
+
+    mockCurrencies();
+    mockUseAnalyzePdfWizardSample.mockReturnValue({
+      mutate: analyzeMutate,
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useAnalyzePdfWizardSample>);
+    mockUsePreviewPdfWizardMapping.mockReturnValue({
+      mutate: previewMutate,
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof usePreviewPdfWizardMapping>);
+    mockUseSavePdfWizardFormat.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useSavePdfWizardFormat>);
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await analyzeAndOpenMapping(user, file);
+    await user.type(screen.getByLabelText('Display name'), 'Custom Checking PDF');
+    await user.type(screen.getByLabelText('Bank name'), 'Example Bank');
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+
+    expect(
+      await screen.findByText('Choose how negative values should be interpreted.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Preview Mapping/ })).toBeInTheDocument();
+  });
+
+  it('returns to mapping and renders field errors when save validation fails', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+    const saveError = new ApiError(422, {
+      type: 'VALIDATION_ERROR',
+      message: 'Fix the highlighted fields.',
+      fieldErrors: [{ field: 'displayName', message: 'Display name is already in use.' }],
+    });
+    const analyzeMutate = vi.fn(
+      (uploadedFile: Parameters<AnalyzeMutate>[0], options?: Parameters<AnalyzeMutate>[1]) => {
+        options?.onSuccess?.(analysisResponse, uploadedFile, undefined, undefined as never);
+      },
+    ) as AnalyzeMutate;
+    const previewMutate = vi.fn(
+      (variables: Parameters<PreviewMutate>[0], options?: Parameters<PreviewMutate>[1]) => {
+        options?.onSuccess?.(previewResponse, variables, undefined, undefined as never);
+      },
+    ) as PreviewMutate;
+    const saveMutate = vi.fn(
+      (variables: Parameters<SaveMutate>[0], options?: Parameters<SaveMutate>[1]) => {
+        options?.onError?.(saveError, variables, undefined, undefined as never);
+      },
+    ) as SaveMutate;
+
+    mockCurrencies();
+    mockUseAnalyzePdfWizardSample.mockReturnValue({
+      mutate: analyzeMutate,
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useAnalyzePdfWizardSample>);
+    mockUsePreviewPdfWizardMapping.mockReturnValue({
+      mutate: previewMutate,
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof usePreviewPdfWizardMapping>);
+    mockUseSavePdfWizardFormat.mockReturnValue({
+      mutate: saveMutate,
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useSavePdfWizardFormat>);
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await analyzeAndOpenMapping(user, file);
+    await user.type(screen.getByLabelText('Display name'), 'Custom Checking PDF');
+    await user.type(screen.getByLabelText('Bank name'), 'Example Bank');
+    await user.click(screen.getByRole('button', { name: 'Negative means money spent' }));
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+    await screen.findByText('Review the parsed rows before saving.');
+    await user.click(screen.getByRole('button', { name: /Save Format/ }));
+
+    expect(await screen.findByLabelText('Display name')).toBeInTheDocument();
+    expect(screen.getByText('Display name is already in use.')).toBeInTheDocument();
+  });
+
+  it('does not render PDF candidate parser internals', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+
+    mockHookDefaults({
+      candidates: [
+        {
+          ...analysisResponse.candidates![0],
+          candidateId: 'candidate-secret-42',
+          startLineNumber: 9881,
+          endLineNumber: 9889,
+        },
+      ],
+    });
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await user.upload(screen.getByLabelText('PDF sample file'), file);
+    await user.click(screen.getByRole('button', { name: /Analyze PDF/ }));
+    await screen.findByRole('button', { name: /Best match/ });
+
+    expect(screen.queryByText('candidate-secret-42')).not.toBeInTheDocument();
+    expect(screen.queryByText('9881')).not.toBeInTheDocument();
+    expect(screen.queryByText('9889')).not.toBeInTheDocument();
+    expect(screen.queryByText(/regex/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/anchor/i)).not.toBeInTheDocument();
+  });
+
+  it('retries preview with the current file and edited mapping after an API error', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+    const previewError = new ApiError(422, {
+      type: 'VALIDATION_ERROR',
+      message: 'Unable to preview mapping.',
+    });
+    let previewCallCount = 0;
+    const analyzeMutate = vi.fn(
+      (uploadedFile: Parameters<AnalyzeMutate>[0], options?: Parameters<AnalyzeMutate>[1]) => {
+        options?.onSuccess?.(analysisResponse, uploadedFile, undefined, undefined as never);
+      },
+    ) as AnalyzeMutate;
+    const previewMutate = vi.fn(
+      (variables: Parameters<PreviewMutate>[0], options?: Parameters<PreviewMutate>[1]) => {
+        previewCallCount += 1;
+
+        if (previewCallCount === 1) {
+          options?.onError?.(previewError, variables, undefined, undefined as never);
+          return;
+        }
+
+        options?.onSuccess?.(previewResponse, variables, undefined, undefined as never);
+      },
+    ) as PreviewMutate;
+
+    mockCurrencies();
+    mockUseAnalyzePdfWizardSample.mockReturnValue({
+      mutate: analyzeMutate,
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useAnalyzePdfWizardSample>);
+    mockUsePreviewPdfWizardMapping.mockReturnValue({
+      mutate: previewMutate,
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof usePreviewPdfWizardMapping>);
+    mockUseSavePdfWizardFormat.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useSavePdfWizardFormat>);
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await analyzeAndOpenMapping(user, file);
+    await user.type(screen.getByLabelText('Display name'), 'Custom Checking PDF');
+    await user.type(screen.getByLabelText('Bank name'), 'Example Bank');
+    await user.click(screen.getByRole('button', { name: 'Negative means money spent' }));
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+
+    expect(await screen.findByText('Unable to preview mapping.')).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText('Date format'));
+    await user.type(screen.getByLabelText('Date format'), 'MM/dd/uuuu');
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+
+    expect(await screen.findByText('Review the parsed rows before saving.')).toBeInTheDocument();
+    expect(previewMutate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        file,
+        request: expect.objectContaining({
+          mapping: expect.objectContaining({
+            dateFormat: 'MM/dd/uuuu',
+          }),
+        }),
+      }),
+      expect.any(Object),
+    );
   });
 
   it('hides parser-internal PDF preview diagnostics', async () => {
