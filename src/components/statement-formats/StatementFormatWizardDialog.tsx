@@ -86,6 +86,15 @@ export function StatementFormatWizardDialog({
     handleDialogOpenChange(false);
   }, [handleDialogOpenChange]);
 
+  const handleSaved = useCallback(
+    (format: StatementFormat) => {
+      resetState();
+      onSaved(format);
+      onOpenChange(false);
+    },
+    [onOpenChange, onSaved, resetState],
+  );
+
   if (branch === 'csv') {
     return (
       <CsvStatementFormatWizardDialog
@@ -93,7 +102,7 @@ export function StatementFormatWizardDialog({
         onOpenChange={handleDialogOpenChange}
         initialFile={sampleFile ?? undefined}
         initialAccountId={initialAccountId}
-        onSaved={onSaved}
+        onSaved={handleSaved}
       />
     );
   }
@@ -105,7 +114,7 @@ export function StatementFormatWizardDialog({
         onOpenChange={handleDialogOpenChange}
         initialFile={sampleFile ?? undefined}
         initialAccountId={initialAccountId}
-        onSaved={onSaved}
+        onSaved={handleSaved}
       />
     );
   }
