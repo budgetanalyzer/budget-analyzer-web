@@ -9,6 +9,7 @@ import {
 } from '@/components/statement-formats/pdf-wizard/hooks/usePdfStatementFormatWizard';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { renderWithProviders } from '@/testing/test-utils';
+import { ApiError } from '@/types/apiError';
 import type {
   PdfWizardAnalysisResponse,
   PdfWizardPreviewResponse,
@@ -90,7 +91,10 @@ function mockCurrencies() {
   } as unknown as ReturnType<typeof useCurrencies>);
 }
 
-function mockWizardMutations(analysis: PdfWizardAnalysisResponse = analysisResponse) {
+function mockWizardMutations(
+  analysis: PdfWizardAnalysisResponse = analysisResponse,
+  preview: PdfWizardPreviewResponse = previewResponse,
+) {
   const analyzeMutate = vi.fn(
     (file: Parameters<AnalyzeMutate>[0], options?: Parameters<AnalyzeMutate>[1]) => {
       options?.onSuccess?.(analysis, file, undefined, undefined as never);
@@ -98,7 +102,7 @@ function mockWizardMutations(analysis: PdfWizardAnalysisResponse = analysisRespo
   ) as AnalyzeMutate;
   const previewMutate = vi.fn(
     (variables: Parameters<PreviewMutate>[0], options?: Parameters<PreviewMutate>[1]) => {
-      options?.onSuccess?.(previewResponse, variables, undefined, undefined as never);
+      options?.onSuccess?.(preview, variables, undefined, undefined as never);
     },
   ) as PreviewMutate;
   const saveMutate = vi.fn(
@@ -126,9 +130,12 @@ function mockWizardMutations(analysis: PdfWizardAnalysisResponse = analysisRespo
   return { previewMutate };
 }
 
-function mockHookDefaults(analysis?: PdfWizardAnalysisResponse) {
+function mockHookDefaults(
+  analysis?: PdfWizardAnalysisResponse,
+  preview?: PdfWizardPreviewResponse,
+) {
   mockCurrencies();
-  return mockWizardMutations(analysis);
+  return mockWizardMutations(analysis, preview);
 }
 
 describe('PdfStatementFormatWizardDialog', () => {
@@ -220,5 +227,135 @@ describe('PdfStatementFormatWizardDialog', () => {
     expect(screen.getByText('This PDF has no selectable text.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Preview Mapping/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Save Format/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Choose another file/ }));
+
+    expect(screen.getByLabelText('PDF sample file')).toBeInTheDocument();
+    expect(screen.queryByText('Selected file: scan.pdf')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Analyze PDF/ })).toBeDisabled();
+  });
+
+  it('renders scanned PDF analyze errors as unsupported file guidance', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'scan.pdf', { type: 'application/pdf' });
+    const analyzeError = new ApiError(422, {
+      type: 'APPLICATION_ERROR',
+      code: 'PDF_PARSING_ERROR',
+      message:
+        'PDF does not contain enough extractable text. Scanned or OCR-dependent PDFs are not supported.',
+    });
+    const analyzeMutate = vi.fn(
+      (uploadedFile: Parameters<AnalyzeMutate>[0], options?: Parameters<AnalyzeMutate>[1]) => {
+        options?.onError?.(analyzeError, uploadedFile, undefined, undefined as never);
+      },
+    ) as AnalyzeMutate;
+
+    mockCurrencies();
+    mockUseAnalyzePdfWizardSample.mockReturnValue({
+      mutate: analyzeMutate,
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useAnalyzePdfWizardSample>);
+    mockUsePreviewPdfWizardMapping.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof usePreviewPdfWizardMapping>);
+    mockUseSavePdfWizardFormat.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useSavePdfWizardFormat>);
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await user.upload(screen.getByLabelText('PDF sample file'), file);
+    await user.click(screen.getByRole('button', { name: /Analyze PDF/ }));
+
+    expect(
+      await screen.findByText('This PDF cannot be used to create a format'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/This PDF appears to be scanned/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Choose another file/ })).toBeInTheDocument();
+  });
+
+  it('requires an explicit negative amount direction when inference omits it', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+
+    mockHookDefaults({
+      candidates: [
+        {
+          ...analysisResponse.candidates![0],
+          inferredMapping: {
+            dateHeader: 'Date',
+            dateFormat: 'MM/dd',
+            descriptionHeader: 'Memo',
+            amountMode: 'SIGNED_AMOUNT',
+            amountHeader: 'Amount',
+          },
+        },
+      ],
+    });
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await user.upload(screen.getByLabelText('PDF sample file'), file);
+    await user.click(screen.getByRole('button', { name: /Analyze PDF/ }));
+    await user.click(await screen.findByRole('button', { name: /Continue Mapping/ }));
+    await user.type(screen.getByLabelText('Display name'), 'Custom Checking PDF');
+    await user.type(screen.getByLabelText('Bank name'), 'Example Bank');
+
+    expect(
+      screen.getByText('Choose how negative amounts should be treated before previewing.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Preview Mapping/ })).toBeDisabled();
+  });
+
+  it('hides parser-internal PDF preview diagnostics', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+
+    mockHookDefaults(analysisResponse, {
+      ...previewResponse,
+      diagnostics: [
+        'Matched a text-PDF table using 3 configured header token(s).',
+        'Review the parsed rows before saving.',
+      ],
+    });
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await user.upload(screen.getByLabelText('PDF sample file'), file);
+    await user.click(screen.getByRole('button', { name: /Analyze PDF/ }));
+    await user.click(await screen.findByRole('button', { name: /Continue Mapping/ }));
+    await user.type(screen.getByLabelText('Display name'), 'Custom Checking PDF');
+    await user.type(screen.getByLabelText('Bank name'), 'Example Bank');
+    await user.click(screen.getByRole('button', { name: 'Negative means money spent' }));
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+
+    expect(await screen.findByText('Review the parsed rows before saving.')).toBeInTheDocument();
+    expect(screen.queryByText(/configured header token/)).not.toBeInTheDocument();
   });
 });

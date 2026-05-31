@@ -54,6 +54,36 @@ const DEFAULT_AMOUNT_MODE: PdfWizardAmountMode = 'SIGNED_AMOUNT';
 const AMOUNT_MODES: PdfWizardAmountMode[] = ['SIGNED_AMOUNT', 'DEBIT_CREDIT_COLUMNS'];
 const NEGATIVE_MEANS_OPTIONS: PdfWizardNegativeMeans[] = ['CREDIT', 'DEBIT'];
 const YEAR_SOURCE_OPTIONS: PdfWizardYearSource[] = ['EXPLICIT_DATE', 'STATEMENT_PERIOD'];
+const UNSUPPORTED_PDF_ERROR_CODES = new Set([
+  'PDF_NO_EXTRACTABLE_TEXT',
+  'PDF_SCANNED_OR_OCR_REQUIRED',
+  'PDF_NO_TRANSACTION_TABLE',
+  'PDF_TABLE_TOO_FEW_ROWS',
+  'PDF_TABLE_STRUCTURE_AMBIGUOUS',
+]);
+const UNSUPPORTED_PDF_MESSAGE_PATTERNS = [
+  /scanned/i,
+  /ocr/i,
+  /no selectable text/i,
+  /no extractable text/i,
+  /not enough extractable text/i,
+  /no transaction table/i,
+  /transaction table could not be found/i,
+  /too few (valid )?rows/i,
+  /ambiguous table/i,
+  /ambiguous .*structure/i,
+];
+const INTERNAL_DIAGNOSTIC_PATTERNS = [
+  /pdf_text_table_config/i,
+  /parser revision/i,
+  /candidate id/i,
+  /configured header token/i,
+  /header token\(s\)/i,
+  /text-pdf table/i,
+  /regex/i,
+  /anchor/i,
+  /coordinate/i,
+];
 
 interface PdfStatementFormatWizardDialogProps {
   open: boolean;
@@ -183,6 +213,38 @@ function getFieldError(fieldErrors: FieldError[], ...fieldNames: string[]) {
 
 function hasOnlyFieldErrors(error: Error | null) {
   return error instanceof ApiError && (error.response.fieldErrors?.length ?? 0) > 0;
+}
+
+function isUnsupportedPdfAnalyzeError(error: Error) {
+  if (!(error instanceof ApiError) || error.status !== 422) {
+    return false;
+  }
+
+  const code = error.response.code;
+  const message = error.response.message;
+
+  return (
+    (code !== undefined && UNSUPPORTED_PDF_ERROR_CODES.has(code)) ||
+    UNSUPPORTED_PDF_MESSAGE_PATTERNS.some((pattern) => pattern.test(message))
+  );
+}
+
+function getUnsupportedPdfErrorReason(error: Error) {
+  if (
+    error instanceof ApiError &&
+    /scanned|ocr|no selectable text|no extractable text/i.test(error.response.message)
+  ) {
+    return (
+      'This PDF appears to be scanned, so there is no selectable text to read. ' +
+      'Try a downloaded statement PDF or use a CSV export if your bank provides one.'
+    );
+  }
+
+  return formatApiError(error, 'This PDF cannot be used to create a format');
+}
+
+function isUserFacingDiagnostic(diagnostic: string) {
+  return !INTERNAL_DIAGNOSTIC_PATTERNS.some((pattern) => pattern.test(diagnostic));
 }
 
 function createInitialMapping(
@@ -460,10 +522,12 @@ export function PdfStatementFormatWizardDialog({
         setStep('candidate-review');
       },
       onError: (error) => {
-        const message = formatApiError(error, 'This PDF cannot be used to create a format');
-        setUnsupportedReasons([message]);
         setActiveError(error);
-        setStep('unsupported');
+
+        if (isUnsupportedPdfAnalyzeError(error)) {
+          setUnsupportedReasons([getUnsupportedPdfErrorReason(error)]);
+          setStep('unsupported');
+        }
       },
     });
   }, [analyzeMutation, applyCandidate, sampleFile]);
@@ -510,7 +574,7 @@ export function PdfStatementFormatWizardDialog({
       {
         onSuccess: (response) => {
           setPreviewTransactions(response.transactions ?? []);
-          setPreviewDiagnostics(response.diagnostics ?? []);
+          setPreviewDiagnostics((response.diagnostics ?? []).filter(isUserFacingDiagnostic));
           setStep('parser-preview');
         },
         onError: (error) => {
@@ -583,6 +647,18 @@ export function PdfStatementFormatWizardDialog({
     setStep('upload');
   }, []);
 
+  const handleChooseAnotherFile = useCallback(() => {
+    setActiveError(null);
+    setUnsupportedReasons([]);
+    setSampleFile(null);
+    setCandidates([]);
+    setSelectedCandidateIndex(0);
+    setMapping({ amountMode: DEFAULT_AMOUNT_MODE });
+    setPreviewDiagnostics([]);
+    setPreviewTransactions([]);
+    setStep('upload');
+  }, []);
+
   const handleBackToCandidates = useCallback(() => {
     setActiveError(null);
     setStep('candidate-review');
@@ -640,7 +716,7 @@ export function PdfStatementFormatWizardDialog({
                 <h3 className="font-medium text-destructive">
                   This PDF cannot be used to create a format
                 </h3>
-                <ul className="mt-2 space-y-1 text-sm text-destructive">
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-destructive">
                   {unsupportedReasons.map((reason, index) => (
                     <li key={`unsupported-${index}`}>{reason}</li>
                   ))}
@@ -919,6 +995,11 @@ export function PdfStatementFormatWizardDialog({
 
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Negative amount meaning</p>
+                      {!mapping.negativeMeans ? (
+                        <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+                          Choose how negative amounts should be treated before previewing.
+                        </div>
+                      ) : null}
                       <div className="grid gap-2">
                         {NEGATIVE_MEANS_OPTIONS.map((negativeMeans) => (
                           <Button
@@ -1033,7 +1114,7 @@ export function PdfStatementFormatWizardDialog({
 
           {step === 'unsupported' ? (
             <>
-              <Button type="button" variant="ghost" onClick={handleBackToUpload}>
+              <Button type="button" onClick={handleChooseAnotherFile}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Choose another file
               </Button>

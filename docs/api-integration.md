@@ -121,7 +121,10 @@ matching parser setup flow, and saves the resulting user-scoped format. After
 the wizard saves a format, the import controls stay open, the existing account
 ID is preserved, the saved format is selected by `id`, and inline success
 feedback prompts the user to choose the actual statement file before running
-normal preview.
+normal preview. PDF wizard analysis shows a dedicated unsupported-file state
+for backend rejection reasons and clear scanned/no-text/table-detection
+failures. PDF preview diagnostics are shown only when they are user-facing;
+parser revision, header-token, candidate, and rule internals stay hidden.
 
 If NGINX rejects the preview upload with HTTP `413`, the response body is not
 the backend JSON error shape. The frontend maps that status on
