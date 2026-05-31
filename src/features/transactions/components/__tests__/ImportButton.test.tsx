@@ -11,8 +11,8 @@ import { ApiError } from '@/types/apiError';
 import type { StatementFormat } from '@/types/statementFormat';
 
 vi.mock('@/features/transactions/hooks/usePreviewTransactions');
-vi.mock('@/components/statement-formats/csv-wizard/CsvStatementFormatWizardDialog', () => ({
-  CsvStatementFormatWizardDialog: ({
+vi.mock('@/components/statement-formats/StatementFormatWizardDialog', () => ({
+  StatementFormatWizardDialog: ({
     open,
     onOpenChange,
     initialAccountId,
@@ -44,6 +44,22 @@ vi.mock('@/components/statement-formats/csv-wizard/CsvStatementFormatWizardDialo
           }
         >
           Save wizard format
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onSaved({
+              id: 100,
+              displayName: 'Custom Checking PDF',
+              formatType: 'PDF',
+              bankName: 'Custom Bank',
+              defaultCurrencyIsoCode: 'USD',
+              scope: 'USER',
+              enabled: true,
+            })
+          }
+        >
+          Save PDF wizard format
         </button>
       </div>
     ) : null,
@@ -226,7 +242,7 @@ describe('ImportButton', () => {
     expect(screen.queryByRole('heading', { name: 'Preview Import' })).not.toBeInTheDocument();
   });
 
-  it('opens the CSV wizard from the new format button and preserves the import form on cancel', async () => {
+  it('opens the create-format wizard from the new format button and preserves the import form on cancel', async () => {
     const user = userEvent.setup();
     const previewMutate = mockPreviewMutation();
 
@@ -286,6 +302,40 @@ describe('ImportButton', () => {
         file,
         statementFormatId: 99,
         accountId: 'checking-789',
+      });
+    });
+  });
+
+  it('selects a saved PDF wizard format and submits its statement format ID', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'statement.pdf', { type: 'application/pdf' });
+    let capturedVariables: PreviewVariables | undefined;
+
+    const previewMutate = vi.fn((variables: PreviewVariables) => {
+      capturedVariables = variables;
+    }) as PreviewMutate;
+    mockPreviewMutation({ mutate: previewMutate });
+
+    useReferenceDataHandlers();
+
+    renderWithProviders(<ImportButton />);
+
+    await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
+    await user.click(screen.getByRole('button', { name: 'New format' }));
+    await user.click(screen.getByRole('button', { name: 'Save PDF wizard format' }));
+
+    expect(screen.getByRole('button', { name: /Custom Checking PDF/ })).toBeInTheDocument();
+    expect(screen.getByText(/Custom Checking PDF saved/)).toBeInTheDocument();
+    expect(previewMutate).not.toHaveBeenCalled();
+
+    await user.upload(screen.getByLabelText('Transaction file input'), file);
+    await user.click(screen.getByRole('button', { name: /Preview Transactions/ }));
+
+    await waitFor(() => {
+      expect(capturedVariables).toEqual({
+        file,
+        statementFormatId: 100,
+        accountId: undefined,
       });
     });
   });

@@ -114,12 +114,14 @@ The import format dropdown is populated from `GET /api/v1/statement-formats`.
 The UI shows enabled formats whose default currency is available, sorted by
 API-provided `displayName`, disambiguates duplicate visible names with `System`
 or `Custom`, and submits the selected `id` as the `statementFormatId` query
-parameter. The dropdown also exposes `New format`, which opens
-the user CSV statement-format wizard entry point without submitting the sentinel
-option to the preview API. After the wizard saves a format, the import controls
-stay open, the existing account ID is preserved, the saved format is selected by
-`id`, and inline success feedback prompts the user to choose the actual
-statement file before running normal preview.
+parameter. The dropdown also exposes `New format`, which opens a user
+statement-format wizard entry point without submitting a sentinel option to the
+preview API. The wizard accepts a CSV or text-based PDF sample, routes to the
+matching parser setup flow, and saves the resulting user-scoped format. After
+the wizard saves a format, the import controls stay open, the existing account
+ID is preserved, the saved format is selected by `id`, and inline success
+feedback prompts the user to choose the actual statement file before running
+normal preview.
 
 If NGINX rejects the preview upload with HTTP `413`, the response body is not
 the backend JSON error shape. The frontend maps that status on

@@ -38,7 +38,7 @@ import type {
 } from '@/types/statementFormat';
 import { formatApiError } from '@/utils/errorMessages';
 import { cn } from '@/utils/cn';
-import { CsvWizardReadOnlyPreviewTable } from '@/components/statement-formats/csv-wizard/CsvWizardReadOnlyPreviewTable';
+import { StatementFormatWizardReadOnlyPreviewTable } from '@/components/statement-formats/shared/StatementFormatWizardReadOnlyPreviewTable';
 import {
   useAnalyzeCsvWizardSample,
   usePreviewCsvWizardMapping,
@@ -54,6 +54,7 @@ const AMOUNT_MODES: CsvWizardAmountMode[] = ['SINGLE_AMOUNT_WITH_TYPE', 'DEBIT_C
 interface CsvStatementFormatWizardDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialFile?: File;
   initialAccountId?: string;
   onSaved: (format: StatementFormat) => void;
 }
@@ -169,6 +170,7 @@ function hasOnlyFieldErrors(error: Error | null) {
 export function CsvStatementFormatWizardDialog({
   open,
   onOpenChange,
+  initialFile,
   initialAccountId,
   onSaved,
 }: CsvStatementFormatWizardDialogProps) {
@@ -178,7 +180,7 @@ export function CsvStatementFormatWizardDialog({
   const saveMutation = useSaveCsvWizardFormat();
 
   const [step, setStep] = useState<CsvWizardStep>('upload');
-  const [sampleFile, setSampleFile] = useState<File | null>(null);
+  const [sampleFile, setSampleFile] = useState<File | null>(initialFile ?? null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [sampleRows, setSampleRows] = useState<Record<string, string>[]>([]);
   const [mapping, setMapping] = useState<CsvWizardColumnMappingRequest>({
@@ -228,7 +230,7 @@ export function CsvStatementFormatWizardDialog({
 
   const resetWizardState = useCallback(() => {
     setStep('upload');
-    setSampleFile(null);
+    setSampleFile(initialFile ?? null);
     setHeaders([]);
     setSampleRows([]);
     setMapping({ amountMode: DEFAULT_AMOUNT_MODE });
@@ -246,7 +248,7 @@ export function CsvStatementFormatWizardDialog({
     analyzeMutation.reset();
     previewMutation.reset();
     saveMutation.reset();
-  }, [analyzeMutation, initialAccountId, previewMutation, saveMutation]);
+  }, [analyzeMutation, initialAccountId, initialFile, previewMutation, saveMutation]);
 
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -722,7 +724,7 @@ export function CsvStatementFormatWizardDialog({
 
               <WarningList warnings={previewWarnings} />
 
-              <CsvWizardReadOnlyPreviewTable transactions={previewTransactions} />
+              <StatementFormatWizardReadOnlyPreviewTable transactions={previewTransactions} />
             </div>
           ) : null}
         </div>

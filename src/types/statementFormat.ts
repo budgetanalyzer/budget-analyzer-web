@@ -102,3 +102,66 @@ export interface CsvWizardPreviewResponse {
   transactions?: PreviewTransaction[];
   warnings?: CsvWizardWarningResponse[];
 }
+
+export type PdfWizardAmountMode = 'SIGNED_AMOUNT' | 'DEBIT_CREDIT_COLUMNS';
+export type PdfWizardNegativeMeans = 'CREDIT' | 'DEBIT';
+export type PdfWizardYearSource = 'EXPLICIT_DATE' | 'STATEMENT_PERIOD';
+
+export interface PdfWizardColumnMappingRequest {
+  dateHeader?: string;
+  dateFormat?: string;
+  descriptionHeader?: string;
+  amountMode: PdfWizardAmountMode;
+  amountHeader?: string;
+  debitHeader?: string;
+  creditHeader?: string;
+  typeHeader?: string;
+  negativeMeans?: PdfWizardNegativeMeans;
+}
+
+export type PdfWizardColumnMappingResponse = PdfWizardColumnMappingRequest;
+
+export interface PdfWizardTableCandidateResponse {
+  candidateId?: string;
+  pageNumber?: number;
+  startLineNumber?: number;
+  endLineNumber?: number;
+  rowCount?: number;
+  repeatedHeaderCount?: number;
+  headers?: string[];
+  sampleRows?: string[][];
+  inferredMapping?: PdfWizardColumnMappingResponse;
+  confidence?: number;
+  columnConfidences?: Record<string, number>;
+}
+
+export interface PdfWizardAnalysisResponse {
+  candidates?: PdfWizardTableCandidateResponse[];
+  confidence?: number;
+  rejectionReasons?: string[];
+}
+
+export interface PdfWizardMappingPreviewRequest {
+  bankName: string;
+  defaultCurrencyIsoCode: string;
+  accountId?: string;
+  headerMustContain?: string[];
+  minimumRows?: number;
+  yearSource: PdfWizardYearSource;
+  mapping: PdfWizardColumnMappingRequest;
+}
+
+export interface PdfWizardSaveRequest {
+  displayName: string;
+  bankName: string;
+  defaultCurrencyIsoCode: string;
+  headerMustContain?: string[];
+  minimumRows?: number;
+  yearSource: PdfWizardYearSource;
+  mapping: PdfWizardColumnMappingRequest;
+}
+
+export interface PdfWizardPreviewResponse {
+  transactions?: PreviewTransaction[];
+  diagnostics?: string[];
+}
