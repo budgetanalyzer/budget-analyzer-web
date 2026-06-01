@@ -18,7 +18,8 @@ import { collapseFromRightVariants, collapseTransition } from '@/lib/animations'
 import { PreviewResponse } from '@/types/transaction';
 import { useStatementFormats } from '@/hooks/useStatementFormats';
 import { useCurrencies } from '@/hooks/useCurrencies';
-import { CsvStatementFormatWizardDialog } from '@/components/statement-formats/csv-wizard/CsvStatementFormatWizardDialog';
+import { StatementFormatWizardDialog } from '@/components/statement-formats/StatementFormatWizardDialog';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 import type { StatementFormat } from '@/types/statementFormat';
 
 interface ImportButtonProps {
@@ -41,8 +42,9 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     isError: isFormatsError,
   } = useStatementFormats();
   const { data: enabledCurrencies } = useCurrencies(true);
+  const canCreateStatementFormats = usePermission('statementformats:write');
   const [isExpanded, setIsExpandedState] = useState(false);
-  const [isCsvWizardOpen, setIsCsvWizardOpen] = useState(false);
+  const [isStatementFormatWizardOpen, setIsStatementFormatWizardOpen] = useState(false);
 
   const setIsExpanded = useCallback(
     (expanded: boolean) => {
@@ -191,18 +193,18 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     setSavedFormatMessage(null);
   }, []);
 
-  const handleOpenCsvWizard = useCallback(() => {
-    setIsCsvWizardOpen(true);
+  const handleOpenStatementFormatWizard = useCallback(() => {
+    setIsStatementFormatWizardOpen(true);
   }, []);
 
-  const handleCsvWizardSaved = useCallback(
+  const handleStatementFormatWizardSaved = useCallback(
     (createdFormat: StatementFormat) => {
       setSavedStatementFormat(createdFormat);
       setSelectedStatementFormatId(createdFormat.id);
       setSavedFormatMessage(
         `${createdFormat.displayName} saved. Choose the statement file to preview transactions.`,
       );
-      setIsCsvWizardOpen(false);
+      setIsStatementFormatWizardOpen(false);
       setIsExpanded(true);
     },
     [setIsExpanded],
@@ -313,16 +315,18 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
                     </SelectContent>
                   </Select>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="default"
-                    onClick={handleOpenCsvWizard}
-                    className="whitespace-nowrap"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    New format
-                  </Button>
+                  {canCreateStatementFormats ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="default"
+                      onClick={handleOpenStatementFormatWizard}
+                      className="whitespace-nowrap"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      New format
+                    </Button>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center gap-2 overflow-hidden">
@@ -397,12 +401,12 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
         statementFormats={importHistoryStatementFormats}
         onImportComplete={handlePreviewImportComplete}
       />
-      {isCsvWizardOpen && (
-        <CsvStatementFormatWizardDialog
-          open={isCsvWizardOpen}
-          onOpenChange={setIsCsvWizardOpen}
+      {isStatementFormatWizardOpen && (
+        <StatementFormatWizardDialog
+          open={isStatementFormatWizardOpen}
+          onOpenChange={setIsStatementFormatWizardOpen}
           initialAccountId={accountId || undefined}
-          onSaved={handleCsvWizardSaved}
+          onSaved={handleStatementFormatWizardSaved}
         />
       )}
     </>

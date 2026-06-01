@@ -6,11 +6,15 @@ import {
   CsvWizardPreviewResponse,
   CsvWizardSaveRequest,
   CreateStatementFormatRequest,
+  PdfWizardAnalysisResponse,
+  PdfWizardMappingPreviewRequest,
+  PdfWizardPreviewResponse,
+  PdfWizardSaveRequest,
   StatementFormat,
   UpdateStatementFormatRequest,
 } from '@/types/statementFormat';
 
-function buildCsvWizardFormData(file: File, request?: object) {
+function buildWizardFormData(file: File, request?: object) {
   const formData = new FormData();
   formData.append('file', file);
 
@@ -68,7 +72,7 @@ export const statementFormatApi = {
   analyzeCsvSample: async (file: File): Promise<CsvWizardAnalysisResponse> => {
     const response = await apiClient.post<CsvWizardAnalysisResponse>(
       '/v1/statement-formats/csv-wizard/analyze',
-      buildCsvWizardFormData(file),
+      buildWizardFormData(file),
       {
         headers: { 'Content-Type': 'multipart/form-data' },
       },
@@ -86,7 +90,7 @@ export const statementFormatApi = {
   ): Promise<CsvWizardPreviewResponse> => {
     const response = await apiClient.post<CsvWizardPreviewResponse>(
       '/v1/statement-formats/csv-wizard/preview',
-      buildCsvWizardFormData(file, request),
+      buildWizardFormData(file, request),
       {
         headers: { 'Content-Type': 'multipart/form-data' },
       },
@@ -104,7 +108,58 @@ export const statementFormatApi = {
   ): Promise<StatementFormat> => {
     const response = await apiClient.post<StatementFormat>(
       '/v1/statement-formats/csv-wizard/save',
-      buildCsvWizardFormData(file, request),
+      buildWizardFormData(file, request),
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      },
+    );
+    return response.data;
+  },
+
+  /**
+   * Analyze a PDF sample and return candidate transaction tables
+   * POST /v1/statement-formats/pdf-wizard/analyze
+   */
+  analyzePdfSample: async (file: File): Promise<PdfWizardAnalysisResponse> => {
+    const response = await apiClient.post<PdfWizardAnalysisResponse>(
+      '/v1/statement-formats/pdf-wizard/analyze',
+      buildWizardFormData(file),
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      },
+    );
+    return response.data;
+  },
+
+  /**
+   * Preview a PDF wizard mapping without creating import state
+   * POST /v1/statement-formats/pdf-wizard/preview
+   */
+  previewPdfMapping: async (
+    file: File,
+    request: PdfWizardMappingPreviewRequest,
+  ): Promise<PdfWizardPreviewResponse> => {
+    const response = await apiClient.post<PdfWizardPreviewResponse>(
+      '/v1/statement-formats/pdf-wizard/preview',
+      buildWizardFormData(file, request),
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      },
+    );
+    return response.data;
+  },
+
+  /**
+   * Save a user-scoped PDF statement format from the confirmed mapping
+   * POST /v1/statement-formats/pdf-wizard/save
+   */
+  savePdfWizardFormat: async (
+    file: File,
+    request: PdfWizardSaveRequest,
+  ): Promise<StatementFormat> => {
+    const response = await apiClient.post<StatementFormat>(
+      '/v1/statement-formats/pdf-wizard/save',
+      buildWizardFormData(file, request),
       {
         headers: { 'Content-Type': 'multipart/form-data' },
       },

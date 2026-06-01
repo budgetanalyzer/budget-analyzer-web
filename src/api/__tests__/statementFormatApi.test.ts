@@ -8,6 +8,8 @@ import type {
   CsvWizardMappingPreviewRequest,
   CsvWizardSaveRequest,
   CreateStatementFormatRequest,
+  PdfWizardMappingPreviewRequest,
+  PdfWizardSaveRequest,
   StatementFormat,
   UpdateStatementFormatRequest,
 } from '@/types/statementFormat';
@@ -239,6 +241,164 @@ describe('statementFormatApi', () => {
       expect.objectContaining({
         id: 99,
         displayName: 'Custom CSV',
+        scope: 'USER',
+      }),
+    );
+  });
+
+  it('posts multipart PDF wizard analyze requests', async () => {
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+    let capturedConfig: InternalAxiosRequestConfig | undefined;
+
+    apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      capturedConfig = config;
+
+      return {
+        data: {
+          candidates: [
+            {
+              candidateId: 'candidate-1',
+              pageNumber: 1,
+              rowCount: 10,
+              headers: ['Date', 'Description', 'Amount'],
+              sampleRows: [['05/01', 'Coffee', '-4.50']],
+              inferredMapping: {
+                dateHeader: 'Date',
+                dateFormat: 'MM/dd',
+                descriptionHeader: 'Description',
+                amountMode: 'SIGNED_AMOUNT',
+                amountHeader: 'Amount',
+                negativeMeans: 'DEBIT',
+              },
+            },
+          ],
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      } satisfies AxiosResponse;
+    });
+
+    const response = await statementFormatApi.analyzePdfSample(file);
+    const formData = capturedConfig?.data as FormData;
+
+    expect(capturedConfig?.url).toBe('/v1/statement-formats/pdf-wizard/analyze');
+    expect(capturedConfig?.headers.getContentType()).toContain('multipart/form-data');
+    expect(formData).toBeInstanceOf(FormData);
+    expect((formData.get('file') as File).name).toBe('sample.pdf');
+    expect(response.candidates).toHaveLength(1);
+  });
+
+  it('posts multipart PDF wizard preview requests with a JSON request part', async () => {
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+    const previewRequest: PdfWizardMappingPreviewRequest = {
+      bankName: 'Example Bank',
+      defaultCurrencyIsoCode: 'USD',
+      accountId: 'checking-001',
+      headerMustContain: ['Date', 'Description', 'Amount'],
+      minimumRows: 3,
+      yearSource: 'EXPLICIT_DATE',
+      mapping: {
+        dateHeader: 'Date',
+        dateFormat: 'MM/dd/uuuu',
+        descriptionHeader: 'Description',
+        amountMode: 'SIGNED_AMOUNT',
+        amountHeader: 'Amount',
+        negativeMeans: 'DEBIT',
+      },
+    };
+    let capturedConfig: InternalAxiosRequestConfig | undefined;
+
+    apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      capturedConfig = config;
+
+      return {
+        data: {
+          transactions: [
+            {
+              date: '2026-05-01',
+              description: 'Coffee',
+              amount: 4.5,
+              type: 'DEBIT',
+              bankName: 'Example Bank',
+              currencyIsoCode: 'USD',
+              accountId: 'checking-001',
+              duplicate: false,
+            },
+          ],
+          diagnostics: ['Review rows before saving.'],
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      } satisfies AxiosResponse;
+    });
+
+    const response = await statementFormatApi.previewPdfMapping(file, previewRequest);
+    const formData = capturedConfig?.data as FormData;
+    const capturedRequestPart = formData.get('request') as Blob;
+
+    expect(capturedConfig?.url).toBe('/v1/statement-formats/pdf-wizard/preview');
+    expect((formData.get('file') as File).name).toBe('sample.pdf');
+    expect(capturedRequestPart).toBeInstanceOf(Blob);
+    expect(capturedRequestPart.type).toBe('application/json');
+    expect(response.transactions).toHaveLength(1);
+  });
+
+  it('posts multipart PDF wizard save requests and returns the created format', async () => {
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+    const saveRequest: PdfWizardSaveRequest = {
+      displayName: 'Custom PDF',
+      bankName: 'Example Bank',
+      defaultCurrencyIsoCode: 'USD',
+      headerMustContain: ['Date', 'Description', 'Amount'],
+      minimumRows: 3,
+      yearSource: 'EXPLICIT_DATE',
+      mapping: {
+        dateHeader: 'Date',
+        dateFormat: 'MM/dd/uuuu',
+        descriptionHeader: 'Description',
+        amountMode: 'SIGNED_AMOUNT',
+        amountHeader: 'Amount',
+        negativeMeans: 'DEBIT',
+      },
+    };
+    let capturedConfig: InternalAxiosRequestConfig | undefined;
+
+    apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      capturedConfig = config;
+
+      return {
+        data: {
+          ...csvFormat,
+          id: 100,
+          displayName: 'Custom PDF',
+          formatType: 'PDF',
+          bankName: 'Example Bank',
+          scope: 'USER',
+        },
+        status: 201,
+        statusText: 'Created',
+        headers: {},
+        config,
+      } satisfies AxiosResponse;
+    });
+
+    const response = await statementFormatApi.savePdfWizardFormat(file, saveRequest);
+    const formData = capturedConfig?.data as FormData;
+    const capturedRequestPart = formData.get('request') as Blob;
+
+    expect(capturedConfig?.url).toBe('/v1/statement-formats/pdf-wizard/save');
+    expect((formData.get('file') as File).name).toBe('sample.pdf');
+    expect(capturedRequestPart).toBeInstanceOf(Blob);
+    expect(capturedRequestPart.type).toBe('application/json');
+    expect(response).toEqual(
+      expect.objectContaining({
+        id: 100,
+        displayName: 'Custom PDF',
+        formatType: 'PDF',
         scope: 'USER',
       }),
     );

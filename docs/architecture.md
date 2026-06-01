@@ -126,6 +126,9 @@ Backend-owned (permission-service), resolved at login and stored in session:
 | Users | `users:read` | — | `users:write` | — |
 
 `:any` variants widen scope from "my resources" to "all users" and gate admin cross-user features.
+The transaction import `New format` button uses `statementformats:write`;
+importing with an existing visible format remains governed by transaction
+import permissions and backend preview validation.
 
 ### Permission Hierarchy
 

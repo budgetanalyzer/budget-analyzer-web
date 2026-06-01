@@ -277,6 +277,11 @@ sites use inline string literals; a typo fails safe by returning `false`.
 gate the admin cross-user features (search page, dashboard tile, sidebar item).
 User-facing self-scope features check the unscoped variants.
 
+The transaction import `New format` affordance is gated with
+`usePermission('statementformats:write')`, matching the CSV/PDF wizard
+endpoints. Users without that permission can still import with existing visible
+formats.
+
 #### Permission hierarchy (invariant)
 
 Permissions have an implied `:read` dependency: a grant of `:write` presumes

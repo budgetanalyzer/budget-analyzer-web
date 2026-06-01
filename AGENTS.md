@@ -231,6 +231,7 @@ on the current user's own data?" → unscoped.
 | User detail page "Deactivate User" button | `src/features/admin/users/pages/UserDetailPage.tsx` | `users:write` | `usePermission` |
 | Currencies list "Add Currency" + per-row Edit | `src/features/admin/currencies/pages/CurrenciesListPage.tsx` | `currencies:write` | `usePermission` |
 | Statement Formats list "Add Format" + per-row Edit | `src/features/admin/statement-formats/pages/StatementFormatsListPage.tsx` | `statementformats:write` | `usePermission` |
+| Import "New format" wizard button | `src/features/transactions/components/ImportButton.tsx` | `statementformats:write` | `usePermission` |
 | Bulk delete trigger (self-scope) | `src/features/transactions/components/TransactionTable.tsx` | `transactions:delete` | `usePermission` |
 | Import transactions button (self-scope) | `src/features/transactions/pages/TransactionsPage.tsx` | `transactions:write` | `usePermission` |
 | Per-row Edit (self-scope) | `src/features/transactions/components/EditableTransactionRow.tsx` (prop threaded from `TransactionTable.tsx`) | `transactions:write` | `usePermission` |

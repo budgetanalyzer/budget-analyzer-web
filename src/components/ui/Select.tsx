@@ -36,24 +36,26 @@ export function Select({ children, value, onValueChange }: SelectProps) {
   );
 }
 
-interface SelectTriggerProps {
+interface SelectTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
   className?: string;
-  id?: string;
-  disabled?: boolean;
 }
 
 export const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(
-  ({ children, className, id, disabled }, ref) => {
+  ({ children, className, disabled, onClick, ...props }, ref) => {
     const { open, setOpen } = useSelect();
 
     return (
       <button
         ref={ref}
-        id={id}
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setOpen(!open)}
+        onClick={(event) => {
+          onClick?.(event);
+          if (!event.defaultPrevented && !disabled) {
+            setOpen(!open);
+          }
+        }}
         className={cn(
           'flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
           'placeholder:text-muted-foreground',
@@ -61,6 +63,7 @@ export const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerPr
           'disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
+        {...props}
       >
         {children}
         <ChevronDown className="h-4 w-4 opacity-50" />

@@ -10,6 +10,11 @@ import {
   useUpdateStatementFormat,
 } from '@/hooks/useStatementFormats';
 import { useSaveCsvWizardFormat } from '@/components/statement-formats/csv-wizard/hooks/useCsvStatementFormatWizard';
+import {
+  useAnalyzePdfWizardSample,
+  usePreviewPdfWizardMapping,
+  useSavePdfWizardFormat,
+} from '@/components/statement-formats/pdf-wizard/hooks/usePdfStatementFormatWizard';
 import { statementFormatApi } from '@/api/statementFormatApi';
 import { server } from '@/testing/mocks/server';
 import { createTestQueryClient } from '@/testing/test-utils';
@@ -177,6 +182,98 @@ describe('statement-format mutation hooks', () => {
             descriptionColumn: 'Description',
             amountMode: 'SINGLE_AMOUNT_WITH_TYPE',
             amountColumn: 'Amount',
+          },
+        },
+      });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['statement-formats'] });
+  });
+
+  it('calls PDF wizard analyze and preview APIs with the current variables', async () => {
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+    const analyzeSpy = vi.spyOn(statementFormatApi, 'analyzePdfSample').mockResolvedValueOnce({
+      candidates: [],
+      rejectionReasons: ['No transaction table found.'],
+    });
+    const previewSpy = vi.spyOn(statementFormatApi, 'previewPdfMapping').mockResolvedValueOnce({
+      transactions: [],
+      diagnostics: [],
+    });
+
+    const { result: analyzeResult } = renderHook(() => useAnalyzePdfWizardSample(), {
+      wrapper: createWrapper(),
+    });
+    const { result: previewResult } = renderHook(() => usePreviewPdfWizardMapping(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await analyzeResult.current.mutateAsync(file);
+      await previewResult.current.mutateAsync({
+        file,
+        request: {
+          bankName: 'Example Bank',
+          defaultCurrencyIsoCode: 'USD',
+          headerMustContain: ['Date', 'Description', 'Amount'],
+          minimumRows: 3,
+          yearSource: 'EXPLICIT_DATE',
+          mapping: {
+            dateHeader: 'Date',
+            dateFormat: 'MM/dd/uuuu',
+            descriptionHeader: 'Description',
+            amountMode: 'SIGNED_AMOUNT',
+            amountHeader: 'Amount',
+            negativeMeans: 'DEBIT',
+          },
+        },
+      });
+    });
+
+    expect(analyzeSpy).toHaveBeenCalledWith(file);
+    expect(previewSpy).toHaveBeenCalledWith(
+      file,
+      expect.objectContaining({
+        bankName: 'Example Bank',
+        yearSource: 'EXPLICIT_DATE',
+      }),
+    );
+  });
+
+  it('invalidates the statement-format list after PDF wizard save success', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+
+    vi.spyOn(statementFormatApi, 'savePdfWizardFormat').mockResolvedValueOnce({
+      ...csvFormat,
+      id: 100,
+      displayName: 'Custom PDF',
+      formatType: 'PDF',
+      scope: 'USER',
+    });
+
+    const { result } = renderHook(() => useSavePdfWizardFormat(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        file,
+        request: {
+          displayName: 'Custom PDF',
+          bankName: 'Example Bank',
+          defaultCurrencyIsoCode: 'USD',
+          headerMustContain: ['Date', 'Description', 'Amount'],
+          minimumRows: 3,
+          yearSource: 'EXPLICIT_DATE',
+          mapping: {
+            dateHeader: 'Date',
+            dateFormat: 'MM/dd/uuuu',
+            descriptionHeader: 'Description',
+            amountMode: 'SIGNED_AMOUNT',
+            amountHeader: 'Amount',
+            negativeMeans: 'DEBIT',
           },
         },
       });
