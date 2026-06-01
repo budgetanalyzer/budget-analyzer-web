@@ -100,14 +100,99 @@ interface WizardFormState {
   accountId: string;
 }
 
+type PdfWizardValidationField =
+  | 'displayName'
+  | 'bankName'
+  | 'defaultCurrencyIsoCode'
+  | 'mapping.dateHeader'
+  | 'mapping.dateFormat'
+  | 'mapping.descriptionHeader'
+  | 'mapping.amountHeader'
+  | 'mapping.negativeMeans'
+  | 'mapping.debitHeader'
+  | 'mapping.creditHeader';
+
+type ClientFieldErrors = Partial<Record<PdfWizardValidationField, string>>;
+type TouchedFields = Partial<Record<PdfWizardValidationField, true>>;
+
+const PDF_WIZARD_FIELD_ORDER: PdfWizardValidationField[] = [
+  'displayName',
+  'bankName',
+  'defaultCurrencyIsoCode',
+  'mapping.dateHeader',
+  'mapping.dateFormat',
+  'mapping.descriptionHeader',
+  'mapping.amountHeader',
+  'mapping.negativeMeans',
+  'mapping.debitHeader',
+  'mapping.creditHeader',
+];
+
+const PDF_WIZARD_FIELD_CONTROL_IDS: Record<PdfWizardValidationField, string> = {
+  displayName: 'pdf-wizard-display-name',
+  bankName: 'pdf-wizard-bank-name',
+  defaultCurrencyIsoCode: 'pdf-wizard-currency',
+  'mapping.dateHeader': 'pdf-wizard-date-header',
+  'mapping.dateFormat': 'pdf-wizard-date-format',
+  'mapping.descriptionHeader': 'pdf-wizard-description-header',
+  'mapping.amountHeader': 'pdf-wizard-amount-header',
+  'mapping.negativeMeans': 'pdf-wizard-negative-means-credit',
+  'mapping.debitHeader': 'pdf-wizard-debit-header',
+  'mapping.creditHeader': 'pdf-wizard-credit-header',
+};
+
+const PDF_WIZARD_MAPPING_FIELD_BY_INPUT_NAME: Record<string, PdfWizardValidationField> = {
+  dateFormat: 'mapping.dateFormat',
+};
+
+const REQUIRED_FORM_FIELD_NAMES = new Set<PdfWizardValidationField>([
+  'displayName',
+  'bankName',
+  'defaultCurrencyIsoCode',
+]);
+
+const INVALID_INPUT_CLASS_NAME = 'border-destructive focus-visible:ring-destructive';
+const INVALID_SELECT_TRIGGER_CLASS_NAME = 'border-destructive focus:ring-destructive';
+const INVALID_BUTTON_CLASS_NAME = 'border-destructive';
+
 interface FieldErrorMessageProps {
+  id?: string;
   message?: string;
 }
 
-function FieldErrorMessage({ message }: FieldErrorMessageProps) {
+function FieldErrorMessage({ id, message }: FieldErrorMessageProps) {
   if (!message) return null;
 
-  return <p className="text-sm text-destructive">{message}</p>;
+  return (
+    <p id={id} className="text-sm text-destructive">
+      {message}
+    </p>
+  );
+}
+
+function RequiredIndicator() {
+  return (
+    <span aria-hidden="true" className="ml-2 text-xs font-normal text-muted-foreground">
+      Required
+    </span>
+  );
+}
+
+interface FieldLabelProps {
+  htmlFor: string;
+  children: React.ReactNode;
+  required?: boolean;
+}
+
+function FieldLabel({ htmlFor, children, required = false }: FieldLabelProps) {
+  return (
+    <div className="flex items-baseline">
+      <label htmlFor={htmlFor} className="text-sm font-medium">
+        {children}
+      </label>
+      {required ? <RequiredIndicator /> : null}
+    </div>
+  );
 }
 
 interface ColumnSelectProps {
@@ -117,6 +202,8 @@ interface ColumnSelectProps {
   headers: string[];
   placeholder: string;
   onValueChange: (value: string) => void;
+  onBlur?: () => void;
+  required?: boolean;
   error?: string;
 }
 
@@ -127,15 +214,27 @@ function ColumnSelect({
   headers,
   placeholder,
   onValueChange,
+  onBlur,
+  required = false,
   error,
 }: ColumnSelectProps) {
+  const errorId = `${id}-error`;
+  const isInvalid = Boolean(error);
+
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="text-sm font-medium">
+      <FieldLabel htmlFor={id} required={required}>
         {label}
-      </label>
+      </FieldLabel>
       <Select value={value ?? ''} onValueChange={onValueChange}>
-        <SelectTrigger id={id}>
+        <SelectTrigger
+          id={id}
+          onBlur={onBlur}
+          aria-invalid={isInvalid || undefined}
+          aria-required={required || undefined}
+          aria-describedby={isInvalid ? errorId : undefined}
+          className={isInvalid ? INVALID_SELECT_TRIGGER_CLASS_NAME : undefined}
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent className="max-w-[calc(100vw-4rem)]">
@@ -147,7 +246,7 @@ function ColumnSelect({
           ))}
         </SelectContent>
       </Select>
-      <FieldErrorMessage message={error} />
+      <FieldErrorMessage id={errorId} message={error} />
     </div>
   );
 }
@@ -198,21 +297,111 @@ function normalizeSelectValue(value: string) {
   return value || undefined;
 }
 
-function getFieldError(fieldErrors: FieldError[], ...fieldNames: string[]) {
-  const match = fieldErrors.find((fieldError) =>
-    fieldNames.some(
-      (fieldName) =>
-        fieldError.field === fieldName ||
-        fieldError.field.endsWith(`.${fieldName}`) ||
-        fieldName.endsWith(`.${fieldError.field}`),
-    ),
+function fieldErrorMatches(fieldError: FieldError, ...fieldNames: string[]) {
+  return fieldNames.some(
+    (fieldName) =>
+      fieldError.field === fieldName ||
+      fieldError.field.endsWith(`.${fieldName}`) ||
+      fieldName.endsWith(`.${fieldError.field}`),
   );
+}
+
+function getFieldError(fieldErrors: FieldError[], ...fieldNames: string[]) {
+  const match = fieldErrors.find((fieldError) => fieldErrorMatches(fieldError, ...fieldNames));
 
   return match?.message;
 }
 
 function hasOnlyFieldErrors(error: Error | null) {
   return error instanceof ApiError && (error.response.fieldErrors?.length ?? 0) > 0;
+}
+
+function removeFieldErrorsForFields(error: Error | null, ...fieldNames: string[]) {
+  if (!(error instanceof ApiError) || !error.response.fieldErrors?.length) {
+    return error;
+  }
+
+  const remainingFieldErrors = error.response.fieldErrors.filter(
+    (fieldError) => !fieldErrorMatches(fieldError, ...fieldNames),
+  );
+
+  if (remainingFieldErrors.length === error.response.fieldErrors.length) {
+    return error;
+  }
+
+  if (remainingFieldErrors.length === 0) {
+    return null;
+  }
+
+  return new ApiError(error.status, {
+    ...error.response,
+    fieldErrors: remainingFieldErrors,
+  });
+}
+
+function validatePdfWizardMapping(
+  formState: WizardFormState,
+  mapping: PdfWizardColumnMappingRequest,
+) {
+  const errors: ClientFieldErrors = {};
+
+  if (formState.displayName.trim() === '') {
+    errors.displayName = 'Enter a display name.';
+  }
+
+  if (formState.bankName.trim() === '') {
+    errors.bankName = 'Enter a bank name.';
+  }
+
+  if (formState.defaultCurrencyIsoCode.trim() === '') {
+    errors.defaultCurrencyIsoCode = 'Select a currency.';
+  }
+
+  if (!mapping.dateHeader) {
+    errors['mapping.dateHeader'] = 'Select a date column.';
+  }
+
+  if (!mapping.dateFormat?.trim()) {
+    errors['mapping.dateFormat'] = 'Enter a date format.';
+  }
+
+  if (!mapping.descriptionHeader) {
+    errors['mapping.descriptionHeader'] = 'Select a description column.';
+  }
+
+  if (mapping.amountMode === 'DEBIT_CREDIT_COLUMNS') {
+    if (!mapping.debitHeader) {
+      errors['mapping.debitHeader'] = 'Select a debit column.';
+    }
+
+    if (!mapping.creditHeader) {
+      errors['mapping.creditHeader'] = 'Select a credit column.';
+    }
+
+    return errors;
+  }
+
+  if (!mapping.amountHeader) {
+    errors['mapping.amountHeader'] = 'Select an amount column.';
+  }
+
+  if (!mapping.negativeMeans) {
+    errors['mapping.negativeMeans'] = 'Choose how negative amounts should be interpreted.';
+  }
+
+  return errors;
+}
+
+function hasClientFieldErrors(errors: ClientFieldErrors) {
+  return Object.values(errors).some(Boolean);
+}
+
+function focusFirstInvalidField(errors: ClientFieldErrors) {
+  const firstInvalidField = PDF_WIZARD_FIELD_ORDER.find((field) => errors[field]);
+
+  if (!firstInvalidField) return;
+
+  document.getElementById(PDF_WIZARD_FIELD_CONTROL_IDS[firstInvalidField])?.focus();
 }
 
 function isUnsupportedPdfAnalyzeError(error: Error) {
@@ -342,11 +531,15 @@ export function PdfStatementFormatWizardDialog({
     defaultCurrencyIsoCode: 'USD',
     accountId: initialAccountId ?? '',
   });
+  const [touchedFields, setTouchedFields] = useState<TouchedFields>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const selectedCandidate = candidates[selectedCandidateIndex];
   const headers = selectedCandidate?.headers ?? [];
-  const fieldErrors =
-    activeError instanceof ApiError ? (activeError.response.fieldErrors ?? []) : [];
+  const fieldErrors = useMemo(
+    () => (activeError instanceof ApiError ? (activeError.response.fieldErrors ?? []) : []),
+    [activeError],
+  );
   const dialogErrorMessage =
     activeError && !hasOnlyFieldErrors(activeError)
       ? formatApiError(activeError, 'Unable to continue the PDF wizard')
@@ -358,20 +551,12 @@ export function PdfStatementFormatWizardDialog({
     return [...codes].sort();
   }, [currencies]);
 
-  const canPreview =
-    sampleFile !== null &&
-    selectedCandidate !== undefined &&
-    formState.displayName.trim() !== '' &&
-    formState.bankName.trim() !== '' &&
-    formState.defaultCurrencyIsoCode.trim() !== '' &&
-    Boolean(mapping.dateHeader) &&
-    Boolean(mapping.dateFormat) &&
-    Boolean(mapping.descriptionHeader) &&
-    (mapping.amountMode === 'SIGNED_AMOUNT'
-      ? Boolean(mapping.amountHeader) && Boolean(mapping.negativeMeans)
-      : Boolean(mapping.debitHeader) && Boolean(mapping.creditHeader));
-
-  const canSave = sampleFile !== null && canPreview;
+  const clientFieldErrors = useMemo(
+    () => validatePdfWizardMapping(formState, mapping),
+    [formState, mapping],
+  );
+  const canPreview = sampleFile !== null && selectedCandidate !== undefined;
+  const canSave = canPreview && step === 'parser-preview';
   const isAnalyzePending = analyzeMutation.isPending;
   const isPreviewPending = previewMutation.isPending;
   const isSavePending = saveMutation.isPending;
@@ -394,6 +579,8 @@ export function PdfStatementFormatWizardDialog({
       defaultCurrencyIsoCode: 'USD',
       accountId: initialAccountId ?? '',
     });
+    setTouchedFields({});
+    setSubmitAttempted(false);
     analyzeMutation.reset();
     previewMutation.reset();
     saveMutation.reset();
@@ -418,6 +605,8 @@ export function PdfStatementFormatWizardDialog({
     setMapping(nextMapping);
     setMinimumRows(deriveMinimumRows(candidate));
     setYearSource('EXPLICIT_DATE');
+    setTouchedFields({});
+    setSubmitAttempted(false);
   }, []);
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -426,60 +615,164 @@ export function PdfStatementFormatWizardDialog({
     setUnsupportedReasons([]);
   }, []);
 
-  const handleTextFieldChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.currentTarget;
-
-    setFormState((current) => ({
-      ...current,
-      [name]: value,
-    }));
+  const clearActiveFieldErrors = useCallback((...fieldNames: string[]) => {
+    setActiveError((current) => removeFieldErrorsForFields(current, ...fieldNames));
   }, []);
 
-  const handleMappingInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.currentTarget;
+  const markFieldTouched = useCallback((field: PdfWizardValidationField) => {
+    setTouchedFields((current) => {
+      if (current[field]) return current;
 
-    setMapping((current) => ({
-      ...current,
-      [name]: value || undefined,
-    }));
+      return {
+        ...current,
+        [field]: true,
+      };
+    });
   }, []);
 
-  const handleCurrencyChange = useCallback((value: string) => {
-    setFormState((current) => ({ ...current, defaultCurrencyIsoCode: value }));
-  }, []);
+  const handleTextFieldChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = event.currentTarget;
 
-  const handleDateHeaderChange = useCallback((value: string) => {
-    setMapping((current) => ({ ...current, dateHeader: normalizeSelectValue(value) }));
-  }, []);
+      setFormState((current) => ({
+        ...current,
+        [name]: value,
+      }));
+      clearActiveFieldErrors(name);
+    },
+    [clearActiveFieldErrors],
+  );
 
-  const handleDescriptionHeaderChange = useCallback((value: string) => {
-    setMapping((current) => ({ ...current, descriptionHeader: normalizeSelectValue(value) }));
-  }, []);
+  const handleTextFieldBlur = useCallback(
+    (event: React.FocusEvent<HTMLInputElement>) => {
+      const fieldName = event.currentTarget.name as PdfWizardValidationField;
 
-  const handleAmountHeaderChange = useCallback((value: string) => {
-    setMapping((current) => ({ ...current, amountHeader: normalizeSelectValue(value) }));
-  }, []);
+      if (REQUIRED_FORM_FIELD_NAMES.has(fieldName)) {
+        markFieldTouched(fieldName);
+      }
+    },
+    [markFieldTouched],
+  );
 
-  const handleDebitHeaderChange = useCallback((value: string) => {
-    setMapping((current) => ({ ...current, debitHeader: normalizeSelectValue(value) }));
-  }, []);
+  const handleMappingInputChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = event.currentTarget;
+      const fieldName = PDF_WIZARD_MAPPING_FIELD_BY_INPUT_NAME[name];
 
-  const handleCreditHeaderChange = useCallback((value: string) => {
-    setMapping((current) => ({ ...current, creditHeader: normalizeSelectValue(value) }));
-  }, []);
+      setMapping((current) => ({
+        ...current,
+        [name]: value || undefined,
+      }));
+      if (fieldName) {
+        clearActiveFieldErrors(fieldName, name);
+      }
+    },
+    [clearActiveFieldErrors],
+  );
 
-  const handleTypeHeaderChange = useCallback((value: string) => {
-    setMapping((current) => ({ ...current, typeHeader: normalizeSelectValue(value) }));
-  }, []);
+  const handleMappingInputBlur = useCallback(
+    (event: React.FocusEvent<HTMLInputElement>) => {
+      const fieldName = PDF_WIZARD_MAPPING_FIELD_BY_INPUT_NAME[event.currentTarget.name];
 
-  const handleAmountModeButtonClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-    const amountMode = event.currentTarget.value as PdfWizardAmountMode;
+      if (fieldName) {
+        markFieldTouched(fieldName);
+      }
+    },
+    [markFieldTouched],
+  );
 
-    setMapping((current) => ({
-      ...current,
-      amountMode,
-    }));
-  }, []);
+  const handleCurrencyChange = useCallback(
+    (value: string) => {
+      setFormState((current) => ({ ...current, defaultCurrencyIsoCode: value }));
+      clearActiveFieldErrors('defaultCurrencyIsoCode');
+    },
+    [clearActiveFieldErrors],
+  );
+
+  const handleCurrencyBlur = useCallback(() => {
+    markFieldTouched('defaultCurrencyIsoCode');
+  }, [markFieldTouched]);
+
+  const handleDateHeaderChange = useCallback(
+    (value: string) => {
+      setMapping((current) => ({ ...current, dateHeader: normalizeSelectValue(value) }));
+      clearActiveFieldErrors('mapping.dateHeader', 'dateHeader');
+    },
+    [clearActiveFieldErrors],
+  );
+
+  const handleDateHeaderBlur = useCallback(() => {
+    markFieldTouched('mapping.dateHeader');
+  }, [markFieldTouched]);
+
+  const handleDescriptionHeaderChange = useCallback(
+    (value: string) => {
+      setMapping((current) => ({ ...current, descriptionHeader: normalizeSelectValue(value) }));
+      clearActiveFieldErrors('mapping.descriptionHeader', 'descriptionHeader');
+    },
+    [clearActiveFieldErrors],
+  );
+
+  const handleDescriptionHeaderBlur = useCallback(() => {
+    markFieldTouched('mapping.descriptionHeader');
+  }, [markFieldTouched]);
+
+  const handleAmountHeaderChange = useCallback(
+    (value: string) => {
+      setMapping((current) => ({ ...current, amountHeader: normalizeSelectValue(value) }));
+      clearActiveFieldErrors('mapping.amountHeader', 'amountHeader');
+    },
+    [clearActiveFieldErrors],
+  );
+
+  const handleAmountHeaderBlur = useCallback(() => {
+    markFieldTouched('mapping.amountHeader');
+  }, [markFieldTouched]);
+
+  const handleDebitHeaderChange = useCallback(
+    (value: string) => {
+      setMapping((current) => ({ ...current, debitHeader: normalizeSelectValue(value) }));
+      clearActiveFieldErrors('mapping.debitHeader', 'debitHeader');
+    },
+    [clearActiveFieldErrors],
+  );
+
+  const handleDebitHeaderBlur = useCallback(() => {
+    markFieldTouched('mapping.debitHeader');
+  }, [markFieldTouched]);
+
+  const handleCreditHeaderChange = useCallback(
+    (value: string) => {
+      setMapping((current) => ({ ...current, creditHeader: normalizeSelectValue(value) }));
+      clearActiveFieldErrors('mapping.creditHeader', 'creditHeader');
+    },
+    [clearActiveFieldErrors],
+  );
+
+  const handleCreditHeaderBlur = useCallback(() => {
+    markFieldTouched('mapping.creditHeader');
+  }, [markFieldTouched]);
+
+  const handleTypeHeaderChange = useCallback(
+    (value: string) => {
+      setMapping((current) => ({ ...current, typeHeader: normalizeSelectValue(value) }));
+      clearActiveFieldErrors('mapping.typeHeader', 'typeHeader');
+    },
+    [clearActiveFieldErrors],
+  );
+
+  const handleAmountModeButtonClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      const amountMode = event.currentTarget.value as PdfWizardAmountMode;
+
+      setMapping((current) => ({
+        ...current,
+        amountMode,
+      }));
+      clearActiveFieldErrors('mapping.amountMode', 'amountMode');
+    },
+    [clearActiveFieldErrors],
+  );
 
   const handleYearSourceButtonClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     setYearSource(event.currentTarget.value as PdfWizardYearSource);
@@ -493,8 +786,9 @@ export function PdfStatementFormatWizardDialog({
         ...current,
         negativeMeans,
       }));
+      clearActiveFieldErrors('mapping.negativeMeans', 'negativeMeans');
     },
-    [],
+    [clearActiveFieldErrors],
   );
 
   const handleAnalyze = useCallback(() => {
@@ -554,6 +848,15 @@ export function PdfStatementFormatWizardDialog({
   const handlePreview = useCallback(() => {
     if (!sampleFile || !selectedCandidate || !canPreview) return;
 
+    setSubmitAttempted(true);
+
+    const validationErrors = validatePdfWizardMapping(formState, mapping);
+
+    if (hasClientFieldErrors(validationErrors)) {
+      focusFirstInvalidField(validationErrors);
+      return;
+    }
+
     const requestMapping = sanitizeMapping(mapping);
     const requestHeaderMustContain = deriveHeaderMustContain(selectedCandidate, requestMapping);
 
@@ -598,6 +901,16 @@ export function PdfStatementFormatWizardDialog({
 
   const handleSave = useCallback(() => {
     if (!sampleFile || !selectedCandidate || !canSave) return;
+
+    setSubmitAttempted(true);
+
+    const validationErrors = validatePdfWizardMapping(formState, mapping);
+
+    if (hasClientFieldErrors(validationErrors)) {
+      setStep('mapping');
+      window.requestAnimationFrame(() => focusFirstInvalidField(validationErrors));
+      return;
+    }
 
     const requestMapping = sanitizeMapping(mapping);
     const requestHeaderMustContain = deriveHeaderMustContain(selectedCandidate, requestMapping);
@@ -656,6 +969,8 @@ export function PdfStatementFormatWizardDialog({
     setMapping({ amountMode: DEFAULT_AMOUNT_MODE });
     setPreviewDiagnostics([]);
     setPreviewTransactions([]);
+    setTouchedFields({});
+    setSubmitAttempted(false);
     setStep('upload');
   }, []);
 
@@ -672,6 +987,69 @@ export function PdfStatementFormatWizardDialog({
   const handleCancel = useCallback(() => {
     handleDialogOpenChange(false);
   }, [handleDialogOpenChange]);
+
+  const getVisibleClientFieldError = useCallback(
+    (field: PdfWizardValidationField) => {
+      const message = clientFieldErrors[field];
+
+      if (!message) return undefined;
+
+      return submitAttempted || touchedFields[field] ? message : undefined;
+    },
+    [clientFieldErrors, submitAttempted, touchedFields],
+  );
+
+  const getVisibleFieldError = useCallback(
+    (field: PdfWizardValidationField, ...fieldNames: string[]) =>
+      getVisibleClientFieldError(field) ?? getFieldError(fieldErrors, ...fieldNames),
+    [fieldErrors, getVisibleClientFieldError],
+  );
+
+  const displayNameError = getVisibleFieldError('displayName', 'displayName');
+  const bankNameError = getVisibleFieldError('bankName', 'bankName');
+  const defaultCurrencyError = getVisibleFieldError(
+    'defaultCurrencyIsoCode',
+    'defaultCurrencyIsoCode',
+  );
+  const dateHeaderError = getVisibleFieldError(
+    'mapping.dateHeader',
+    'mapping.dateHeader',
+    'dateHeader',
+  );
+  const dateFormatError = getVisibleFieldError(
+    'mapping.dateFormat',
+    'mapping.dateFormat',
+    'dateFormat',
+  );
+  const descriptionHeaderError = getVisibleFieldError(
+    'mapping.descriptionHeader',
+    'mapping.descriptionHeader',
+    'descriptionHeader',
+  );
+  const amountHeaderError = getVisibleFieldError(
+    'mapping.amountHeader',
+    'mapping.amountHeader',
+    'amountHeader',
+  );
+  const negativeMeansError = getVisibleFieldError(
+    'mapping.negativeMeans',
+    'mapping.negativeMeans',
+    'negativeMeans',
+  );
+  const debitHeaderError = getVisibleFieldError(
+    'mapping.debitHeader',
+    'mapping.debitHeader',
+    'debitHeader',
+  );
+  const creditHeaderError = getVisibleFieldError(
+    'mapping.creditHeader',
+    'mapping.creditHeader',
+    'creditHeader',
+  );
+  const typeHeaderError = getFieldError(fieldErrors, 'mapping.typeHeader', 'typeHeader');
+  const amountModeError = getFieldError(fieldErrors, 'mapping.amountMode');
+  const yearSourceError = getFieldError(fieldErrors, 'yearSource');
+  const accountIdError = getFieldError(fieldErrors, 'accountId');
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
@@ -815,44 +1193,68 @@ export function PdfStatementFormatWizardDialog({
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label htmlFor="pdf-wizard-display-name" className="text-sm font-medium">
+                  <FieldLabel htmlFor="pdf-wizard-display-name" required>
                     Display name
-                  </label>
+                  </FieldLabel>
                   <Input
                     id="pdf-wizard-display-name"
                     name="displayName"
                     value={formState.displayName}
                     onChange={handleTextFieldChange}
+                    onBlur={handleTextFieldBlur}
                     maxLength={100}
                     required
+                    aria-invalid={Boolean(displayNameError) || undefined}
+                    aria-describedby={
+                      displayNameError ? 'pdf-wizard-display-name-error' : undefined
+                    }
+                    className={displayNameError ? INVALID_INPUT_CLASS_NAME : undefined}
                   />
-                  <FieldErrorMessage message={getFieldError(fieldErrors, 'displayName')} />
+                  <FieldErrorMessage
+                    id="pdf-wizard-display-name-error"
+                    message={displayNameError}
+                  />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="pdf-wizard-bank-name" className="text-sm font-medium">
+                  <FieldLabel htmlFor="pdf-wizard-bank-name" required>
                     Bank name
-                  </label>
+                  </FieldLabel>
                   <Input
                     id="pdf-wizard-bank-name"
                     name="bankName"
                     value={formState.bankName}
                     onChange={handleTextFieldChange}
+                    onBlur={handleTextFieldBlur}
                     maxLength={100}
                     required
+                    aria-invalid={Boolean(bankNameError) || undefined}
+                    aria-describedby={bankNameError ? 'pdf-wizard-bank-name-error' : undefined}
+                    className={bankNameError ? INVALID_INPUT_CLASS_NAME : undefined}
                   />
-                  <FieldErrorMessage message={getFieldError(fieldErrors, 'bankName')} />
+                  <FieldErrorMessage id="pdf-wizard-bank-name-error" message={bankNameError} />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="pdf-wizard-currency" className="text-sm font-medium">
+                  <FieldLabel htmlFor="pdf-wizard-currency" required>
                     Default currency
-                  </label>
+                  </FieldLabel>
                   <Select
                     value={formState.defaultCurrencyIsoCode}
                     onValueChange={handleCurrencyChange}
                   >
-                    <SelectTrigger id="pdf-wizard-currency">
+                    <SelectTrigger
+                      id="pdf-wizard-currency"
+                      onBlur={handleCurrencyBlur}
+                      aria-invalid={Boolean(defaultCurrencyError) || undefined}
+                      aria-required="true"
+                      aria-describedby={
+                        defaultCurrencyError ? 'pdf-wizard-currency-error' : undefined
+                      }
+                      className={
+                        defaultCurrencyError ? INVALID_SELECT_TRIGGER_CLASS_NAME : undefined
+                      }
+                    >
                       <SelectValue placeholder="Select currency" />
                     </SelectTrigger>
                     <SelectContent>
@@ -864,7 +1266,8 @@ export function PdfStatementFormatWizardDialog({
                     </SelectContent>
                   </Select>
                   <FieldErrorMessage
-                    message={getFieldError(fieldErrors, 'defaultCurrencyIsoCode')}
+                    id="pdf-wizard-currency-error"
+                    message={defaultCurrencyError}
                   />
                 </div>
 
@@ -880,7 +1283,7 @@ export function PdfStatementFormatWizardDialog({
                     maxLength={100}
                     placeholder="Optional parser preview value"
                   />
-                  <FieldErrorMessage message={getFieldError(fieldErrors, 'accountId')} />
+                  <FieldErrorMessage message={accountIdError} />
                 </div>
               </div>
 
@@ -892,25 +1295,29 @@ export function PdfStatementFormatWizardDialog({
                   headers={headers}
                   placeholder="Select column"
                   onValueChange={handleDateHeaderChange}
-                  error={getFieldError(fieldErrors, 'mapping.dateHeader', 'dateHeader')}
+                  onBlur={handleDateHeaderBlur}
+                  required
+                  error={dateHeaderError}
                 />
 
                 <div className="space-y-2">
-                  <label htmlFor="pdf-wizard-date-format" className="text-sm font-medium">
+                  <FieldLabel htmlFor="pdf-wizard-date-format" required>
                     Date format
-                  </label>
+                  </FieldLabel>
                   <Input
                     id="pdf-wizard-date-format"
                     name="dateFormat"
                     value={mapping.dateFormat ?? ''}
                     onChange={handleMappingInputChange}
+                    onBlur={handleMappingInputBlur}
                     maxLength={50}
-                    required={Boolean(mapping.dateHeader)}
+                    required
                     placeholder="MM/dd/uuuu"
+                    aria-invalid={Boolean(dateFormatError) || undefined}
+                    aria-describedby={dateFormatError ? 'pdf-wizard-date-format-error' : undefined}
+                    className={dateFormatError ? INVALID_INPUT_CLASS_NAME : undefined}
                   />
-                  <FieldErrorMessage
-                    message={getFieldError(fieldErrors, 'mapping.dateFormat', 'dateFormat')}
-                  />
+                  <FieldErrorMessage id="pdf-wizard-date-format-error" message={dateFormatError} />
                 </div>
 
                 <ColumnSelect
@@ -920,11 +1327,9 @@ export function PdfStatementFormatWizardDialog({
                   headers={headers}
                   placeholder="Select column"
                   onValueChange={handleDescriptionHeaderChange}
-                  error={getFieldError(
-                    fieldErrors,
-                    'mapping.descriptionHeader',
-                    'descriptionHeader',
-                  )}
+                  onBlur={handleDescriptionHeaderBlur}
+                  required
+                  error={descriptionHeaderError}
                 />
 
                 <ColumnSelect
@@ -934,7 +1339,7 @@ export function PdfStatementFormatWizardDialog({
                   headers={headers}
                   placeholder="No column"
                   onValueChange={handleTypeHeaderChange}
-                  error={getFieldError(fieldErrors, 'mapping.typeHeader', 'typeHeader')}
+                  error={typeHeaderError}
                 />
               </div>
 
@@ -957,7 +1362,7 @@ export function PdfStatementFormatWizardDialog({
                       </Button>
                     ))}
                   </div>
-                  <FieldErrorMessage message={getFieldError(fieldErrors, 'yearSource')} />
+                  <FieldErrorMessage message={yearSourceError} />
                 </div>
 
                 <div>
@@ -978,7 +1383,7 @@ export function PdfStatementFormatWizardDialog({
                       </Button>
                     ))}
                   </div>
-                  <FieldErrorMessage message={getFieldError(fieldErrors, 'mapping.amountMode')} />
+                  <FieldErrorMessage message={amountModeError} />
                 </div>
 
                 {mapping.amountMode === 'SIGNED_AMOUNT' ? (
@@ -990,27 +1395,35 @@ export function PdfStatementFormatWizardDialog({
                       headers={headers}
                       placeholder="Select column"
                       onValueChange={handleAmountHeaderChange}
-                      error={getFieldError(fieldErrors, 'mapping.amountHeader', 'amountHeader')}
+                      onBlur={handleAmountHeaderBlur}
+                      required
+                      error={amountHeaderError}
                     />
 
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">Negative amount meaning</p>
-                      {!mapping.negativeMeans ? (
-                        <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-                          Choose how negative amounts should be treated before previewing.
-                        </div>
-                      ) : null}
+                      <p className="text-sm font-medium">
+                        Negative amount meaning
+                        <RequiredIndicator />
+                      </p>
                       <div className="grid gap-2">
                         {NEGATIVE_MEANS_OPTIONS.map((negativeMeans) => (
                           <Button
                             key={negativeMeans}
+                            id={`pdf-wizard-negative-means-${negativeMeans.toLowerCase()}`}
                             type="button"
                             value={negativeMeans}
                             variant={
                               mapping.negativeMeans === negativeMeans ? 'default' : 'outline'
                             }
                             onClick={handleNegativeMeansButtonClick}
-                            className="h-auto justify-start whitespace-normal"
+                            aria-invalid={Boolean(negativeMeansError) || undefined}
+                            aria-describedby={
+                              negativeMeansError ? 'pdf-wizard-negative-means-error' : undefined
+                            }
+                            className={cn(
+                              'h-auto justify-start whitespace-normal',
+                              negativeMeansError ? INVALID_BUTTON_CLASS_NAME : undefined,
+                            )}
                           >
                             {negativeMeans === 'CREDIT'
                               ? 'Negative means money received'
@@ -1019,11 +1432,8 @@ export function PdfStatementFormatWizardDialog({
                         ))}
                       </div>
                       <FieldErrorMessage
-                        message={getFieldError(
-                          fieldErrors,
-                          'mapping.negativeMeans',
-                          'negativeMeans',
-                        )}
+                        id="pdf-wizard-negative-means-error"
+                        message={negativeMeansError}
                       />
                     </div>
                   </div>
@@ -1036,7 +1446,9 @@ export function PdfStatementFormatWizardDialog({
                       headers={headers}
                       placeholder="Select column"
                       onValueChange={handleDebitHeaderChange}
-                      error={getFieldError(fieldErrors, 'mapping.debitHeader', 'debitHeader')}
+                      onBlur={handleDebitHeaderBlur}
+                      required
+                      error={debitHeaderError}
                     />
                     <ColumnSelect
                       id="pdf-wizard-credit-header"
@@ -1045,7 +1457,9 @@ export function PdfStatementFormatWizardDialog({
                       headers={headers}
                       placeholder="Select column"
                       onValueChange={handleCreditHeaderChange}
-                      error={getFieldError(fieldErrors, 'mapping.creditHeader', 'creditHeader')}
+                      onBlur={handleCreditHeaderBlur}
+                      required
+                      error={creditHeaderError}
                     />
                   </div>
                 )}

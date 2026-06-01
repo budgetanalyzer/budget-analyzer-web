@@ -66,6 +66,23 @@ const previewResponse: PdfWizardPreviewResponse = {
   diagnostics: ['Review the parsed rows before saving.'],
 };
 
+const analysisResponseWithoutInference: PdfWizardAnalysisResponse = {
+  candidates: [
+    {
+      candidateId: 'candidate-blank',
+      pageNumber: 1,
+      rowCount: 4,
+      repeatedHeaderCount: 0,
+      confidence: 0.9,
+      headers: ['Posted', 'Details', 'Value'],
+      sampleRows: [['05/01', 'Coffee', '-4.50']],
+      inferredMapping: {
+        amountMode: 'SIGNED_AMOUNT',
+      },
+    },
+  ],
+};
+
 const savedFormat: StatementFormat = {
   id: 100,
   displayName: 'Custom Checking PDF',
@@ -145,6 +162,131 @@ async function analyzeAndOpenMapping(user: ReturnType<typeof userEvent.setup>, f
 }
 
 describe('PdfStatementFormatWizardDialog', () => {
+  it('opens the mapping step with required markers but no required errors', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+
+    mockHookDefaults(analysisResponseWithoutInference);
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await analyzeAndOpenMapping(user, file);
+
+    expect(screen.getAllByText('Required')).toHaveLength(8);
+    expect(screen.queryByText('Enter a display name.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Select a date column.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Preview Mapping/ })).toBeEnabled();
+  });
+
+  it('validates only the blurred empty text field before submit', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+
+    mockHookDefaults(analysisResponseWithoutInference);
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await analyzeAndOpenMapping(user, file);
+    await user.click(screen.getByLabelText('Display name'));
+    await user.tab();
+
+    expect(screen.getByText('Enter a display name.')).toBeInTheDocument();
+    expect(screen.queryByText('Enter a bank name.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Select a date column.')).not.toBeInTheDocument();
+  });
+
+  it('does not reveal every required error when one field is edited', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+
+    mockHookDefaults(analysisResponseWithoutInference);
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await analyzeAndOpenMapping(user, file);
+    await user.type(screen.getByLabelText('Display name'), 'Custom Checking PDF');
+
+    expect(screen.queryByText('Enter a display name.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Enter a bank name.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Select a date column.')).not.toBeInTheDocument();
+  });
+
+  it('shows all blocking missing-field errors on preview without calling the preview mutation', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+    const { previewMutate } = mockHookDefaults(analysisResponseWithoutInference);
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await analyzeAndOpenMapping(user, file);
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+
+    expect(screen.getByText('Enter a display name.')).toBeInTheDocument();
+    expect(screen.getByText('Enter a bank name.')).toBeInTheDocument();
+    expect(screen.getByText('Select a date column.')).toBeInTheDocument();
+    expect(screen.getByText('Enter a date format.')).toBeInTheDocument();
+    expect(screen.getByText('Select a description column.')).toBeInTheDocument();
+    expect(screen.getByText('Select an amount column.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Choose how negative amounts should be interpreted.'),
+    ).toBeInTheDocument();
+    expect(previewMutate).not.toHaveBeenCalled();
+  });
+
+  it('removes a client-side field error as soon as that field is fixed after preview validation', async () => {
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
+
+    mockHookDefaults(analysisResponseWithoutInference);
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={vi.fn()}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    await analyzeAndOpenMapping(user, file);
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+
+    expect(screen.getByText('Enter a display name.')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Display name'), 'Custom Checking PDF');
+
+    expect(screen.queryByText('Enter a display name.')).not.toBeInTheDocument();
+    expect(screen.getByText('Enter a bank name.')).toBeInTheDocument();
+  });
+
   it('analyzes a sample, reviews a candidate, previews a read-only parse, and saves the created format', async () => {
     const user = userEvent.setup();
     const onSaved = vi.fn();
@@ -292,11 +434,10 @@ describe('PdfStatementFormatWizardDialog', () => {
     expect(screen.getByRole('button', { name: /Choose another file/ })).toBeInTheDocument();
   });
 
-  it('requires an explicit negative amount direction when inference omits it', async () => {
+  it('keeps preview available and validates negative amount direction on click', async () => {
     const user = userEvent.setup();
     const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
-
-    mockHookDefaults({
+    const { previewMutate } = mockHookDefaults({
       candidates: [
         {
           ...analysisResponse.candidates![0],
@@ -327,9 +468,16 @@ describe('PdfStatementFormatWizardDialog', () => {
     await user.type(screen.getByLabelText('Bank name'), 'Example Bank');
 
     expect(
-      screen.getByText('Choose how negative amounts should be treated before previewing.'),
+      screen.queryByText('Choose how negative amounts should be interpreted.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Preview Mapping/ })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: /Preview Mapping/ }));
+
+    expect(
+      screen.getByText('Choose how negative amounts should be interpreted.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Preview Mapping/ })).toBeDisabled();
+    expect(previewMutate).not.toHaveBeenCalled();
   });
 
   it('sends debit and credit headers after switching away from signed amount mode', async () => {

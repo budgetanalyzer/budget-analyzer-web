@@ -86,6 +86,19 @@ function WizardHarness({ onSaved }: { onSaved: (format: StatementFormat) => void
 }
 
 describe('StatementFormatWizardDialog', () => {
+  it('routes a CSV sample directly to the CSV child wizard', async () => {
+    const user = userEvent.setup();
+    const file = new File(['date,amount'], 'sample.csv', { type: 'text/csv' });
+
+    renderWithProviders(<WizardHarness onSaved={vi.fn()} />);
+
+    await user.upload(screen.getByLabelText('Sample file'), file);
+
+    expect(await screen.findByRole('dialog', { name: 'CSV child' })).toBeInTheDocument();
+    expect(screen.getByText('CSV sample: sample.csv')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Continue/ })).not.toBeInTheDocument();
+  });
+
   it('closes and resets the selected sample after a PDF child saves', async () => {
     const user = userEvent.setup();
     const onSaved = vi.fn();
@@ -94,7 +107,6 @@ describe('StatementFormatWizardDialog', () => {
     renderWithProviders(<WizardHarness onSaved={onSaved} />);
 
     await user.upload(screen.getByLabelText('Sample file'), file);
-    await user.click(screen.getByRole('button', { name: /Continue/ }));
 
     expect(await screen.findByRole('dialog', { name: 'PDF child' })).toBeInTheDocument();
     expect(screen.getByText('PDF sample: sample.pdf')).toBeInTheDocument();

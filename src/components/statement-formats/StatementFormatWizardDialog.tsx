@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import { Upload } from 'lucide-react';
 import { CsvStatementFormatWizardDialog } from '@/components/statement-formats/csv-wizard/CsvStatementFormatWizardDialog';
 import { PdfStatementFormatWizardDialog } from '@/components/statement-formats/pdf-wizard/PdfStatementFormatWizardDialog';
 import { Button } from '@/components/ui/Button';
@@ -65,14 +64,14 @@ export function StatementFormatWizardDialog({
   );
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setSampleFile(event.currentTarget.files?.[0] ?? null);
+    const nextFile = event.currentTarget.files?.[0] ?? null;
+
+    setSampleFile(nextFile);
     setFileError(null);
-  }, []);
 
-  const handleContinue = useCallback(() => {
-    if (!sampleFile) return;
+    if (!nextFile) return;
 
-    const nextBranch = detectWizardBranch(sampleFile);
+    const nextBranch = detectWizardBranch(nextFile);
 
     if (!nextBranch) {
       setFileError('Choose a CSV or PDF sample file.');
@@ -80,7 +79,7 @@ export function StatementFormatWizardDialog({
     }
 
     setBranch(nextBranch);
-  }, [sampleFile]);
+  }, []);
 
   const handleCancel = useCallback(() => {
     handleDialogOpenChange(false);
@@ -151,10 +150,6 @@ export function StatementFormatWizardDialog({
         <DialogFooter className="mt-6 gap-2">
           <Button type="button" variant="outline" onClick={handleCancel}>
             Cancel
-          </Button>
-          <Button type="button" onClick={handleContinue} disabled={!sampleFile}>
-            <Upload className="mr-2 h-4 w-4" />
-            Continue
           </Button>
         </DialogFooter>
       </DialogContent>

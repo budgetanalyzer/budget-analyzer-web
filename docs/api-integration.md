@@ -117,11 +117,12 @@ or `Custom`, and submits the selected `id` as the `statementFormatId` query
 parameter. Users with `statementformats:write` also see `New format`, which
 opens a user statement-format wizard entry point without submitting a sentinel
 option to the preview API. The wizard accepts a CSV or text-based PDF sample,
-routes to the matching parser setup flow, and saves the resulting user-scoped
-format. After the wizard saves a format, the import controls stay open, the
-existing account ID is preserved, the saved format is selected by `id`, and
-inline success feedback prompts the user to choose the actual statement file
-before running normal preview. PDF wizard analysis shows a dedicated
+immediately routes to the matching parser setup flow after file selection, and
+saves the resulting user-scoped format. After the wizard saves a format, the
+import controls stay open, the existing account ID is preserved, the saved
+format is selected by `id`, and inline success feedback prompts the user to
+choose the actual statement file before running normal preview. PDF wizard
+analysis shows a dedicated
 unsupported-file state for backend rejection reasons and clear
 scanned/no-text/table-detection failures. PDF preview diagnostics are shown
 only when they are user-facing; parser revision, header-token, candidate, and
