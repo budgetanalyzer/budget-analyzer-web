@@ -1,6 +1,6 @@
 # Statement Format Visibility Management UI Plan
 
-**Status:** Draft
+**Status:** Complete
 **Scope:** `budget-analyzer-web`
 **Source plan:** `/workspace/transaction-service/docs/plans/user-scoped-statement-format-wizard.md`, Phase 5 steps 8 and 9
 
@@ -405,3 +405,11 @@ npm run test:coverage
 - Tests cover hiding a system format, hiding a custom format, restoring a
   hidden format, and import dropdown exclusion with management recovery.
 - Documentation reflects the new API usage and permissions.
+
+## Completion Notes
+
+Completed on 2026-06-02. Steps 7 and 8 are covered by MSW-backed management
+page tests, import-dropdown exclusion tests, profile-menu permission tests, and
+updated API/authentication documentation. The implementation uses the backend
+visibility contract only; no client-side hidden-format preference fallback was
+added.

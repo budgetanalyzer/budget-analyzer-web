@@ -20,6 +20,7 @@ import {
 import { statementFormatApi } from '@/api/statementFormatApi';
 import { server } from '@/testing/mocks/server';
 import { createTestQueryClient } from '@/testing/test-utils';
+import { ApiError } from '@/types/apiError';
 import type { StatementFormat } from '@/types/statementFormat';
 
 const csvFormat: StatementFormat = {
@@ -90,6 +91,50 @@ describe('useStatementFormats', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(capturedSearchParams).toEqual(['?includeHidden=true']);
+    expect(
+      queryClient.getQueryData(['statement-formats', 'list', { includeHidden: true }]),
+    ).toEqual([csvFormat, hiddenFormat]);
+  });
+
+  it('keeps normal and includeHidden list variants in distinct query cache entries', async () => {
+    const queryClient = createTestQueryClient();
+    const hiddenFormat: StatementFormat = {
+      ...csvFormat,
+      id: 2,
+      displayName: 'Hidden CSV',
+      hidden: true,
+    };
+
+    server.use(
+      http.get('/api/v1/statement-formats', ({ request }) => {
+        const url = new URL(request.url);
+
+        return HttpResponse.json(
+          url.searchParams.get('includeHidden') === 'true'
+            ? [csvFormat, hiddenFormat]
+            : [csvFormat],
+        );
+      }),
+    );
+
+    const { result: visibleResult } = renderHook(() => useStatementFormats(), {
+      wrapper: createWrapper(queryClient),
+    });
+    const { result: managementResult } = renderHook(
+      () => useStatementFormats({ includeHidden: true }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    await waitFor(() => {
+      expect(visibleResult.current.isSuccess).toBe(true);
+      expect(managementResult.current.isSuccess).toBe(true);
+    });
+
+    expect(
+      queryClient.getQueryData(['statement-formats', 'list', { includeHidden: false }]),
+    ).toEqual([csvFormat]);
     expect(
       queryClient.getQueryData(['statement-formats', 'list', { includeHidden: true }]),
     ).toEqual([csvFormat, hiddenFormat]);
@@ -213,6 +258,43 @@ describe('statement-format mutation hooks', () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['statement-formats'] });
     expect(invalidateSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('surfaces hide and unhide mutation API errors without swallowing messages', async () => {
+    server.use(
+      http.post('/api/v1/statement-formats/:id/hide', () => {
+        return HttpResponse.json(
+          { type: 'APPLICATION_ERROR', message: 'Cannot hide this format' },
+          { status: 409 },
+        );
+      }),
+      http.post('/api/v1/statement-formats/:id/unhide', () => {
+        return HttpResponse.json(
+          { type: 'FORBIDDEN', message: 'Missing statement format write permission' },
+          { status: 403 },
+        );
+      }),
+    );
+
+    const { result: hideResult } = renderHook(() => useHideStatementFormat(), {
+      wrapper: createWrapper(),
+    });
+    const { result: unhideResult } = renderHook(() => useUnhideStatementFormat(), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(hideResult.current.mutateAsync(1)).rejects.toMatchObject({
+      status: 409,
+      message: 'Cannot hide this format',
+    });
+    await expect(unhideResult.current.mutateAsync(1)).rejects.toMatchObject({
+      status: 403,
+      message: 'Missing statement format write permission',
+    });
+    await waitFor(() => {
+      expect(hideResult.current.error).toBeInstanceOf(ApiError);
+      expect(unhideResult.current.error).toBeInstanceOf(ApiError);
+    });
   });
 
   it('invalidates the statement-format list after CSV wizard save success', async () => {
