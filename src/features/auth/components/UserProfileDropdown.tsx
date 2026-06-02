@@ -1,4 +1,4 @@
-import { FileSpreadsheet, LogOut } from 'lucide-react';
+import { ChevronDown, FileSpreadsheet, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCallback } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
@@ -42,8 +42,20 @@ export function UserProfileDropdown() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
-          <Avatar src={user.picture} alt={user.name || user.email} fallback={fallback} />
+        <Button
+          variant="ghost"
+          className="relative h-10 gap-1.5 rounded-full px-1.5 pr-2 sm:px-2 sm:pr-3"
+        >
+          <Avatar
+            src={user.picture}
+            alt={user.name || user.email}
+            fallback={fallback}
+            className="h-8 w-8"
+          />
+          <span aria-hidden="true" className="hidden text-sm font-medium sm:inline">
+            Preferences
+          </span>
+          <ChevronDown aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
@@ -62,7 +74,7 @@ export function UserProfileDropdown() {
           <>
             <DropdownMenuItem onClick={handleStatementFormatsClick}>
               <FileSpreadsheet className="mr-2 h-4 w-4" />
-              <span>Statement formats</span>
+              <span>Statement Formats</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>

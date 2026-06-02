@@ -278,7 +278,7 @@ gate the admin cross-user features (search page, dashboard tile, sidebar item).
 User-facing self-scope features check the unscoped variants.
 
 The user statement-format visibility page is route-gated with
-`statementformats:read` and is discoverable from the profile dropdown only for
+`statementformats:read` and is discoverable from the Preferences menu only for
 users with that permission. Its hide/restore actions and the transaction import
 `New format` affordance are gated with
 `usePermission('statementformats:write')`, matching the CSV/PDF wizard and
