@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient, UseQueryResult } from '@tanstack
 import {
   StatementFormat,
   CreateStatementFormatRequest,
+  StatementFormatListOptions,
   UpdateStatementFormatRequest,
 } from '@/types/statementFormat';
 import { statementFormatApi } from '@/api/statementFormatApi';
@@ -13,6 +14,12 @@ import { ApiError } from '@/types/apiError';
  */
 export const statementFormatsKeys = {
   all: ['statement-formats'] as const,
+  list: (options?: StatementFormatListOptions) =>
+    [
+      ...statementFormatsKeys.all,
+      'list',
+      { includeHidden: Boolean(options?.includeHidden) },
+    ] as const,
   detail: (id: number) => [...statementFormatsKeys.all, 'detail', id] as const,
 };
 
@@ -20,10 +27,12 @@ export const statementFormatsKeys = {
  * Fetch the list of statement formats
  * Cached for 5 minutes since formats may change occasionally
  */
-export const useStatementFormats = (): UseQueryResult<StatementFormat[], ApiError> => {
+export const useStatementFormats = (
+  options?: StatementFormatListOptions,
+): UseQueryResult<StatementFormat[], ApiError> => {
   return useQuery<StatementFormat[], ApiError>({
-    queryKey: statementFormatsKeys.all,
-    queryFn: () => statementFormatApi.listFormats(),
+    queryKey: statementFormatsKeys.list(options),
+    queryFn: () => statementFormatApi.listFormats(options),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
   });
@@ -82,6 +91,34 @@ export const useUpdateStatementFormat = () => {
       await queryClient.invalidateQueries({
         queryKey: statementFormatsKeys.detail(updatedFormat.id),
       });
+    },
+  });
+};
+
+/**
+ * Hide a statement format from the current user's normal import lists
+ */
+export const useHideStatementFormat = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, ApiError, number>({
+    mutationFn: (id) => statementFormatApi.hideFormat(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: statementFormatsKeys.all });
+    },
+  });
+};
+
+/**
+ * Restore a hidden statement format to the current user's normal import lists
+ */
+export const useUnhideStatementFormat = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, ApiError, number>({
+    mutationFn: (id) => statementFormatApi.unhideFormat(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: statementFormatsKeys.all });
     },
   });
 };

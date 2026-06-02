@@ -11,6 +11,7 @@ import {
   PdfWizardPreviewResponse,
   PdfWizardSaveRequest,
   StatementFormat,
+  StatementFormatListOptions,
   UpdateStatementFormatRequest,
 } from '@/types/statementFormat';
 
@@ -30,8 +31,10 @@ export const statementFormatApi = {
    * Get all statement formats
    * GET /v1/statement-formats
    */
-  listFormats: async (): Promise<StatementFormat[]> => {
-    const response = await apiClient.get<StatementFormat[]>('/v1/statement-formats');
+  listFormats: async (options?: StatementFormatListOptions): Promise<StatementFormat[]> => {
+    const response = await apiClient.get<StatementFormat[]>('/v1/statement-formats', {
+      params: options?.includeHidden ? { includeHidden: true } : undefined,
+    });
     return response.data;
   },
 
@@ -63,6 +66,22 @@ export const statementFormatApi = {
   ): Promise<StatementFormat> => {
     const response = await apiClient.put<StatementFormat>(`/v1/statement-formats/${id}`, data);
     return response.data;
+  },
+
+  /**
+   * Hide a statement format from the current user's normal import lists
+   * POST /v1/statement-formats/{id}/hide
+   */
+  hideFormat: async (id: number): Promise<void> => {
+    await apiClient.post<void>(`/v1/statement-formats/${id}/hide`);
+  },
+
+  /**
+   * Restore a hidden statement format to the current user's normal import lists
+   * POST /v1/statement-formats/{id}/unhide
+   */
+  unhideFormat: async (id: number): Promise<void> => {
+    await apiClient.post<void>(`/v1/statement-formats/${id}/unhide`);
   },
 
   /**

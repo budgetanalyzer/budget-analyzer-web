@@ -110,18 +110,22 @@ Statement imports use a two-step review flow:
 1. `POST /api/v1/transactions/preview?statementFormatId=<id>&accountId=<optional-account-id>` uploads the statement file as multipart form data and returns editable preview rows.
 2. `POST /api/v1/transactions/batch` submits the reviewed rows as JSON with the same `previewImportToken`.
 
-The import format dropdown is populated from `GET /api/v1/statement-formats`.
-The UI shows enabled formats whose default currency is available, sorted by
-API-provided `displayName`, disambiguates duplicate visible names with `System`
-or `Custom`, and submits the selected `id` as the `statementFormatId` query
-parameter. Users with `statementformats:write` also see `New format`, which
-opens a user statement-format wizard entry point without submitting a sentinel
-option to the preview API. The wizard accepts a CSV or text-based PDF sample,
-immediately routes to the matching parser setup flow after file selection, and
-saves the resulting user-scoped format. After the wizard saves a format, the
-import controls stay open, the existing account ID is preserved, the saved
-format is selected by `id`, and inline success feedback prompts the user to
-choose the actual statement file before running normal preview. PDF wizard
+The import format dropdown is populated from `GET /api/v1/statement-formats`
+without query parameters, so formats hidden by the current user are omitted by
+the API default. Statement-format management screens call the same list endpoint
+with `includeHidden=true` and use `POST /api/v1/statement-formats/{id}/hide` or
+`POST /api/v1/statement-formats/{id}/unhide` for current-user visibility
+changes. The UI shows enabled formats whose default currency is available,
+sorted by API-provided `displayName`, disambiguates duplicate visible names with
+`System` or `Custom`, and submits the selected `id` as the `statementFormatId`
+query parameter. Users with `statementformats:write` also see `New format`,
+which opens a user statement-format wizard entry point without submitting a
+sentinel option to the preview API. The wizard accepts a CSV or text-based PDF
+sample, immediately routes to the matching parser setup flow after file
+selection, and saves the resulting user-scoped format. After the wizard saves a
+format, the import controls stay open, the existing account ID is preserved, the
+saved format is selected by `id`, and inline success feedback prompts the user
+to choose the actual statement file before running normal preview. PDF wizard
 analysis shows a dedicated
 unsupported-file state for backend rejection reasons and clear
 scanned/no-text/table-detection failures. PDF preview diagnostics are shown
