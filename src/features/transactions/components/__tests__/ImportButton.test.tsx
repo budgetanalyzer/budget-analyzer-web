@@ -405,4 +405,53 @@ describe('ImportButton', () => {
     expect(screen.getByRole('button', { name: 'Shared CSV Custom' })).toBeInTheDocument();
     expect(screen.queryByText(/revision/i)).not.toBeInTheDocument();
   });
+
+  it('uses the default statement-format list so hidden formats are omitted by the API', async () => {
+    const user = userEvent.setup();
+    const capturedSearchParams: string[] = [];
+    const formats: StatementFormat[] = [
+      {
+        id: 20,
+        displayName: 'Visible CSV',
+        formatType: 'CSV',
+        bankName: 'Acme Bank',
+        defaultCurrencyIsoCode: 'USD',
+        scope: 'SYSTEM',
+        enabled: true,
+      },
+      {
+        id: 21,
+        displayName: 'Hidden CSV',
+        formatType: 'CSV',
+        bankName: 'Acme Bank',
+        defaultCurrencyIsoCode: 'USD',
+        scope: 'SYSTEM',
+        enabled: true,
+        hidden: true,
+      },
+    ];
+
+    server.use(
+      http.get('/api/v1/statement-formats', ({ request }) => {
+        const url = new URL(request.url);
+        capturedSearchParams.push(url.search);
+
+        return HttpResponse.json(
+          url.searchParams.get('includeHidden') === 'true'
+            ? formats
+            : formats.filter((format) => !format.hidden),
+        );
+      }),
+      http.get('/api/v1/currencies', () => HttpResponse.json([])),
+    );
+
+    renderWithProviders(<ImportButton />);
+
+    await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
+    await user.click(await screen.findByRole('button', { name: 'Select Format' }));
+
+    expect(screen.getByRole('button', { name: 'Visible CSV' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hidden CSV' })).not.toBeInTheDocument();
+    expect(capturedSearchParams).toEqual(['']);
+  });
 });

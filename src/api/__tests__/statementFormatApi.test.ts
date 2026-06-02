@@ -48,7 +48,24 @@ describe('statementFormatApi', () => {
     const response = await statementFormatApi.listFormats();
 
     expect(capturedUrl?.pathname).toBe('/api/v1/statement-formats');
+    expect(capturedUrl?.search).toBe('');
     expect(response).toEqual([csvFormat]);
+  });
+
+  it('requests hidden statement formats only when includeHidden is true', async () => {
+    const capturedSearchParams: string[] = [];
+
+    server.use(
+      http.get('/api/v1/statement-formats', ({ request }) => {
+        capturedSearchParams.push(new URL(request.url).search);
+        return HttpResponse.json([csvFormat]);
+      }),
+    );
+
+    await statementFormatApi.listFormats({ includeHidden: false });
+    await statementFormatApi.listFormats({ includeHidden: true });
+
+    expect(capturedSearchParams).toEqual(['', '?includeHidden=true']);
   });
 
   it('requests a statement format by ID', async () => {
@@ -105,6 +122,31 @@ describe('statementFormatApi', () => {
 
     expect(capturedMethods).toEqual(['POST', 'PUT']);
     expect(capturedBodies).toEqual([createRequest, updateRequest]);
+  });
+
+  it('posts hide and unhide requests to the current-user visibility endpoints', async () => {
+    const capturedRequests: Array<{ method: string; pathname: string }> = [];
+
+    server.use(
+      http.post('/api/v1/statement-formats/:id/hide', ({ request }) => {
+        const url = new URL(request.url);
+        capturedRequests.push({ method: request.method, pathname: url.pathname });
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.post('/api/v1/statement-formats/:id/unhide', ({ request }) => {
+        const url = new URL(request.url);
+        capturedRequests.push({ method: request.method, pathname: url.pathname });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    await statementFormatApi.hideFormat(7);
+    await statementFormatApi.unhideFormat(7);
+
+    expect(capturedRequests).toEqual([
+      { method: 'POST', pathname: '/api/v1/statement-formats/7/hide' },
+      { method: 'POST', pathname: '/api/v1/statement-formats/7/unhide' },
+    ]);
   });
 
   it('posts multipart CSV wizard analyze requests', async () => {

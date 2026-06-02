@@ -3,6 +3,10 @@ import type { PreviewTransaction } from '@/types/transaction';
 export type FormatType = 'CSV' | 'PDF' | 'XLSX';
 export type StatementFormatScope = 'SYSTEM' | 'USER';
 
+export interface StatementFormatListOptions {
+  includeHidden?: boolean;
+}
+
 export interface StatementFormat {
   id: number;
   displayName: string;
@@ -11,6 +15,7 @@ export interface StatementFormat {
   defaultCurrencyIsoCode: string;
   scope?: StatementFormatScope;
   ownerId?: string | null;
+  hidden?: boolean;
   dateHeader?: string;
   dateFormat?: string;
   descriptionHeader?: string;
