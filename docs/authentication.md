@@ -277,10 +277,13 @@ sites use inline string literals; a typo fails safe by returning `false`.
 gate the admin cross-user features (search page, dashboard tile, sidebar item).
 User-facing self-scope features check the unscoped variants.
 
-The transaction import `New format` affordance is gated with
-`usePermission('statementformats:write')`, matching the CSV/PDF wizard
-endpoints. Users without that permission can still import with existing visible
-formats.
+The user statement-format visibility page is route-gated with
+`statementformats:read` and is discoverable from the profile dropdown only for
+users with that permission. Its hide/restore actions and the transaction import
+`New format` affordance are gated with
+`usePermission('statementformats:write')`, matching the CSV/PDF wizard and
+current-user visibility endpoints. Users without write permission can still
+import with existing visible formats and can read their visibility state.
 
 #### Permission hierarchy (invariant)
 

@@ -215,6 +215,7 @@ on the current user's own data?" → unscoped.
 | Admin statement formats list page | `src/App.tsx` route wrap | `statementformats:read` | `<PermissionGuard>` |
 | Admin statement format create page | `src/App.tsx` route wrap | `statementformats:write` | `<PermissionGuard>` |
 | Admin statement format edit page | `src/App.tsx` route wrap | `statementformats:write` | `<PermissionGuard>` |
+| User statement format visibility management page | `src/App.tsx` route wrap | `statementformats:read` | `<PermissionGuard>` |
 | Cross-user transaction search page | `src/App.tsx` route wrap | `transactions:read:any` | `<PermissionGuard>` |
 | Admin users list page | `src/App.tsx` route wrap | `users:read` | `<PermissionGuard>` |
 | Admin user detail page | `src/App.tsx` route wrap | `users:read` | `<PermissionGuard>` |
@@ -231,6 +232,8 @@ on the current user's own data?" → unscoped.
 | User detail page "Deactivate User" button | `src/features/admin/users/pages/UserDetailPage.tsx` | `users:write` | `usePermission` |
 | Currencies list "Add Currency" + per-row Edit | `src/features/admin/currencies/pages/CurrenciesListPage.tsx` | `currencies:write` | `usePermission` |
 | Statement Formats list "Add Format" + per-row Edit | `src/features/admin/statement-formats/pages/StatementFormatsListPage.tsx` | `statementformats:write` | `usePermission` |
+| Profile dropdown "Statement formats" menu item | `src/features/auth/components/UserProfileDropdown.tsx` | `statementformats:read` | `usePermission` |
+| User statement format hide/restore actions | `src/features/statement-formats/components/StatementFormatVisibilityTable.tsx` | `statementformats:write` | `usePermission` |
 | Import "New format" wizard button | `src/features/transactions/components/ImportButton.tsx` | `statementformats:write` | `usePermission` |
 | Bulk delete trigger (self-scope) | `src/features/transactions/components/TransactionTable.tsx` | `transactions:delete` | `usePermission` |
 | Import transactions button (self-scope) | `src/features/transactions/pages/TransactionsPage.tsx` | `transactions:write` | `usePermission` |

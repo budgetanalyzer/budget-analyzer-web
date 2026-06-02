@@ -91,6 +91,12 @@ const StatementFormatEditPage = lazy(() =>
   })),
 );
 
+const StatementFormatManagementPage = lazy(() =>
+  import('@/features/statement-formats/pages/StatementFormatManagementPage').then((module) => ({
+    default: module.StatementFormatManagementPage,
+  })),
+);
+
 const AdminTransactionsPage = lazy(() =>
   import('@/features/admin/transactions/pages/AdminTransactionsPage').then((module) => ({
     default: module.AdminTransactionsPage,
@@ -262,6 +268,16 @@ function App() {
               <LazyRoute>
                 <ViewPage />
               </LazyRoute>
+            }
+          />
+          <Route
+            path="statement-formats"
+            element={
+              <PermissionGuard permission="statementformats:read">
+                <LazyRoute>
+                  <StatementFormatManagementPage />
+                </LazyRoute>
+              </PermissionGuard>
             }
           />
         </Route>

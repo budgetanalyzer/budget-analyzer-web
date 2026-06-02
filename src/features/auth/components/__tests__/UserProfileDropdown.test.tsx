@@ -18,7 +18,7 @@ const namedUser: User = {
   picture: 'https://example.com/pat.png',
   authenticated: true,
   roles: ['USER'],
-  permissions: [],
+  permissions: ['statementformats:read'],
 };
 
 function mockAuth(user: User | null, logout = vi.fn()) {
@@ -39,7 +39,10 @@ describe('UserProfileDropdown', () => {
   it('renders nothing when there is no current user', () => {
     mockAuth(null);
 
-    const { container } = renderWithProviders(<UserProfileDropdown />);
+    const { container } = renderWithProviders(<UserProfileDropdown />, {
+      initialEntries: ['/'],
+      router: 'dom',
+    });
 
     expect(container).toBeEmptyDOMElement();
   });
@@ -48,11 +51,12 @@ describe('UserProfileDropdown', () => {
     mockAuth(namedUser);
     const user = userEvent.setup();
 
-    renderWithProviders(<UserProfileDropdown />);
+    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'], router: 'dom' });
     await user.click(screen.getByRole('button', { name: 'Pat Example' }));
 
     expect(screen.getByText('Pat Example')).toBeInTheDocument();
     expect(screen.getByText('pat@example.com')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /statement formats/i })).toBeInTheDocument();
   });
 
   it('calls logout from the menu affordance', async () => {
@@ -60,7 +64,7 @@ describe('UserProfileDropdown', () => {
     mockAuth(namedUser, logout);
     const user = userEvent.setup();
 
-    renderWithProviders(<UserProfileDropdown />);
+    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'], router: 'dom' });
     await user.click(screen.getByRole('button', { name: 'Pat Example' }));
     await user.click(screen.getByRole('menuitem', { name: /logout/i }));
 
@@ -77,10 +81,20 @@ describe('UserProfileDropdown', () => {
     });
     const user = userEvent.setup();
 
-    renderWithProviders(<UserProfileDropdown />);
+    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'], router: 'dom' });
     await user.click(screen.getByRole('button', { name: 'F' }));
 
     expect(screen.getByText('fallback@example.com')).toBeInTheDocument();
     expect(screen.queryByText('Pat Example')).not.toBeInTheDocument();
+  });
+
+  it('hides the statement formats link when read permission is missing', async () => {
+    mockAuth({ ...namedUser, permissions: [] });
+    const user = userEvent.setup();
+
+    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'], router: 'dom' });
+    await user.click(screen.getByRole('button', { name: 'Pat Example' }));
+
+    expect(screen.queryByRole('menuitem', { name: /statement formats/i })).not.toBeInTheDocument();
   });
 });

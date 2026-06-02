@@ -1,4 +1,6 @@
-import { LogOut } from 'lucide-react';
+import { FileSpreadsheet, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useCallback } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
 import {
   DropdownMenu,
@@ -9,13 +11,19 @@ import {
 } from '@/components/ui/DropdownMenu';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 
 /**
  * User profile dropdown component
  * Displays user avatar and provides logout functionality
  */
 export function UserProfileDropdown() {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const canReadStatementFormats = usePermission('statementformats:read');
+  const handleStatementFormatsClick = useCallback(() => {
+    navigate('/statement-formats');
+  }, [navigate]);
 
   if (!user) {
     return null;
@@ -49,6 +57,16 @@ export function UserProfileDropdown() {
         </div>
 
         <DropdownMenuSeparator />
+
+        {canReadStatementFormats && (
+          <>
+            <DropdownMenuItem onClick={handleStatementFormatsClick}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              <span>Statement formats</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
 
         {/* Logout button */}
         <DropdownMenuItem onClick={logout}>

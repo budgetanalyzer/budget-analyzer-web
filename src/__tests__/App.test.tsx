@@ -38,6 +38,9 @@ vi.mock('@/features/admin/currencies/pages/CurrencyCreatePage', () => ({
 vi.mock('@/features/admin/transactions/pages/AdminTransactionsPage', () => ({
   AdminTransactionsPage: () => 'admin transactions page',
 }));
+vi.mock('@/features/statement-formats/pages/StatementFormatManagementPage', () => ({
+  StatementFormatManagementPage: () => 'statement format management page',
+}));
 vi.mock('@/features/admin/components/UnauthorizedPage', () => ({
   UnauthorizedPage: () => 'unauthorized route',
 }));
@@ -124,6 +127,22 @@ describe('App route authorization', () => {
 
     expect(await screen.findByText('admin transactions page')).toBeInTheDocument();
     expect(mockUsePermission).toHaveBeenCalledWith('transactions:read:any');
+  });
+
+  it('uses the read permission for the user statement format management route', async () => {
+    mockUseAuth.mockReturnValue({
+      user: regularUser,
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    });
+    mockUsePermission.mockImplementation((permission) => permission === 'statementformats:read');
+
+    renderApp('/statement-formats');
+
+    expect(await screen.findByText('statement format management page')).toBeInTheDocument();
+    expect(mockUsePermission).toHaveBeenCalledWith('statementformats:read');
   });
 
   it('keeps non-admin authenticated users out of the admin route tree', async () => {

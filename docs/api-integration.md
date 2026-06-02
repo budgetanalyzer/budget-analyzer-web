@@ -115,7 +115,9 @@ without query parameters, so formats hidden by the current user are omitted by
 the API default. Statement-format management screens call the same list endpoint
 with `includeHidden=true` and use `POST /api/v1/statement-formats/{id}/hide` or
 `POST /api/v1/statement-formats/{id}/unhide` for current-user visibility
-changes. The UI shows enabled formats whose default currency is available,
+changes. The user-facing management screen is available at `/statement-formats`
+for users with `statementformats:read`, and its hide/restore actions require
+`statementformats:write`. The import UI shows enabled formats whose default currency is available,
 sorted by API-provided `displayName`, disambiguates duplicate visible names with
 `System` or `Custom`, and submits the selected `id` as the `statementFormatId`
 query parameter. Users with `statementformats:write` also see `New format`,
