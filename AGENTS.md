@@ -41,6 +41,11 @@ Update the nearest affected documentation in the same work:
 Plan files under `docs/plans/` are ephemeral working documents. Never link to
 plan files from non-plan documentation or other non-plan files.
 
+When creating an implementation or execution plan intended for AI Session
+Handler, follow the [AI Session Handler plan format](../ai-session-handler/docs/plan-format.md),
+use its canonical template, replace every placeholder, and retain the numbered
+`## Phase N: Title` headings.
+
 Do not leave documentation updates as follow-up work.
 
 ## Application Purpose
