@@ -39,6 +39,11 @@ the visible saved-view membership: `q`, `dateFrom`, `dateTo`, `bankName`,
 the canonical membership already loaded for the view; they do not change saved
 view criteria, pins, or exclusions and do not issue another backend request.
 Both the stats and table rows are derived from the same locally filtered list.
+Because the URL is the source of truth, the temporary filters survive refresh,
+can be shared, and are preserved when navigating to a transaction and back.
+`q` is a case-insensitive description-only substring search, each date bound is
+inclusive and applies independently, and amount bounds compare against the
+absolute transaction amount.
 
 Analytics URLs carry an explicit source scope. Missing `scope` still means all
 transactions for backward compatibility, while scoped saved-view analytics use
@@ -49,7 +54,9 @@ to the operational surface for that source: all-transaction analytics link to
 `/?dateFrom=...&dateTo=...`, and saved-view analytics link to
 `/views/<id>?dateFrom=...&dateTo=...`. Both include `returnTo` and
 `breadcrumbLabel` so the filtered operational page can navigate back to the
-same analytics state.
+same analytics state. Individual temporary-filter changes preserve this return
+context; the filter bar's Clear action removes it together with all transaction
+filter parameters.
 
 When reconciling saved-view membership with cached transactions, the frontend
 first removes excluded IDs and de-duplicates visible membership IDs before
