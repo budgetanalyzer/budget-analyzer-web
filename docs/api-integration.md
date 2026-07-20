@@ -43,7 +43,10 @@ Because the URL is the source of truth, the temporary filters survive refresh,
 can be shared, and are preserved when navigating to a transaction and back.
 `q` is a case-insensitive description-only substring search, each date bound is
 inclusive and applies independently, and amount bounds compare against the
-absolute transaction amount.
+absolute transaction amount. Applying one temporary filter on the same saved
+view resets table pagination and selection without discarding unrelated draft
+search or amount input. Navigating to a different saved view discards those
+drafts.
 
 Analytics URLs carry an explicit source scope. Missing `scope` still means all
 transactions for backward compatibility, while scoped saved-view analytics use
@@ -56,7 +59,8 @@ to the operational surface for that source: all-transaction analytics link to
 `breadcrumbLabel` so the filtered operational page can navigate back to the
 same analytics state. Individual temporary-filter changes preserve this return
 context; the filter bar's Clear action removes it together with all transaction
-filter parameters.
+filter parameters and discards any description or amount input that has not yet
+been applied.
 
 When reconciling saved-view membership with cached transactions, the frontend
 first removes excluded IDs and de-duplicates visible membership IDs before

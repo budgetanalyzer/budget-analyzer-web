@@ -87,6 +87,41 @@ describe('TransactionFilterBar', () => {
     expect(screen.getByRole('spinbutton', { name: 'Maximum amount' })).toHaveValue(30);
   });
 
+  it('discards pending search and amount drafts when all filters are cleared', () => {
+    vi.useFakeTimers();
+    const onAmountFilterChange = vi.fn();
+    const onClearAllFilters = vi.fn();
+    render(
+      <TransactionFilterBar
+        {...createProps({
+          filters: {
+            ...emptyFilters,
+            dateFilter: { from: '2026-01-01', to: null },
+          },
+          onAmountFilterChange,
+          onClearAllFilters,
+        })}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Search descriptions ↵'), {
+      target: { value: 'unsubmitted' },
+    });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Minimum amount' }), {
+      target: { value: '15' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+
+    expect(onClearAllFilters).toHaveBeenCalledOnce();
+    expect(screen.getByPlaceholderText('Search descriptions ↵')).toHaveValue('');
+    expect(screen.getByRole('spinbutton', { name: 'Minimum amount' })).toHaveValue(null);
+    expect(screen.getByRole('spinbutton', { name: 'Maximum amount' })).toHaveValue(null);
+
+    act(() => vi.advanceTimersByTime(800));
+    expect(onAmountFilterChange).not.toHaveBeenCalled();
+  });
+
   it('shows bank and account selectors only for multiple options', () => {
     const props = createProps();
     const { rerender } = render(<TransactionFilterBar {...props} />);
@@ -134,6 +169,64 @@ describe('TransactionFilterBar', () => {
     await user.click(screen.getByRole('button', { name: 'Filter by transaction type' }));
     await user.click(screen.getByRole('button', { name: 'Credit' }));
     expect(onTypeFilterChange).toHaveBeenCalledWith('CREDIT');
+  });
+
+  it('round-trips dynamic bank and account values that resemble internal values', async () => {
+    const user = userEvent.setup();
+    const onBankNameFilterChange = vi.fn();
+    const onAccountIdFilterChange = vi.fn();
+    const prefixedValue = 'transaction-filter:value:nested';
+    render(
+      <TransactionFilterBar
+        {...createProps({
+          availableBankNames: ['Bank A', 'all', prefixedValue],
+          availableAccountIds: ['checking', 'all'],
+          onBankNameFilterChange,
+          onAccountIdFilterChange,
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Filter by bank' }));
+    await user.click(screen.getByRole('button', { name: 'all' }));
+    expect(onBankNameFilterChange).toHaveBeenLastCalledWith('all');
+
+    await user.click(screen.getByRole('button', { name: 'Filter by bank' }));
+    await user.click(screen.getByRole('button', { name: prefixedValue }));
+    expect(onBankNameFilterChange).toHaveBeenLastCalledWith(prefixedValue);
+
+    await user.click(screen.getByRole('button', { name: 'Filter by account' }));
+    await user.click(screen.getByRole('button', { name: 'all' }));
+    expect(onAccountIdFilterChange).toHaveBeenLastCalledWith('all');
+  });
+
+  it('maps the bank and account all-state options to null', async () => {
+    const user = userEvent.setup();
+    const onBankNameFilterChange = vi.fn();
+    const onAccountIdFilterChange = vi.fn();
+    render(
+      <TransactionFilterBar
+        {...createProps({
+          filters: {
+            ...emptyFilters,
+            bankNameFilter: 'Bank A',
+            accountIdFilter: 'checking',
+          },
+          availableBankNames: ['Bank A', 'Bank B'],
+          availableAccountIds: ['checking', 'savings'],
+          onBankNameFilterChange,
+          onAccountIdFilterChange,
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Filter by bank' }));
+    await user.click(screen.getByRole('button', { name: 'All Banks' }));
+    expect(onBankNameFilterChange).toHaveBeenCalledWith(null);
+
+    await user.click(screen.getByRole('button', { name: 'Filter by account' }));
+    await user.click(screen.getByRole('button', { name: 'All Accounts' }));
+    expect(onAccountIdFilterChange).toHaveBeenCalledWith(null);
   });
 
   it('commits date changes through the controlled date range', () => {

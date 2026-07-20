@@ -76,17 +76,16 @@ interface ViewTransactionTableProps {
   isExchangeRatesLoading: boolean;
 }
 
-export function ViewTransactionTable({ viewId, ...props }: ViewTransactionTableProps) {
-  return (
-    <ViewTransactionTableContent
-      key={`${viewId}:${JSON.stringify(props.filters)}`}
-      viewId={viewId}
-      {...props}
-    />
-  );
+interface ViewTransactionTableContentProps {
+  transactions: ViewTransaction[];
+  viewId: string;
+  filters: TransactionFilterValues;
+  displayCurrency: string;
+  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
+  isExchangeRatesLoading: boolean;
 }
 
-function ViewTransactionTableContent({
+export function ViewTransactionTable({
   transactions,
   viewId,
   filters,
@@ -103,6 +102,43 @@ function ViewTransactionTableContent({
   exchangeRatesMap,
   isExchangeRatesLoading,
 }: ViewTransactionTableProps) {
+  return (
+    <div className="space-y-4">
+      <TransactionFilterBar
+        key={viewId}
+        filters={filters}
+        availableBankNames={availableBankNames}
+        availableAccountIds={availableAccountIds}
+        onSearchChange={onSearchChange}
+        onDateFilterChange={onDateFilterChange}
+        onBankNameFilterChange={onBankNameFilterChange}
+        onAccountIdFilterChange={onAccountIdFilterChange}
+        onTypeFilterChange={onTypeFilterChange}
+        onAmountFilterChange={onAmountFilterChange}
+        onClearAllFilters={onClearAllFilters}
+      />
+
+      <ViewTransactionTableContent
+        key={JSON.stringify([viewId, filters])}
+        transactions={transactions}
+        viewId={viewId}
+        filters={filters}
+        displayCurrency={displayCurrency}
+        exchangeRatesMap={exchangeRatesMap}
+        isExchangeRatesLoading={isExchangeRatesLoading}
+      />
+    </div>
+  );
+}
+
+function ViewTransactionTableContent({
+  transactions,
+  viewId,
+  filters,
+  displayCurrency,
+  exchangeRatesMap,
+  isExchangeRatesLoading,
+}: ViewTransactionTableContentProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
@@ -449,20 +485,7 @@ function ViewTransactionTableContent({
     : 'No transactions in this view.';
 
   return (
-    <div className="space-y-4">
-      <TransactionFilterBar
-        filters={filters}
-        availableBankNames={availableBankNames}
-        availableAccountIds={availableAccountIds}
-        onSearchChange={onSearchChange}
-        onDateFilterChange={onDateFilterChange}
-        onBankNameFilterChange={onBankNameFilterChange}
-        onAccountIdFilterChange={onAccountIdFilterChange}
-        onTypeFilterChange={onTypeFilterChange}
-        onAmountFilterChange={onAmountFilterChange}
-        onClearAllFilters={onClearAllFilters}
-      />
-
+    <>
       {table.getIsAllPageRowsSelected() && transactions.length > pageSize && !selectAllMatching && (
         <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
           <span>
@@ -608,6 +631,6 @@ function ViewTransactionTableContent({
           onSuccess={handleBulkSuccess}
         />
       )}
-    </div>
+    </>
   );
 }

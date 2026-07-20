@@ -36,6 +36,19 @@ interface TransactionFilterBarProps {
   contextualAction?: ReactNode;
 }
 
+const DYNAMIC_FILTER_ALL_VALUE = 'transaction-filter:none';
+const DYNAMIC_FILTER_VALUE_PREFIX = 'transaction-filter:value:';
+
+function encodeDynamicFilterValue(value: string | null): string {
+  return value === null ? DYNAMIC_FILTER_ALL_VALUE : `${DYNAMIC_FILTER_VALUE_PREFIX}${value}`;
+}
+
+function decodeDynamicFilterValue(value: string): string | null {
+  return value === DYNAMIC_FILTER_ALL_VALUE
+    ? null
+    : value.slice(DYNAMIC_FILTER_VALUE_PREFIX.length);
+}
+
 interface TransactionSearchInputProps {
   appliedValue: string;
   onSearchChange: (query: string) => void;
@@ -175,16 +188,18 @@ export function TransactionFilterBar({
   onClearAllFilters,
   contextualAction,
 }: TransactionFilterBarProps) {
+  const [draftResetGeneration, setDraftResetGeneration] = useState(0);
+
   const handleBankNameChange = useCallback(
     (bankName: string) => {
-      onBankNameFilterChange(bankName === 'all' ? null : bankName);
+      onBankNameFilterChange(decodeDynamicFilterValue(bankName));
     },
     [onBankNameFilterChange],
   );
 
   const handleAccountIdChange = useCallback(
     (accountId: string) => {
-      onAccountIdFilterChange(accountId === 'all' ? null : accountId);
+      onAccountIdFilterChange(decodeDynamicFilterValue(accountId));
     },
     [onAccountIdFilterChange],
   );
@@ -196,13 +211,23 @@ export function TransactionFilterBar({
     [onTypeFilterChange],
   );
 
+  const handleClearAllFilters = useCallback(() => {
+    setDraftResetGeneration((generation) => generation + 1);
+    onClearAllFilters();
+  }, [onClearAllFilters]);
+
   const hasActiveFilters = hasActiveTransactionFilters(filters);
-  const amountFilterKey = `${filters.amountFilter.min ?? ''}:${filters.amountFilter.max ?? ''}`;
+  const searchInputKey = JSON.stringify([filters.globalFilter, draftResetGeneration]);
+  const amountFilterKey = JSON.stringify([
+    filters.amountFilter.min,
+    filters.amountFilter.max,
+    draftResetGeneration,
+  ]);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <TransactionSearchInput
-        key={filters.globalFilter}
+        key={searchInputKey}
         appliedValue={filters.globalFilter}
         onSearchChange={onSearchChange}
       />
@@ -212,14 +237,19 @@ export function TransactionFilterBar({
         onChange={onDateFilterChange}
       />
       {availableBankNames.length > 1 && (
-        <Select value={filters.bankNameFilter ?? 'all'} onValueChange={handleBankNameChange}>
+        <Select
+          value={encodeDynamicFilterValue(filters.bankNameFilter)}
+          onValueChange={handleBankNameChange}
+        >
           <SelectTrigger className="w-[150px]" aria-label="Filter by bank">
-            <SelectValue placeholder="All Banks" />
+            <SelectValue>
+              <span>{filters.bankNameFilter ?? 'All Banks'}</span>
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Banks</SelectItem>
+            <SelectItem value={DYNAMIC_FILTER_ALL_VALUE}>All Banks</SelectItem>
             {availableBankNames.map((bank) => (
-              <SelectItem key={bank} value={bank}>
+              <SelectItem key={bank} value={encodeDynamicFilterValue(bank)}>
                 {bank}
               </SelectItem>
             ))}
@@ -227,14 +257,19 @@ export function TransactionFilterBar({
         </Select>
       )}
       {availableAccountIds.length > 1 && (
-        <Select value={filters.accountIdFilter ?? 'all'} onValueChange={handleAccountIdChange}>
+        <Select
+          value={encodeDynamicFilterValue(filters.accountIdFilter)}
+          onValueChange={handleAccountIdChange}
+        >
           <SelectTrigger className="w-[150px]" aria-label="Filter by account">
-            <SelectValue placeholder="All Accounts" />
+            <SelectValue>
+              <span>{filters.accountIdFilter ?? 'All Accounts'}</span>
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Accounts</SelectItem>
+            <SelectItem value={DYNAMIC_FILTER_ALL_VALUE}>All Accounts</SelectItem>
             {availableAccountIds.map((account) => (
-              <SelectItem key={account} value={account}>
+              <SelectItem key={account} value={encodeDynamicFilterValue(account)}>
                 {account}
               </SelectItem>
             ))}
@@ -260,7 +295,7 @@ export function TransactionFilterBar({
       {hasActiveFilters && (
         <>
           <div className="mx-1 h-6 w-px bg-border" />
-          <Button variant="ghost" size="sm" onClick={onClearAllFilters} className="h-9 px-3">
+          <Button variant="ghost" size="sm" onClick={handleClearAllFilters} className="h-9 px-3">
             <X className="mr-1.5 h-4 w-4" />
             Clear
           </Button>

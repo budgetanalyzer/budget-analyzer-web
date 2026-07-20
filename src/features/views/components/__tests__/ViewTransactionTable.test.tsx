@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ViewTransactionTable } from '@/features/views/components/ViewTransactionTable';
 import { renderWithProviders } from '@/testing/test-utils';
@@ -144,6 +144,10 @@ function renderViewTransactionTable({
 
 beforeEach(() => {
   Object.values(mutationMocks).forEach((mock) => mock.mockReset());
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('ViewTransactionTable search', () => {
@@ -291,6 +295,45 @@ describe('ViewTransactionTable shared filters', () => {
     expect(screen.getByText('No transactions match these filters.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /save as view/i })).not.toBeInTheDocument();
+  });
+
+  it('preserves unrelated search and amount drafts when an applied filter changes', () => {
+    vi.useFakeTimers();
+    const onAmountFilterChange = vi.fn();
+    const { rerender } = renderViewTransactionTable({ onAmountFilterChange });
+
+    fireEvent.change(screen.getByPlaceholderText('Search descriptions ↵'), {
+      target: { value: 'unsubmitted draft' },
+    });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Minimum amount' }), {
+      target: { value: '25' },
+    });
+
+    rerender(
+      <ViewTransactionTable
+        transactions={transactions}
+        viewId="view-1"
+        filters={{ ...emptyFilters, typeFilter: 'CREDIT' }}
+        availableBankNames={['Alpha Bank', 'Beta Bank', 'Coffee Credit Union']}
+        availableAccountIds={['account-1', 'account-2', 'account-3']}
+        onSearchChange={vi.fn()}
+        onDateFilterChange={vi.fn()}
+        onBankNameFilterChange={vi.fn()}
+        onAccountIdFilterChange={vi.fn()}
+        onTypeFilterChange={vi.fn()}
+        onAmountFilterChange={onAmountFilterChange}
+        onClearAllFilters={vi.fn()}
+        displayCurrency="USD"
+        exchangeRatesMap={new Map()}
+        isExchangeRatesLoading={false}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText('Search descriptions ↵')).toHaveValue('unsubmitted draft');
+    expect(screen.getByRole('spinbutton', { name: 'Minimum amount' })).toHaveValue(25);
+
+    act(() => vi.advanceTimersByTime(400));
+    expect(onAmountFilterChange).toHaveBeenCalledWith(25, null);
   });
 
   it('resets pagination and bulk selection when an applied filter changes', async () => {
