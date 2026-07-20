@@ -54,10 +54,10 @@ transactions for backward compatibility, while scoped saved-view analytics use
 canonical membership endpoint as view detail, so pinned transactions are
 included and excluded transactions are omitted. Analytics drilldown links route
 to the operational surface for that source: all-transaction analytics link to
-`/?dateFrom=...&dateTo=...`, and saved-view analytics link to
-`/views/<id>?dateFrom=...&dateTo=...`. Both include `returnTo` and
-`breadcrumbLabel` so the filtered operational page can navigate back to the
-same analytics state. Individual temporary-filter changes preserve this return
+`/?dateFrom=...&dateTo=...&type=DEBIT|CREDIT`, and saved-view analytics link to
+`/views/<id>?dateFrom=...&dateTo=...&type=DEBIT|CREDIT`. Both include `returnTo`
+and `breadcrumbLabel` so the filtered operational page can navigate back to
+the same analytics state. Individual temporary-filter changes preserve this return
 context; the filter bar's Clear action removes it together with all transaction
 filter parameters and discards any description or amount input that has not yet
 been applied.

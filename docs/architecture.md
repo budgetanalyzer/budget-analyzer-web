@@ -2,12 +2,12 @@
 
 ## State Management
 
-| Layer | Tool | Purpose |
-|-------|------|---------|
-| Server state | TanStack Query (React Query) | API data, caching, loading/error states |
-| Route state | URL search params | Shareable filters, analytics source, drilldown return context |
-| Client state | Redux Toolkit | Global preferences: theme, display currency, desktop admin sidebar |
-| Local state | React component state | Table mechanics, draft inputs, modals, mobile overlays |
+| Layer        | Tool                         | Purpose                                                            |
+| ------------ | ---------------------------- | ------------------------------------------------------------------ |
+| Server state | TanStack Query (React Query) | API data, caching, loading/error states                            |
+| Route state  | URL search params            | Shareable filters, analytics source, drilldown return context      |
+| Client state | Redux Toolkit                | Global preferences: theme, display currency, desktop admin sidebar |
+| Local state  | React component state        | Table mechanics, draft inputs, modals, mobile overlays             |
 
 This separation keeps server concerns (caching, refetching, optimistic updates) out of the global store.
 Redux intentionally does not store transaction filters, table sorting,
@@ -17,6 +17,7 @@ saved-view selection.
 ## Component Strategy
 
 Using **Shadcn/UI** for components:
+
 - Copy-paste components (no package dependency bloat)
 - Full customization control
 - Tailwind CSS integration
@@ -26,12 +27,12 @@ Using **Shadcn/UI** for components:
 
 Transactions, saved views, and analytics are separate task surfaces:
 
-| Page | Responsibility |
-|------|----------------|
-| Transactions (`/`) | All-transaction management and filtering |
-| Views (`/views`) | Saved-view directory and entry point to view detail or view-scoped analytics |
-| View detail (`/views/:id`) | Saved-view membership management, including pinned and excluded rows |
-| Analytics (`/analytics`) | Spending analysis for either all transactions or one saved view |
+| Page                       | Responsibility                                                               |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| Transactions (`/`)         | All-transaction management and filtering                                     |
+| Views (`/views`)           | Saved-view directory and entry point to view detail or view-scoped analytics |
+| View detail (`/views/:id`) | Saved-view membership management, including pinned and excluded rows         |
+| Analytics (`/analytics`)   | Spending analysis for either all transactions or one saved view              |
 
 Transaction filters are URL-backed so filtered lists remain refreshable and
 shareable. The supported filter params are `q`, `dateFrom`, `dateTo`,
@@ -48,9 +49,10 @@ View detail and saved-view cards link to analytics with an explicit
 `scope=view&viewId=<id>` URL; they do not store selected analytics context.
 Analytics drilldowns route back to the operational surface for the selected
 source: `/` for all transactions and `/views/:id` for saved-view analytics.
-Those drilldowns carry `dateFrom`, `dateTo`, `returnTo`, and `breadcrumbLabel`
-URL parameters so the operational page is filtered to the clicked analytics
-period and can return to the same analytics state.
+Those drilldowns carry `dateFrom`, `dateTo`, `type`, `returnTo`, and
+`breadcrumbLabel` URL parameters so the operational page is filtered to the
+clicked analytics period and debit/credit selection, and can return to the
+same analytics state.
 
 ## CSP Compliance
 
@@ -90,12 +92,12 @@ Budget Analyzer uses a **Session Gateway** pattern for authentication:
 
 ### Security Properties
 
-| Property | Mechanism |
-|----------|-----------|
-| XSS token theft | Impossible — no tokens in browser memory or storage |
-| CSRF | SameSite=Strict cookies |
-| Session fixation | New session ID on login |
-| Stale sessions | 15-minute sliding expiry + instant Redis revocation |
+| Property         | Mechanism                                           |
+| ---------------- | --------------------------------------------------- |
+| XSS token theft  | Impossible — no tokens in browser memory or storage |
+| CSRF             | SameSite=Strict cookies                             |
+| Session fixation | New session ID on login                             |
+| Stale sessions   | 15-minute sliding expiry + instant Redis revocation |
 
 ## Permission Model
 
@@ -108,12 +110,12 @@ Following the bulletproof-react pattern:
 
 ### Gating Tools
 
-| Tool | Use Case |
-|------|----------|
-| `AdminRoute` | Role-based chrome guard — decides if admin shell loads |
+| Tool                                 | Use Case                                                     |
+| ------------------------------------ | ------------------------------------------------------------ |
+| `AdminRoute`                         | Role-based chrome guard — decides if admin shell loads       |
 | `<PermissionGuard permission="...">` | Route/subtree permission guard — denied children never mount |
-| `usePermission('...')` | Inline hook for single boolean-gated affordances |
-| `hasPermission(user, perm)` | Plain function for non-component code paths |
+| `usePermission('...')`               | Inline hook for single boolean-gated affordances             |
+| `hasPermission(user, perm)`          | Plain function for non-component code paths                  |
 
 **Rule of thumb:** `<PermissionGuard>` for "should this page exist?", `usePermission` for "should this button render?"
 
@@ -121,12 +123,12 @@ Following the bulletproof-react pattern:
 
 Backend-owned (permission-service), resolved at login and stored in session:
 
-| Resource | Read (self) | Read (cross-user) | Write | Delete |
-|---|---|---|---|---|
-| Transactions | `transactions:read` | `transactions:read:any` | `transactions:write` (+ `:any`) | `transactions:delete` (+ `:any`) |
-| Currencies | `currencies:read` | — | `currencies:write` | — |
-| Statement Formats | `statementformats:read` | — | `statementformats:write` | — |
-| Users | `users:read` | — | `users:write` | — |
+| Resource          | Read (self)             | Read (cross-user)       | Write                           | Delete                           |
+| ----------------- | ----------------------- | ----------------------- | ------------------------------- | -------------------------------- |
+| Transactions      | `transactions:read`     | `transactions:read:any` | `transactions:write` (+ `:any`) | `transactions:delete` (+ `:any`) |
+| Currencies        | `currencies:read`       | —                       | `currencies:write`              | —                                |
+| Statement Formats | `statementformats:read` | —                       | `statementformats:write`        | —                                |
+| Users             | `users:read`            | —                       | `users:write`                   | —                                |
 
 `:any` variants widen scope from "my resources" to "all users" and gate admin cross-user features.
 The non-admin statement-format visibility page and profile menu entry use
@@ -145,12 +147,12 @@ Permissions have an implied dependency: `:write` presumes `:read`, `:delete` pre
 
 ## Integration Points
 
-| Service | Role |
-|---------|------|
-| [Session Gateway](https://github.com/budgetanalyzer/session-gateway) | OAuth2 login, session management, Redis session storage |
-| API Gateway (NGINX) | Request routing to backend services |
-| Transaction Service | Transaction CRUD |
-| Currency Service | Currencies and exchange rates |
-| [Permission Service](https://github.com/budgetanalyzer/permission-service) | Role/permission resolution at login |
+| Service                                                                    | Role                                                    |
+| -------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [Session Gateway](https://github.com/budgetanalyzer/session-gateway)       | OAuth2 login, session management, Redis session storage |
+| API Gateway (NGINX)                                                        | Request routing to backend services                     |
+| Transaction Service                                                        | Transaction CRUD                                        |
+| Currency Service                                                           | Currencies and exchange rates                           |
+| [Permission Service](https://github.com/budgetanalyzer/permission-service) | Role/permission resolution at login                     |
 
 See the [orchestration repository](https://github.com/budgetanalyzer/orchestration) for full system architecture.

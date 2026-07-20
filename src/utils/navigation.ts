@@ -19,6 +19,8 @@ export interface BuildAnalyticsDrilldownUrlParams extends BuildTransactionsUrlPa
   scope: 'all' | 'view';
   /** Saved view ID when scope is "view" */
   viewId?: string;
+  /** Transaction type selected in analytics */
+  transactionType: 'debit' | 'credit';
 }
 
 /**
@@ -54,11 +56,12 @@ export function buildTransactionsUrl(params: BuildTransactionsUrlParams): string
  *
  * All-transaction analytics drill into the Transactions page. Saved-view
  * analytics drill into the corresponding View detail page with the same date
- * bounds and return breadcrumb context.
+ * bounds, transaction-type filter, and return breadcrumb context.
  */
 export function buildAnalyticsDrilldownUrl(params: BuildAnalyticsDrilldownUrlParams): string {
-  const { scope, viewId, dateFrom, dateTo, returnTo, breadcrumbLabel } = params;
+  const { scope, viewId, transactionType, dateFrom, dateTo, returnTo, breadcrumbLabel } = params;
   const basePath = scope === 'view' && viewId ? `/views/${encodeURIComponent(viewId)}` : '/';
+  const type = transactionType === 'debit' ? 'DEBIT' : 'CREDIT';
 
-  return `${basePath}?dateFrom=${dateFrom}&dateTo=${dateTo}&returnTo=${encodeURIComponent(returnTo)}&breadcrumbLabel=${encodeURIComponent(breadcrumbLabel)}`;
+  return `${basePath}?dateFrom=${dateFrom}&dateTo=${dateTo}&type=${type}&returnTo=${encodeURIComponent(returnTo)}&breadcrumbLabel=${encodeURIComponent(breadcrumbLabel)}`;
 }
