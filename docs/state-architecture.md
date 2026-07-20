@@ -49,7 +49,8 @@ return target for drilldowns.
 
 ### Transaction Filters
 
-The Transactions page treats these URL params as the source of truth:
+The Transactions and saved-view detail pages treat these URL params as the
+source of truth:
 
 ```text
 /?q=coffee&dateFrom=2026-01-01&dateTo=2026-01-31&bankName=Test%20Bank&accountId=checking&type=DEBIT&minAmount=10&maxAmount=250
@@ -66,16 +67,21 @@ Supported params:
 - `minAmount`
 - `maxAmount`
 
-The applied values use the shared `TransactionFilterValues` model. The main
-transaction table renders the controlled `TransactionFilterBar`, while the
-page applies `filterTransactions` to the complete transaction collection.
+The applied values use the shared `TransactionFilterValues` model. Both
+transaction surfaces render the controlled `TransactionFilterBar`, while each
+page applies `filterTransactions` to its complete unfiltered collection.
 Description matching remains a case-insensitive substring search against the
 description only; bank, account, and type use exact matches; amount bounds use
 the absolute transaction amount. Each date boundary is inclusive and applies
 independently, so a from-only or to-only URL filters rows immediately.
 
+On saved-view detail, these URL values are temporary table filters over the
+canonical membership returned by `useViewTransactions`. They update rows and
+stats together without changing persisted criteria, pins, or exclusions.
+
 `returnTo` and `breadcrumbLabel` are navigation context from drilldowns, not
-filters. Clearing filters removes them along with the filter params.
+filters. Ordinary filter updates preserve them; the filter bar's Clear action
+removes them along with all filter params.
 
 ### Analytics Source
 

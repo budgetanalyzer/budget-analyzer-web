@@ -33,10 +33,12 @@ Saved-view criteria mirror the user-facing transaction filters supported by the 
 
 `searchText` is a saved-view description filter. The Transactions and View table search boxes filter the already loaded rows locally with a case-insensitive substring match against transaction descriptions only; use the explicit bank filter when the saved view should persist a bank criterion.
 
-View detail also supports URL-backed table filters for the visible saved-view
-membership: `dateFrom`, `dateTo`, and `q`. Date filters are applied before the
-local description search so the stats and table rows are derived from the same
-filtered transaction list.
+View detail supports the same URL-backed temporary filters as Transactions for
+the visible saved-view membership: `q`, `dateFrom`, `dateTo`, `bankName`,
+`accountId`, `type`, `minAmount`, and `maxAmount`. These filters apply only to
+the canonical membership already loaded for the view; they do not change saved
+view criteria, pins, or exclusions and do not issue another backend request.
+Both the stats and table rows are derived from the same locally filtered list.
 
 Analytics URLs carry an explicit source scope. Missing `scope` still means all
 transactions for backward compatibility, while scoped saved-view analytics use

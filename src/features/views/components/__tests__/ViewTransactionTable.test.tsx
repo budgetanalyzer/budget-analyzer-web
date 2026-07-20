@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ViewTransactionTable } from '@/features/views/components/ViewTransactionTable';
 import { renderWithProviders } from '@/testing/test-utils';
 import { ViewTransaction } from '@/types/view';
+import type { TransactionFilterValues } from '@/types/transactionFilters';
 
 const mutationMocks = vi.hoisted(() => ({
   pinMutate: vi.fn(),
@@ -66,34 +67,61 @@ const transactions: ViewTransaction[] = [
   },
 ];
 
+const emptyFilters: TransactionFilterValues = {
+  globalFilter: '',
+  dateFilter: { from: null, to: null },
+  bankNameFilter: null,
+  accountIdFilter: null,
+  typeFilter: null,
+  amountFilter: { min: null, max: null },
+};
+
+const paginatedTransactions: ViewTransaction[] = Array.from({ length: 21 }, (_, index) => ({
+  ...transactions[0],
+  id: index + 1,
+  description: `Transaction ${index + 1}`,
+}));
+
 function renderViewTransactionTable({
   rows = transactions,
   viewId = 'view-1',
-  searchText = '',
-  dateFilter = { from: null, to: null },
-  hasActiveFilters = false,
+  filters = emptyFilters,
+  availableBankNames = ['Alpha Bank', 'Beta Bank', 'Coffee Credit Union'],
+  availableAccountIds = ['account-1', 'account-2', 'account-3'],
   onSearchChange = vi.fn(),
   onDateFilterChange = vi.fn(),
+  onBankNameFilterChange = vi.fn(),
+  onAccountIdFilterChange = vi.fn(),
+  onTypeFilterChange = vi.fn(),
+  onAmountFilterChange = vi.fn(),
   onClearAllFilters = vi.fn(),
 }: {
   rows?: ViewTransaction[];
   viewId?: string;
-  searchText?: string;
-  dateFilter?: { from: string | null; to: string | null };
-  hasActiveFilters?: boolean;
+  filters?: TransactionFilterValues;
+  availableBankNames?: string[];
+  availableAccountIds?: string[];
   onSearchChange?: (query: string) => void;
   onDateFilterChange?: (from: string | null, to: string | null) => void;
+  onBankNameFilterChange?: (bankName: string | null) => void;
+  onAccountIdFilterChange?: (accountId: string | null) => void;
+  onTypeFilterChange?: (type: 'DEBIT' | 'CREDIT' | null) => void;
+  onAmountFilterChange?: (min: number | null, max: number | null) => void;
   onClearAllFilters?: () => void;
 } = {}) {
   const result = renderWithProviders(
     <ViewTransactionTable
       transactions={rows}
       viewId={viewId}
-      searchText={searchText}
-      dateFilter={dateFilter}
-      hasActiveFilters={hasActiveFilters}
+      filters={filters}
+      availableBankNames={availableBankNames}
+      availableAccountIds={availableAccountIds}
       onSearchChange={onSearchChange}
       onDateFilterChange={onDateFilterChange}
+      onBankNameFilterChange={onBankNameFilterChange}
+      onAccountIdFilterChange={onAccountIdFilterChange}
+      onTypeFilterChange={onTypeFilterChange}
+      onAmountFilterChange={onAmountFilterChange}
       onClearAllFilters={onClearAllFilters}
       displayCurrency="USD"
       exchangeRatesMap={new Map()}
@@ -102,7 +130,16 @@ function renderViewTransactionTable({
     { initialEntries: [`/views/${viewId}`] },
   );
 
-  return { onSearchChange, onDateFilterChange, onClearAllFilters, ...result };
+  return {
+    onSearchChange,
+    onDateFilterChange,
+    onBankNameFilterChange,
+    onAccountIdFilterChange,
+    onTypeFilterChange,
+    onAmountFilterChange,
+    onClearAllFilters,
+    ...result,
+  };
 }
 
 beforeEach(() => {
@@ -121,7 +158,10 @@ describe('ViewTransactionTable search', () => {
   });
 
   it('shows the filtered empty state when an applied search has no rows', () => {
-    renderViewTransactionTable({ rows: [], searchText: 'coffee', hasActiveFilters: true });
+    renderViewTransactionTable({
+      rows: [],
+      filters: { ...emptyFilters, globalFilter: 'coffee' },
+    });
 
     expect(screen.getByText('No transactions match these filters.')).toBeInTheDocument();
     expect(screen.queryByText('No transactions in this view.')).not.toBeInTheDocument();
@@ -129,7 +169,10 @@ describe('ViewTransactionTable search', () => {
 
   it('clears the applied search when the clear button is clicked', async () => {
     const onSearchChange = vi.fn();
-    renderViewTransactionTable({ searchText: 'coffee', onSearchChange });
+    renderViewTransactionTable({
+      filters: { ...emptyFilters, globalFilter: 'coffee' },
+      onSearchChange,
+    });
 
     await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
 
@@ -139,7 +182,7 @@ describe('ViewTransactionTable search', () => {
   it('resets the draft search input when the view changes', async () => {
     const onSearchChange = vi.fn();
     const { rerender } = renderViewTransactionTable({
-      searchText: 'coffee',
+      filters: { ...emptyFilters, globalFilter: 'coffee' },
       onSearchChange,
     });
 
@@ -153,11 +196,15 @@ describe('ViewTransactionTable search', () => {
       <ViewTransactionTable
         transactions={transactions}
         viewId="view-2"
-        searchText=""
-        dateFilter={{ from: null, to: null }}
-        hasActiveFilters={false}
+        filters={emptyFilters}
+        availableBankNames={['Alpha Bank', 'Beta Bank', 'Coffee Credit Union']}
+        availableAccountIds={['account-1', 'account-2', 'account-3']}
         onSearchChange={onSearchChange}
         onDateFilterChange={vi.fn()}
+        onBankNameFilterChange={vi.fn()}
+        onAccountIdFilterChange={vi.fn()}
+        onTypeFilterChange={vi.fn()}
+        onAmountFilterChange={vi.fn()}
         onClearAllFilters={vi.fn()}
         displayCurrency="USD"
         exchangeRatesMap={new Map()}
@@ -172,8 +219,10 @@ describe('ViewTransactionTable search', () => {
 describe('ViewTransactionTable date filters', () => {
   it('renders the active date filters', () => {
     renderViewTransactionTable({
-      dateFilter: { from: '2026-01-01', to: '2026-01-31' },
-      hasActiveFilters: true,
+      filters: {
+        ...emptyFilters,
+        dateFilter: { from: '2026-01-01', to: '2026-01-31' },
+      },
     });
 
     expect(screen.getByDisplayValue('2026-01-01')).toBeInTheDocument();
@@ -192,15 +241,88 @@ describe('ViewTransactionTable date filters', () => {
   it('clears search and date filters from the clear action', async () => {
     const onClearAllFilters = vi.fn();
     renderViewTransactionTable({
-      searchText: 'coffee',
-      dateFilter: { from: '2026-01-01', to: '2026-01-31' },
-      hasActiveFilters: true,
+      filters: {
+        ...emptyFilters,
+        globalFilter: 'coffee',
+        dateFilter: { from: '2026-01-01', to: '2026-01-31' },
+      },
       onClearAllFilters,
     });
 
     await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
 
     expect(onClearAllFilters).toHaveBeenCalled();
+  });
+});
+
+describe('ViewTransactionTable shared filters', () => {
+  it('passes bank, account, and type selections to the shared callbacks', async () => {
+    const onBankNameFilterChange = vi.fn();
+    const onAccountIdFilterChange = vi.fn();
+    const onTypeFilterChange = vi.fn();
+    renderViewTransactionTable({
+      onBankNameFilterChange,
+      onAccountIdFilterChange,
+      onTypeFilterChange,
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter by bank' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Beta Bank' }));
+    expect(onBankNameFilterChange).toHaveBeenCalledWith('Beta Bank');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter by account' }));
+    await userEvent.click(screen.getByRole('button', { name: 'account-2' }));
+    expect(onAccountIdFilterChange).toHaveBeenCalledWith('account-2');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter by transaction type' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Credit' }));
+    expect(onTypeFilterChange).toHaveBeenCalledWith('CREDIT');
+  });
+
+  it('uses every filter dimension for the filtered empty state without a contextual action', () => {
+    renderViewTransactionTable({
+      rows: [],
+      filters: {
+        ...emptyFilters,
+        amountFilter: { min: 100, max: null },
+      },
+    });
+
+    expect(screen.getByText('No transactions match these filters.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /save as view/i })).not.toBeInTheDocument();
+  });
+
+  it('resets pagination and bulk selection when an applied filter changes', async () => {
+    const { rerender } = renderViewTransactionTable({ rows: paginatedTransactions });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 21' }));
+    expect(screen.getByText('Showing 21 to 21 of 21 transactions')).toBeInTheDocument();
+    expect(screen.getByText('1 transaction selected')).toBeInTheDocument();
+
+    rerender(
+      <ViewTransactionTable
+        transactions={paginatedTransactions}
+        viewId="view-1"
+        filters={{ ...emptyFilters, typeFilter: 'CREDIT' }}
+        availableBankNames={['Alpha Bank', 'Beta Bank', 'Coffee Credit Union']}
+        availableAccountIds={['account-1', 'account-2', 'account-3']}
+        onSearchChange={vi.fn()}
+        onDateFilterChange={vi.fn()}
+        onBankNameFilterChange={vi.fn()}
+        onAccountIdFilterChange={vi.fn()}
+        onTypeFilterChange={vi.fn()}
+        onAmountFilterChange={vi.fn()}
+        onClearAllFilters={vi.fn()}
+        displayCurrency="USD"
+        exchangeRatesMap={new Map()}
+        isExchangeRatesLoading={false}
+      />,
+    );
+
+    expect(screen.getByText('Showing 1 to 20 of 21 transactions')).toBeInTheDocument();
+    expect(screen.queryByText('1 transaction selected')).not.toBeInTheDocument();
   });
 });
 

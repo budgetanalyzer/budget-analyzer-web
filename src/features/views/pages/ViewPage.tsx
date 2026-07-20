@@ -21,13 +21,13 @@ import { ViewSettingsMenu } from '@/features/views/components/ViewSettingsMenu';
 import { EditViewModal } from '@/features/views/components/EditViewModal';
 import { DeleteViewModal } from '@/features/views/components/DeleteViewModal';
 import { RestoreExcludedTransactionsModal } from '@/features/views/components/RestoreExcludedTransactionsModal';
-import { useViewTransactionFiltersSync } from '@/features/views/hooks/useViewTransactionFiltersSync';
+import { useTransactionFiltersSync } from '@/hooks/useTransactionFiltersSync';
 import { TransactionStatsGrid } from '@/features/transactions/components/TransactionStatsGrid';
 import { StatCardConfig } from '@/features/transactions/components/TransactionStatsGrid';
 import { fadeInVariants, layoutTransition } from '@/lib/animations';
 import { formatCurrency } from '@/utils/currency';
-import { compareLocalDates, formatLocalDate, getDateRange } from '@/utils/dates';
-import { filterTransactionsByTableSearch } from '@/utils/transactionSearch';
+import { formatLocalDate, getDateRange } from '@/utils/dates';
+import { filterTransactions } from '@/utils/transactionFilters';
 import { buildAnalyticsReturnUrl } from '@/features/analytics/utils/urlState';
 
 export function ViewPage() {
@@ -53,13 +53,15 @@ function ViewPageContent({ id }: { id: string }) {
   const handleRestoreClose = useCallback(() => setIsRestoreModalOpen(false), []);
 
   const {
-    dateFilter,
-    searchText,
+    filters,
     handleDateFilterChange,
     handleSearchChange,
+    handleBankNameFilterChange,
+    handleAccountIdFilterChange,
+    handleTypeFilterChange,
+    handleAmountFilterChange,
     clearAllFilters,
-    hasActiveFilters,
-  } = useViewTransactionFiltersSync();
+  } = useTransactionFiltersSync();
 
   const handleRefreshExchangeRates = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
@@ -97,23 +99,24 @@ function ViewPageContent({ id }: { id: string }) {
 
   const disabledCurrencies = useMissingCurrencies();
 
-  const filteredTransactions = useMemo(() => {
-    let filtered = transactions ?? [];
+  const availableBankNames = useMemo(() => {
+    if (!transactions) return [];
+    return [...new Set(transactions.map((transaction) => transaction.bankName))].sort();
+  }, [transactions]);
 
-    if (dateFilter.from) {
-      const dateFrom = dateFilter.from;
-      filtered = filtered.filter(
-        (transaction) => compareLocalDates(transaction.date, dateFrom) >= 0,
-      );
-    }
+  const availableAccountIds = useMemo(() => {
+    if (!transactions) return [];
+    return [
+      ...new Set(
+        transactions.map((transaction) => transaction.accountId).filter(Boolean) as string[],
+      ),
+    ].sort();
+  }, [transactions]);
 
-    if (dateFilter.to) {
-      const dateTo = dateFilter.to;
-      filtered = filtered.filter((transaction) => compareLocalDates(transaction.date, dateTo) <= 0);
-    }
-
-    return filterTransactionsByTableSearch(filtered, searchText);
-  }, [dateFilter.from, dateFilter.to, searchText, transactions]);
+  const filteredTransactions = useMemo(
+    () => filterTransactions(transactions ?? [], filters),
+    [filters, transactions],
+  );
 
   // Calculate stats with proper currency conversion
   const { stats: transactionStats } = useTransactionStats({
@@ -294,11 +297,15 @@ function ViewPageContent({ id }: { id: string }) {
               <ViewTransactionTable
                 transactions={filteredTransactions}
                 viewId={id}
-                searchText={searchText}
-                dateFilter={dateFilter}
-                hasActiveFilters={hasActiveFilters}
+                filters={filters}
+                availableBankNames={availableBankNames}
+                availableAccountIds={availableAccountIds}
                 onSearchChange={handleSearchChange}
                 onDateFilterChange={handleDateFilterChange}
+                onBankNameFilterChange={handleBankNameFilterChange}
+                onAccountIdFilterChange={handleAccountIdFilterChange}
+                onTypeFilterChange={handleTypeFilterChange}
+                onAmountFilterChange={handleAmountFilterChange}
                 onClearAllFilters={clearAllFilters}
                 displayCurrency={displayCurrency}
                 exchangeRatesMap={exchangeRatesMap}

@@ -5,7 +5,7 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
 import { useTransactionStats } from '@/features/transactions/hooks/useTransactionStats';
-import { useTransactionFiltersSync } from '@/features/transactions/hooks/useTransactionFiltersSync';
+import { useTransactionFiltersSync } from '@/hooks/useTransactionFiltersSync';
 import { useImportMessageHandler } from '@/features/transactions/hooks/useImportMessageHandler';
 import { fadeInVariants, layoutTransition } from '@/lib/animations';
 import { TransactionTable } from '@/features/transactions/components/TransactionTable';

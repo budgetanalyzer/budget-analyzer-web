@@ -23,9 +23,8 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Checkbox } from '@/components/ui/Checkbox';
-import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { DateRangeFilter } from '@/components/DateRangeFilter';
+import { TransactionFilterBar } from '@/components/TransactionFilterBar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,23 +49,27 @@ import {
   PinOff,
   EyeOff,
   MoreHorizontal,
-  Search,
-  X,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { cn } from '@/utils/cn';
 import { usePinTransaction, useUnpinTransaction, useExcludeTransaction } from '@/hooks/useViews';
 import { columnWidthClass } from '@/utils/columnWidth';
-import type { ViewTransactionDateFilter } from '@/features/views/hooks/useViewTransactionFiltersSync';
+import type { TransactionType } from '@/types/transaction';
+import type { TransactionFilterValues } from '@/types/transactionFilters';
+import { hasActiveTransactionFilters } from '@/utils/transactionFilters';
 
 interface ViewTransactionTableProps {
   transactions: ViewTransaction[];
   viewId: string;
-  searchText: string;
-  dateFilter: ViewTransactionDateFilter;
-  hasActiveFilters: boolean;
+  filters: TransactionFilterValues;
+  availableBankNames: string[];
+  availableAccountIds: string[];
   onSearchChange: (query: string) => void;
   onDateFilterChange: (from: string | null, to: string | null) => void;
+  onBankNameFilterChange: (bankName: string | null) => void;
+  onAccountIdFilterChange: (accountId: string | null) => void;
+  onTypeFilterChange: (type: TransactionType | null) => void;
+  onAmountFilterChange: (min: number | null, max: number | null) => void;
   onClearAllFilters: () => void;
   displayCurrency: string;
   exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
@@ -76,7 +79,7 @@ interface ViewTransactionTableProps {
 export function ViewTransactionTable({ viewId, ...props }: ViewTransactionTableProps) {
   return (
     <ViewTransactionTableContent
-      key={`${viewId}:${props.searchText}:${props.dateFilter.from ?? ''}:${props.dateFilter.to ?? ''}`}
+      key={`${viewId}:${JSON.stringify(props.filters)}`}
       viewId={viewId}
       {...props}
     />
@@ -86,11 +89,15 @@ export function ViewTransactionTable({ viewId, ...props }: ViewTransactionTableP
 function ViewTransactionTableContent({
   transactions,
   viewId,
-  searchText,
-  dateFilter,
-  hasActiveFilters,
+  filters,
+  availableBankNames,
+  availableAccountIds,
   onSearchChange,
   onDateFilterChange,
+  onBankNameFilterChange,
+  onAccountIdFilterChange,
+  onTypeFilterChange,
+  onAmountFilterChange,
   onClearAllFilters,
   displayCurrency,
   exchangeRatesMap,
@@ -100,7 +107,6 @@ function ViewTransactionTableContent({
   const location = useLocation();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
   const [pageIndex, setPageIndex] = useState(0);
-  const [localSearchValue, setLocalSearchValue] = useState(searchText);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [selectAllMatching, setSelectAllMatching] = useState(false);
   const [bulkAction, setBulkAction] = useState<BulkViewTransactionAction | null>(null);
@@ -113,40 +119,6 @@ function ViewTransactionTableContent({
   const { mutate: excludeTransaction, isPending: isExcluding } = useExcludeTransaction();
 
   const isMutating = isPinning || isUnpinning || isExcluding;
-
-  const handleSearchSubmit = useCallback(() => {
-    onSearchChange(localSearchValue);
-    setPageIndex(0);
-  }, [localSearchValue, onSearchChange]);
-
-  const handleSearchKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        handleSearchSubmit();
-      }
-    },
-    [handleSearchSubmit],
-  );
-
-  const handleClearSearch = useCallback(() => {
-    setLocalSearchValue('');
-    onSearchChange('');
-    setPageIndex(0);
-  }, [onSearchChange]);
-
-  const handleDateChange = useCallback(
-    (from: string | null, to: string | null) => {
-      onDateFilterChange(from, to);
-      setPageIndex(0);
-    },
-    [onDateFilterChange],
-  );
-
-  const handleClearFilters = useCallback(() => {
-    setLocalSearchValue('');
-    onClearAllFilters();
-    setPageIndex(0);
-  }, [onClearAllFilters]);
 
   // Handle row click to navigate to transaction detail
   const handleRowClick = useCallback(
@@ -472,44 +444,24 @@ function ViewTransactionTableContent({
     setSelectAllMatching(false);
   }, []);
 
-  const emptyMessage = hasActiveFilters
+  const emptyMessage = hasActiveTransactionFilters(filters)
     ? 'No transactions match these filters.'
     : 'No transactions in this view.';
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search descriptions ↵"
-            value={localSearchValue}
-            onChange={(e) => setLocalSearchValue(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            className="pl-9 pr-9"
-          />
-          {localSearchValue && (
-            <button
-              type="button"
-              onClick={handleClearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Clear search</span>
-            </button>
-          )}
-        </div>
-        <DateRangeFilter from={dateFilter.from} to={dateFilter.to} onChange={handleDateChange} />
-        {hasActiveFilters && (
-          <>
-            <div className="mx-1 h-6 w-px bg-border" />
-            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 px-3">
-              <X className="mr-1.5 h-4 w-4" />
-              Clear
-            </Button>
-          </>
-        )}
-      </div>
+      <TransactionFilterBar
+        filters={filters}
+        availableBankNames={availableBankNames}
+        availableAccountIds={availableAccountIds}
+        onSearchChange={onSearchChange}
+        onDateFilterChange={onDateFilterChange}
+        onBankNameFilterChange={onBankNameFilterChange}
+        onAccountIdFilterChange={onAccountIdFilterChange}
+        onTypeFilterChange={onTypeFilterChange}
+        onAmountFilterChange={onAmountFilterChange}
+        onClearAllFilters={onClearAllFilters}
+      />
 
       {table.getIsAllPageRowsSelected() && transactions.length > pageSize && !selectAllMatching && (
         <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">

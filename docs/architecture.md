@@ -37,6 +37,9 @@ Transaction filters are URL-backed so filtered lists remain refreshable and
 shareable. The supported filter params are `q`, `dateFrom`, `dateTo`,
 `bankName`, `accountId`, `type`, `minAmount`, and `maxAmount`. Table sorting,
 pagination, row selection, and draft filter input text are local table state.
+Transactions and saved-view detail use the same filter model, URL hook, filter
+bar, and client-side semantics. Saved-view filters are temporary presentation
+state over canonical membership and never modify the saved view itself.
 
 Analytics source selection is explicit in the URL. Missing `scope` defaults to
 all transactions; `scope=view&viewId=<id>` analyzes canonical saved-view
