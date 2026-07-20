@@ -181,7 +181,7 @@ describe('AnalyticsPage source resolution', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/?dateFrom=2026-01-01&dateTo=2026-01-31&returnTo=%2Fanalytics%3Fscope%3Dall%26viewMode%3Dmonthly%26transactionType%3Ddebit%26year%3D2026&breadcrumbLabel=Jan%202026',
+        '/?dateFrom=2026-01-01&dateTo=2026-01-31&type=DEBIT&returnTo=%2Fanalytics%3Fscope%3Dall%26viewMode%3Dmonthly%26transactionType%3Ddebit%26year%3D2026&breadcrumbLabel=Jan%202026',
       );
     });
   });
@@ -195,7 +195,30 @@ describe('AnalyticsPage source resolution', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/views/view-1?dateFrom=2026-01-01&dateTo=2026-01-31&returnTo=%2Fanalytics%3Fscope%3Dview%26viewId%3Dview-1%26viewMode%3Dmonthly%26transactionType%3Ddebit%26year%3D2026&breadcrumbLabel=Jan%202026',
+        '/views/view-1?dateFrom=2026-01-01&dateTo=2026-01-31&type=DEBIT&returnTo=%2Fanalytics%3Fscope%3Dview%26viewId%3Dview-1%26viewMode%3Dmonthly%26transactionType%3Ddebit%26year%3D2026&breadcrumbLabel=Jan%202026',
+      );
+    });
+  });
+
+  it('routes a credit analytics drilldown to the credit-only view detail page', async () => {
+    hookMocks.useViewTransactions.mockReturnValue(
+      queryResult<ViewTransaction[]>([
+        {
+          ...transaction({ id: 2, amount: 25, type: 'CREDIT', description: 'Refund' }),
+          membershipType: 'PINNED',
+        },
+      ]),
+    );
+
+    renderPage(
+      '/analytics?scope=view&viewId=view-1&viewMode=monthly&transactionType=credit&year=2026',
+    );
+
+    await userEvent.click(screen.getByRole('link', { name: /Jan 2026/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/views/view-1?dateFrom=2026-01-01&dateTo=2026-01-31&type=CREDIT&returnTo=%2Fanalytics%3Fscope%3Dview%26viewId%3Dview-1%26viewMode%3Dmonthly%26transactionType%3Dcredit%26year%3D2026&breadcrumbLabel=Jan%202026',
       );
     });
   });
@@ -260,7 +283,7 @@ describe('AnalyticsPage source resolution', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/?dateFrom=2025-01-01&dateTo=2025-12-31&returnTo=%2Fanalytics%3Fscope%3Dall%26viewMode%3Dyearly%26transactionType%3Ddebit&breadcrumbLabel=2025',
+        '/?dateFrom=2025-01-01&dateTo=2025-12-31&type=DEBIT&returnTo=%2Fanalytics%3Fscope%3Dall%26viewMode%3Dyearly%26transactionType%3Ddebit&breadcrumbLabel=2025',
       );
     });
   });

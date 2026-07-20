@@ -45,9 +45,9 @@ View detail and saved-view cards link to analytics with an explicit
 `scope=view&viewId=<id>` URL; they do not store selected analytics context.
 Analytics drilldowns route back to the operational surface for the selected
 source: `/` for all transactions and `/views/:id` for saved-view analytics.
-Those drilldowns carry `dateFrom`, `dateTo`, `returnTo`, and `breadcrumbLabel`
-URL parameters so the operational page is filtered to the clicked analytics
-period and can return to the same analytics state.
+Those drilldowns carry `dateFrom`, `dateTo`, `type`, `returnTo`, and
+`breadcrumbLabel` URL parameters so the operational page is filtered to the
+clicked analytics period and can return to the same analytics state.
 
 ## CSP Compliance
 

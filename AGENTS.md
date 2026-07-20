@@ -38,6 +38,12 @@ Update the nearest affected documentation in the same work:
 - `README.md` when setup, usage, or repository purpose changes
 - `docs/` when architecture, configuration, APIs, behaviors, or operating procedures change
 
+Keep documentation concise and meaningful. Record durable contracts, decisions,
+setup, and behavior at the level appropriate to the document. Do not add
+component walkthroughs, transient UI-state details, duplicated explanations, or
+unrelated formatting churn unless that detail is necessary to use or maintain
+the documented concern.
+
 Plan files under `docs/plans/` are ephemeral working documents. Never link to
 plan files from non-plan documentation or other non-plan files.
 

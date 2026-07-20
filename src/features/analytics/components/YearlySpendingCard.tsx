@@ -53,10 +53,11 @@ export function YearlySpendingCard({
     viewId,
   });
 
-  // Build URL with date filters, return path, and breadcrumb label
+  // Build URL with date and transaction-type filters plus return context
   const drilldownUrl = buildAnalyticsDrilldownUrl({
     scope: analyticsScope,
     viewId,
+    transactionType,
     dateFrom: firstDay,
     dateTo: lastDay,
     returnTo,

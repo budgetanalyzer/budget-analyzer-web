@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import type { Transaction } from '@/types/transaction';
+
+const { transactionTableMock, transactionData } = vi.hoisted(() => ({
+  transactionTableMock: vi.fn(),
+  transactionData: [] as Transaction[],
+}));
 
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/hooks/useTransactions', () => ({
   useTransactions: () => ({
-    data: [],
+    data: transactionData,
     isLoading: false,
     error: null,
     refetch: vi.fn(),
@@ -21,15 +27,24 @@ vi.mock('@/hooks/useCurrencies', () => ({
 vi.mock('@/hooks/useMissingCurrencies', () => ({
   useMissingCurrencies: () => [],
 }));
-const transactionTableMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/transactions/components/TransactionTable', () => ({
-  TransactionTable: (props: { viewCriteria?: unknown }) => {
+  TransactionTable: (props: {
+    viewCriteria?: unknown;
+    filters: unknown;
+    transactions: Transaction[];
+    availableBankNames: string[];
+    availableAccountIds: string[];
+  }) => {
     transactionTableMock(props);
     return (
       <div
         data-testid="transaction-table-stub"
         data-criteria={JSON.stringify(props.viewCriteria)}
+        data-filters={JSON.stringify(props.filters)}
+        data-transaction-ids={props.transactions.map((transaction) => transaction.id).join(',')}
+        data-bank-options={props.availableBankNames.join(',')}
+        data-account-options={props.availableAccountIds.join(',')}
       />
     );
   },
@@ -53,6 +68,7 @@ function renderPage(initialEntry = '/transactions') {
 beforeEach(() => {
   mockUsePermission.mockReset();
   transactionTableMock.mockReset();
+  transactionData.splice(0);
 });
 
 describe('TransactionsPage Import button gating', () => {
@@ -96,5 +112,67 @@ describe('TransactionsPage saved-view criteria', () => {
         }),
       );
     });
+  });
+});
+
+describe('TransactionsPage shared transaction filters', () => {
+  it('passes the shared model and independently applies a from date to table rows', async () => {
+    transactionData.push(
+      {
+        id: 1,
+        accountId: 'checking',
+        bankName: 'Bank B',
+        date: '2026-01-01',
+        currencyIsoCode: 'USD',
+        amount: -10,
+        type: 'DEBIT',
+        description: 'Coffee',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        accountId: 'savings',
+        bankName: 'Bank A',
+        date: '2026-01-15',
+        currencyIsoCode: 'USD',
+        amount: 100,
+        type: 'CREDIT',
+        description: 'Salary',
+        createdAt: '2026-01-15T00:00:00Z',
+        updatedAt: '2026-01-15T00:00:00Z',
+      },
+      {
+        id: 3,
+        accountId: 'checking',
+        bankName: 'Bank B',
+        date: '2026-02-01',
+        currencyIsoCode: 'USD',
+        amount: -200,
+        type: 'DEBIT',
+        description: 'Rent',
+        createdAt: '2026-02-01T00:00:00Z',
+        updatedAt: '2026-02-01T00:00:00Z',
+      },
+    );
+    mockUsePermission.mockReturnValue(false);
+
+    renderPage('/transactions?dateFrom=2026-01-15');
+
+    const table = await screen.findByTestId('transaction-table-stub');
+    expect(table).toHaveAttribute('data-transaction-ids', '2,3');
+    expect(table).toHaveAttribute('data-bank-options', 'Bank A,Bank B');
+    expect(table).toHaveAttribute('data-account-options', 'checking,savings');
+    expect(table).toHaveAttribute(
+      'data-filters',
+      JSON.stringify({
+        globalFilter: '',
+        dateFilter: { from: '2026-01-15', to: null },
+        bankNameFilter: null,
+        accountIdFilter: null,
+        typeFilter: null,
+        amountFilter: { min: null, max: null },
+      }),
+    );
   });
 });

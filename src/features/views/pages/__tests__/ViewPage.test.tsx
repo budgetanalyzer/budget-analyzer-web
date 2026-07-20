@@ -1,7 +1,7 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewPage } from '@/features/views/pages/ViewPage';
 import { SavedView, ViewTransaction } from '@/types/view';
 import { renderWithProviders } from '@/testing/test-utils';
@@ -11,6 +11,13 @@ const hookMocks = vi.hoisted(() => ({
   useViewTransactions: vi.fn(),
 }));
 
+const mutationMocks = vi.hoisted(() => ({
+  updateView: vi.fn(),
+  pin: vi.fn(),
+  unpin: vi.fn(),
+  exclude: vi.fn(),
+}));
+
 vi.mock('@/hooks/useViews', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/useViews')>();
 
@@ -18,9 +25,10 @@ vi.mock('@/hooks/useViews', async (importOriginal) => {
     ...actual,
     useView: hookMocks.useView,
     useViewTransactions: hookMocks.useViewTransactions,
-    usePinTransaction: () => ({ mutate: vi.fn(), isPending: false }),
-    useUnpinTransaction: () => ({ mutate: vi.fn(), isPending: false }),
-    useExcludeTransaction: () => ({ mutate: vi.fn(), isPending: false }),
+    useUpdateView: () => ({ mutate: mutationMocks.updateView, isPending: false }),
+    usePinTransaction: () => ({ mutate: mutationMocks.pin, isPending: false }),
+    useUnpinTransaction: () => ({ mutate: mutationMocks.unpin, isPending: false }),
+    useExcludeTransaction: () => ({ mutate: mutationMocks.exclude, isPending: false }),
     useBulkPinTransactions: () => ({ mutate: vi.fn(), isPending: false }),
     useBulkExcludeTransactions: () => ({ mutate: vi.fn(), isPending: false }),
     useExcludedViewTransactions: () => ({
@@ -52,7 +60,7 @@ const view: SavedView = {
   openEnded: true,
   pinnedCount: 0,
   excludedCount: 0,
-  transactionCount: 2,
+  transactionCount: 3,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
 };
@@ -61,7 +69,7 @@ const transactions: ViewTransaction[] = [
   {
     id: 1,
     accountId: 'checking',
-    bankName: 'Test Bank',
+    bankName: 'Alpha Bank',
     date: '2026-01-15',
     currencyIsoCode: 'USD',
     amount: -25,
@@ -73,8 +81,8 @@ const transactions: ViewTransaction[] = [
   },
   {
     id: 2,
-    accountId: 'checking',
-    bankName: 'Test Bank',
+    accountId: 'savings',
+    bankName: 'Beta Bank',
     date: '2026-02-15',
     currencyIsoCode: 'USD',
     amount: -50,
@@ -83,6 +91,19 @@ const transactions: ViewTransaction[] = [
     membershipType: 'MATCHED',
     createdAt: '2026-02-15T00:00:00Z',
     updatedAt: '2026-02-15T00:00:00Z',
+  },
+  {
+    id: 3,
+    accountId: 'savings',
+    bankName: 'Alpha Bank',
+    date: '2026-01-20',
+    currencyIsoCode: 'USD',
+    amount: 200,
+    type: 'CREDIT',
+    description: 'January salary',
+    membershipType: 'MATCHED',
+    createdAt: '2026-01-20T00:00:00Z',
+    updatedAt: '2026-01-20T00:00:00Z',
   },
 ];
 
@@ -116,10 +137,15 @@ function renderPage(initialEntry = '/views/view-1', viewOverride: Partial<SavedV
         }
       />
       <Route path="/analytics" element={<LocationProbe />} />
+      <Route path="/transactions/:id" element={<LocationProbe />} />
     </Routes>,
     { initialEntries: [initialEntry] },
   );
 }
+
+beforeEach(() => {
+  Object.values(mutationMocks).forEach((mock) => mock.mockReset());
+});
 
 describe('ViewPage analytics entry point', () => {
   it('opens analytics scoped to the active view', async () => {
@@ -140,6 +166,7 @@ describe('ViewPage analytics entry point', () => {
     );
 
     expect(screen.getByText('Pinned grocery')).toBeInTheDocument();
+    expect(screen.getByText('January salary')).toBeInTheDocument();
     expect(screen.queryByText('February grocery')).not.toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/views/view-1?dateFrom=2026-01-01&dateTo=2026-01-31&returnTo=%2Fanalytics%3Fscope%3Dview%26viewId%3Dview-1%26viewMode%3Dmonthly%26transactionType%3Ddebit%26year%3D2026&breadcrumbLabel=Jan%202026',
@@ -158,6 +185,7 @@ describe('ViewPage analytics entry point', () => {
     });
     expect(screen.getByText('Pinned grocery')).toBeInTheDocument();
     expect(screen.getByText('February grocery')).toBeInTheDocument();
+    expect(screen.getByText('January salary')).toBeInTheDocument();
   });
 
   it('opens the restore excluded modal from the criteria excluded badge', async () => {
@@ -168,5 +196,84 @@ describe('ViewPage analytics entry point', () => {
     expect(
       screen.getByRole('heading', { name: 'Restore Excluded Transactions' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('ViewPage temporary transaction filters', () => {
+  it('filters credits through the URL and recalculates rows and stats without mutations', async () => {
+    renderPage();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter by transaction type' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Credit' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1?type=CREDIT');
+    });
+    expect(screen.getByText('January salary')).toBeInTheDocument();
+    expect(screen.queryByText('Pinned grocery')).not.toBeInTheDocument();
+    expect(screen.queryByText('February grocery')).not.toBeInTheDocument();
+
+    const totalTransactionsCard =
+      screen.getByText('Total Transactions').parentElement?.parentElement;
+    const pinnedCard = screen.getByText('Pinned').parentElement?.parentElement;
+    expect(totalTransactionsCard).not.toBeNull();
+    expect(pinnedCard).not.toBeNull();
+    expect(within(totalTransactionsCard!).getByText('1')).toBeInTheDocument();
+    expect(within(pinnedCard!).getByText('0')).toBeInTheDocument();
+
+    expect(mutationMocks.updateView).not.toHaveBeenCalled();
+    expect(mutationMocks.pin).not.toHaveBeenCalled();
+    expect(mutationMocks.unpin).not.toHaveBeenCalled();
+    expect(mutationMocks.exclude).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['bank', '/views/view-1?bankName=Beta%20Bank', 'February grocery'],
+    ['account', '/views/view-1?accountId=checking', 'Pinned grocery'],
+    ['amount', '/views/view-1?minAmount=40&maxAmount=100', 'February grocery'],
+  ])('applies the %s filter to visible membership and stats', (_name, url, expectedRow) => {
+    renderPage(url);
+
+    expect(screen.getByText(expectedRow)).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    const totalTransactionsCard =
+      screen.getByText('Total Transactions').parentElement?.parentElement;
+    expect(totalTransactionsCard).not.toBeNull();
+    expect(within(totalTransactionsCard!).getByText('1')).toBeInTheDocument();
+  });
+
+  it('applies combined filters while retaining options from full canonical membership', async () => {
+    renderPage(
+      '/views/view-1?bankName=Alpha%20Bank&accountId=savings&type=CREDIT&minAmount=150&maxAmount=250',
+    );
+
+    expect(screen.getByText('January salary')).toBeInTheDocument();
+    expect(screen.queryByText('Pinned grocery')).not.toBeInTheDocument();
+    expect(screen.queryByText('February grocery')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter by bank' }));
+    expect(screen.getByRole('button', { name: 'Beta Bank' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter by account' }));
+    expect(screen.getByRole('button', { name: 'checking' })).toBeInTheDocument();
+  });
+
+  it('preserves every temporary filter when navigating to transaction detail', async () => {
+    renderPage(
+      '/views/view-1?bankName=Alpha%20Bank&accountId=savings&type=CREDIT&minAmount=150&maxAmount=250',
+    );
+
+    await userEvent.click(screen.getByText('January salary'));
+
+    await waitFor(() => {
+      const locationText = screen.getByTestId('location').textContent ?? '';
+      const detailSearch = locationText.split('?')[1];
+      const detailParams = new URLSearchParams(detailSearch);
+      expect(locationText).toContain('/transactions/3?');
+      expect(detailParams.get('returnTo')).toBe(
+        '/views/view-1?bankName=Alpha%20Bank&accountId=savings&type=CREDIT&minAmount=150&maxAmount=250',
+      );
+    });
   });
 });

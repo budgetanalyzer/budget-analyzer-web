@@ -49,7 +49,8 @@ return target for drilldowns.
 
 ### Transaction Filters
 
-The Transactions page treats these URL params as the source of truth:
+The Transactions and saved-view detail pages treat these URL params as the
+source of truth:
 
 ```text
 /?q=coffee&dateFrom=2026-01-01&dateTo=2026-01-31&bankName=Test%20Bank&accountId=checking&type=DEBIT&minAmount=10&maxAmount=250
@@ -65,6 +66,9 @@ Supported params:
 - `type`
 - `minAmount`
 - `maxAmount`
+
+On saved-view detail, these filters do not change saved criteria, pins, or
+exclusions.
 
 `returnTo` and `breadcrumbLabel` are navigation context from drilldowns, not
 filters. Clearing filters removes them along with the filter params.

@@ -6,13 +6,14 @@ describe('buildAnalyticsDrilldownUrl', () => {
     expect(
       buildAnalyticsDrilldownUrl({
         scope: 'all',
+        transactionType: 'debit',
         dateFrom: '2026-01-01',
         dateTo: '2026-01-31',
         returnTo: '/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2026',
         breadcrumbLabel: 'Jan 2026',
       }),
     ).toBe(
-      '/?dateFrom=2026-01-01&dateTo=2026-01-31&returnTo=%2Fanalytics%3Fscope%3Dall%26viewMode%3Dmonthly%26transactionType%3Ddebit%26year%3D2026&breadcrumbLabel=Jan%202026',
+      '/?dateFrom=2026-01-01&dateTo=2026-01-31&type=DEBIT&returnTo=%2Fanalytics%3Fscope%3Dall%26viewMode%3Dmonthly%26transactionType%3Ddebit%26year%3D2026&breadcrumbLabel=Jan%202026',
     );
   });
 
@@ -21,13 +22,14 @@ describe('buildAnalyticsDrilldownUrl', () => {
       buildAnalyticsDrilldownUrl({
         scope: 'view',
         viewId: 'view-123',
+        transactionType: 'credit',
         dateFrom: '2026-01-01',
         dateTo: '2026-12-31',
         returnTo: '/analytics?scope=view&viewId=view-123&viewMode=yearly&transactionType=credit',
         breadcrumbLabel: '2026',
       }),
     ).toBe(
-      '/views/view-123?dateFrom=2026-01-01&dateTo=2026-12-31&returnTo=%2Fanalytics%3Fscope%3Dview%26viewId%3Dview-123%26viewMode%3Dyearly%26transactionType%3Dcredit&breadcrumbLabel=2026',
+      '/views/view-123?dateFrom=2026-01-01&dateTo=2026-12-31&type=CREDIT&returnTo=%2Fanalytics%3Fscope%3Dview%26viewId%3Dview-123%26viewMode%3Dyearly%26transactionType%3Dcredit&breadcrumbLabel=2026',
     );
   });
 });
