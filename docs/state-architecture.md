@@ -67,21 +67,11 @@ Supported params:
 - `minAmount`
 - `maxAmount`
 
-The applied values use the shared `TransactionFilterValues` model. Both
-transaction surfaces render the controlled `TransactionFilterBar`, while each
-page applies `filterTransactions` to its complete unfiltered collection.
-Description matching remains a case-insensitive substring search against the
-description only; bank, account, and type use exact matches; amount bounds use
-the absolute transaction amount. Each date boundary is inclusive and applies
-independently, so a from-only or to-only URL filters rows immediately.
-
-On saved-view detail, these URL values are temporary table filters over the
-canonical membership returned by `useViewTransactions`. They update rows and
-stats together without changing persisted criteria, pins, or exclusions.
+On saved-view detail, these filters do not change saved criteria, pins, or
+exclusions.
 
 `returnTo` and `breadcrumbLabel` are navigation context from drilldowns, not
-filters. Ordinary filter updates preserve them; the filter bar's Clear action
-removes them along with all filter params.
+filters. Clearing filters removes them along with the filter params.
 
 ### Analytics Source
 
@@ -130,10 +120,7 @@ mounted:
 
 For table filters, keep a distinction between draft input state and committed
 route state. For example, the transaction search box keeps typed text locally
-until Enter commits it to `q`, and amount drafts commit after a 400 ms debounce.
-Draft inputs are isolated inside the shared filter bar and remount from their
-corresponding applied value when URL navigation, drilldowns, or Clear changes
-the route state.
+until Enter commits it to `q`.
 
 ## Navigation State
 

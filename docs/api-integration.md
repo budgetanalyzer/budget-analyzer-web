@@ -33,20 +33,10 @@ Saved-view criteria mirror the user-facing transaction filters supported by the 
 
 `searchText` is a saved-view description filter. The Transactions and View table search boxes filter the already loaded rows locally with a case-insensitive substring match against transaction descriptions only; use the explicit bank filter when the saved view should persist a bank criterion.
 
-View detail supports the same URL-backed temporary filters as Transactions for
-the visible saved-view membership: `q`, `dateFrom`, `dateTo`, `bankName`,
-`accountId`, `type`, `minAmount`, and `maxAmount`. These filters apply only to
-the canonical membership already loaded for the view; they do not change saved
-view criteria, pins, or exclusions and do not issue another backend request.
-Both the stats and table rows are derived from the same locally filtered list.
-Because the URL is the source of truth, the temporary filters survive refresh,
-can be shared, and are preserved when navigating to a transaction and back.
-`q` is a case-insensitive description-only substring search, each date bound is
-inclusive and applies independently, and amount bounds compare against the
-absolute transaction amount. Applying one temporary filter on the same saved
-view resets table pagination and selection without discarding unrelated draft
-search or amount input. Navigating to a different saved view discards those
-drafts.
+View detail also supports URL-backed table filters for the visible saved-view
+membership: `dateFrom`, `dateTo`, and `q`. Date filters are applied before the
+local description search so the stats and table rows are derived from the same
+filtered transaction list.
 
 Analytics URLs carry an explicit source scope. Missing `scope` still means all
 transactions for backward compatibility, while scoped saved-view analytics use
@@ -54,13 +44,10 @@ transactions for backward compatibility, while scoped saved-view analytics use
 canonical membership endpoint as view detail, so pinned transactions are
 included and excluded transactions are omitted. Analytics drilldown links route
 to the operational surface for that source: all-transaction analytics link to
-`/?dateFrom=...&dateTo=...&type=DEBIT|CREDIT`, and saved-view analytics link to
-`/views/<id>?dateFrom=...&dateTo=...&type=DEBIT|CREDIT`. Both include `returnTo`
-and `breadcrumbLabel` so the filtered operational page can navigate back to
-the same analytics state. Individual temporary-filter changes preserve this return
-context; the filter bar's Clear action removes it together with all transaction
-filter parameters and discards any description or amount input that has not yet
-been applied.
+`/?dateFrom=...&dateTo=...`, and saved-view analytics link to
+`/views/<id>?dateFrom=...&dateTo=...`. Both include `returnTo` and
+`breadcrumbLabel` so the filtered operational page can navigate back to the
+same analytics state.
 
 When reconciling saved-view membership with cached transactions, the frontend
 first removes excluded IDs and de-duplicates visible membership IDs before
