@@ -23,8 +23,7 @@ import {
   buildMonthlyStatsConfig,
 } from '@/features/transactions/components/statsConfig';
 import { useAppSelector } from '@/store/hooks';
-import { isDateInRange } from '@/utils/dates';
-import { filterTransactionsByTableSearch } from '@/utils/transactionSearch';
+import { filterTransactions } from '@/utils/transactionFilters';
 import { ViewCriteriaApi } from '@/types/view';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 
@@ -36,14 +35,7 @@ export function TransactionsPage() {
   const canImportTransactions = usePermission('transactions:write');
 
   const {
-    filters: {
-      globalFilter,
-      dateFilter,
-      bankNameFilter,
-      accountIdFilter,
-      typeFilter,
-      amountFilter,
-    },
+    filters,
     handleDateFilterChange,
     handleSearchChange,
     handleBankNameFilterChange,
@@ -53,6 +45,8 @@ export function TransactionsPage() {
     hasActiveFilters,
     clearAllFilters,
   } = useTransactionFiltersSync();
+  const { globalFilter, dateFilter, bankNameFilter, accountIdFilter, typeFilter, amountFilter } =
+    filters;
 
   // Fetch exchange rates and build map for currency conversion
   const {
@@ -85,57 +79,8 @@ export function TransactionsPage() {
   const filteredTransactions = useMemo(() => {
     if (!transactions) return [];
 
-    let filtered = transactions;
-
-    // Apply date filter
-    if (dateFilter?.from && dateFilter?.to) {
-      filtered = filtered.filter((transaction) =>
-        isDateInRange(transaction.date, dateFilter.from!, dateFilter.to!),
-      );
-    }
-
-    // Apply local text search against transaction descriptions.
-    if (globalFilter) {
-      filtered = filterTransactionsByTableSearch(filtered, globalFilter);
-    }
-
-    // Apply bank name filter
-    if (bankNameFilter) {
-      filtered = filtered.filter((transaction) => transaction.bankName === bankNameFilter);
-    }
-
-    // Apply account ID filter
-    if (accountIdFilter) {
-      filtered = filtered.filter((transaction) => transaction.accountId === accountIdFilter);
-    }
-
-    // Apply type filter
-    if (typeFilter) {
-      filtered = filtered.filter((transaction) => transaction.type === typeFilter);
-    }
-
-    // Apply amount filter
-    if (amountFilter.min !== null) {
-      filtered = filtered.filter(
-        (transaction) => Math.abs(transaction.amount) >= amountFilter.min!,
-      );
-    }
-    if (amountFilter.max !== null) {
-      filtered = filtered.filter(
-        (transaction) => Math.abs(transaction.amount) <= amountFilter.max!,
-      );
-    }
-
-    return filtered;
-  }, [
-    transactions,
-    dateFilter,
-    globalFilter,
-    bankNameFilter,
-    accountIdFilter,
-    typeFilter,
-    amountFilter,
-  ]);
+    return filterTransactions(transactions, filters);
+  }, [transactions, filters]);
 
   // Handle import success/error messages with auto-dismiss
   const { importMessage, handleImportSuccess, handleImportError, clearImportMessage } =
@@ -260,6 +205,7 @@ export function TransactionsPage() {
               {transactions && (
                 <TransactionTable
                   transactions={filteredTransactions}
+                  filters={filters}
                   onDateFilterChange={handleDateFilterChange}
                   onSearchChange={handleSearchChange}
                   onBankNameFilterChange={handleBankNameFilterChange}
@@ -267,12 +213,6 @@ export function TransactionsPage() {
                   onTypeFilterChange={handleTypeFilterChange}
                   onAmountFilterChange={handleAmountFilterChange}
                   onClearAllFilters={clearAllFilters}
-                  globalFilter={globalFilter}
-                  dateFilter={dateFilter}
-                  bankNameFilter={bankNameFilter}
-                  accountIdFilter={accountIdFilter}
-                  typeFilter={typeFilter}
-                  amountFilter={amountFilter}
                   displayCurrency={displayCurrency}
                   exchangeRatesMap={exchangeRatesMap}
                   isExchangeRatesLoading={isExchangeRatesLoading}

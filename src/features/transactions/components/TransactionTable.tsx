@@ -1,5 +1,5 @@
 // src/features/transactions/components/TransactionTable.tsx
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -10,7 +10,8 @@ import {
   RowSelectionState,
   SortingState,
 } from '@tanstack/react-table';
-import { Transaction, TransactionType } from '@/types/transaction';
+import { Transaction, type TransactionType } from '@/types/transaction';
+import type { TransactionFilterValues } from '@/types/transactionFilters';
 import { ExchangeRateResponse } from '@/types/currency';
 import {
   Table,
@@ -21,7 +22,6 @@ import {
   TableCell,
 } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { DeleteTransactionModal } from '@/features/transactions/components/DeleteTransactionModal';
 import { EditableTransactionRow } from '@/features/transactions/components/EditableTransactionRow';
 import { BulkDeleteBar } from '@/features/transactions/components/BulkDeleteBar';
@@ -30,59 +30,25 @@ import { SaveAsViewButton } from '@/components/SaveAsViewButton';
 import { ViewCriteriaApi } from '@/types/view';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { compareLocalDates } from '@/utils/dates';
-import {
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  ChevronsLeft,
-  ChevronsRight,
-  X,
-} from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { DateRangeFilter } from '@/components/DateRangeFilter';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/Select';
 import { useUpdateTransaction } from '@/hooks/useTransactions';
 import { formatApiError } from '@/utils/errorMessages';
 import { toast } from '@/hooks/useToast';
-import { useDebounce } from '@/hooks/useDebounce';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { columnWidthClass } from '@/utils/columnWidth';
-
-function parseAmountInput(value: string): number | null {
-  if (!value) return null;
-
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+import { TransactionFilterBar } from '@/components/TransactionFilterBar';
 
 interface TransactionTableProps {
   transactions: Transaction[];
-  globalFilter: string;
-  dateFilter: {
-    from: string | null;
-    to: string | null;
-  };
-  bankNameFilter: string | null;
-  accountIdFilter: string | null;
-  typeFilter: TransactionType | null;
-  amountFilter: {
-    min: number | null;
-    max: number | null;
-  };
-  onDateFilterChange?: (from: string | null, to: string | null) => void;
-  onSearchChange?: (query: string) => void;
-  onBankNameFilterChange?: (bankName: string | null) => void;
-  onAccountIdFilterChange?: (accountId: string | null) => void;
-  onTypeFilterChange?: (type: TransactionType | null) => void;
-  onAmountFilterChange?: (min: number | null, max: number | null) => void;
-  onClearAllFilters?: () => void;
+  filters: TransactionFilterValues;
+  onDateFilterChange: (from: string | null, to: string | null) => void;
+  onSearchChange: (query: string) => void;
+  onBankNameFilterChange: (bankName: string | null) => void;
+  onAccountIdFilterChange: (accountId: string | null) => void;
+  onTypeFilterChange: (type: TransactionType | null) => void;
+  onAmountFilterChange: (min: number | null, max: number | null) => void;
+  onClearAllFilters: () => void;
   displayCurrency: string;
   exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
   isExchangeRatesLoading: boolean;
@@ -93,12 +59,7 @@ interface TransactionTableProps {
 
 export function TransactionTable({
   transactions,
-  globalFilter,
-  dateFilter,
-  bankNameFilter,
-  accountIdFilter,
-  typeFilter,
-  amountFilter,
+  filters,
   onDateFilterChange,
   onSearchChange,
   onBankNameFilterChange,
@@ -117,9 +78,6 @@ export function TransactionTable({
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
-  const [localSearchValue, setLocalSearchValue] = useState(globalFilter ?? '');
-  const [localMinAmount, setLocalMinAmount] = useState(amountFilter.min?.toString() ?? '');
-  const [localMaxAmount, setLocalMaxAmount] = useState(amountFilter.max?.toString() ?? '');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [selectAllMatching, setSelectAllMatching] = useState(false);
@@ -127,59 +85,6 @@ export function TransactionTable({
   const { mutate: updateTransaction, isPending: isUpdating } = useUpdateTransaction();
   const canBulkDelete = usePermission('transactions:delete');
   const canEditTransactions = usePermission('transactions:write');
-
-  // Debounce amount filters only (search uses explicit submit)
-  const debouncedMinAmount = useDebounce(localMinAmount, 400);
-  const debouncedMaxAmount = useDebounce(localMaxAmount, 400);
-
-  useEffect(() => {
-    setLocalSearchValue(globalFilter ?? '');
-  }, [globalFilter]);
-
-  useEffect(() => {
-    setLocalMinAmount(amountFilter.min?.toString() ?? '');
-    setLocalMaxAmount(amountFilter.max?.toString() ?? '');
-  }, [amountFilter.min, amountFilter.max]);
-
-  // Submit search on Enter key press
-  const handleSearchSubmit = useCallback(() => {
-    onSearchChange?.(localSearchValue);
-  }, [localSearchValue, onSearchChange]);
-
-  // Handle search input keydown - submit on Enter
-  const handleSearchKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        handleSearchSubmit();
-      }
-    },
-    [handleSearchSubmit],
-  );
-
-  // Handle clearing search - submit immediately
-  const handleClearSearch = useCallback(() => {
-    setLocalSearchValue('');
-    onSearchChange?.('');
-  }, [onSearchChange]);
-
-  // Commit debounced draft amount values to the URL-backed filter state.
-  useEffect(() => {
-    if (debouncedMinAmount !== localMinAmount || debouncedMaxAmount !== localMaxAmount) return;
-
-    const min = parseAmountInput(debouncedMinAmount);
-    const max = parseAmountInput(debouncedMaxAmount);
-    if (min === amountFilter.min && max === amountFilter.max) return;
-
-    onAmountFilterChange?.(min, max);
-  }, [
-    amountFilter.min,
-    amountFilter.max,
-    debouncedMinAmount,
-    debouncedMaxAmount,
-    localMinAmount,
-    localMaxAmount,
-    onAmountFilterChange,
-  ]);
 
   // Handle save from row component
   const handleSaveTransaction = useCallback(
@@ -383,158 +288,21 @@ export function TransactionTable({
     autoResetPageIndex: true,
   });
 
-  const hasActiveFilters =
-    dateFilter?.from ||
-    dateFilter?.to ||
-    globalFilter ||
-    bankNameFilter ||
-    accountIdFilter ||
-    typeFilter ||
-    amountFilter.min !== null ||
-    amountFilter.max !== null;
-
-  const handleDateChange = useCallback(
-    (from: string | null, to: string | null) => {
-      if (onDateFilterChange) {
-        onDateFilterChange(from, to);
-      }
-    },
-    [onDateFilterChange],
-  );
-
-  const handleBankNameChange = useCallback(
-    (bankName: string) => {
-      const value = bankName === 'all' ? null : bankName;
-      onBankNameFilterChange?.(value);
-    },
-    [onBankNameFilterChange],
-  );
-
-  const handleAccountIdChange = useCallback(
-    (accountId: string) => {
-      const value = accountId === 'all' ? null : accountId;
-      onAccountIdFilterChange?.(value);
-    },
-    [onAccountIdFilterChange],
-  );
-
-  const handleTypeChange = useCallback(
-    (type: string) => {
-      const value = type === 'all' ? null : (type as TransactionType);
-      onTypeFilterChange?.(value);
-    },
-    [onTypeFilterChange],
-  );
-
-  const handleClearFilters = useCallback(() => {
-    // Clear local state
-    setLocalSearchValue('');
-    setLocalMinAmount('');
-    setLocalMaxAmount('');
-
-    onClearAllFilters?.();
-  }, [onClearAllFilters]);
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search descriptions ↵"
-            value={localSearchValue}
-            onChange={(e) => setLocalSearchValue(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            className="pl-9 pr-9"
-          />
-          {localSearchValue && (
-            <button
-              onClick={handleClearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              title="Clear search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <DateRangeFilter
-          from={dateFilter?.from || null}
-          to={dateFilter?.to || null}
-          onChange={handleDateChange}
-        />
-        {availableBankNames.length > 1 && (
-          <Select value={bankNameFilter ?? 'all'} onValueChange={handleBankNameChange}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="All Banks" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Banks</SelectItem>
-              {availableBankNames.map((bank) => (
-                <SelectItem key={bank} value={bank}>
-                  {bank}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        {availableAccountIds.length > 1 && (
-          <Select value={accountIdFilter ?? 'all'} onValueChange={handleAccountIdChange}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="All Accounts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Accounts</SelectItem>
-              {availableAccountIds.map((account) => (
-                <SelectItem key={account} value={account}>
-                  {account}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <Select value={typeFilter ?? 'all'} onValueChange={handleTypeChange}>
-          <SelectTrigger className="w-[100px]">
-            <SelectValue placeholder="All Types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="DEBIT">Debit</SelectItem>
-            <SelectItem value="CREDIT">Credit</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="flex items-center gap-1">
-          <Input
-            type="number"
-            placeholder="Min"
-            value={localMinAmount}
-            onChange={(e) => setLocalMinAmount(e.target.value)}
-            className="w-[80px]"
-            min="0"
-            step="0.01"
-          />
-          <span className="text-muted-foreground">-</span>
-          <Input
-            type="number"
-            placeholder="Max"
-            value={localMaxAmount}
-            onChange={(e) => setLocalMaxAmount(e.target.value)}
-            className="w-[80px]"
-            min="0"
-            step="0.01"
-          />
-        </div>
-        {/* Filter Actions - visual separator and action buttons */}
-        {hasActiveFilters && (
-          <>
-            <div className="mx-1 h-6 w-px bg-border" />
-            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 px-3">
-              <X className="mr-1.5 h-4 w-4" />
-              Clear
-            </Button>
-            {viewCriteria && <SaveAsViewButton criteria={viewCriteria} />}
-          </>
-        )}
-      </div>
+      <TransactionFilterBar
+        filters={filters}
+        availableBankNames={availableBankNames}
+        availableAccountIds={availableAccountIds}
+        onDateFilterChange={onDateFilterChange}
+        onSearchChange={onSearchChange}
+        onBankNameFilterChange={onBankNameFilterChange}
+        onAccountIdFilterChange={onAccountIdFilterChange}
+        onTypeFilterChange={onTypeFilterChange}
+        onAmountFilterChange={onAmountFilterChange}
+        onClearAllFilters={onClearAllFilters}
+        contextualAction={viewCriteria ? <SaveAsViewButton criteria={viewCriteria} /> : undefined}
+      />
 
       {/* Select all matching banner */}
       {canBulkDelete &&

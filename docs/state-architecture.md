@@ -66,6 +66,14 @@ Supported params:
 - `minAmount`
 - `maxAmount`
 
+The applied values use the shared `TransactionFilterValues` model. The main
+transaction table renders the controlled `TransactionFilterBar`, while the
+page applies `filterTransactions` to the complete transaction collection.
+Description matching remains a case-insensitive substring search against the
+description only; bank, account, and type use exact matches; amount bounds use
+the absolute transaction amount. Each date boundary is inclusive and applies
+independently, so a from-only or to-only URL filters rows immediately.
+
 `returnTo` and `breadcrumbLabel` are navigation context from drilldowns, not
 filters. Clearing filters removes them along with the filter params.
 
@@ -116,7 +124,10 @@ mounted:
 
 For table filters, keep a distinction between draft input state and committed
 route state. For example, the transaction search box keeps typed text locally
-until Enter commits it to `q`.
+until Enter commits it to `q`, and amount drafts commit after a 400 ms debounce.
+Draft inputs are isolated inside the shared filter bar and remount from their
+corresponding applied value when URL navigation, drilldowns, or Clear changes
+the route state.
 
 ## Navigation State
 

@@ -2,21 +2,7 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { TransactionType } from '@/types/transaction';
-
-interface TransactionFilters {
-  globalFilter: string;
-  dateFilter: {
-    from: string | null;
-    to: string | null;
-  };
-  bankNameFilter: string | null;
-  accountIdFilter: string | null;
-  typeFilter: TransactionType | null;
-  amountFilter: {
-    min: number | null;
-    max: number | null;
-  };
-}
+import type { TransactionFilterValues } from '@/types/transactionFilters';
 
 function parseAmount(value: string | null): number | null {
   if (!value) return null;
@@ -34,7 +20,7 @@ function parseAmount(value: string | null): number | null {
 export function useTransactionFiltersSync() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const filters = useMemo<TransactionFilters>(() => {
+  const filters = useMemo<TransactionFilterValues>(() => {
     const type = searchParams.get('type');
 
     return {

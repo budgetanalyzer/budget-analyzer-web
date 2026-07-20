@@ -25,6 +25,7 @@ import { Transaction } from '@/types/transaction';
 import { renderWithProviders } from '@/testing/test-utils';
 
 const mockUsePermission = vi.mocked(usePermission);
+const noop = vi.fn();
 
 const transactions: Transaction[] = [
   {
@@ -70,12 +71,21 @@ function renderTable() {
   return renderWithProviders(
     <TransactionTable
       transactions={transactions}
-      globalFilter=""
-      dateFilter={{ from: null, to: null }}
-      bankNameFilter={null}
-      accountIdFilter={null}
-      typeFilter={null}
-      amountFilter={{ min: null, max: null }}
+      filters={{
+        globalFilter: '',
+        dateFilter: { from: null, to: null },
+        bankNameFilter: null,
+        accountIdFilter: null,
+        typeFilter: null,
+        amountFilter: { min: null, max: null },
+      }}
+      onDateFilterChange={noop}
+      onSearchChange={noop}
+      onBankNameFilterChange={noop}
+      onAccountIdFilterChange={noop}
+      onTypeFilterChange={noop}
+      onAmountFilterChange={noop}
+      onClearAllFilters={noop}
       displayCurrency="USD"
       exchangeRatesMap={new Map()}
       isExchangeRatesLoading={false}
