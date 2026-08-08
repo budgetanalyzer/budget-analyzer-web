@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ViewTransactionTable } from '@/features/views/components/ViewTransactionTable';
 import { renderWithProviders } from '@/testing/test-utils';
 import { ViewTransaction } from '@/types/view';
 import type { TransactionFilterValues } from '@/types/transactionFilters';
+import type { ExchangeRateResponse } from '@/types/currency';
+import { buildExchangeRateMap } from '@/utils/currency';
 
 const mutationMocks = vi.hoisted(() => ({
   pinMutate: vi.fn(),
@@ -82,6 +84,8 @@ const paginatedTransactions: ViewTransaction[] = Array.from({ length: 21 }, (_, 
   description: `Transaction ${index + 1}`,
 }));
 
+type ExchangeRatesMap = Map<string, Map<string, ExchangeRateResponse>>;
+
 function renderViewTransactionTable({
   rows = transactions,
   viewId = 'view-1',
@@ -95,6 +99,7 @@ function renderViewTransactionTable({
   onTypeFilterChange = vi.fn(),
   onAmountFilterChange = vi.fn(),
   onClearAllFilters = vi.fn(),
+  exchangeRatesMap = new Map(),
 }: {
   rows?: ViewTransaction[];
   viewId?: string;
@@ -108,6 +113,7 @@ function renderViewTransactionTable({
   onTypeFilterChange?: (type: 'DEBIT' | 'CREDIT' | null) => void;
   onAmountFilterChange?: (min: number | null, max: number | null) => void;
   onClearAllFilters?: () => void;
+  exchangeRatesMap?: ExchangeRatesMap;
 } = {}) {
   const result = renderWithProviders(
     <ViewTransactionTable
@@ -124,7 +130,7 @@ function renderViewTransactionTable({
       onAmountFilterChange={onAmountFilterChange}
       onClearAllFilters={onClearAllFilters}
       displayCurrency="USD"
-      exchangeRatesMap={new Map()}
+      exchangeRatesMap={exchangeRatesMap}
       isExchangeRatesLoading={false}
     />,
     { initialEntries: [`/views/${viewId}`] },
@@ -142,12 +148,69 @@ function renderViewTransactionTable({
   };
 }
 
+function expectDescriptionOrder(expectedDescriptions: string[]) {
+  const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+
+  expectedDescriptions.forEach((description, index) => {
+    expect(within(rows[index]).getByText(description)).toBeInTheDocument();
+  });
+}
+
 beforeEach(() => {
   Object.values(mutationMocks).forEach((mock) => mock.mockReset());
 });
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('ViewTransactionTable sorting', () => {
+  const mixedCurrencyTransactions: ViewTransaction[] = [
+    {
+      ...transactions[0],
+      id: 10,
+      amount: -1_000,
+      currencyIsoCode: 'JPY',
+      description: 'JPY view debit',
+    },
+    {
+      ...transactions[1],
+      id: 11,
+      date: transactions[0].date,
+      amount: -20,
+      currencyIsoCode: 'USD',
+      description: 'USD view debit',
+    },
+  ];
+  const exchangeRatesMap = buildExchangeRateMap([
+    {
+      baseCurrency: 'USD',
+      targetCurrency: 'JPY',
+      date: transactions[0].date,
+      rate: 100,
+    },
+  ]);
+
+  it('sorts signed mixed-currency amounts by USD equivalents in both directions', async () => {
+    renderViewTransactionTable({ rows: mixedCurrencyTransactions, exchangeRatesMap });
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+    expectDescriptionOrder(['USD view debit', 'JPY view debit']);
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+    expectDescriptionOrder(['JPY view debit', 'USD view debit']);
+  });
+
+  it('returns to the first page when a new sort is selected', async () => {
+    renderViewTransactionTable({ rows: paginatedTransactions });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('Showing 21 to 21 of 21 transactions')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+
+    expect(screen.getByText('Showing 1 to 20 of 21 transactions')).toBeInTheDocument();
+  });
 });
 
 describe('ViewTransactionTable search', () => {

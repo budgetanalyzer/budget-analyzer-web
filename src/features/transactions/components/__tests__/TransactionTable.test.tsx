@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { screen, fireEvent, within } from '@testing-library/react';
+import { act, screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/hooks/useTransactions', async (importOriginal) => {
@@ -22,7 +23,9 @@ vi.mock('@/hooks/useViews', async (importOriginal) => {
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { TransactionTable } from '@/features/transactions/components/TransactionTable';
 import { Transaction } from '@/types/transaction';
+import type { ExchangeRateResponse } from '@/types/currency';
 import { renderWithProviders } from '@/testing/test-utils';
+import { buildExchangeRateMap } from '@/utils/currency';
 
 const mockUsePermission = vi.mocked(usePermission);
 const noop = vi.fn();
@@ -67,10 +70,12 @@ beforeAll(() => {
   }
 });
 
-function renderTable() {
-  return renderWithProviders(
+type ExchangeRatesMap = Map<string, Map<string, ExchangeRateResponse>>;
+
+function createTable(rows: Transaction[], exchangeRatesMap: ExchangeRatesMap) {
+  return (
     <TransactionTable
-      transactions={transactions}
+      transactions={rows}
       filters={{
         globalFilter: '',
         dateFilter: { from: null, to: null },
@@ -87,13 +92,32 @@ function renderTable() {
       onAmountFilterChange={noop}
       onClearAllFilters={noop}
       displayCurrency="USD"
-      exchangeRatesMap={new Map()}
+      exchangeRatesMap={exchangeRatesMap}
       isExchangeRatesLoading={false}
       availableBankNames={['Test Bank']}
       availableAccountIds={['acct-1']}
-    />,
-    { initialEntries: ['/transactions'] },
+    />
   );
+}
+
+function renderTable({
+  rows = transactions,
+  exchangeRatesMap = new Map(),
+}: {
+  rows?: Transaction[];
+  exchangeRatesMap?: ExchangeRatesMap;
+} = {}) {
+  return renderWithProviders(createTable(rows, exchangeRatesMap), {
+    initialEntries: ['/transactions'],
+  });
+}
+
+function expectDescriptionOrder(expectedDescriptions: string[]) {
+  const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+
+  expectedDescriptions.forEach((description, index) => {
+    expect(within(rows[index]).getByText(description)).toBeInTheDocument();
+  });
 }
 
 function openFirstRowMenu() {
@@ -176,5 +200,79 @@ describe('TransactionTable permission gating', () => {
     const headerRow = within(table).getAllByRole('row')[0];
     // Select + Date, Description, Bank, Account, Type, Amount, Actions = 8 columns.
     expect(within(headerRow).getAllByRole('columnheader')).toHaveLength(8);
+  });
+});
+
+describe('TransactionTable sorting', () => {
+  const mixedCurrencyTransactions: Transaction[] = [
+    {
+      ...transactions[0],
+      id: 10,
+      amount: -1_000,
+      currencyIsoCode: 'JPY',
+      description: 'JPY debit',
+    },
+    {
+      ...transactions[1],
+      id: 11,
+      date: transactions[0].date,
+      amount: -20,
+      currencyIsoCode: 'USD',
+      type: 'DEBIT',
+      description: 'USD debit',
+    },
+  ];
+  const exchangeRatesMap = buildExchangeRateMap([
+    {
+      baseCurrency: 'USD',
+      targetCurrency: 'JPY',
+      date: transactions[0].date,
+      rate: 100,
+    },
+  ]);
+
+  it('sorts signed mixed-currency amounts by USD equivalents in both directions', async () => {
+    mockUsePermission.mockReturnValue(false);
+    renderTable({ rows: mixedCurrencyTransactions, exchangeRatesMap });
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+    expectDescriptionOrder(['USD debit', 'JPY debit']);
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+    expectDescriptionOrder(['JPY debit', 'USD debit']);
+  });
+
+  it('recalculates an active Amount sort when exchange rates arrive', async () => {
+    mockUsePermission.mockReturnValue(false);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { rerender } = renderTable({ rows: mixedCurrencyTransactions });
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+    expectDescriptionOrder(['JPY debit', 'USD debit']);
+
+    await act(async () => {
+      rerender(createTable(mixedCurrencyTransactions, exchangeRatesMap));
+    });
+
+    expectDescriptionOrder(['USD debit', 'JPY debit']);
+    warnSpy.mockRestore();
+  });
+
+  it('returns to the first page when the current sort direction changes', async () => {
+    mockUsePermission.mockReturnValue(false);
+    const paginatedTransactions = Array.from({ length: 11 }, (_, index) => ({
+      ...transactions[0],
+      id: index + 1,
+      amount: index + 1,
+      description: `Transaction ${index + 1}`,
+    }));
+    renderTable({ rows: paginatedTransactions });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('Showing 11 to 11 of 11 transactions')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Date/ }));
+
+    expect(screen.getByText('Showing 1 to 10 of 11 transactions')).toBeInTheDocument();
   });
 });

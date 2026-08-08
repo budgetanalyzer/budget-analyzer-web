@@ -37,6 +37,10 @@ Transaction filters are URL-backed so filtered lists remain refreshable and
 shareable. The supported filter params are `q`, `dateFrom`, `dateTo`,
 `bankName`, `accountId`, `type`, `minAmount`, and `maxAmount`. Table sorting,
 pagination, row selection, and draft filter input text are local table state.
+In the Transactions and saved-view detail tables, Amount sorting compares each
+row's transaction-date USD equivalent, independent of the selected display
+currency; amount cells still use the selected display currency. Changing any
+sort column or direction returns these client-side tables to the first page.
 
 Analytics source selection is explicit in the URL. Missing `scope` defaults to
 all transactions; `scope=view&viewId=<id>` analyzes canonical saved-view

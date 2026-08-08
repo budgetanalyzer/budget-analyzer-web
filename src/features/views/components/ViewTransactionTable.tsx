@@ -9,6 +9,7 @@ import {
   flexRender,
   SortingState,
   RowSelectionState,
+  type Updater,
 } from '@tanstack/react-table';
 import { ViewTransaction } from '@/types/view';
 import { ExchangeRateResponse } from '@/types/currency';
@@ -57,6 +58,11 @@ import { columnWidthClass } from '@/utils/columnWidth';
 import type { TransactionType } from '@/types/transaction';
 import type { TransactionFilterValues } from '@/types/transactionFilters';
 import { hasActiveTransactionFilters } from '@/utils/transactionFilters';
+import { convertCurrency } from '@/utils/currency';
+
+type ViewTransactionTableRow = ViewTransaction & {
+  amountInUsd: number;
+};
 
 interface ViewTransactionTableProps {
   transactions: ViewTransaction[];
@@ -156,6 +162,21 @@ function ViewTransactionTableContent({
 
   const isMutating = isPinning || isUnpinning || isExcluding;
 
+  const tableRows = useMemo<ViewTransactionTableRow[]>(
+    () =>
+      transactions.map((transaction) => ({
+        ...transaction,
+        amountInUsd: convertCurrency(
+          transaction.amount,
+          transaction.date,
+          transaction.currencyIsoCode,
+          'USD',
+          exchangeRatesMap,
+        ),
+      })),
+    [exchangeRatesMap, transactions],
+  );
+
   // Handle row click to navigate to transaction detail
   const handleRowClick = useCallback(
     (transaction: ViewTransaction) => {
@@ -198,7 +219,7 @@ function ViewTransactionTableContent({
   );
 
   // Define columns for TanStack Table
-  const columns = useMemo<ColumnDef<ViewTransaction>[]>(
+  const columns = useMemo<ColumnDef<ViewTransactionTableRow>[]>(
     () => [
       {
         id: 'select',
@@ -306,7 +327,8 @@ function ViewTransactionTableContent({
         maxSize: 100,
       },
       {
-        accessorKey: 'amount',
+        id: 'amount',
+        accessorFn: (row) => row.amountInUsd,
         header: ({ column }) => {
           return (
             <Button
@@ -319,6 +341,7 @@ function ViewTransactionTableContent({
             </Button>
           );
         },
+        sortingFn: 'basic',
         cell: ({ row }) => {
           if (isExchangeRatesLoading) {
             return (
@@ -405,8 +428,15 @@ function ViewTransactionTableContent({
     ],
   );
 
+  const handleSortingChange = useCallback((updater: Updater<SortingState>) => {
+    setSorting((currentSorting) =>
+      typeof updater === 'function' ? updater(currentSorting) : updater,
+    );
+    setPageIndex(0);
+  }, []);
+
   const table = useReactTable({
-    data: transactions,
+    data: tableRows,
     columns,
     state: {
       sorting,
@@ -425,7 +455,7 @@ function ViewTransactionTableContent({
       }
     },
     getRowId: (row) => row.id.toString(),
-    onSortingChange: setSorting,
+    onSortingChange: handleSortingChange,
     onPaginationChange: (updater) => {
       const currentPagination = { pageIndex, pageSize };
       const newPagination = typeof updater === 'function' ? updater(currentPagination) : updater;
