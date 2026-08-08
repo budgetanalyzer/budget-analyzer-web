@@ -9,6 +9,7 @@ import {
   flexRender,
   RowSelectionState,
   SortingState,
+  type Updater,
 } from '@tanstack/react-table';
 import { Transaction, type TransactionType } from '@/types/transaction';
 import type { TransactionFilterValues } from '@/types/transactionFilters';
@@ -38,6 +39,11 @@ import { toast } from '@/hooks/useToast';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { columnWidthClass } from '@/utils/columnWidth';
 import { TransactionFilterBar } from '@/components/TransactionFilterBar';
+import { convertCurrency } from '@/utils/currency';
+
+type TransactionTableRow = Transaction & {
+  amountInUsd: number;
+};
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -85,6 +91,21 @@ export function TransactionTable({
   const { mutate: updateTransaction, isPending: isUpdating } = useUpdateTransaction();
   const canBulkDelete = usePermission('transactions:delete');
   const canEditTransactions = usePermission('transactions:write');
+
+  const tableRows = useMemo<TransactionTableRow[]>(
+    () =>
+      transactions.map((transaction) => ({
+        ...transaction,
+        amountInUsd: convertCurrency(
+          transaction.amount,
+          transaction.date,
+          transaction.currencyIsoCode,
+          'USD',
+          exchangeRatesMap,
+        ),
+      })),
+    [exchangeRatesMap, transactions],
+  );
 
   // Handle save from row component
   const handleSaveTransaction = useCallback(
@@ -155,8 +176,8 @@ export function TransactionTable({
   // Define columns for TanStack Table
   // Note: Cell rendering is handled by EditableTransactionRow, not by these column definitions
   // These columns are only used for: headers, sorting configuration, and column widths
-  const columns = useMemo<ColumnDef<Transaction>[]>(() => {
-    const selectColumn: ColumnDef<Transaction> = {
+  const columns = useMemo<ColumnDef<TransactionTableRow>[]>(() => {
+    const selectColumn: ColumnDef<TransactionTableRow> = {
       id: 'select',
       header: ({ table }) => (
         <Checkbox
@@ -228,7 +249,8 @@ export function TransactionTable({
         maxSize: 100,
       },
       {
-        accessorKey: 'amount',
+        id: 'amount',
+        accessorFn: (row) => row.amountInUsd,
         header: ({ column }) => {
           return (
             <Button
@@ -241,6 +263,7 @@ export function TransactionTable({
             </Button>
           );
         },
+        sortingFn: 'basic',
         size: 150,
         minSize: 130,
         maxSize: 150,
@@ -255,8 +278,15 @@ export function TransactionTable({
     ];
   }, [canBulkDelete]);
 
+  const handleSortingChange = useCallback((updater: Updater<SortingState>) => {
+    setSorting((currentSorting) =>
+      typeof updater === 'function' ? updater(currentSorting) : updater,
+    );
+    setPagination((currentPagination) => ({ ...currentPagination, pageIndex: 0 }));
+  }, []);
+
   const table = useReactTable({
-    data: transactions,
+    data: tableRows,
     columns,
     state: {
       sorting,
@@ -273,10 +303,7 @@ export function TransactionTable({
       }
     },
     getRowId: (row) => row.id.toString(),
-    onSortingChange: (updater) => {
-      const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
-      setSorting(newSorting);
-    },
+    onSortingChange: handleSortingChange,
     onPaginationChange: (updater) => {
       const newPagination = typeof updater === 'function' ? updater(pagination) : updater;
       setPagination(newPagination);
