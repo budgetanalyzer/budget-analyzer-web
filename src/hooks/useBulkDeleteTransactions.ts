@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Transaction } from '@/types/transaction';
 import { transactionApi } from '@/api/transactionApi';
 import { ApiError } from '@/types/apiError';
+import { viewKeys } from '@/hooks/useViews';
 
 export interface BulkDeleteResult {
   deletedCount: number;
@@ -24,6 +25,7 @@ export const useBulkDeleteTransactions = () => {
       });
 
       queryClient.invalidateQueries({ queryKey: ['transactionCount'] });
+      queryClient.invalidateQueries({ queryKey: viewKeys.all });
     },
   });
 };

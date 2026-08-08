@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient, UseQueryResult } from '@tanstack
 import { Transaction, TransactionUpdateRequest } from '@/types/transaction';
 import { transactionApi } from '@/api/transactionApi';
 import { ApiError } from '@/types/apiError';
+import { viewKeys } from '@/hooks/useViews';
 
 interface UseTransactionsOptions {
   enabled?: boolean;
@@ -55,6 +56,7 @@ export const useDeleteTransaction = () => {
         type: 'inactive',
       });
       queryClient.invalidateQueries({ queryKey: ['transactionCount'] });
+      queryClient.invalidateQueries({ queryKey: viewKeys.all });
     },
   });
 };
@@ -78,6 +80,7 @@ export const useUpdateTransaction = () => {
         ['transaction', updatedTransaction.id],
         updatedTransaction,
       );
+      queryClient.invalidateQueries({ queryKey: viewKeys.all });
     },
   });
 };
