@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '@/testing/mocks/server';
+import { viewKeys } from '@/hooks/useViews';
 import { renderWithProviders } from '@/testing/test-utils';
 import { TransactionPreviewModal } from '@/features/transactions/components/TransactionPreviewModal';
 import type { BatchImportRequest, PreviewResponse, PreviewTransaction } from '@/types/transaction';
@@ -371,6 +372,7 @@ describe('TransactionPreviewModal', () => {
     await waitFor(() => {
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['transactions'] });
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['transactionCount'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: viewKeys.all });
     });
   });
 });

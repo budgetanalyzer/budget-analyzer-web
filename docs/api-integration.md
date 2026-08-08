@@ -54,6 +54,11 @@ first removes excluded IDs and de-duplicates visible membership IDs before
 fetching any missing transaction details. If an inconsistent membership payload
 places the same visible ID in multiple groups, the row is rendered once.
 
+Successful transaction imports, edits, and deletions invalidate the complete
+saved-view query family. Saved-view membership and transaction counts depend on
+the active transaction set, so inactive views refetch their current membership
+when they are next opened.
+
 View detail and saved-view cards expose normal analytics links built as
 `/analytics?scope=view&viewId=<id>&viewMode=monthly&transactionType=debit`.
 The analytics page fills the year from the latest transaction year when the URL
