@@ -7,6 +7,10 @@ describe('error message utilities', () => {
     ['MISSING_ORIGINAL_FILENAME', 'The uploaded file must include a filename.'],
     ['BATCH_IMPORT_NO_TRANSACTIONS_CREATED', 'All submitted rows were skipped as duplicates.'],
     [
+      'BATCH_IMPORT_SOURCE_MISMATCH',
+      'These files cannot be imported together. Please preview the files together again.',
+    ],
+    [
       'PREVIEW_IMPORT_TOKEN_INVALID',
       'This preview has expired or is no longer valid. Please preview the file again.',
     ],

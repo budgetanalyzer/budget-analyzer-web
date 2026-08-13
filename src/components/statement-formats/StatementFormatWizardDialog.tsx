@@ -18,6 +18,7 @@ type WizardBranch = 'upload' | 'csv' | 'pdf';
 interface StatementFormatWizardDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCancel?: () => void;
   initialAccountId?: string;
   onSaved: (format: StatementFormat) => void;
 }
@@ -40,6 +41,7 @@ function detectWizardBranch(file: File): Exclude<WizardBranch, 'upload'> | null 
 export function StatementFormatWizardDialog({
   open,
   onOpenChange,
+  onCancel,
   initialAccountId,
   onSaved,
 }: StatementFormatWizardDialogProps) {
@@ -57,10 +59,11 @@ export function StatementFormatWizardDialog({
     (nextOpen: boolean) => {
       if (!nextOpen) {
         resetState();
+        onCancel?.();
       }
       onOpenChange(nextOpen);
     },
-    [onOpenChange, resetState],
+    [onCancel, onOpenChange, resetState],
   );
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {

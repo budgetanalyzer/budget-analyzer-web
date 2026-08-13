@@ -50,12 +50,16 @@ export interface PreviewTransaction {
   duplicateReason?: PreviewDuplicateReason | null;
 }
 
-export interface PreviewResponse {
+export interface PreviewFileResponse {
   sourceFile: string;
-  detectedFormat: string;
+  statementFormatId: number;
   previewImportToken: string;
   fileImport: PreviewFileImportStatusResponse;
   transactions: PreviewTransaction[];
+}
+
+export interface PreviewResponse {
+  files: PreviewFileResponse[];
 }
 
 export interface BatchImportTransactionRequest {
@@ -70,16 +74,28 @@ export interface BatchImportTransactionRequest {
   allowDuplicate?: boolean;
 }
 
-export interface BatchImportRequest {
+export interface BatchImportFileRequest {
   previewImportToken: string;
   transactions: BatchImportTransactionRequest[];
+}
+
+export interface BatchImportRequest {
+  files: BatchImportFileRequest[];
+}
+
+export interface BatchImportFileResponse {
+  sourceFile: string;
+  created: number;
+  duplicatesSkipped: number;
+  duplicatesImported: number;
+  transactions: Transaction[];
 }
 
 export interface BatchImportResponse {
   created: number;
   duplicatesSkipped: number;
   duplicatesImported: number;
-  transactions: Transaction[];
+  files: BatchImportFileResponse[];
 }
 
 export interface TransactionCountFilter {

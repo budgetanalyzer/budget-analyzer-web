@@ -39,10 +39,11 @@ function toBatchImportTransaction(
   };
 }
 
-const PREVIEW_UPLOAD_TOO_LARGE_MESSAGE = 'Sorry, the file exceeds our 25MB limit.';
+const PREVIEW_UPLOAD_TOO_LARGE_MESSAGE = 'The selected files exceed the upload size limit.';
+const GROUPED_PREVIEW_TIMEOUT_MS = 60_000;
 
 export interface PreviewTransactionsRequest {
-  file: File;
+  files: File[];
   statementFormatId: number;
   accountId?: string;
 }
@@ -78,12 +79,12 @@ export const transactionApi = {
   },
 
   previewTransactions: async ({
-    file,
+    files,
     statementFormatId,
     accountId,
   }: PreviewTransactionsRequest): Promise<PreviewResponse> => {
     const formData = new FormData();
-    formData.append('file', file);
+    files.forEach((file) => formData.append('files', file));
 
     const params = new URLSearchParams({ statementFormatId: String(statementFormatId) });
     if (accountId) {
@@ -97,6 +98,7 @@ export const transactionApi = {
         {
           // Override the API client's JSON default so Axios leaves FormData as multipart.
           headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: GROUPED_PREVIEW_TIMEOUT_MS,
         },
       );
       return response.data;
@@ -114,8 +116,10 @@ export const transactionApi = {
 
   batchImportTransactions: async (request: BatchImportRequest): Promise<BatchImportResponse> => {
     const response = await apiClient.post<BatchImportResponse>('/v1/transactions/batch', {
-      previewImportToken: request.previewImportToken,
-      transactions: request.transactions.map(toBatchImportTransaction),
+      files: request.files.map((file) => ({
+        previewImportToken: file.previewImportToken,
+        transactions: file.transactions.map(toBatchImportTransaction),
+      })),
     });
     return response.data;
   },

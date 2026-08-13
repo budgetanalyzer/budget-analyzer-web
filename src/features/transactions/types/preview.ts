@@ -6,3 +6,9 @@ export type EditablePreviewTransaction = PreviewTransaction &
 export type EditablePreviewTransactionField = keyof EditablePreviewTransaction;
 
 export type EditablePreviewTransactionValue = string | number | boolean | null | undefined;
+
+export interface EditablePreviewTableRow {
+  fileIndex: number;
+  transactionIndex: number;
+  transaction: EditablePreviewTransaction;
+}

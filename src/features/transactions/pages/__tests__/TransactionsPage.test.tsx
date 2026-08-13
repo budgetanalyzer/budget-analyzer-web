@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { Transaction } from '@/types/transaction';
 
 const { transactionTableMock, transactionData } = vi.hoisted(() => ({
@@ -50,7 +51,32 @@ vi.mock('@/features/transactions/components/TransactionTable', () => ({
   },
 }));
 vi.mock('@/features/transactions/components/ImportButton', () => ({
-  ImportButton: () => <button type="button">Import Transactions</button>,
+  ImportButton: ({
+    onSuccess,
+    onError,
+  }: {
+    onSuccess?: (created: number, duplicatesSkipped: number, duplicatesImported: number) => void;
+    onError?: (error: Error) => void;
+  }) => (
+    <>
+      <button type="button">Import Transactions</button>
+      <button type="button" onClick={() => onSuccess?.(7, 3, 2)}>
+        Complete grouped import
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onError?.(
+            new Error(
+              "Failed to preview file 'bad-statement.csv': Missing required Description column",
+            ),
+          )
+        }
+      >
+        Fail grouped preview
+      </button>
+    </>
+  ),
 }));
 
 import { usePermission } from '@/features/auth/hooks/usePermission';
@@ -85,6 +111,32 @@ describe('TransactionsPage Import button gating', () => {
     renderPage();
 
     expect(screen.queryByRole('button', { name: /Import Transactions/ })).not.toBeInTheDocument();
+  });
+
+  it('uses aggregate grouped-import counts in the existing success banner', async () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
+    renderPage();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Complete grouped import' }));
+
+    expect(
+      screen.getByText(
+        'Successfully imported 7 transactions, including 2 duplicates. Skipped 3 duplicates.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a filename-bearing first-file preview failure in the existing error banner', async () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
+    renderPage();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Fail grouped preview' }));
+
+    expect(
+      screen.getByText(
+        "Failed to preview file 'bad-statement.csv': Missing required Description column",
+      ),
+    ).toBeInTheDocument();
   });
 });
 

@@ -20,22 +20,25 @@ import type {
   EditablePreviewTransactionValue,
 } from '@/features/transactions/types/preview';
 import { cn } from '@/utils/cn';
+import { columnMinWidthClass, columnWidthClass } from '@/utils/columnWidth';
 
 interface PreviewTableRowProps {
   transaction: EditablePreviewTransaction;
-  index: number;
+  fileIndex: number;
+  transactionIndex: number;
   onUpdate: (
-    index: number,
+    fileIndex: number,
+    transactionIndex: number,
     field: EditablePreviewTransactionField,
     value: EditablePreviewTransactionValue,
   ) => void;
-  onRemove: (index: number) => void;
-  hasDuplicateRows: boolean;
+  onRemove: (fileIndex: number, transactionIndex: number) => void;
+  reviewColumnWidth: number;
 }
 
 function getDuplicateStatusLabel(reason?: PreviewDuplicateReason | null): string {
   if (reason === 'IN_BATCH') {
-    return 'Duplicate in file';
+    return 'Matches earlier file';
   }
 
   if (reason === 'EXISTING_TRANSACTION') {
@@ -47,59 +50,60 @@ function getDuplicateStatusLabel(reason?: PreviewDuplicateReason | null): string
 
 export const PreviewTableRow = memo(function PreviewTableRow({
   transaction,
-  index,
+  fileIndex,
+  transactionIndex,
   onUpdate,
   onRemove,
-  hasDuplicateRows,
+  reviewColumnWidth,
 }: PreviewTableRowProps) {
   const handleDateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      onUpdate(index, 'date', e.target.value);
+      onUpdate(fileIndex, transactionIndex, 'date', e.target.value);
     },
-    [index, onUpdate],
+    [fileIndex, transactionIndex, onUpdate],
   );
 
   const handleDescriptionChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      onUpdate(index, 'description', e.target.value);
+      onUpdate(fileIndex, transactionIndex, 'description', e.target.value);
     },
-    [index, onUpdate],
+    [fileIndex, transactionIndex, onUpdate],
   );
 
   const handleTypeChange = useCallback(
     (value: string) => {
-      onUpdate(index, 'type', value as TransactionType);
+      onUpdate(fileIndex, transactionIndex, 'type', value as TransactionType);
     },
-    [index, onUpdate],
+    [fileIndex, transactionIndex, onUpdate],
   );
 
   const handleAmountChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = parseFloat(e.target.value) || 0;
-      onUpdate(index, 'amount', value);
+      onUpdate(fileIndex, transactionIndex, 'amount', value);
     },
-    [index, onUpdate],
+    [fileIndex, transactionIndex, onUpdate],
   );
 
   const handleAccountIdChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      onUpdate(index, 'accountId', e.target.value);
+      onUpdate(fileIndex, transactionIndex, 'accountId', e.target.value);
     },
-    [index, onUpdate],
+    [fileIndex, transactionIndex, onUpdate],
   );
 
   const handleRemove = useCallback(() => {
-    onRemove(index);
-  }, [index, onRemove]);
+    onRemove(fileIndex, transactionIndex);
+  }, [fileIndex, transactionIndex, onRemove]);
 
   const handleAllowDuplicateChange = useCallback(
     (checked: boolean | 'indeterminate') => {
-      onUpdate(index, 'allowDuplicate', checked === true);
+      onUpdate(fileIndex, transactionIndex, 'allowDuplicate', checked === true);
     },
-    [index, onUpdate],
+    [fileIndex, transactionIndex, onUpdate],
   );
 
-  const importAnywayId = `preview-import-anyway-${index}`;
+  const importAnywayId = `preview-import-anyway-${fileIndex}-${transactionIndex}`;
   const duplicateStatusLabel = getDuplicateStatusLabel(transaction.duplicateReason);
 
   return (
@@ -178,7 +182,9 @@ export const PreviewTableRow = memo(function PreviewTableRow({
       </TableCell>
 
       {/* Review actions */}
-      <TableCell className={cn(hasDuplicateRows ? 'w-[220px] min-w-[220px]' : 'w-[72px]')}>
+      <TableCell
+        className={cn(columnWidthClass(reviewColumnWidth), columnMinWidthClass(reviewColumnWidth))}
+      >
         <div className="flex items-center justify-end gap-3">
           {transaction.duplicate && (
             <div className="min-w-0 rounded-md bg-warning/15 px-2 py-1.5">

@@ -5,7 +5,11 @@ import { http, HttpResponse } from 'msw';
 import { server } from '@/testing/mocks/server';
 import { apiClient } from '@/api/client';
 import { transactionApi } from '@/api/transactionApi';
-import { BatchImportRequest, BatchImportTransactionRequest } from '@/types/transaction';
+import type {
+  BatchImportRequest,
+  BatchImportResponse,
+  BatchImportTransactionRequest,
+} from '@/types/transaction';
 import { ApiError } from '@/types/apiError';
 
 const baseTransaction: BatchImportTransactionRequest = {
@@ -26,8 +30,11 @@ afterEach(() => {
 });
 
 describe('transactionApi.previewTransactions', () => {
-  it('uploads the statement file as multipart form data', async () => {
-    const file = new File(['date,description,amount'], 'statement.csv', { type: 'text/csv' });
+  it('uploads statement files as ordered repeated multipart parts', async () => {
+    const januaryFile = new File(['january'], 'january.csv', { type: 'text/csv' });
+    const februaryFile = new File(['february'], 'february.pdf', {
+      type: 'application/pdf',
+    });
     let capturedConfig: InternalAxiosRequestConfig | undefined;
 
     apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
@@ -35,10 +42,7 @@ describe('transactionApi.previewTransactions', () => {
 
       return {
         data: {
-          previewImportToken: 'preview-token-123',
-          sourceFile: 'statement.csv',
-          fileImport: null,
-          transactions: [],
+          files: [],
         },
         status: 200,
         statusText: 'OK',
@@ -48,7 +52,7 @@ describe('transactionApi.previewTransactions', () => {
     });
 
     await transactionApi.previewTransactions({
-      file,
+      files: [januaryFile, februaryFile],
       statementFormatId: 42,
       accountId: 'checking-123',
     });
@@ -57,11 +61,21 @@ describe('transactionApi.previewTransactions', () => {
       '/v1/transactions/preview?statementFormatId=42&accountId=checking-123',
     );
     expect(capturedConfig?.headers.getContentType()).toContain('multipart/form-data');
+    expect(capturedConfig?.timeout).toBe(60_000);
     expect(capturedConfig?.data).toBeInstanceOf(FormData);
+    const uploadedFiles = (capturedConfig?.data as FormData).getAll('files');
+    expect(uploadedFiles).toEqual([januaryFile, februaryFile]);
+    expect((capturedConfig?.data as FormData).get('file')).toBeNull();
   });
 
-  it('maps nginx 413 preview upload responses to a readable file-size error', async () => {
-    const file = new File(['large statement'], 'large-statement.csv', { type: 'text/csv' });
+  it.each([
+    ['a single selected file', 1],
+    ['a combined multi-file request', 2],
+  ])('maps nginx 413 for %s to a deployment-neutral upload-limit error', async (_, fileCount) => {
+    const files = Array.from(
+      { length: fileCount },
+      (__, index) => new File(['large statement'], `large-statement-${index}.csv`),
+    );
     let caughtError: unknown;
 
     apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
@@ -83,7 +97,7 @@ describe('transactionApi.previewTransactions', () => {
     });
 
     try {
-      await transactionApi.previewTransactions({ file, statementFormatId: 42 });
+      await transactionApi.previewTransactions({ files, statementFormatId: 42 });
     } catch (error) {
       caughtError = error;
     }
@@ -92,41 +106,74 @@ describe('transactionApi.previewTransactions', () => {
     expect(caughtError).toMatchObject({
       name: 'ApiError',
       status: 413,
-      message: 'Sorry, the file exceeds our 25MB limit.',
+      message: 'The selected files exceed the upload size limit.',
       response: {
         type: 'INVALID_REQUEST',
-        message: 'Sorry, the file exceeds our 25MB limit.',
+        message: 'The selected files exceed the upload size limit.',
       },
     });
   });
 });
 
 describe('transactionApi.batchImportTransactions', () => {
-  it('posts the preview import token with reviewed transactions', async () => {
+  it('posts ordered preview file groups with their reviewed transactions', async () => {
     let capturedBody: unknown;
-
-    server.use(
-      http.post('/api/v1/transactions/batch', async ({ request }) => {
-        capturedBody = await request.json();
-        return HttpResponse.json({
+    const expectedResponse = {
+      created: 1,
+      duplicatesSkipped: 0,
+      duplicatesImported: 0,
+      files: [
+        {
+          sourceFile: 'january.csv',
           created: 1,
           duplicatesSkipped: 0,
           duplicatesImported: 0,
           transactions: [],
-        });
+        },
+        {
+          sourceFile: 'february.csv',
+          created: 0,
+          duplicatesSkipped: 0,
+          duplicatesImported: 0,
+          transactions: [],
+        },
+      ],
+    } satisfies BatchImportResponse;
+
+    server.use(
+      http.post('/api/v1/transactions/batch', async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json(expectedResponse);
       }),
     );
 
     const response = await transactionApi.batchImportTransactions({
-      previewImportToken: 'preview-token-123',
-      transactions: [baseTransaction],
+      files: [
+        {
+          previewImportToken: 'january-token',
+          transactions: [baseTransaction],
+        },
+        {
+          previewImportToken: 'february-token',
+          transactions: [],
+        },
+      ],
     });
 
     expect(capturedBody).toEqual({
-      previewImportToken: 'preview-token-123',
-      transactions: [baseTransaction],
+      files: [
+        {
+          previewImportToken: 'january-token',
+          transactions: [baseTransaction],
+        },
+        {
+          previewImportToken: 'february-token',
+          transactions: [],
+        },
+      ],
     });
-    expect(response.duplicatesImported).toBe(0);
+    expect(response).toEqual(expectedResponse);
+    expect(response.files.map((file) => file.sourceFile)).toEqual(['january.csv', 'february.csv']);
   });
 
   it('only sends allowDuplicate when requested and strips preview-only metadata', async () => {
@@ -139,7 +186,7 @@ describe('transactionApi.batchImportTransactions', () => {
           created: 1,
           duplicatesSkipped: 1,
           duplicatesImported: 1,
-          transactions: [],
+          files: [],
         });
       }),
     );
@@ -151,16 +198,20 @@ describe('transactionApi.batchImportTransactions', () => {
     };
 
     const request: BatchImportRequest = {
-      previewImportToken: 'preview-token-456',
-      transactions: [
+      files: [
         {
-          ...duplicatePreviewRow,
-          allowDuplicate: false,
-        },
-        {
-          ...duplicatePreviewRow,
-          description: 'Coffee duplicate',
-          allowDuplicate: true,
+          previewImportToken: 'preview-token-456',
+          transactions: [
+            {
+              ...duplicatePreviewRow,
+              allowDuplicate: false,
+            },
+            {
+              ...duplicatePreviewRow,
+              description: 'Coffee duplicate',
+              allowDuplicate: true,
+            },
+          ],
         },
       ],
     };
@@ -168,13 +219,17 @@ describe('transactionApi.batchImportTransactions', () => {
     await transactionApi.batchImportTransactions(request);
 
     expect(capturedBody).toEqual({
-      previewImportToken: 'preview-token-456',
-      transactions: [
-        baseTransaction,
+      files: [
         {
-          ...baseTransaction,
-          description: 'Coffee duplicate',
-          allowDuplicate: true,
+          previewImportToken: 'preview-token-456',
+          transactions: [
+            baseTransaction,
+            {
+              ...baseTransaction,
+              description: 'Coffee duplicate',
+              allowDuplicate: true,
+            },
+          ],
         },
       ],
     });

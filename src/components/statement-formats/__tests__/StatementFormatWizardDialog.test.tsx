@@ -72,7 +72,13 @@ vi.mock('@/components/statement-formats/pdf-wizard/PdfStatementFormatWizardDialo
     ) : null,
 }));
 
-function WizardHarness({ onSaved }: { onSaved: (format: StatementFormat) => void }) {
+function WizardHarness({
+  onSaved,
+  onCancel,
+}: {
+  onSaved: (format: StatementFormat) => void;
+  onCancel?: () => void;
+}) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -80,7 +86,12 @@ function WizardHarness({ onSaved }: { onSaved: (format: StatementFormat) => void
       <button type="button" onClick={() => setOpen(true)}>
         Open wizard
       </button>
-      <StatementFormatWizardDialog open={open} onOpenChange={setOpen} onSaved={onSaved} />
+      <StatementFormatWizardDialog
+        open={open}
+        onOpenChange={setOpen}
+        onCancel={onCancel}
+        onSaved={onSaved}
+      />
     </>
   );
 }
@@ -99,12 +110,27 @@ describe('StatementFormatWizardDialog', () => {
     expect(screen.queryByRole('button', { name: /Continue/ })).not.toBeInTheDocument();
   });
 
+  it('reports cancellation when the upload dialog is cancelled', async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+
+    renderWithProviders(<WizardHarness onSaved={vi.fn()} onCancel={onCancel} />);
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByRole('heading', { name: 'Create statement format' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('closes and resets the selected sample after a PDF child saves', async () => {
     const user = userEvent.setup();
     const onSaved = vi.fn();
+    const onCancel = vi.fn();
     const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });
 
-    renderWithProviders(<WizardHarness onSaved={onSaved} />);
+    renderWithProviders(<WizardHarness onSaved={onSaved} onCancel={onCancel} />);
 
     await user.upload(screen.getByLabelText('Sample file'), file);
 
@@ -119,6 +145,7 @@ describe('StatementFormatWizardDialog', () => {
         formatType: 'PDF',
       }),
     );
+    expect(onCancel).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: 'PDF child' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Open wizard' }));

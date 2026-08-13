@@ -17,18 +17,26 @@ vi.mock('@/components/statement-formats/StatementFormatWizardDialog', () => ({
   StatementFormatWizardDialog: ({
     open,
     onOpenChange,
+    onCancel,
     initialAccountId,
     onSaved,
   }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onCancel?: () => void;
     initialAccountId?: string;
     onSaved: (format: StatementFormat) => void;
   }) =>
     open ? (
       <div role="dialog" aria-label="Create statement format">
         <div>Initial account ID: {initialAccountId ?? ''}</div>
-        <button type="button" onClick={() => onOpenChange(false)}>
+        <button
+          type="button"
+          onClick={() => {
+            onCancel?.();
+            onOpenChange(false);
+          }}
+        >
           Cancel wizard
         </button>
         <button
@@ -74,24 +82,47 @@ type PreviewVariables = Parameters<PreviewMutate>[0];
 type PreviewMutateOptions = Parameters<PreviewMutate>[1];
 
 const previewResponse: PreviewResponse = {
-  sourceFile: 'statement.csv',
-  detectedFormat: 'acme-csv',
-  previewImportToken: 'preview-token-123',
-  fileImport: {
-    alreadyImported: false,
-  },
-  transactions: [
+  files: [
     {
-      date: '2026-05-01',
-      description: 'Coffee',
-      amount: 4.5,
-      type: 'DEBIT',
-      category: 'Dining',
-      bankName: 'Acme Bank',
-      currencyIsoCode: 'USD',
-      accountId: 'checking-123',
-      duplicate: false,
-      duplicateReason: null,
+      sourceFile: 'statement.csv',
+      statementFormatId: 1,
+      previewImportToken: 'preview-token-123',
+      fileImport: {
+        alreadyImported: false,
+      },
+      transactions: [
+        {
+          date: '2026-05-01',
+          description: 'Coffee',
+          amount: 4.5,
+          type: 'DEBIT',
+          category: 'Dining',
+          bankName: 'Acme Bank',
+          currencyIsoCode: 'USD',
+          accountId: 'checking-123',
+          duplicate: false,
+          duplicateReason: null,
+        },
+      ],
+    },
+    {
+      sourceFile: 'statement-2.pdf',
+      statementFormatId: 1,
+      previewImportToken: 'preview-token-456',
+      fileImport: {
+        alreadyImported: false,
+      },
+      transactions: [
+        {
+          date: '2026-05-02',
+          description: 'Groceries',
+          amount: 25,
+          type: 'DEBIT',
+          bankName: 'Acme Bank',
+          currencyIsoCode: 'USD',
+          duplicate: false,
+        },
+      ],
     },
   ],
 };
@@ -134,6 +165,7 @@ function mockPreviewMutation({
   mockUsePreviewTransactions.mockReturnValue({
     mutate,
     isPending,
+    reset: vi.fn(),
   } as unknown as ReturnType<typeof usePreviewTransactions>);
 
   return mutate;
@@ -153,9 +185,14 @@ beforeEach(() => {
 });
 
 describe('ImportButton', () => {
-  it('previews the selected file with statement format ID and account query params, then opens the preview modal', async () => {
+  it('previews selected files in order with shared params, then opens the grouped preview modal', async () => {
     const user = userEvent.setup();
-    const file = new File(['date,description,amount'], 'statement.csv', { type: 'text/csv' });
+    const firstFile = new File(['date,description,amount'], 'statement.csv', {
+      type: 'text/csv',
+    });
+    const secondFile = new File(['%PDF-1.7'], 'statement-2.pdf', {
+      type: 'application/pdf',
+    });
     let capturedVariables: PreviewVariables | undefined;
 
     const previewMutate = vi.fn((variables: PreviewVariables, options?: PreviewMutateOptions) => {
@@ -170,20 +207,90 @@ describe('ImportButton', () => {
 
     await expandImportForm(user);
     await user.type(screen.getByPlaceholderText('Account ID (optional)'), 'checking-123');
-    await user.upload(screen.getByLabelText('Transaction file input'), file);
-    expect(screen.getByRole('button', { name: 'statement.csv' })).toBeInTheDocument();
+    const fileInput = screen.getByLabelText('Transaction file input');
+    expect(fileInput).toHaveAttribute('multiple');
+    await user.upload(fileInput, [firstFile, secondFile]);
+    expect(screen.getByRole('button', { name: '2 files selected' })).toBeInTheDocument();
+    expect(screen.queryByText(firstFile.name)).not.toBeInTheDocument();
+    expect(screen.queryByText(secondFile.name)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Preview Transactions/ }));
 
     await waitFor(() => {
       expect(capturedVariables).toEqual({
-        file,
+        files: [firstFile, secondFile],
         statementFormatId: 1,
         accountId: 'checking-123',
       });
     });
     expect(await screen.findByRole('heading', { name: 'Preview Import' })).toBeInTheDocument();
-    expect(screen.getByText('File: statement.csv | 1 transaction')).toBeInTheDocument();
+    expect(screen.getByText('2 files | 2 transactions')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Coffee')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Groceries')).toBeInTheDocument();
+    expect(fileInput).toHaveProperty('files.length', 0);
+    expect(screen.getByRole('button', { name: 'Import Transactions' })).toBeInTheDocument();
+  });
+
+  it('shows one filename and replaces the native selection when files are chosen again', async () => {
+    const user = userEvent.setup();
+    const firstFile = new File(['first'], 'first.csv', { type: 'text/csv' });
+    const secondFile = new File(['second'], 'second.csv', { type: 'text/csv' });
+    const replacementFile = new File(['replacement'], 'replacement.pdf', {
+      type: 'application/pdf',
+    });
+
+    useReferenceDataHandlers();
+    renderWithProviders(<ImportButton />);
+
+    await expandImportForm(user);
+    const fileInput = screen.getByLabelText('Transaction file input');
+
+    await user.upload(fileInput, firstFile);
+    expect(screen.getByRole('button', { name: 'first.csv' })).toBeInTheDocument();
+
+    await user.upload(fileInput, [firstFile, secondFile]);
+    expect(screen.getByRole('button', { name: '2 files selected' })).toBeInTheDocument();
+
+    await user.upload(fileInput, replacementFile);
+    expect(screen.getByRole('button', { name: 'replacement.pdf' })).toBeInTheDocument();
+    expect(fileInput).toHaveProperty('files.length', 1);
+    expect((fileInput as HTMLInputElement).files?.[0]).toBe(replacementFile);
+  });
+
+  it('opens the native file input from the choose-file button', async () => {
+    const user = userEvent.setup();
+
+    useReferenceDataHandlers();
+    renderWithProviders(<ImportButton />);
+
+    await expandImportForm(user);
+    const fileInput = screen.getByLabelText('Transaction file input');
+    const clickSpy = vi.spyOn(fileInput, 'click');
+
+    await user.click(screen.getByRole('button', { name: 'Choose File' }));
+
+    expect(clickSpy).toHaveBeenCalledOnce();
+  });
+
+  it('clears the entire native selection when the import form is cancelled', async () => {
+    const user = userEvent.setup();
+    const firstFile = new File(['first'], 'first.csv', { type: 'text/csv' });
+    const secondFile = new File(['second'], 'second.csv', { type: 'text/csv' });
+
+    useReferenceDataHandlers();
+    renderWithProviders(<ImportButton />);
+
+    await expandImportForm(user);
+    const fileInput = screen.getByLabelText('Transaction file input');
+    await user.upload(fileInput, [firstFile, secondFile]);
+
+    await user.click(screen.getByRole('button', { name: 'Cancel import' }));
+
+    expect(fileInput).toHaveProperty('files.length', 0);
+    expect(screen.getByRole('button', { name: 'Import Transactions' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: '2 files selected' })).not.toBeInTheDocument();
+    });
   });
 
   it('keeps preview disabled until file and format are selected', async () => {
@@ -220,17 +327,23 @@ describe('ImportButton', () => {
     expect(await screen.findByRole('button', { name: /Loading/ })).toBeDisabled();
   });
 
-  it('calls the error callback and does not open the preview modal when preview fails', async () => {
+  it('passes a filename-bearing first-file failure to the page error callback without opening a partial modal', async () => {
     const user = userEvent.setup();
     const onError = vi.fn();
-    const file = new File(['bad csv'], 'bad-statement.csv', { type: 'text/csv' });
+    const failedFile = new File(['bad csv'], 'bad-statement.csv', { type: 'text/csv' });
+    const unprocessedFile = new File(['valid csv'], 'unprocessed-statement.csv', {
+      type: 'text/csv',
+    });
+    let capturedVariables: PreviewVariables | undefined;
 
     useReferenceDataHandlers();
     const previewError = new ApiError(422, {
-      type: 'VALIDATION_ERROR',
-      message: 'Unable to preview statement',
+      type: 'APPLICATION_ERROR',
+      message: "Failed to preview file 'bad-statement.csv': Missing required Description column",
+      code: 'CSV_PARSING_ERROR',
     });
     const previewMutate = vi.fn((variables: PreviewVariables, options?: PreviewMutateOptions) => {
+      capturedVariables = variables;
       options?.onError?.(previewError, variables, undefined, undefined as never);
     }) as PreviewMutate;
     mockPreviewMutation({ mutate: previewMutate });
@@ -238,24 +351,33 @@ describe('ImportButton', () => {
     renderWithProviders(<ImportButton onError={onError} />);
 
     await expandImportForm(user);
-    await user.upload(screen.getByLabelText('Transaction file input'), file);
+    await user.upload(screen.getByLabelText('Transaction file input'), [
+      failedFile,
+      unprocessedFile,
+    ]);
     await user.click(screen.getByRole('button', { name: /Preview Transactions/ }));
 
     await waitFor(() => {
-      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onError).toHaveBeenCalledWith(previewError);
     });
+    expect(capturedVariables?.files).toEqual([failedFile, unprocessedFile]);
+    expect(previewError.response.message).toContain('bad-statement.csv');
     expect(screen.queryByRole('heading', { name: 'Preview Import' })).not.toBeInTheDocument();
   });
 
-  it('opens the create-format wizard from the new format button and preserves the import form on cancel', async () => {
+  it('clears the entire import workflow when the create-format wizard is cancelled', async () => {
     const user = userEvent.setup();
+    const file = new File(['date,description,amount'], 'statement.csv', { type: 'text/csv' });
     const previewMutate = mockPreviewMutation();
 
     useReferenceDataHandlers();
 
     renderWithProviders(<ImportButton />);
 
-    await user.click(screen.getByRole('button', { name: /Import Transactions/ }));
+    await expandImportForm(user);
+    await user.type(screen.getByPlaceholderText('Account ID (optional)'), 'checking-789');
+    const fileInput = screen.getByLabelText('Transaction file input');
+    await user.upload(fileInput, file);
     await user.click(screen.getByRole('button', { name: 'New format' }));
 
     expect(screen.getByRole('dialog', { name: 'Create statement format' })).toBeInTheDocument();
@@ -265,8 +387,16 @@ describe('ImportButton', () => {
     expect(
       screen.queryByRole('dialog', { name: 'Create statement format' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Preview Transactions/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Import Transactions' })).toBeInTheDocument();
+    expect(fileInput).toHaveProperty('files.length', 0);
     expect(previewMutate).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Import Transactions' }));
+
+    expect(screen.getByRole('button', { name: /Preview Transactions/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Select Format' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Account ID (optional)')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Choose File' })).toBeInTheDocument();
   });
 
   it('shows the new-format button when the user can write statement formats', async () => {
@@ -331,7 +461,7 @@ describe('ImportButton', () => {
 
     await waitFor(() => {
       expect(capturedVariables).toEqual({
-        file,
+        files: [file],
         statementFormatId: 99,
         accountId: 'checking-789',
       });
@@ -365,7 +495,7 @@ describe('ImportButton', () => {
 
     await waitFor(() => {
       expect(capturedVariables).toEqual({
-        file,
+        files: [file],
         statementFormatId: 100,
         accountId: undefined,
       });
