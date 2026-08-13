@@ -1,12 +1,10 @@
 // src/components/Layout.tsx
 import { Outlet, Link, Navigate, useLocation, useSearchParams } from 'react-router';
-import { useCallback } from 'react';
 import { Wallet } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CurrencySelector } from '@/components/CurrencySelector';
 import { ViewSelector } from '@/components/ViewSelector';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
-import { Button } from '@/components/ui/Button';
 import { UserProfileDropdown } from '@/features/auth/components/UserProfileDropdown';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { isAdmin } from '@/features/auth/utils/role';
@@ -15,20 +13,15 @@ import { cn } from '@/utils/cn';
 export function Layout() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { user, isAuthenticated, isLoading, login } = useAuth();
+  const { user } = useAuth();
 
   // Check if we should show breadcrumbs (only when returnTo and breadcrumbLabel are present)
   const returnTo = searchParams.get('returnTo');
   const breadcrumbLabel = searchParams.get('breadcrumbLabel');
   const showBreadcrumbs = returnTo && breadcrumbLabel;
 
-  // Handle login with current path as return URL
-  const handleLogin = useCallback(() => {
-    login(location.pathname);
-  }, [login, location.pathname]);
-
-  // Redirect admin users to /admin (after all hooks)
-  if (!isLoading && user && isAdmin(user.roles)) {
+  // Redirect authenticated admin users to their role-specific layout.
+  if (user && isAdmin(user.roles)) {
     return <Navigate to="/admin" replace />;
   }
 
@@ -66,17 +59,7 @@ export function Layout() {
           <div className="flex items-center gap-2">
             <CurrencySelector />
             <ThemeToggle />
-            {!isLoading && (
-              <>
-                {isAuthenticated ? (
-                  <UserProfileDropdown />
-                ) : (
-                  <Button variant="default" size="sm" onClick={handleLogin}>
-                    Login
-                  </Button>
-                )}
-              </>
-            )}
+            <UserProfileDropdown />
           </div>
         </div>
       </header>

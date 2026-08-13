@@ -29,16 +29,18 @@ export function ViewsPage() {
     );
   }
 
-  const viewsList = Array.isArray(views) ? views : [];
+  if (!views) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Saved Views"
-        description={`${viewsList.length} view${viewsList.length !== 1 ? 's' : ''}`}
+        description={`${views.length} view${views.length !== 1 ? 's' : ''}`}
       />
 
-      {viewsList.length === 0 ? (
+      {views.length === 0 ? (
         <motion.div
           variants={fadeInVariants}
           initial="initial"
@@ -64,7 +66,7 @@ export function ViewsPage() {
           transition={layoutTransition}
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
-          {viewsList.map((view) => (
+          {views.map((view) => (
             <ViewCard key={view.id} view={view} />
           ))}
         </motion.div>

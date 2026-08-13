@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { viewApi } from '@/api/viewApi';
 import { server } from '@/testing/mocks/server';
+import { ApiError } from '@/types/apiError';
 import type { CreateSavedViewRequest, SavedView, UpdateSavedViewRequest } from '@/types/view';
 
 const savedView: SavedView = {
@@ -42,15 +43,35 @@ describe('viewApi', () => {
       }),
     );
 
-    await viewApi.listViews();
+    const views = await viewApi.listViews();
     await viewApi.getView('view-1');
     await viewApi.deleteView('view-1');
 
+    expect(views).toEqual([savedView]);
     expect(calls).toEqual([
       { method: 'GET', path: '/api/v1/views' },
       { method: 'GET', path: '/api/v1/views/view-1' },
       { method: 'DELETE', path: '/api/v1/views/view-1' },
     ]);
+  });
+
+  it('rejects an undocumented saved-view envelope', async () => {
+    server.use(
+      http.get('/api/v1/views', () => {
+        return HttpResponse.json({ items: [savedView] });
+      }),
+    );
+
+    const request = viewApi.listViews();
+
+    await expect(request).rejects.toBeInstanceOf(ApiError);
+    await expect(request).rejects.toMatchObject({
+      status: 502,
+      response: {
+        type: 'INTERNAL_ERROR',
+        code: 'INVALID_COLLECTION_RESPONSE',
+      },
+    });
   });
 
   it('posts create payloads and puts update payloads to saved-view resources', async () => {

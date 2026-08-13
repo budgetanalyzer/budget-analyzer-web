@@ -15,10 +15,12 @@ describe('SessionHeartbeatProvider', () => {
   it('does not activate heartbeat when user is not authenticated', () => {
     mockUseAuth.mockReturnValue({
       user: null,
+      error: null,
       isLoading: false,
       isAuthenticated: false,
       login: vi.fn(),
       logout: vi.fn(),
+      refetch: vi.fn(),
     });
     mockUseSessionHeartbeat.mockReturnValue({
       showWarning: false,
@@ -41,10 +43,12 @@ describe('SessionHeartbeatProvider', () => {
         roles: ['ADMIN'],
         permissions: [],
       },
+      error: null,
       isLoading: false,
       isAuthenticated: true,
       login: vi.fn(),
       logout: vi.fn(),
+      refetch: vi.fn(),
     });
     mockUseSessionHeartbeat.mockReturnValue({
       showWarning: false,
@@ -67,10 +71,12 @@ describe('SessionHeartbeatProvider', () => {
         roles: ['ADMIN'],
         permissions: [],
       },
+      error: null,
       isLoading: false,
       isAuthenticated: true,
       login: vi.fn(),
       logout: vi.fn(),
+      refetch: vi.fn(),
     });
     mockUseSessionHeartbeat.mockReturnValue({
       showWarning: true,

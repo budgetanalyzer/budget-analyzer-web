@@ -1,5 +1,6 @@
 // src/api/currencyApi.ts
 import { apiClient } from '@/api/client';
+import { assertArrayResponse } from '@/api/collectionResponse';
 import {
   CurrencySeriesResponse,
   CurrencySeriesCreateRequest,
@@ -13,10 +14,10 @@ export const currencyApi = {
    * GET /v1/currencies?enabledOnly={boolean}
    */
   getCurrencies: async (enabledOnly = false): Promise<CurrencySeriesResponse[]> => {
-    const response = await apiClient.get<CurrencySeriesResponse[]>('/v1/currencies', {
+    const response = await apiClient.get<unknown>('/v1/currencies', {
       params: { enabledOnly },
     });
-    return response.data;
+    return assertArrayResponse<CurrencySeriesResponse>(response.data);
   },
 
   /**
@@ -60,9 +61,9 @@ export const currencyApi = {
     startDate?: string; // LocalDate format YYYY-MM-DD
     endDate?: string; // LocalDate format YYYY-MM-DD
   }): Promise<ExchangeRateResponse[]> => {
-    const response = await apiClient.get<ExchangeRateResponse[]>('/v1/exchange-rates', {
+    const response = await apiClient.get<unknown>('/v1/exchange-rates', {
       params,
     });
-    return response.data;
+    return assertArrayResponse<ExchangeRateResponse>(response.data);
   },
 };

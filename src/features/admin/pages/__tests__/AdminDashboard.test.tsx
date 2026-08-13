@@ -91,10 +91,12 @@ beforeEach(() => {
       roles: ['ADMIN'],
       permissions: [],
     },
+    error: null,
     isLoading: false,
     isAuthenticated: true,
     login: vi.fn(),
     logout: vi.fn(),
+    refetch: vi.fn(),
   });
   stubQueries();
 });

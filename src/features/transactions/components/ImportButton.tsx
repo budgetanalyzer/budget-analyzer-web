@@ -76,7 +76,9 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
 
   // Filter to only enabled formats with enabled currencies, then sort for display
   const enabledFormats = useMemo(() => {
-    const formats = Array.isArray(statementFormats) ? [...statementFormats] : [];
+    if (!statementFormats) return undefined;
+
+    const formats = [...statementFormats];
     if (savedStatementFormat && !formats.some((f) => f.id === savedStatementFormat.id)) {
       formats.push(savedStatementFormat);
     }
@@ -88,7 +90,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
 
   const duplicateDisplayNames = useMemo(() => {
     const counts = new Map<string, number>();
-    enabledFormats.forEach((statementFormat) => {
+    enabledFormats?.forEach((statementFormat) => {
       counts.set(statementFormat.displayName, (counts.get(statementFormat.displayName) ?? 0) + 1);
     });
 
@@ -98,7 +100,9 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
   }, [enabledFormats]);
 
   const importHistoryStatementFormats = useMemo(() => {
-    const formats = Array.isArray(statementFormats) ? [...statementFormats] : [];
+    if (!statementFormats) return undefined;
+
+    const formats = [...statementFormats];
     if (savedStatementFormat && !formats.some((f) => f.id === savedStatementFormat.id)) {
       formats.push(savedStatementFormat);
     }
@@ -142,7 +146,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     [duplicateDisplayNames, getFormatSourceLabel],
   );
 
-  const selectedFormat = enabledFormats.find((f) => f.id === selectedStatementFormatId);
+  const selectedFormat = enabledFormats?.find((f) => f.id === selectedStatementFormatId);
   const selectedLabel = selectedFormat ? getFormatDisplayLabel(selectedFormat) : null;
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -314,7 +318,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
                             ? 'Loading...'
                             : isFormatsError
                               ? 'Error loading formats'
-                              : enabledFormats.length === 0
+                              : enabledFormats?.length === 0
                                 ? 'No formats available'
                                 : 'Select Format'
                         }
@@ -323,7 +327,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {enabledFormats.map((f) => (
+                      {enabledFormats?.map((f) => (
                         <SelectItem key={f.id} value={String(f.id)}>
                           {renderFormatSelectLabel(f)}
                         </SelectItem>

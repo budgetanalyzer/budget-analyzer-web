@@ -271,17 +271,36 @@ const apiClient = axios.create({
 
 ### 401 Handling
 
-```typescript
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      window.location.href = '/oauth2/authorization/idp';
-    }
-    throw error;
-  },
-);
-```
+An API 401 means the current session is absent, expired, or revoked. The Axios
+response interceptor asks the shared auth navigation utility for one replacement
+navigation to `/oauth2/authorization/idp`, preserving the browser's current
+same-origin path, query, and hash as `returnUrl`. Concurrent 401 responses share
+the navigation latch, so only one OAuth2 navigation starts per document.
+
+Navigation does not change the request contract: every unauthorized request
+still rejects independently as an `ApiError`. Structured JSON 401 bodies retain
+their API error fields; empty, text, and HTML bodies normalize to an
+`UNAUTHORIZED` error with a stable user-safe message. A 403 remains a normal
+authorization failure and never starts login. The interceptor has no fulfilled
+401 path: navigation is a side effect, not a replacement for rejecting the
+failed request.
+
+### Collection Response Contracts
+
+TypeScript response generics do not validate network data. At the API adapter
+boundary, documented top-level array responses are therefore accepted as
+`unknown` and returned only after `Array.isArray` succeeds. This applies to
+enabled/all currencies, exchange rates, current-user transactions, statement
+formats, and saved views.
+
+A malformed HTTP 200 collection body is rejected as a retryable HTTP 502
+`ApiError` with type `INTERNAL_ERROR` and code
+`INVALID_COLLECTION_RESPONSE`. The error message never includes the response
+payload. Adapters do not coerce malformed data to `[]` or unwrap undocumented
+envelopes, so React Query records an error instead of caching a plausible empty
+list. The assertion validates only the top-level collection shape; item-level
+fields remain governed by the OpenAPI contract. Object and paginated endpoints,
+including cross-user transaction search, retain their documented adapters.
 
 ## Error Format
 

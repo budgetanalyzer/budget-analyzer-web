@@ -29,6 +29,25 @@ afterEach(() => {
   apiClient.defaults.adapter = originalAdapter;
 });
 
+describe('transactionApi.getTransactions', () => {
+  it('rejects a null transaction collection', async () => {
+    server.use(
+      http.get('/api/v1/transactions', () => {
+        return HttpResponse.json(null);
+      }),
+    );
+
+    await expect(transactionApi.getTransactions()).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 502,
+      response: {
+        type: 'INTERNAL_ERROR',
+        code: 'INVALID_COLLECTION_RESPONSE',
+      },
+    });
+  });
+});
+
 describe('transactionApi.previewTransactions', () => {
   it('uploads statement files as ordered repeated multipart parts', async () => {
     const januaryFile = new File(['january'], 'january.csv', { type: 'text/csv' });

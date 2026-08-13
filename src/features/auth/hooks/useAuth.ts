@@ -1,7 +1,9 @@
+import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import type { User } from '@/types/auth';
 import * as authApi from '@/api/auth';
+import { navigateToLogin } from '@/features/auth/utils/loginRedirect';
 
 /**
  * Authentication hook
@@ -20,7 +22,12 @@ export function useAuth() {
   const queryClient = useQueryClient();
 
   // Get current user from Session Gateway
-  const { data: user, isLoading } = useQuery<User | null>({
+  const {
+    data: user,
+    error,
+    isLoading,
+    refetch,
+  } = useQuery<User | null>({
     queryKey: ['auth', 'currentUser'],
     queryFn: async () => {
       try {
@@ -28,9 +35,12 @@ export function useAuth() {
         // This validates the session cookie and returns user info
         const user = await authApi.getCurrentUser();
         return user;
-      } catch {
-        // No valid session - user is not authenticated
-        return null;
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          return null;
+        }
+
+        throw error;
       }
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -38,7 +48,7 @@ export function useAuth() {
   });
 
   // Login - redirect to Session Gateway OAuth flow
-  const login = (returnUrl?: string) => {
+  const login = useCallback((returnUrl?: string) => {
     // Redirect to Session Gateway OAuth2 authorization endpoint
     // Session Gateway will:
     // 1. Redirect to identity provider for authentication
@@ -46,45 +56,29 @@ export function useAuth() {
     // 3. Store session data in Redis
     // 4. Set session cookie
     // 5. Redirect back to frontend
-    const url = returnUrl
-      ? `/oauth2/authorization/idp?returnUrl=${encodeURIComponent(returnUrl)}`
-      : '/oauth2/authorization/idp';
-    window.location.href = url;
-  };
+    navigateToLogin(returnUrl);
+  }, []);
 
   // Logout - navigate to Session Gateway logout endpoint
   // This allows the browser to follow the full redirect chain:
   // /logout → Session Gateway clears session → IdP logout → back to app
-  const logout = () => {
+  const logout = useCallback(() => {
     // Clear cached data before navigating
     queryClient.clear();
     // Navigate to logout endpoint (browser follows redirects)
-    window.location.href = '/logout';
-  };
+    window.location.assign('/logout');
+  }, [queryClient]);
 
   return {
     // State
     user,
+    error,
     isLoading,
     isAuthenticated: !!user,
 
     // Operations
     login,
     logout,
+    refetch,
   };
-}
-
-/**
- * Hook to require authentication
- * Redirects to login if not authenticated
- */
-export function useRequireAuth() {
-  const { isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
-
-  if (!isLoading && !isAuthenticated) {
-    navigate('/login', { replace: true });
-  }
-
-  return { isLoading };
 }

@@ -24,10 +24,12 @@ const namedUser: User = {
 function mockAuth(user: User | null, logout = vi.fn()) {
   mockUseAuth.mockReturnValue({
     user,
+    error: null,
     isLoading: false,
     isAuthenticated: user !== null,
     login: vi.fn(),
     logout,
+    refetch: vi.fn(),
   });
 }
 

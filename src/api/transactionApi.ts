@@ -1,5 +1,6 @@
 // src/api/transactionApi.ts
 import { apiClient } from '@/api/client';
+import { assertArrayResponse } from '@/api/collectionResponse';
 import { ApiError } from '@/types/apiError';
 import {
   Transaction,
@@ -50,8 +51,8 @@ export interface PreviewTransactionsRequest {
 
 export const transactionApi = {
   getTransactions: async (): Promise<Transaction[]> => {
-    const response = await apiClient.get<Transaction[]>('/v1/transactions');
-    return response.data;
+    const response = await apiClient.get<unknown>('/v1/transactions');
+    return assertArrayResponse<Transaction>(response.data);
   },
 
   getTransaction: async (id: number): Promise<Transaction> => {
