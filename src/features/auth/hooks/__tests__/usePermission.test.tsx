@@ -20,10 +20,12 @@ function mockAuthUser(permissions: string[] | null) {
             roles: ['USER'],
             permissions,
           },
+    error: null,
     isLoading: false,
     isAuthenticated: permissions !== null,
     login: vi.fn(),
     logout: vi.fn(),
+    refetch: vi.fn(),
   });
 }
 

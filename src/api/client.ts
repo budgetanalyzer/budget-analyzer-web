@@ -1,5 +1,6 @@
 // src/api/client.ts
 import axios, { AxiosError, AxiosInstance } from 'axios';
+import { replaceWithLogin } from '@/features/auth/utils/loginRedirect';
 import { ApiError, ApiErrorResponse } from '@/types/apiError';
 
 /**
@@ -15,6 +16,7 @@ import { ApiError, ApiErrorResponse } from '@/types/apiError';
  */
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+const unauthorizedMessage = 'Your session has expired. Please sign in again.';
 
 function isApiErrorResponse(data: unknown): data is ApiErrorResponse {
   return (
@@ -42,9 +44,19 @@ apiClient.interceptors.response.use(
   (error: AxiosError<ApiErrorResponse>) => {
     // Handle 401 Unauthorized - session expired or invalid
     if (error.response?.status === 401) {
-      // Redirect to login - Session Gateway will handle OAuth flow
-      window.location.href = '/oauth2/authorization/idp';
-      return;
+      const returnUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+      replaceWithLogin(returnUrl);
+
+      if (isApiErrorResponse(error.response.data)) {
+        const apiErrorResponse = error.response.data;
+        throw new ApiError(401, apiErrorResponse, apiErrorResponse.message);
+      }
+
+      throw new ApiError(401, {
+        type: 'UNAUTHORIZED',
+        message: unauthorizedMessage,
+      });
     }
 
     if (error.response) {

@@ -1,5 +1,6 @@
 // src/api/viewApi.ts
 import { apiClient } from '@/api/client';
+import { assertArrayResponse } from '@/api/collectionResponse';
 import {
   SavedView,
   CreateSavedViewRequest,
@@ -14,8 +15,8 @@ export const viewApi = {
    * Get all saved views for the current user
    */
   listViews: async (): Promise<SavedView[]> => {
-    const response = await apiClient.get<SavedView[]>('/v1/views');
-    return response.data;
+    const response = await apiClient.get<unknown>('/v1/views');
+    return assertArrayResponse<SavedView>(response.data);
   },
 
   /**

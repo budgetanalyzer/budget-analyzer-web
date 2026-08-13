@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { currencyApi } from '@/api/currencyApi';
 import { server } from '@/testing/mocks/server';
+import { createTestQueryClient } from '@/testing/test-utils';
+import { ApiError } from '@/types/apiError';
 import type {
   CurrencySeriesCreateRequest,
   CurrencySeriesResponse,
@@ -33,6 +35,32 @@ describe('currencyApi', () => {
     expect(capturedUrl?.pathname).toBe('/api/v1/currencies');
     expect(capturedUrl?.searchParams.get('enabledOnly')).toBe('true');
     expect(response).toEqual([usdCurrency]);
+  });
+
+  it('rejects an object-shaped currency list without caching an empty collection', async () => {
+    const queryClient = createTestQueryClient();
+
+    server.use(
+      http.get('/api/v1/currencies', () => {
+        return HttpResponse.json({ currencies: [usdCurrency] });
+      }),
+    );
+
+    const query = queryClient.fetchQuery({
+      queryKey: ['currencies', true],
+      queryFn: () => currencyApi.getCurrencies(true),
+    });
+
+    await expect(query).rejects.toBeInstanceOf(ApiError);
+    await expect(query).rejects.toMatchObject({
+      status: 502,
+      response: {
+        type: 'INTERNAL_ERROR',
+        code: 'INVALID_COLLECTION_RESPONSE',
+        message: 'The server returned an invalid collection response. Please try again.',
+      },
+    });
+    expect(queryClient.getQueryData(['currencies', true])).toBeUndefined();
   });
 
   it('requests a currency by id', async () => {
@@ -111,5 +139,19 @@ describe('currencyApi', () => {
     expect(capturedUrl?.searchParams.get('startDate')).toBe('2026-01-01');
     expect(capturedUrl?.searchParams.get('endDate')).toBe('2026-01-31');
     expect(response[0].rate).toBe(0.92);
+  });
+
+  it('rejects a string exchange-rate response', async () => {
+    server.use(
+      http.get('/api/v1/exchange-rates', () => {
+        return HttpResponse.text('exchange rates unavailable');
+      }),
+    );
+
+    await expect(currencyApi.getExchangeRates({ targetCurrency: 'EUR' })).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 502,
+      response: { code: 'INVALID_COLLECTION_RESPONSE' },
+    });
   });
 });

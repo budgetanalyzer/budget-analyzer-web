@@ -7,7 +7,7 @@ Budget Analyzer uses a **Session Gateway pattern** with **Istio ext_authz** for 
 - Session cookies are HttpOnly, Secure, and SameSite
 - Auth lifecycle flows are handled server-side by the Session Gateway
 - Per-request session validation is handled by ext_authz at the Istio ingress layer
-- Frontend only needs to call `/user` endpoint and redirect to login/logout
+- Frontend bootstraps the session through `/auth/v1/user` and redirects to login/logout
 
 ## Architecture
 
@@ -81,6 +81,30 @@ login(); // Redirects to /oauth2/authorization/idp
 // 8. Redirect back to frontend
 ```
 
+#### Protected-route bootstrap
+
+Protected user and admin routes share one authentication boundary:
+
+1. The ingress serves the public frontend document, and the SPA requests
+   `GET /auth/v1/user` before mounting any protected layout, permission guard,
+   or feature data hook.
+2. A 200 user response mounts the protected route tree. While the request is
+   pending, the boundary renders only its authentication loading state.
+3. A 401 means no valid session. The boundary starts one replacement navigation
+   to `/oauth2/authorization/idp`, using the requested local pathname, query,
+   and hash as the encoded `returnUrl`.
+4. Network errors and non-401 responses such as 500/503 remain in-app
+   availability errors with a Retry action. They do not start OAuth2 or mount
+   protected UI.
+
+Automatic return URLs must be same-origin absolute paths: they start with one
+`/` and cannot start with `//` or `/\\`. Unsafe or external values are omitted,
+so the Session Gateway uses its default post-login destination. One shared
+in-document latch prevents Strict Mode effects, route bootstrap, and concurrent
+API failures from starting duplicate automatic navigations.
+
+`/login`, `/peace`, `/oops`, and `/unauthorized` remain public frontend routes.
+
 ### Logout Flow
 
 ```typescript
@@ -99,11 +123,11 @@ logout(); // Navigates to /logout
 
 ```typescript
 // On app load, check if user is authenticated
-const { user, isAuthenticated, isLoading } = useAuth();
+const { user, error, isAuthenticated, isLoading, refetch } = useAuth();
 
-// Internally calls GET /user endpoint (routed to Session Gateway)
+// Internally calls GET /auth/v1/user endpoint (routed to Session Gateway)
 // Returns user info if session is valid
-// Returns null if no valid session
+// Returns null only for a sessionless 401; other failures populate error
 ```
 
 ### Session Heartbeat
@@ -171,18 +195,13 @@ const apiClient = axios.create({
 
 ### Error Handling
 
-```typescript
-// 401 Unauthorized → redirect to login
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      window.location.href = '/oauth2/authorization/idp';
-    }
-    throw error;
-  }
-);
-```
+An API 401 asks the shared auth navigation utility to start one replacement
+navigation to OAuth2 with the current local path, query, and hash as the safe
+`returnUrl`. Every failed request still rejects independently as an `ApiError`,
+including empty and proxy-shaped 401 responses. Parallel 401s do not start
+parallel navigations. A 403 remains an authorization error and does not trigger
+login. This handles a session that expires or is revoked after protected route
+bootstrap without converting the failed API request into successful query data.
 
 ## Configuration Files
 
@@ -205,6 +224,10 @@ The Istio Ingress Gateway routes requests based on path:
 - `/login`, `/*` → NGINX (8080), frontend (no auth required)
 
 Session Gateway does **not** proxy API or frontend requests. It only handles auth lifecycle paths.
+Frontend documents and static assets deliberately remain public at the ingress;
+the SPA route boundary protects the application tree after the document loads.
+Unauthorized `/api/*` requests remain HTTP 401 responses rather than ingress or
+OAuth redirects. The SPA owns the resulting browser navigation into OAuth2.
 
 ## User Info Structure
 

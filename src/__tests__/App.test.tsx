@@ -1,8 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 
+const routeMounts = vi.hoisted(() => ({
+  dataHook: vi.fn(),
+  layout: vi.fn(),
+  transactions: vi.fn(),
+}));
+
 vi.mock('@/features/auth/hooks/useAuth');
 vi.mock('@/features/auth/hooks/usePermission');
+vi.mock('@/features/auth/utils/loginRedirect', () => ({
+  replaceWithLogin: vi.fn(),
+}));
 vi.mock('@/components/SessionHeartbeatProvider', () => ({
   SessionHeartbeatProvider: () => null,
 }));
@@ -13,7 +22,10 @@ vi.mock('@/components/Layout', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
   const { Outlet } = await vi.importActual<typeof import('react-router')>('react-router');
   return {
-    Layout: () => React.createElement(Outlet),
+    Layout: () => {
+      routeMounts.layout();
+      return React.createElement(Outlet);
+    },
   };
 });
 vi.mock('@/features/admin/components/AdminLayout', async () => {
@@ -24,7 +36,11 @@ vi.mock('@/features/admin/components/AdminLayout', async () => {
   };
 });
 vi.mock('@/features/transactions/pages/TransactionsPage', () => ({
-  TransactionsPage: () => 'transactions home',
+  TransactionsPage: () => {
+    routeMounts.transactions();
+    routeMounts.dataHook();
+    return 'transactions home';
+  },
 }));
 vi.mock('@/features/auth/pages/LoginPage', () => ({
   LoginPage: () => 'login page',
@@ -48,6 +64,7 @@ vi.mock('@/features/admin/components/UnauthorizedPage', () => ({
 import App from '@/App';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePermission } from '@/features/auth/hooks/usePermission';
+import { replaceWithLogin } from '@/features/auth/utils/loginRedirect';
 import { renderWithProviders } from '@/testing/test-utils';
 import type { User } from '@/types/auth';
 
@@ -79,10 +96,12 @@ function renderApp(path: string) {
 function mockAdminAuth() {
   mockUseAuth.mockReturnValue({
     user: adminUser,
+    error: null,
     isLoading: false,
     isAuthenticated: true,
     login: vi.fn(),
     logout: vi.fn(),
+    refetch: vi.fn(),
   });
 }
 
@@ -90,6 +109,10 @@ describe('App route authorization', () => {
   beforeEach(() => {
     mockUseAuth.mockReset();
     mockUsePermission.mockReset();
+    vi.mocked(replaceWithLogin).mockReset();
+    routeMounts.dataHook.mockReset();
+    routeMounts.layout.mockReset();
+    routeMounts.transactions.mockReset();
     mockAdminAuth();
   });
 
@@ -132,10 +155,12 @@ describe('App route authorization', () => {
   it('uses the read permission for the user statement format management route', async () => {
     mockUseAuth.mockReturnValue({
       user: regularUser,
+      error: null,
       isLoading: false,
       isAuthenticated: true,
       login: vi.fn(),
       logout: vi.fn(),
+      refetch: vi.fn(),
     });
     mockUsePermission.mockImplementation((permission) => permission === 'statementformats:read');
 
@@ -148,10 +173,12 @@ describe('App route authorization', () => {
   it('keeps non-admin authenticated users out of the admin route tree', async () => {
     mockUseAuth.mockReturnValue({
       user: regularUser,
+      error: null,
       isLoading: false,
       isAuthenticated: true,
       login: vi.fn(),
       logout: vi.fn(),
+      refetch: vi.fn(),
     });
     mockUsePermission.mockReturnValue(true);
 
@@ -160,4 +187,86 @@ describe('App route authorization', () => {
     expect(await screen.findByText('transactions home')).toBeInTheDocument();
     expect(screen.queryByText('currencies list page')).not.toBeInTheDocument();
   });
+
+  it('keeps public login reachable while authentication bootstrap is pending', () => {
+    mockUseAuth.mockReturnValue({
+      user: undefined,
+      error: null,
+      isLoading: true,
+      isAuthenticated: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetch: vi.fn(),
+    });
+
+    renderApp('/login');
+
+    expect(screen.getByText('login page')).toBeInTheDocument();
+    expect(routeMounts.layout).not.toHaveBeenCalled();
+    expect(routeMounts.transactions).not.toHaveBeenCalled();
+    expect(routeMounts.dataHook).not.toHaveBeenCalled();
+  });
+
+  it('does not mount the protected layout or page before authentication succeeds', () => {
+    mockUseAuth.mockReturnValue({
+      user: undefined,
+      error: null,
+      isLoading: true,
+      isAuthenticated: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetch: vi.fn(),
+    });
+
+    renderApp('/');
+
+    expect(screen.getByRole('status', { name: 'Checking authentication' })).toBeInTheDocument();
+    expect(routeMounts.layout).not.toHaveBeenCalled();
+    expect(routeMounts.transactions).not.toHaveBeenCalled();
+    expect(routeMounts.dataHook).not.toHaveBeenCalled();
+    expect(mockUsePermission).not.toHaveBeenCalled();
+  });
+
+  it('does not mount protected routes when bootstrap fails', () => {
+    mockUseAuth.mockReturnValue({
+      user: undefined,
+      error: new Error('Network unavailable'),
+      isLoading: false,
+      isAuthenticated: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetch: vi.fn(),
+    });
+
+    renderApp('/admin');
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Authentication unavailable');
+    expect(routeMounts.layout).not.toHaveBeenCalled();
+    expect(mockUsePermission).not.toHaveBeenCalled();
+    expect(replaceWithLogin).not.toHaveBeenCalled();
+  });
+
+  it.each(['/', '/analytics', '/transactions/42', '/admin'])(
+    'redirects anonymous access to protected route %s without mounting protected children',
+    (path) => {
+      mockUseAuth.mockReturnValue({
+        user: null,
+        error: null,
+        isLoading: false,
+        isAuthenticated: false,
+        login: vi.fn(),
+        logout: vi.fn(),
+        refetch: vi.fn(),
+      });
+
+      renderApp(path);
+
+      expect(replaceWithLogin).toHaveBeenCalledTimes(1);
+      expect(replaceWithLogin).toHaveBeenCalledWith(path);
+      expect(routeMounts.layout).not.toHaveBeenCalled();
+      expect(routeMounts.transactions).not.toHaveBeenCalled();
+      expect(routeMounts.dataHook).not.toHaveBeenCalled();
+      expect(mockUsePermission).not.toHaveBeenCalled();
+    },
+  );
 });

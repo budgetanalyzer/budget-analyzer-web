@@ -20,9 +20,6 @@ export function ViewSelector() {
     ? location.pathname.split('/views/')[1]
     : null;
 
-  // Ensure views is an array
-  const viewsList = Array.isArray(views) ? views : [];
-
   if (isLoading) {
     return null;
   }
@@ -55,7 +52,7 @@ export function ViewSelector() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56">
           {/* Saved Views */}
-          {viewsList.map((view) => (
+          {views?.map((view) => (
             <DropdownMenuItem
               key={view.id}
               asChild
@@ -71,7 +68,7 @@ export function ViewSelector() {
           ))}
 
           {/* Empty state */}
-          {viewsList.length === 0 && (
+          {views?.length === 0 && (
             <div className="px-2 py-1.5 text-sm text-muted-foreground">No saved views yet</div>
           )}
         </DropdownMenuContent>

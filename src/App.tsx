@@ -13,6 +13,7 @@ import { AdminRoute } from '@/features/admin/components/AdminRoute';
 import { AdminLayout } from '@/features/admin/components/AdminLayout';
 import { UnauthorizedPage } from '@/features/admin/components/UnauthorizedPage';
 import { PermissionGuard } from '@/features/auth/components/PermissionGuard';
+import { AuthenticatedRoute } from '@/features/auth/components/AuthenticatedRoute';
 
 // Auth imports
 import { LoginPage } from '@/features/auth/pages/LoginPage';
@@ -123,45 +124,152 @@ function App() {
   return (
     <ErrorBoundary>
       <Routes>
-        {/* Admin — top-level, separate layout */}
-        <Route path="/admin" element={<AdminRoute />}>
-          <Route element={<AdminLayout />}>
+        <Route element={<AuthenticatedRoute />}>
+          {/* Admin — top-level, separate layout */}
+          <Route path="/admin" element={<AdminRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route
+                index
+                element={
+                  <LazyRoute>
+                    <AdminDashboard />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path="currencies"
+                element={
+                  <PermissionGuard permission="currencies:read">
+                    <LazyRoute>
+                      <CurrenciesListPage />
+                    </LazyRoute>
+                  </PermissionGuard>
+                }
+              />
+              <Route
+                path="currencies/new"
+                element={
+                  <PermissionGuard permission="currencies:write">
+                    <LazyRoute>
+                      <CurrencyCreatePage />
+                    </LazyRoute>
+                  </PermissionGuard>
+                }
+              />
+              <Route
+                path="currencies/:id"
+                element={
+                  <PermissionGuard permission="currencies:write">
+                    <LazyRoute>
+                      <CurrencyEditPage />
+                    </LazyRoute>
+                  </PermissionGuard>
+                }
+              />
+              <Route
+                path="statement-formats"
+                element={
+                  <PermissionGuard permission="statementformats:read">
+                    <LazyRoute>
+                      <StatementFormatsListPage />
+                    </LazyRoute>
+                  </PermissionGuard>
+                }
+              />
+              <Route
+                path="statement-formats/new"
+                element={
+                  <PermissionGuard permission="statementformats:write">
+                    <LazyRoute>
+                      <StatementFormatCreatePage />
+                    </LazyRoute>
+                  </PermissionGuard>
+                }
+              />
+              <Route
+                path="statement-formats/:id"
+                element={
+                  <PermissionGuard permission="statementformats:write">
+                    <LazyRoute>
+                      <StatementFormatEditPage />
+                    </LazyRoute>
+                  </PermissionGuard>
+                }
+              />
+              <Route
+                path="transactions"
+                element={
+                  <PermissionGuard permission="transactions:read:any">
+                    <LazyRoute>
+                      <AdminTransactionsPage />
+                    </LazyRoute>
+                  </PermissionGuard>
+                }
+              />
+              <Route
+                path="users"
+                element={
+                  <PermissionGuard permission="users:read">
+                    <LazyRoute>
+                      <UsersListPage />
+                    </LazyRoute>
+                  </PermissionGuard>
+                }
+              />
+              <Route
+                path="users/:id"
+                element={
+                  <PermissionGuard permission="users:read">
+                    <LazyRoute>
+                      <UserDetailPage />
+                    </LazyRoute>
+                  </PermissionGuard>
+                }
+              />
+              <Route
+                path="*"
+                element={
+                  <LazyRoute>
+                    <AdminNotFoundPage />
+                  </LazyRoute>
+                }
+              />
+            </Route>
+          </Route>
+
+          {/* User — standard layout */}
+          <Route path="/" element={<Layout />}>
+            <Route index element={<TransactionsPage />} />
             <Route
-              index
+              path="analytics"
               element={
                 <LazyRoute>
-                  <AdminDashboard />
+                  <AnalyticsPage />
                 </LazyRoute>
               }
             />
             <Route
-              path="currencies"
+              path="transactions/:id"
               element={
-                <PermissionGuard permission="currencies:read">
-                  <LazyRoute>
-                    <CurrenciesListPage />
-                  </LazyRoute>
-                </PermissionGuard>
+                <LazyRoute>
+                  <TransactionDetailPage />
+                </LazyRoute>
               }
             />
             <Route
-              path="currencies/new"
+              path="views"
               element={
-                <PermissionGuard permission="currencies:write">
-                  <LazyRoute>
-                    <CurrencyCreatePage />
-                  </LazyRoute>
-                </PermissionGuard>
+                <LazyRoute>
+                  <ViewsPage />
+                </LazyRoute>
               }
             />
             <Route
-              path="currencies/:id"
+              path="views/:id"
               element={
-                <PermissionGuard permission="currencies:write">
-                  <LazyRoute>
-                    <CurrencyEditPage />
-                  </LazyRoute>
-                </PermissionGuard>
+                <LazyRoute>
+                  <ViewPage />
+                </LazyRoute>
               }
             />
             <Route
@@ -169,117 +277,12 @@ function App() {
               element={
                 <PermissionGuard permission="statementformats:read">
                   <LazyRoute>
-                    <StatementFormatsListPage />
+                    <StatementFormatManagementPage />
                   </LazyRoute>
                 </PermissionGuard>
-              }
-            />
-            <Route
-              path="statement-formats/new"
-              element={
-                <PermissionGuard permission="statementformats:write">
-                  <LazyRoute>
-                    <StatementFormatCreatePage />
-                  </LazyRoute>
-                </PermissionGuard>
-              }
-            />
-            <Route
-              path="statement-formats/:id"
-              element={
-                <PermissionGuard permission="statementformats:write">
-                  <LazyRoute>
-                    <StatementFormatEditPage />
-                  </LazyRoute>
-                </PermissionGuard>
-              }
-            />
-            <Route
-              path="transactions"
-              element={
-                <PermissionGuard permission="transactions:read:any">
-                  <LazyRoute>
-                    <AdminTransactionsPage />
-                  </LazyRoute>
-                </PermissionGuard>
-              }
-            />
-            <Route
-              path="users"
-              element={
-                <PermissionGuard permission="users:read">
-                  <LazyRoute>
-                    <UsersListPage />
-                  </LazyRoute>
-                </PermissionGuard>
-              }
-            />
-            <Route
-              path="users/:id"
-              element={
-                <PermissionGuard permission="users:read">
-                  <LazyRoute>
-                    <UserDetailPage />
-                  </LazyRoute>
-                </PermissionGuard>
-              }
-            />
-            <Route
-              path="*"
-              element={
-                <LazyRoute>
-                  <AdminNotFoundPage />
-                </LazyRoute>
               }
             />
           </Route>
-        </Route>
-
-        {/* User — standard layout */}
-        <Route path="/" element={<Layout />}>
-          <Route index element={<TransactionsPage />} />
-          <Route
-            path="analytics"
-            element={
-              <LazyRoute>
-                <AnalyticsPage />
-              </LazyRoute>
-            }
-          />
-          <Route
-            path="transactions/:id"
-            element={
-              <LazyRoute>
-                <TransactionDetailPage />
-              </LazyRoute>
-            }
-          />
-          <Route
-            path="views"
-            element={
-              <LazyRoute>
-                <ViewsPage />
-              </LazyRoute>
-            }
-          />
-          <Route
-            path="views/:id"
-            element={
-              <LazyRoute>
-                <ViewPage />
-              </LazyRoute>
-            }
-          />
-          <Route
-            path="statement-formats"
-            element={
-              <PermissionGuard permission="statementformats:read">
-                <LazyRoute>
-                  <StatementFormatManagementPage />
-                </LazyRoute>
-              </PermissionGuard>
-            }
-          />
         </Route>
 
         {/* Auth routes */}

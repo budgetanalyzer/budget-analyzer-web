@@ -48,10 +48,12 @@ describe('AdminRoute', () => {
   it('renders child routes for authenticated admins', () => {
     mockUseAuth.mockReturnValue({
       user: adminUser,
+      error: null,
       isLoading: false,
       isAuthenticated: true,
       login: vi.fn(),
       logout: vi.fn(),
+      refetch: vi.fn(),
     });
 
     renderAdminRoute();
@@ -62,10 +64,12 @@ describe('AdminRoute', () => {
   it('redirects unauthenticated users to login', () => {
     mockUseAuth.mockReturnValue({
       user: null,
+      error: null,
       isLoading: false,
       isAuthenticated: false,
       login: vi.fn(),
       logout: vi.fn(),
+      refetch: vi.fn(),
     });
 
     renderAdminRoute();
@@ -77,10 +81,12 @@ describe('AdminRoute', () => {
   it('redirects authenticated non-admin users to the home route', () => {
     mockUseAuth.mockReturnValue({
       user,
+      error: null,
       isLoading: false,
       isAuthenticated: true,
       login: vi.fn(),
       logout: vi.fn(),
+      refetch: vi.fn(),
     });
 
     renderAdminRoute();
@@ -92,10 +98,12 @@ describe('AdminRoute', () => {
   it('shows the admin loading skeleton while auth state is loading', () => {
     const { container } = renderAdminRouteWithAuth({
       user: null,
+      error: null,
       isLoading: true,
       isAuthenticated: false,
       login: vi.fn(),
       logout: vi.fn(),
+      refetch: vi.fn(),
     });
 
     expect(container.querySelector('aside')).toBeInTheDocument();

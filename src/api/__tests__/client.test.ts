@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { apiClient } from '@/api/client';
 import { server } from '@/testing/mocks/server';
@@ -70,6 +70,26 @@ describe('apiClient error normalization', () => {
     });
   });
 
+  it('keeps permission-denied responses as rejected structured ApiErrors', async () => {
+    server.use(
+      http.get('/api/v1/client-error/forbidden', () => {
+        return HttpResponse.json(
+          { type: 'FORBIDDEN', message: 'You cannot access this resource' },
+          { status: 403 },
+        );
+      }),
+    );
+
+    await expect(apiClient.get('/v1/client-error/forbidden')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 403,
+      response: {
+        type: 'FORBIDDEN',
+        message: 'You cannot access this resource',
+      },
+    });
+  });
+
   it('preserves the ApiError prototype for normalized errors', async () => {
     server.use(
       http.get('/api/v1/client-error/not-found', () => {
@@ -78,5 +98,95 @@ describe('apiClient error normalization', () => {
     );
 
     await expect(apiClient.get('/v1/client-error/not-found')).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('rejects concurrent 401 responses as ApiErrors while requesting one login redirect', async () => {
+    const replace = vi.fn();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        hash: '#details',
+        href: 'https://app.budgetanalyzer.localhost/transactions/42?view=recent&sort=desc#details',
+        origin: 'https://app.budgetanalyzer.localhost',
+        pathname: '/transactions/42',
+        replace,
+        search: '?view=recent&sort=desc',
+      },
+      writable: true,
+    });
+    server.use(
+      http.get('/api/v1/client-error/unauthorized-empty', () => {
+        return new HttpResponse(null, { status: 401 });
+      }),
+      http.get('/api/v1/client-error/unauthorized-structured', () => {
+        return HttpResponse.json(
+          {
+            type: 'UNAUTHORIZED',
+            message: 'Session is no longer valid',
+            code: 'SESSION_REVOKED',
+          },
+          { status: 401 },
+        );
+      }),
+      http.get('/api/v1/client-error/unauthorized-html', () => {
+        return new HttpResponse('<html><body>Unauthorized</body></html>', {
+          status: 401,
+          headers: { 'Content-Type': 'text/html' },
+        });
+      }),
+    );
+
+    const [emptyResult, structuredResult, htmlResult] = await Promise.allSettled([
+      apiClient.get('/v1/client-error/unauthorized-empty'),
+      apiClient.get('/v1/client-error/unauthorized-structured'),
+      apiClient.get('/v1/client-error/unauthorized-html'),
+    ]);
+
+    expect(emptyResult).toMatchObject({
+      status: 'rejected',
+      reason: {
+        name: 'ApiError',
+        status: 401,
+        message: 'Your session has expired. Please sign in again.',
+        response: {
+          type: 'UNAUTHORIZED',
+          message: 'Your session has expired. Please sign in again.',
+        },
+      },
+    });
+    expect(structuredResult).toMatchObject({
+      status: 'rejected',
+      reason: {
+        name: 'ApiError',
+        status: 401,
+        message: 'Session is no longer valid',
+        response: {
+          type: 'UNAUTHORIZED',
+          message: 'Session is no longer valid',
+          code: 'SESSION_REVOKED',
+        },
+      },
+    });
+    expect(htmlResult).toMatchObject({
+      status: 'rejected',
+      reason: {
+        name: 'ApiError',
+        status: 401,
+        message: 'Your session has expired. Please sign in again.',
+        response: {
+          type: 'UNAUTHORIZED',
+          message: 'Your session has expired. Please sign in again.',
+        },
+      },
+    });
+    expect(emptyResult.status === 'rejected' && emptyResult.reason).toBeInstanceOf(ApiError);
+    expect(structuredResult.status === 'rejected' && structuredResult.reason).toBeInstanceOf(
+      ApiError,
+    );
+    expect(htmlResult.status === 'rejected' && htmlResult.reason).toBeInstanceOf(ApiError);
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith(
+      '/oauth2/authorization/idp?returnUrl=%2Ftransactions%2F42%3Fview%3Drecent%26sort%3Ddesc%23details',
+    );
   });
 });

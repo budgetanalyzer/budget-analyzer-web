@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { statementFormatApi } from '@/api/statementFormatApi';
 import { apiClient } from '@/api/client';
 import { server } from '@/testing/mocks/server';
+import { ApiError } from '@/types/apiError';
 import type {
   CsvWizardMappingPreviewRequest,
   CsvWizardSaveRequest,
@@ -66,6 +67,29 @@ describe('statementFormatApi', () => {
     await statementFormatApi.listFormats({ includeHidden: true });
 
     expect(capturedSearchParams).toEqual(['', '?includeHidden=true']);
+  });
+
+  it('rejects a statement-format response with missing data', async () => {
+    apiClient.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      return {
+        data: undefined,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      } satisfies AxiosResponse<undefined>;
+    });
+
+    const request = statementFormatApi.listFormats();
+
+    await expect(request).rejects.toBeInstanceOf(ApiError);
+    await expect(request).rejects.toMatchObject({
+      status: 502,
+      response: {
+        type: 'INTERNAL_ERROR',
+        code: 'INVALID_COLLECTION_RESPONSE',
+      },
+    });
   });
 
   it('requests a statement format by ID', async () => {

@@ -1,5 +1,6 @@
 // src/api/statementFormatApi.ts
 import { apiClient } from '@/api/client';
+import { assertArrayResponse } from '@/api/collectionResponse';
 import {
   CsvWizardAnalysisResponse,
   CsvWizardMappingPreviewRequest,
@@ -32,10 +33,10 @@ export const statementFormatApi = {
    * GET /v1/statement-formats
    */
   listFormats: async (options?: StatementFormatListOptions): Promise<StatementFormat[]> => {
-    const response = await apiClient.get<StatementFormat[]>('/v1/statement-formats', {
+    const response = await apiClient.get<unknown>('/v1/statement-formats', {
       params: options?.includeHidden ? { includeHidden: true } : undefined,
     });
-    return response.data;
+    return assertArrayResponse<StatementFormat>(response.data);
   },
 
   /**
