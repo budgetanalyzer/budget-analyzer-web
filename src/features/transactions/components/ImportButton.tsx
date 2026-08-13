@@ -35,7 +35,11 @@ interface PreviewModalState {
 
 export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportButtonProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { mutate: previewTransactions, isPending } = usePreviewTransactions();
+  const {
+    mutate: previewTransactions,
+    isPending,
+    reset: resetPreviewTransactions,
+  } = usePreviewTransactions();
   const {
     data: statementFormats,
     isLoading: isLoadingFormats,
@@ -57,7 +61,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
   const [savedStatementFormat, setSavedStatementFormat] = useState<StatementFormat | null>(null);
   const [savedFormatMessage, setSavedFormatMessage] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string>('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewModal, setPreviewModal] = useState<PreviewModalState>({
     isOpen: false,
     previewData: null,
@@ -142,25 +146,30 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
   const selectedLabel = selectedFormat ? getFormatDisplayLabel(selectedFormat) : null;
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      setSelectedFile(files[0]);
-    }
+    setSelectedFiles(Array.from(event.target.files ?? []));
   }, []);
 
   const clearForm = useCallback(() => {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    setSelectedFile(null);
+    setSelectedFiles([]);
     setSelectedStatementFormatId(null);
     setSavedFormatMessage(null);
     setAccountId('');
     setIsExpanded(false);
   }, [setIsExpanded]);
 
+  const resetImportWorkflow = useCallback(() => {
+    resetPreviewTransactions();
+    clearForm();
+    setSavedStatementFormat(null);
+    setIsStatementFormatWizardOpen(false);
+    setPreviewModal({ isOpen: false, previewData: null });
+  }, [clearForm, resetPreviewTransactions]);
+
   const handleSubmit = useCallback(() => {
-    if (!selectedFile || selectedStatementFormatId === null) {
+    if (selectedFiles.length === 0 || selectedStatementFormatId === null) {
       return;
     }
 
@@ -169,7 +178,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     // All formats now use the preview workflow
     previewTransactions(
       {
-        file: selectedFile,
+        files: selectedFiles,
         statementFormatId: selectedStatementFormatId,
         accountId: accountId || undefined,
       },
@@ -186,7 +195,14 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
         },
       },
     );
-  }, [selectedFile, selectedStatementFormatId, accountId, previewTransactions, clearForm, onError]);
+  }, [
+    selectedFiles,
+    selectedStatementFormatId,
+    accountId,
+    previewTransactions,
+    clearForm,
+    onError,
+  ]);
 
   const handleFormatValueChange = useCallback((value: string) => {
     setSelectedStatementFormatId(Number(value));
@@ -210,14 +226,16 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
     [setIsExpanded],
   );
 
-  const handlePreviewModalOpenChange = useCallback((open: boolean) => {
-    if (open) {
-      setPreviewModal((prev) => ({ ...prev, isOpen: open }));
-    } else {
-      // Fully reset modal state when closing
-      setPreviewModal({ isOpen: false, previewData: null });
-    }
-  }, []);
+  const handlePreviewModalOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) {
+        setPreviewModal((prev) => ({ ...prev, isOpen: open }));
+      } else {
+        resetImportWorkflow();
+      }
+    },
+    [resetImportWorkflow],
+  );
 
   const handlePreviewImportComplete = useCallback(
     (created: number, duplicatesSkipped: number, duplicatesImported: number) => {
@@ -239,21 +257,18 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
   }, [setIsExpanded]);
 
   const handleCancel = useCallback(() => {
-    setIsExpanded(false);
-    setSelectedStatementFormatId(null);
-    setSavedFormatMessage(null);
-    setAccountId('');
-    setSelectedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }, [setIsExpanded]);
+    resetImportWorkflow();
+  }, [resetImportWorkflow]);
 
   const handleDismissSavedFormatMessage = useCallback(() => {
     setSavedFormatMessage(null);
   }, []);
 
-  const canSubmit = selectedFile && selectedStatementFormatId !== null;
+  const canSubmit = selectedFiles.length > 0 && selectedStatementFormatId !== null;
+  const selectedFileLabel =
+    selectedFiles.length > 1
+      ? `${selectedFiles.length} files selected`
+      : (selectedFiles[0]?.name ?? 'Choose File');
 
   // All formats now use preview workflow
   const getButtonText = () => {
@@ -269,6 +284,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
             ref={fileInputRef}
             type="file"
             accept=".csv,.pdf"
+            multiple
             onChange={handleFileChange}
             className="hidden"
             aria-label="Transaction file input"
@@ -345,9 +361,7 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
                     onClick={handleChooseFile}
                     className="max-w-[200px] whitespace-nowrap"
                   >
-                    <span className="truncate">
-                      {selectedFile ? selectedFile.name : 'Choose File'}
-                    </span>
+                    <span className="truncate">{selectedFileLabel}</span>
                   </Button>
 
                   <Button
@@ -394,17 +408,20 @@ export function ImportButton({ onSuccess, onError, onExpandedChange }: ImportBut
         </AnimatePresence>
       </div>
 
-      <TransactionPreviewModal
-        isOpen={previewModal.isOpen}
-        onOpenChange={handlePreviewModalOpenChange}
-        previewData={previewModal.previewData}
-        statementFormats={importHistoryStatementFormats}
-        onImportComplete={handlePreviewImportComplete}
-      />
+      {previewModal.previewData ? (
+        <TransactionPreviewModal
+          isOpen={previewModal.isOpen}
+          onOpenChange={handlePreviewModalOpenChange}
+          previewData={previewModal.previewData}
+          statementFormats={importHistoryStatementFormats}
+          onImportComplete={handlePreviewImportComplete}
+        />
+      ) : null}
       {isStatementFormatWizardOpen && (
         <StatementFormatWizardDialog
           open={isStatementFormatWizardOpen}
           onOpenChange={setIsStatementFormatWizardOpen}
+          onCancel={resetImportWorkflow}
           initialAccountId={accountId || undefined}
           onSaved={handleStatementFormatWizardSaved}
         />

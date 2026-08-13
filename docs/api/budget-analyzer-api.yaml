@@ -792,13 +792,18 @@ paths:
         content:
           multipart/form-data:
             schema:
-              type: array
-              description: Ordered CSV or PDF files to preview. Repeat the files multipart
-                part for each source.
-              items:
-                type: string
-                format: binary
-              minItems: 1
+              type: object
+              properties:
+                files:
+                  type: array
+                  description: Ordered CSV or PDF files to preview. Repeat the files
+                    multipart part for each source.
+                  items:
+                    type: string
+                    format: binary
+                  minItems: 1
+              required:
+                - files
         required: true
       responses:
         '200':

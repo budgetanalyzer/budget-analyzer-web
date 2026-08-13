@@ -3,47 +3,50 @@ import { useCallback } from 'react';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { PreviewTableRow } from '@/features/transactions/components/PreviewTableRow';
 import type {
-  EditablePreviewTransaction,
+  EditablePreviewTableRow,
   EditablePreviewTransactionField,
   EditablePreviewTransactionValue,
 } from '@/features/transactions/types/preview';
-import { cn } from '@/utils/cn';
+import { columnWidthClass } from '@/utils/columnWidth';
 
 interface PreviewTableProps {
-  transactions: EditablePreviewTransaction[];
+  rows: EditablePreviewTableRow[];
   onUpdateTransaction: (
-    index: number,
+    fileIndex: number,
+    transactionIndex: number,
     field: EditablePreviewTransactionField,
     value: EditablePreviewTransactionValue,
   ) => void;
-  onRemoveTransaction: (index: number) => void;
+  onRemoveTransaction: (fileIndex: number, transactionIndex: number) => void;
 }
 
 export function PreviewTable({
-  transactions,
+  rows,
   onUpdateTransaction,
   onRemoveTransaction,
 }: PreviewTableProps) {
   const handleUpdate = useCallback(
     (
-      index: number,
+      fileIndex: number,
+      transactionIndex: number,
       field: EditablePreviewTransactionField,
       value: EditablePreviewTransactionValue,
     ) => {
-      onUpdateTransaction(index, field, value);
+      onUpdateTransaction(fileIndex, transactionIndex, field, value);
     },
     [onUpdateTransaction],
   );
 
   const handleRemove = useCallback(
-    (index: number) => {
-      onRemoveTransaction(index);
+    (fileIndex: number, transactionIndex: number) => {
+      onRemoveTransaction(fileIndex, transactionIndex);
     },
     [onRemoveTransaction],
   );
-  const hasDuplicateRows = transactions.some((transaction) => transaction.duplicate);
+  const hasDuplicateRows = rows.some(({ transaction }) => transaction.duplicate);
+  const reviewColumnWidth = hasDuplicateRows ? 220 : 72;
 
-  if (transactions.length === 0) {
+  if (rows.length === 0) {
     return (
       <div className="flex items-center justify-center py-8 text-muted-foreground">
         No transactions to preview
@@ -61,18 +64,19 @@ export function PreviewTable({
           <TableHead className="w-[160px] text-right">Amount</TableHead>
           <TableHead className="w-[80px]">Currency</TableHead>
           <TableHead className="w-[150px]">Account ID</TableHead>
-          <TableHead className={cn(hasDuplicateRows ? 'w-[220px]' : 'w-[72px]')}>Review</TableHead>
+          <TableHead className={columnWidthClass(reviewColumnWidth)}>Review</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {transactions.map((transaction, index) => (
+        {rows.map(({ fileIndex, transactionIndex, transaction }) => (
           <PreviewTableRow
-            key={index}
+            key={`${fileIndex}-${transactionIndex}`}
             transaction={transaction}
-            index={index}
+            fileIndex={fileIndex}
+            transactionIndex={transactionIndex}
             onUpdate={handleUpdate}
             onRemove={handleRemove}
-            hasDuplicateRows={hasDuplicateRows}
+            reviewColumnWidth={reviewColumnWidth}
           />
         ))}
       </TableBody>

@@ -1,5 +1,5 @@
 // src/features/transactions/components/TransactionPreviewModal.tsx
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,11 +14,13 @@ import { PreviewFileImportWarningBanner } from '@/features/transactions/componen
 import { useBatchImport } from '@/features/transactions/hooks/useBatchImport';
 import {
   BatchImportTransactionRequest,
+  PreviewFileImportStatusResponse,
   PreviewResponse,
   PreviewTransaction,
 } from '@/types/transaction';
 import type { StatementFormat } from '@/types/statementFormat';
 import type {
+  EditablePreviewTableRow,
   EditablePreviewTransaction,
   EditablePreviewTransactionField,
   EditablePreviewTransactionValue,
@@ -30,13 +32,30 @@ import { formatApiError } from '@/utils/errorMessages';
 interface TransactionPreviewModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  previewData: PreviewResponse | null;
+  previewData: PreviewResponse;
   statementFormats?: StatementFormat[];
   onImportComplete: (
     created: number,
     duplicatesSkipped: number,
     duplicatesImported: number,
   ) => void;
+}
+
+interface EditablePreviewFile {
+  fileIndex: number;
+  sourceFile: string;
+  statementFormatId: number;
+  previewImportToken: string;
+  fileImport: PreviewFileImportStatusResponse;
+  transactions: EditablePreviewTransaction[];
+}
+
+interface AggregateReviewData {
+  rows: EditablePreviewTableRow[];
+  totalVisibleRows: number;
+  skippedDuplicateCount: number;
+  allowedDuplicateCount: number;
+  importableTransactionCount: number;
 }
 
 const duplicateKeyFields = new Set<EditablePreviewTransactionField>([
@@ -54,6 +73,17 @@ function toEditableTransaction(transaction: PreviewTransaction): EditablePreview
     ...transaction,
     allowDuplicate: false,
   };
+}
+
+function toEditableFiles(previewData: PreviewResponse): EditablePreviewFile[] {
+  return previewData.files.map((file, fileIndex) => ({
+    fileIndex,
+    sourceFile: file.sourceFile,
+    statementFormatId: file.statementFormatId,
+    previewImportToken: file.previewImportToken,
+    fileImport: file.fileImport,
+    transactions: file.transactions.map(toEditableTransaction),
+  }));
 }
 
 function toBatchImportTransaction(
@@ -85,16 +115,6 @@ function toBatchImportTransaction(
   };
 }
 
-function getSkippedDuplicateCount(transactions: EditablePreviewTransaction[]): number {
-  return transactions.filter(
-    (transaction) => transaction.duplicate && transaction.allowDuplicate !== true,
-  ).length;
-}
-
-function getImportableTransactionCount(transactions: EditablePreviewTransaction[]): number {
-  return transactions.length - getSkippedDuplicateCount(transactions);
-}
-
 function getTransactionLabel(count: number): string {
   return count === 1 ? 'Transaction' : 'Transactions';
 }
@@ -112,6 +132,16 @@ function buildImportButtonLabel(transactionCount: number, skippedDuplicateCount:
   return `Import ${importCount} ${getTransactionLabel(importCount)}, Skip ${skippedDuplicateCount} ${getDuplicateLabel(skippedDuplicateCount)}`;
 }
 
+function buildReviewSummary(files: EditablePreviewFile[], transactionCount: number): string {
+  const transactionSummary = `${transactionCount} transaction${transactionCount === 1 ? '' : 's'}`;
+
+  if (files.length === 1) {
+    return `File: ${files[0].sourceFile} | ${transactionSummary}`;
+  }
+
+  return `${files.length} files | ${transactionSummary}`;
+}
+
 export function TransactionPreviewModal({
   isOpen,
   onOpenChange,
@@ -119,74 +149,112 @@ export function TransactionPreviewModal({
   statementFormats,
   onImportComplete,
 }: TransactionPreviewModalProps) {
-  const [transactions, setTransactions] = useState<EditablePreviewTransaction[]>([]);
+  const [editableFiles, setEditableFiles] = useState<EditablePreviewFile[]>(() =>
+    toEditableFiles(previewData),
+  );
   const { mutate: batchImport, isPending: isImporting } = useBatchImport();
 
-  // Sync state when modal opens with new data
-  // This is needed because Dialog onOpenChange only fires on user interaction,
-  // not when the controlled open prop changes programmatically
-  useEffect(() => {
-    if (isOpen && previewData) {
-      setTransactions(previewData.transactions.map(toEditableTransaction));
-    }
-  }, [isOpen, previewData]);
+  const reviewData = useMemo<AggregateReviewData>(() => {
+    const rows = editableFiles.flatMap((file) =>
+      file.transactions.map((transaction, transactionIndex) => ({
+        fileIndex: file.fileIndex,
+        transactionIndex,
+        transaction,
+      })),
+    );
+    const duplicateRows = rows.filter(({ transaction }) => transaction.duplicate);
+    const allowedDuplicateCount = duplicateRows.filter(
+      ({ transaction }) => transaction.allowDuplicate === true,
+    ).length;
+    const skippedDuplicateCount = duplicateRows.length - allowedDuplicateCount;
+
+    return {
+      rows,
+      totalVisibleRows: rows.length,
+      skippedDuplicateCount,
+      allowedDuplicateCount,
+      importableTransactionCount: rows.length - duplicateRows.length + allowedDuplicateCount,
+    };
+  }, [editableFiles]);
 
   // Handle user-initiated open/close
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (open && previewData) {
-        setTransactions(previewData.transactions.map(toEditableTransaction));
-      }
       if (!isImporting) {
         onOpenChange(open);
       }
     },
-    [previewData, isImporting, onOpenChange],
+    [isImporting, onOpenChange],
   );
 
   const handleUpdateTransaction = useCallback(
     (
-      index: number,
+      fileIndex: number,
+      transactionIndex: number,
       field: EditablePreviewTransactionField,
       value: EditablePreviewTransactionValue,
     ) => {
-      setTransactions((prev) => {
-        return prev.map((transaction, transactionIndex) => {
-          if (transactionIndex !== index) {
-            return transaction;
+      setEditableFiles((previousFiles) =>
+        previousFiles.map((file) => {
+          if (file.fileIndex !== fileIndex) {
+            return file;
           }
 
-          const updated = {
-            ...transaction,
-            [field]: value,
-          } as EditablePreviewTransaction;
+          return {
+            ...file,
+            transactions: file.transactions.map((transaction, currentTransactionIndex) => {
+              if (currentTransactionIndex !== transactionIndex) {
+                return transaction;
+              }
 
-          if (duplicateKeyFields.has(field) && transaction.duplicate) {
-            updated.duplicate = false;
-            updated.duplicateReason = null;
-            updated.allowDuplicate = false;
-          }
+              const updated = {
+                ...transaction,
+                [field]: value,
+              } as EditablePreviewTransaction;
 
-          return updated;
-        });
-      });
+              if (duplicateKeyFields.has(field) && transaction.duplicate) {
+                updated.duplicate = false;
+                updated.duplicateReason = null;
+                updated.allowDuplicate = false;
+              }
+
+              return updated;
+            }),
+          };
+        }),
+      );
     },
     [],
   );
 
-  const handleRemoveTransaction = useCallback((index: number) => {
-    setTransactions((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveTransaction = useCallback((fileIndex: number, transactionIndex: number) => {
+    setEditableFiles((previousFiles) =>
+      previousFiles.map((file) => {
+        if (file.fileIndex !== fileIndex) {
+          return file;
+        }
+
+        return {
+          ...file,
+          transactions: file.transactions.filter(
+            (_, currentTransactionIndex) => currentTransactionIndex !== transactionIndex,
+          ),
+        };
+      }),
+    );
   }, []);
 
   const handleImport = useCallback(() => {
-    if (getImportableTransactionCount(transactions) === 0 || !previewData) {
+    if (reviewData.importableTransactionCount === 0) {
       return;
     }
 
     batchImport(
       {
-        previewImportToken: previewData.previewImportToken,
-        transactions: transactions.map(toBatchImportTransaction),
+        files: editableFiles.map((file) => ({
+          previewImportToken: file.previewImportToken,
+          transactions: file.transactions.map(toBatchImportTransaction),
+        })),
       },
       {
         onSuccess: (data) => {
@@ -198,7 +266,13 @@ export function TransactionPreviewModal({
         },
       },
     );
-  }, [transactions, previewData, batchImport, onOpenChange, onImportComplete]);
+  }, [
+    reviewData.importableTransactionCount,
+    editableFiles,
+    batchImport,
+    onOpenChange,
+    onImportComplete,
+  ]);
 
   const handleCancel = useCallback(() => {
     if (!isImporting) {
@@ -206,10 +280,12 @@ export function TransactionPreviewModal({
     }
   }, [isImporting, onOpenChange]);
 
-  const skippedDuplicateCount = getSkippedDuplicateCount(transactions);
-  const importableTransactionCount = getImportableTransactionCount(transactions);
-  const importButtonLabel = buildImportButtonLabel(transactions.length, skippedDuplicateCount);
-  const hasDuplicateRows = transactions.some((transaction) => transaction.duplicate);
+  const importButtonLabel = buildImportButtonLabel(
+    reviewData.totalVisibleRows,
+    reviewData.skippedDuplicateCount,
+  );
+  const hasDuplicateRows = reviewData.skippedDuplicateCount + reviewData.allowedDuplicateCount > 0;
+  const reviewSummary = buildReviewSummary(editableFiles, reviewData.totalVisibleRows);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -221,26 +297,25 @@ export function TransactionPreviewModal({
       >
         <DialogHeader>
           <DialogTitle>Preview Import</DialogTitle>
-          <DialogDescription>
-            {previewData && (
-              <>
-                File: {previewData.sourceFile} | {transactions.length} transaction
-                {transactions.length !== 1 ? 's' : ''}
-              </>
-            )}
-          </DialogDescription>
+          <DialogDescription>{reviewSummary}</DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
-          {previewData && (
-            <PreviewFileImportWarningBanner
-              fileImport={previewData.fileImport}
-              statementFormats={statementFormats}
-            />
-          )}
-          <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto py-4">
+          <div className="space-y-4">
+            <div className="space-y-3">
+              {editableFiles.map((file) =>
+                file.fileImport.alreadyImported ? (
+                  <PreviewFileImportWarningBanner
+                    key={file.fileIndex}
+                    sourceFile={file.sourceFile}
+                    fileImport={file.fileImport}
+                    statementFormats={statementFormats}
+                  />
+                ) : null,
+              )}
+            </div>
             <PreviewTable
-              transactions={transactions}
+              rows={reviewData.rows}
               onUpdateTransaction={handleUpdateTransaction}
               onRemoveTransaction={handleRemoveTransaction}
             />
@@ -251,7 +326,10 @@ export function TransactionPreviewModal({
           <Button variant="outline" onClick={handleCancel} disabled={isImporting}>
             Cancel
           </Button>
-          <Button onClick={handleImport} disabled={isImporting || importableTransactionCount === 0}>
+          <Button
+            onClick={handleImport}
+            disabled={isImporting || reviewData.importableTransactionCount === 0}
+          >
             {isImporting ? 'Importing...' : importButtonLabel}
           </Button>
         </DialogFooter>

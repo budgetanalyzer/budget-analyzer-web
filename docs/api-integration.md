@@ -20,8 +20,8 @@ All endpoints accessed through the gateway:
 
 - `GET /api/v1/transactions` — List all transactions
 - `GET /api/v1/transactions/{id}` — Get single transaction
-- `POST /api/v1/transactions/preview` — Preview an uploaded statement file before import. The response includes `previewImportToken`, `fileImport` re-import status, and per-row duplicate metadata (`duplicate`, `duplicateReason`).
-- `POST /api/v1/transactions/batch` — Import reviewed preview rows. The request requires `previewImportToken` and may set per-row `allowDuplicate: true` when the user explicitly imports a duplicate row.
+- `POST /api/v1/transactions/preview` — Preview one or more ordered statement files before import. The grouped response includes one `previewImportToken`, `fileImport` re-import status, and transaction list per source file.
+- `POST /api/v1/transactions/batch` — Import ordered groups of reviewed preview rows. Each file group requires its own `previewImportToken` and may set per-row `allowDuplicate: true` when the user explicitly imports a duplicate row.
 - `GET /api/v1/currencies` — List currencies
 - `GET /api/v1/exchange-rates` — Get exchange rates
 
@@ -112,8 +112,17 @@ without a manual page refresh.
 
 Statement imports use a two-step review flow:
 
-1. `POST /api/v1/transactions/preview?statementFormatId=<id>&accountId=<optional-account-id>` uploads the statement file as multipart form data and returns editable preview rows.
-2. `POST /api/v1/transactions/batch` submits the reviewed rows as JSON with the same `previewImportToken`.
+1. The browser's native file picker supplies one or more statement files in selection order. `POST /api/v1/transactions/preview?statementFormatId=<id>&accountId=<optional-account-id>` sends them as repeated multipart `files` parts and returns an ordered result group per file.
+2. `POST /api/v1/transactions/batch` submits the ordered reviewed file groups as JSON, pairing each transaction list with its source file's `previewImportToken`.
+
+Grouped transaction preview overrides the API client's general 10-second Axios
+timeout with a 60-second endpoint timeout because the request combines multipart
+upload and statement parsing. Other API requests retain the general timeout.
+
+Cancelling from the import controls, statement-format wizard, or transaction
+review ends the complete import workflow. The frontend clears selected files,
+format, account ID, wizard state, preview data, and pending mutation state so the
+entry action returns to `Import Transactions` and the next attempt starts fresh.
 
 The import format dropdown is populated from `GET /api/v1/statement-formats`
 without query parameters, so formats hidden by the current user are omitted by
@@ -141,76 +150,112 @@ scanned/no-text/table-detection failures. PDF preview diagnostics are shown only
 when they are user-facing; parser revision, header-token, candidate, and rule
 internals stay hidden.
 
-If NGINX rejects the preview upload with HTTP `413`, the response body is not
-the backend JSON error shape. The frontend maps that status on
-`/v1/transactions/preview` to `Sorry, the file exceeds our 25MB limit.` before
-showing the import error banner.
+The service currently defaults to a `25MB` limit for each repeated file part
+and a `25MB` limit for the combined multipart body. Deployments and gateways
+may configure different limits, so the frontend does not enforce a fixed file
+count or size. If the upload is rejected with HTTP `413`, its body may not use
+the backend JSON error shape; the frontend instead shows the neutral import-page
+message `The selected files exceed the upload size limit.`
 
-The preview response includes:
+Each item in the preview response's ordered `files` array includes:
 
+- `sourceFile` and `statementFormatId` — the source identity and format used for parsing.
 - `previewImportToken` — opaque token required for the batch request. Treat it as client state only; do not parse it.
 - `fileImport` — file-level re-import status for the current user and uploaded bytes.
 - `transactions[].duplicate` and `transactions[].duplicateReason` — advisory row-level duplicate metadata.
 
-`fileImport.alreadyImported` means the exact uploaded file was imported before.
-The UI shows previous import metadata from `fileImport.previousImport`, resolves
-`previousImport.statementFormatId` to a visible format label when the format is
-loaded, and does not block the batch import action.
+The service hashes each source file's bytes for exact-file import history.
+`fileImport.alreadyImported` means the current user imported bytes with that
+same hash before. This status is an advisory exact-reimport warning orthogonal
+to row-level duplicate detection: the combined review dialog identifies each
+affected source file and its previous import, but does not block import. Source
+grouping is retained internally for this warning and token-backed submission;
+it is not exposed as a way to organize transactions.
 
 Duplicate reasons map to UI labels:
 
 | `duplicateReason`      | Meaning                                                   | UI label          |
 | ---------------------- | --------------------------------------------------------- | ----------------- |
 | `EXISTING_TRANSACTION` | Row matches an existing active owner-owned transaction    | Already imported  |
-| `IN_BATCH`             | Row duplicates an earlier row in the same preview payload | Duplicate in file |
+| `IN_BATCH`             | Row matches a row from a completed earlier source file    | Matches earlier file |
 
-Duplicate preview rows stay visible in the UI and are skipped by default. A row is imported despite duplicate metadata only when the batch payload sets `allowDuplicate: true` for that row. If every visible row would be skipped, the UI disables the import action and leaves Cancel as the way out of the review dialog. Preview-only fields such as `duplicate` and `duplicateReason` are never sent in the batch request.
+Rows within their own source file are not compared with each other. All source
+groups appear as one continuous transaction review set without row-level file
+attribution, while edits and removals remain associated with the correct
+ordered group for batch submission. Duplicate preview rows stay visible and
+are skipped by default. A row is imported despite duplicate metadata only when
+the batch payload sets `allowDuplicate: true` for that row. Preview warnings
+are advisory: the backend re-evaluates the edited grouped batch and remains
+authoritative about which rows are duplicates. If every visible row would be
+skipped, the UI disables the import action and leaves Cancel as the way out of
+the review dialog. Preview-only fields such as `duplicate` and
+`duplicateReason` are never sent in the batch request.
 
 Batch request shape:
 
 ```json
 {
-  "previewImportToken": "v2.dGVzdGl2MTIzNDU.Kc4WwTqfh1sFD8pxVq7Hxg",
-  "transactions": [
+  "files": [
     {
-      "date": "2026-05-01",
-      "description": "Coffee",
-      "amount": 4.5,
-      "type": "DEBIT",
-      "category": "Dining",
-      "bankName": "Test Bank",
-      "currencyIsoCode": "USD",
-      "accountId": "checking-123"
+      "previewImportToken": "v2.january-token",
+      "transactions": [
+        {
+          "date": "2026-05-01",
+          "description": "Coffee",
+          "amount": 4.5,
+          "type": "DEBIT",
+          "category": "Dining",
+          "bankName": "Test Bank",
+          "currencyIsoCode": "USD",
+          "accountId": "checking-123"
+        },
+        {
+          "date": "2026-05-01",
+          "description": "Coffee duplicate",
+          "amount": 4.5,
+          "type": "DEBIT",
+          "category": "Dining",
+          "bankName": "Test Bank",
+          "currencyIsoCode": "USD",
+          "accountId": "checking-123",
+          "allowDuplicate": true
+        }
+      ]
     },
     {
-      "date": "2026-05-01",
-      "description": "Coffee duplicate",
-      "amount": 4.5,
-      "type": "DEBIT",
-      "category": "Dining",
-      "bankName": "Test Bank",
-      "currencyIsoCode": "USD",
-      "accountId": "checking-123",
-      "allowDuplicate": true
+      "previewImportToken": "v2.february-token",
+      "transactions": []
     }
   ]
 }
 ```
 
+Every preview file remains in the request in its original order, including an
+empty reviewed transaction group. An empty group is valid in a mixed import and
+receives an ordered zero-count result, but the complete batch must create at
+least one transaction. If every group is empty or every submitted row is
+skipped as a duplicate, the backend returns
+`BATCH_IMPORT_NO_TRANSACTIONS_CREATED`.
+
 The batch response reports:
 
-- `created` — number of transactions created.
-- `duplicatesSkipped` — duplicate rows skipped because `allowDuplicate` was false or omitted.
-- `duplicatesImported` — duplicate rows intentionally imported with `allowDuplicate: true`.
+- `created`, `duplicatesSkipped`, and `duplicatesImported` — aggregate counts
+  across the complete request. The frontend closes the review dialog and uses
+  these aggregates for its success feedback.
+- `files` — ordered per-source `sourceFile`, counts, and created transactions;
+  this preserves API provenance without adding a post-import file results view.
 
-Relevant 422 import error codes surfaced through `formatApiError`:
+Relevant 422 import error codes are mapped by `formatApiError`. Preview errors
+appear in the import-page banner; batch errors appear as a toast while the
+review dialog remains open:
 
-| Code                                   | User-facing handling                           |
-| -------------------------------------- | ---------------------------------------------- |
-| `MISSING_ORIGINAL_FILENAME`            | The uploaded file must include a filename.     |
-| `BATCH_IMPORT_NO_TRANSACTIONS_CREATED` | All submitted rows were skipped as duplicates. |
-| `PREVIEW_IMPORT_TOKEN_INVALID`         | Prompt the user to preview the file again.     |
-| `PREVIEW_IMPORT_TOKEN_EXPIRED`         | Prompt the user to preview the file again.     |
+| Code                                   | User-facing handling                                                       |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| `MISSING_ORIGINAL_FILENAME`            | Explain that a filename is required so the user can reselect the files.    |
+| `BATCH_IMPORT_NO_TRANSACTIONS_CREATED` | Explain that every submitted row was skipped; review or cancel the import. |
+| `BATCH_IMPORT_SOURCE_MISMATCH`          | Prompt the user to preview the files together again.                       |
+| `PREVIEW_IMPORT_TOKEN_INVALID`         | Explain that the preview is invalid or expired and prompt another preview. |
+| `PREVIEW_IMPORT_TOKEN_EXPIRED`         | Explain that the preview expired and prompt another preview.               |
 
 ## Axios Configuration
 

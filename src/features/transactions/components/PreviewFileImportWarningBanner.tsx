@@ -4,11 +4,13 @@ import type { StatementFormat } from '@/types/statementFormat';
 import { formatTimestamp } from '@/utils/dates';
 
 interface PreviewFileImportWarningBannerProps {
+  sourceFile: string;
   fileImport: PreviewFileImportStatusResponse;
   statementFormats?: StatementFormat[];
 }
 
 export function PreviewFileImportWarningBanner({
+  sourceFile,
   fileImport,
   statementFormats,
 }: PreviewFileImportWarningBannerProps) {
@@ -36,6 +38,9 @@ export function PreviewFileImportWarningBanner({
         <div className="space-y-2">
           <p className="font-semibold text-foreground">
             This uploaded file has already been imported.
+          </p>
+          <p className="text-muted-foreground">
+            <span className="font-medium text-foreground">Current file:</span> {sourceFile}
           </p>
           {previousImport && (
             <dl className="grid gap-x-6 gap-y-1 text-muted-foreground sm:grid-cols-2">
