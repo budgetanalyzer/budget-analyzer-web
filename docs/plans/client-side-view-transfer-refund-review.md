@@ -11,11 +11,10 @@ a debit from a different owned account. It does not attempt to classify merchant
 income. The workflow remains a modal; strict CSP is satisfied by repairing the shared dialog's
 body scroll lock rather than substituting a different interaction.
 
-This plan has one hard execution prerequisite: the closure criteria in
-`docs/bugs/radix-dropdown-strict-csp.md` must be satisfied and that temporary bug document must be
-removed. Until the Radix dropdown dependency and its runtime style/positioning behavior are gone,
-the required application-wide CSP bundle scan cannot pass. That remediation is intentionally a
-separate concern and is not folded into this saved-view feature. If the prerequisite is still open,
+This plan has one hard execution prerequisite: `docs/bugs/radix-dropdown-strict-csp.md` must be
+absent, the Radix dropdown dependency must be absent from package metadata and application source,
+and `npm run build:prod-smoke` must pass its automatic dropdown CSP gate. Together these checks are
+the durable proof that the separate remediation closed without a waiver. If any check fails,
 Phase 1 must stop before editing any feature or shared-dialog code.
 
 Execute the phases in order. The shared CSP-safe scroll lock must be complete before the new modal
@@ -35,7 +34,7 @@ attributes, and establish a CSP-safe shared primitive before adding another dial
 
 ### Scope
 
-- Verify the open Radix dropdown CSP defect has been remediated before making changes.
+- Verify the durable Radix dropdown CSP prerequisite before making changes.
 - Add a small reference-counted body scroll-lock utility that toggles the statically generated
   Tailwind `overflow-hidden` class.
 - Replace direct `document.body.style.overflow` mutations in the shared `Dialog` and admin mobile
@@ -49,8 +48,8 @@ attributes, and establish a CSP-safe shared primitive before adding another dial
 ### Non-goals
 
 - Replacing modal UX with an inline panel, drawer, or different interaction.
-- Remediating `@radix-ui/react-dropdown-menu`; that is the hard prerequisite tracked by
-  `docs/bugs/radix-dropdown-strict-csp.md`.
+- Re-remediating `@radix-ui/react-dropdown-menu`; the durable prerequisite must already prove that
+  dependency and its temporary bug record are absent.
 - Replacing the custom dialog system with Radix Dialog or adding any dependency.
 - Redesigning dialog focus management, markup, animations, sizing, or consumer APIs.
 - Changing admin sidebar behavior beyond its body scroll-lock implementation.
@@ -58,12 +57,10 @@ attributes, and establish a CSP-safe shared primitive before adding another dial
 
 ### Required context
 
-- Read `AGENTS.md` and `docs/bugs/radix-dropdown-strict-csp.md` completely. If the bug document
-  still has `Status: Open`, if `@radix-ui/react-dropdown-menu` or its unsafe runtime behavior
-  remains, or if the bug's closure criteria do not pass, stop without editing and report the
-  prerequisite.
-- Run the bug document's production-smoke bundle scan before implementation. A known match must
-  not be waived merely because it predates this feature.
+- Read `AGENTS.md`, then confirm `docs/bugs/radix-dropdown-strict-csp.md` is absent, the Radix
+  dropdown dependency/source scan returns no matches, and `npm run build:prod-smoke` passes its
+  automatic dropdown CSP gate. If any check fails, stop without editing and report the
+  prerequisite; do not waive a known match merely because it predates this feature.
 - Review `src/components/ui/Dialog.tsx`, every direct dialog consumer, and
   `src/features/admin/components/AdminLayout.tsx` before changing the shared behavior.
 - Review `src/features/admin/components/__tests__/AdminLayout.test.tsx`, representative modal
@@ -74,10 +71,18 @@ attributes, and establish a CSP-safe shared primitive before adding another dial
 
 ### Execution steps
 
-1. Prove the prerequisite is closed by confirming the temporary Radix bug document has been
-   removed, building the production smoke bundle, and running its zero-exception CSP scan. Stop
-   immediately if any dropdown style injection, floating inline positioning, or other known bug
-   closure criterion remains.
+1. Prove the prerequisite is closed with the following commands; the `rg` command must print no
+   matches:
+
+   ```bash
+   test ! -e docs/bugs/radix-dropdown-strict-csp.md
+   rg -n "@radix-ui/react-dropdown-menu" package.json package-lock.json src
+   npm run build:prod-smoke
+   ```
+
+   Stop immediately if the temporary bug record or any dropdown style injection, floating inline
+   positioning, dependency, source import, or gate failure remains.
+
 2. Add `src/utils/bodyScrollLock.ts` with an acquire/release API designed for use inside external-
    system effects. On the first lock, remember whether `document.body` already had the literal
    `overflow-hidden` class and add it only when absent. Reference-count active locks, make each
@@ -571,8 +576,9 @@ review, formatting, coverage, and production builds.
 ### Required context
 
 - Confirm Phases 1 through 4 are complete and their focused validations pass.
-- Confirm `docs/bugs/radix-dropdown-strict-csp.md` is absent because its closure criteria were
-  satisfied, not renamed or waived, and confirm the shared body scroll-lock tests still pass.
+- Re-run the durable dropdown prerequisite: confirm the temporary bug document is absent, the
+  Radix dropdown dependency/source scan is clean, and `npm run build:prod-smoke` passes. Also
+  confirm the shared body scroll-lock tests still pass.
 - Read the Saved Views and Transaction Import Review sections of `docs/api-integration.md` and the
   Page Responsibilities and State Management sections of `docs/architecture.md` before editing.
 - Re-read the documentation discipline, testing, CSP, no-tooltip, centralized date, and no-git
@@ -639,16 +645,18 @@ Run the CSP/security smoke build and inspect it for prohibited runtime behavior:
 
 ```bash
 npm run build:prod-smoke
+rg -n "@radix-ui/react-dropdown-menu" package.json package-lock.json src
 rg -n "createElement\(['\"]style['\"]\)|setAttribute\(['\"]style|document\.(body|documentElement)\.style|styleSheet\.cssText|insertRule\(|eval\(|new Function\(" dist/
 rg -n "style=|\.style\.|setAttribute\(['\"]style|createElement\(['\"]style|cssText|insertRule|eval\(|new Function\(" \
   src --glob '*.{ts,tsx,js,jsx}'
 test ! -e docs/bugs/radix-dropdown-strict-csp.md
 ```
 
-The bundle `rg` must return no matches, with no exception for pre-existing or dependency code. The
-source `rg` may find explanatory CSP comments, but it must find no executable style or evaluation
-mechanism. The final command must prove the prerequisite bug was closed and its temporary document
-removed. Also verify the durable docs contain the new behavior and do not link to plans:
+The dependency and bundle `rg` commands must return no matches, with no exception for pre-existing
+or dependency code. The source `rg` may find explanatory CSP comments, but it must find no
+executable style or evaluation mechanism. The final command must prove the prerequisite bug was
+closed and its temporary document removed. Also verify the durable docs contain the new behavior
+and do not link to plans:
 
 ```bash
 rg -n "Transfers & Refunds|transfer|refund|client-side|bulk exclusion" \

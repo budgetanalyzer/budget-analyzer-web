@@ -1,22 +1,38 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { act, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router';
+
+const transactionHookMocks = vi.hoisted(() => ({
+  deleteMutate: vi.fn(),
+  updateMutate: vi.fn(),
+}));
+
+const viewHookState = vi.hoisted(() => ({
+  isLoading: false,
+  isPinning: false,
+  pinMutate: vi.fn(),
+  views: [] as unknown[],
+}));
 
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/hooks/useTransactions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/useTransactions')>();
   return {
     ...actual,
-    useUpdateTransaction: () => ({ mutate: vi.fn(), isPending: false }),
-    useDeleteTransaction: () => ({ mutate: vi.fn(), isPending: false }),
+    useUpdateTransaction: () => ({ mutate: transactionHookMocks.updateMutate, isPending: false }),
+    useDeleteTransaction: () => ({ mutate: transactionHookMocks.deleteMutate, isPending: false }),
   };
 });
 vi.mock('@/hooks/useViews', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/useViews')>();
   return {
     ...actual,
-    useViews: () => ({ data: [], isLoading: false }),
-    usePinTransaction: () => ({ mutate: vi.fn(), isPending: false }),
+    useViews: () => ({ data: viewHookState.views, isLoading: viewHookState.isLoading }),
+    usePinTransaction: () => ({
+      mutate: viewHookState.pinMutate,
+      isPending: viewHookState.isPinning,
+    }),
   };
 });
 
@@ -26,6 +42,7 @@ import { Transaction } from '@/types/transaction';
 import type { ExchangeRateResponse } from '@/types/currency';
 import { renderWithProviders } from '@/testing/test-utils';
 import { buildExchangeRateMap } from '@/utils/currency';
+import type { SavedView } from '@/types/view';
 
 const mockUsePermission = vi.mocked(usePermission);
 const noop = vi.fn();
@@ -57,46 +74,55 @@ const transactions: Transaction[] = [
   },
 ];
 
-beforeAll(() => {
-  // Radix DropdownMenu needs these on Element.prototype but jsdom doesn't ship them.
-  if (!Element.prototype.hasPointerCapture) {
-    Element.prototype.hasPointerCapture = () => false;
-  }
-  if (!Element.prototype.releasePointerCapture) {
-    Element.prototype.releasePointerCapture = () => {};
-  }
-  if (!Element.prototype.scrollIntoView) {
-    Element.prototype.scrollIntoView = () => {};
-  }
-});
+const savedViews: SavedView[] = [
+  {
+    id: 'monthly-view',
+    name: 'Monthly Review',
+    criteria: {},
+    openEnded: false,
+    pinnedCount: 0,
+    excludedCount: 0,
+    transactionCount: 3,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+];
 
 type ExchangeRatesMap = Map<string, Map<string, ExchangeRateResponse>>;
 
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
+}
+
 function createTable(rows: Transaction[], exchangeRatesMap: ExchangeRatesMap) {
   return (
-    <TransactionTable
-      transactions={rows}
-      filters={{
-        globalFilter: '',
-        dateFilter: { from: null, to: null },
-        bankNameFilter: null,
-        accountIdFilter: null,
-        typeFilter: null,
-        amountFilter: { min: null, max: null },
-      }}
-      onDateFilterChange={noop}
-      onSearchChange={noop}
-      onBankNameFilterChange={noop}
-      onAccountIdFilterChange={noop}
-      onTypeFilterChange={noop}
-      onAmountFilterChange={noop}
-      onClearAllFilters={noop}
-      displayCurrency="USD"
-      exchangeRatesMap={exchangeRatesMap}
-      isExchangeRatesLoading={false}
-      availableBankNames={['Test Bank']}
-      availableAccountIds={['acct-1']}
-    />
+    <>
+      <TransactionTable
+        transactions={rows}
+        filters={{
+          globalFilter: '',
+          dateFilter: { from: null, to: null },
+          bankNameFilter: null,
+          accountIdFilter: null,
+          typeFilter: null,
+          amountFilter: { min: null, max: null },
+        }}
+        onDateFilterChange={noop}
+        onSearchChange={noop}
+        onBankNameFilterChange={noop}
+        onAccountIdFilterChange={noop}
+        onTypeFilterChange={noop}
+        onAmountFilterChange={noop}
+        onClearAllFilters={noop}
+        displayCurrency="USD"
+        exchangeRatesMap={exchangeRatesMap}
+        isExchangeRatesLoading={false}
+        availableBankNames={['Test Bank']}
+        availableAccountIds={['acct-1']}
+      />
+      <LocationProbe />
+    </>
   );
 }
 
@@ -120,63 +146,75 @@ function expectDescriptionOrder(expectedDescriptions: string[]) {
   });
 }
 
-function openFirstRowMenu() {
+async function openFirstRowMenu() {
+  const user = userEvent.setup();
   const triggers = screen.getAllByRole('button', { name: /open menu/i });
-  // Radix DropdownMenu opens on Enter via its keyDown handler. We avoid
-  // pointerDown because jsdom doesn't propagate `button` on PointerEvent.
-  triggers[0].focus();
-  fireEvent.keyDown(triggers[0], { key: 'Enter' });
+  await user.click(triggers[0]);
+}
+
+function expectNoRuntimeStyles(styleCount: number, ...elements: HTMLElement[]) {
+  expect(document.querySelectorAll('style')).toHaveLength(styleCount);
+  elements.forEach((element) => {
+    expect(element).not.toHaveAttribute('style');
+    expect(element.querySelector('[style]')).toBeNull();
+  });
 }
 
 beforeEach(() => {
   mockUsePermission.mockReset();
+  transactionHookMocks.deleteMutate.mockReset();
+  transactionHookMocks.updateMutate.mockReset();
+  viewHookState.isLoading = false;
+  viewHookState.isPinning = false;
+  viewHookState.pinMutate.mockReset();
+  viewHookState.views = [];
 });
 
 describe('TransactionTable permission gating', () => {
-  it('shows the select column and Edit + Delete row actions when all permissions are granted', () => {
+  it('shows the select column and Edit + Delete row actions when all permissions are granted', async () => {
     mockUsePermission.mockReturnValue(true);
     renderTable();
 
     // Header checkbox + one checkbox per row
     expect(screen.getAllByRole('checkbox')).toHaveLength(transactions.length + 1);
 
-    openFirstRowMenu();
+    await openFirstRowMenu();
     expect(screen.getByRole('menuitem', { name: /Edit/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Delete/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Add to View/ })).toBeInTheDocument();
   });
 
-  it('hides the select column and the Delete action when transactions:delete is missing', () => {
+  it('hides the select column and the Delete action when transactions:delete is missing', async () => {
     mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
     renderTable();
 
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
 
-    openFirstRowMenu();
+    await openFirstRowMenu();
     expect(screen.getByRole('menuitem', { name: /Edit/ })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /Delete/ })).not.toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Add to View/ })).toBeInTheDocument();
   });
 
-  it('hides the Edit action but keeps the select column when transactions:write is missing', () => {
+  it('hides the Edit action but keeps the select column when transactions:write is missing', async () => {
     mockUsePermission.mockImplementation((permission) => permission === 'transactions:delete');
     renderTable();
 
     expect(screen.getAllByRole('checkbox')).toHaveLength(transactions.length + 1);
 
-    openFirstRowMenu();
+    await openFirstRowMenu();
     expect(screen.queryByRole('menuitem', { name: /Edit/ })).not.toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Delete/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Add to View/ })).toBeInTheDocument();
   });
 
-  it('leaves only the Add to View action and removes the select column when neither permission is granted', () => {
+  it('leaves only the Add to View action and removes the select column when neither permission is granted', async () => {
     mockUsePermission.mockReturnValue(false);
     renderTable();
 
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
 
-    openFirstRowMenu();
+    await openFirstRowMenu();
     expect(screen.queryByRole('menuitem', { name: /Edit/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /Delete/ })).not.toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Add to View/ })).toBeInTheDocument();
@@ -200,6 +238,85 @@ describe('TransactionTable permission gating', () => {
     const headerRow = within(table).getAllByRole('row')[0];
     // Select + Date, Description, Bank, Account, Type, Amount, Actions = 8 columns.
     expect(within(headerRow).getAllByRole('columnheader')).toHaveLength(8);
+  });
+});
+
+describe('TransactionTable Add to View submenu', () => {
+  it('pins from pointer interaction without triggering row, edit, or delete behavior', async () => {
+    mockUsePermission.mockReturnValue(true);
+    viewHookState.views = savedViews;
+    const user = userEvent.setup();
+    const styleCount = document.querySelectorAll('style').length;
+    renderTable();
+
+    const row = screen.getByText('Salary').closest('tr');
+    expect(row).not.toBeNull();
+    const trigger = within(row as HTMLTableRowElement).getByRole('button', { name: 'Open menu' });
+    await user.click(trigger);
+    const parentMenu = screen.getByRole('menu');
+    await user.hover(screen.getByRole('menuitem', { name: 'Add to View' }));
+    const submenu = screen.getAllByRole('menu')[1];
+    await user.click(screen.getByRole('menuitem', { name: 'Monthly Review' }));
+
+    expect(viewHookState.pinMutate).toHaveBeenCalledOnce();
+    expect(viewHookState.pinMutate).toHaveBeenCalledWith(
+      { viewId: 'monthly-view', txnId: 2 },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+    expect(screen.getByTestId('location')).toHaveTextContent('/transactions');
+    expect(screen.queryByRole('heading', { name: 'Delete Transaction' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    expect(transactionHookMocks.updateMutate).not.toHaveBeenCalled();
+    expect(transactionHookMocks.deleteMutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expectNoRuntimeStyles(styleCount, trigger, parentMenu, submenu);
+  });
+
+  it('opens with ArrowRight and pins the selected view exactly once by keyboard', async () => {
+    mockUsePermission.mockReturnValue(false);
+    viewHookState.views = savedViews;
+    const user = userEvent.setup();
+    renderTable();
+
+    const trigger = screen.getAllByRole('button', { name: 'Open menu' })[0];
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    const addToView = screen.getByRole('menuitem', { name: 'Add to View' });
+    expect(addToView).toHaveFocus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('menuitem', { name: 'Monthly Review' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    expect(viewHookState.pinMutate).toHaveBeenCalledOnce();
+    expect(viewHookState.pinMutate).toHaveBeenCalledWith(
+      { viewId: 'monthly-view', txnId: 2 },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+    expect(screen.getByTestId('location')).toHaveTextContent('/transactions');
+  });
+
+  it.each([
+    { label: 'views are loading', isLoading: true, isPinning: false },
+    { label: 'a pin is pending', isLoading: false, isPinning: true },
+  ])('does not activate the submenu when $label', async ({ isLoading, isPinning }) => {
+    mockUsePermission.mockReturnValue(false);
+    viewHookState.views = savedViews;
+    viewHookState.isLoading = isLoading;
+    viewHookState.isPinning = isPinning;
+    const user = userEvent.setup();
+    renderTable();
+
+    const trigger = screen.getAllByRole('button', { name: 'Open menu' })[0];
+    await user.click(trigger);
+    const addToView = screen.getByRole('menuitem', { name: 'Add to View' });
+    expect(addToView).toBeDisabled();
+    addToView.focus();
+    await user.keyboard('{ArrowRight}{Enter}');
+
+    expect(screen.queryByRole('menuitem', { name: 'Monthly Review' })).not.toBeInTheDocument();
+    expect(viewHookState.pinMutate).not.toHaveBeenCalled();
+    expect(screen.getByTestId('location')).toHaveTextContent('/transactions');
   });
 });
 

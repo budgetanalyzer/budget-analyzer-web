@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router-dom';
 
 vi.mock('@/features/auth/hooks/useAuth');
 
@@ -31,6 +32,11 @@ function mockAuth(user: User | null, logout = vi.fn()) {
     logout,
     refetch: vi.fn(),
   });
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
 }
 
 describe('UserProfileDropdown', () => {
@@ -71,6 +77,44 @@ describe('UserProfileDropdown', () => {
     await user.click(screen.getByRole('menuitem', { name: /logout/i }));
 
     expect(logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('navigates to statement format preferences from the permitted menu item', async () => {
+    mockAuth(namedUser);
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <>
+        <UserProfileDropdown />
+        <LocationProbe />
+      </>,
+      { initialEntries: ['/'], router: 'dom' },
+    );
+    await user.click(screen.getByRole('button', { name: 'Pat Example' }));
+    await user.click(screen.getByRole('menuitem', { name: /statement formats/i }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/statement-formats');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('restores trigger focus on Escape and synchronizes outside dismissal', async () => {
+    mockAuth(namedUser);
+    const user = userEvent.setup();
+
+    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'], router: 'dom' });
+    const trigger = screen.getByRole('button', { name: 'Pat Example' });
+
+    trigger.focus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: /statement formats/i })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(trigger).toHaveFocus();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    await user.click(trigger);
+    await user.click(document.body);
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   it('falls back to email identity when optional profile fields are missing', async () => {

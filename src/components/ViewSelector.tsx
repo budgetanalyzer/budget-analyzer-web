@@ -42,6 +42,8 @@ export function ViewSelector() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
+            type="button"
+            aria-label="Open saved views menu"
             className={cn(
               'rounded-r-md px-1 py-1.5 transition-colors hover:text-primary',
               isActive ? 'text-foreground' : 'text-muted-foreground',
@@ -50,7 +52,7 @@ export function ViewSelector() {
             <ChevronDown className="h-4 w-4" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuContent align="end" className="w-56">
           {/* Saved Views */}
           {views?.map((view) => (
             <DropdownMenuItem
@@ -58,7 +60,11 @@ export function ViewSelector() {
               asChild
               className={cn(currentViewId === view.id && 'bg-accent')}
             >
-              <Link to={`/views/${view.id}`} className="flex w-full items-center justify-between">
+              <Link
+                to={`/views/${view.id}`}
+                aria-current={currentViewId === view.id ? 'page' : undefined}
+                className="flex w-full items-center justify-between"
+              >
                 <span className="truncate">{view.name}</span>
                 <span className="ml-2 text-xs text-muted-foreground">
                   ({view.transactionCount})
