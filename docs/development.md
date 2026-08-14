@@ -28,6 +28,8 @@ The Docker development runtime runs Vite as UID/GID `1001` (non-root). Keep cont
 npm run dev       # Start development server
 npm run build     # Coverage gate + production build
 npm run build:bundle  # Production bundle only
+npm run build:prod-smoke  # Prod-smoke build + dropdown CSP gate
+npm run check:csp:dropdown  # Check an existing dist/ for known dropdown blockers
 npm run preview   # Preview production build
 npm run lint      # Run ESLint
 npm run format    # Format with Prettier
@@ -98,7 +100,16 @@ build exits non-zero if global coverage drops below `80%` statements, `80%`
 branches, `75%` functions, or `80%` lines. Use `npm run build:bundle` only
 when coverage has already been checked in the same flow.
 
-The `build:prod-smoke` build is used by orchestration to verify production CSP and browser security on the live origin. Auth and API paths remain root-relative regardless of which build is used.
+The `build:prod-smoke` build is used by orchestration to verify production CSP and browser security
+on the live origin. It automatically runs `check:csp:dropdown` after bundling, so known Radix menu,
+`react-remove-scroll`, runtime stylesheet-injection, source-import, and package-metadata blockers
+fail the build. The standalone check requires an existing `dist/` and does not rebuild it. Auth and
+API paths remain root-relative regardless of which build is used.
+
+This gate is deliberately dropdown-specific. For the coordinated static verifier, run
+`./scripts/smoketest/audit-frontend-csp.sh` from the sibling orchestration repository. Manual
+browser-console validation at `https://app.budgetanalyzer.localhost/_prod-smoke/` remains required
+as the stronger runtime CSP proof; neither static scan replaces it.
 
 ### Container Releases
 

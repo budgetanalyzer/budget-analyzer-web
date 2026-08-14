@@ -20,7 +20,14 @@ Using **Shadcn/UI** for components:
 - Copy-paste components (no package dependency bloat)
 - Full customization control
 - Tailwind CSS integration
-- Built-in accessibility (Radix primitives)
+- Accessible primitives, either application-owned or selectively Radix-backed
+
+### Browser Support
+
+The supported browser floor is Chrome/Edge 125+, Firefox 147+, and Safari/iOS 26+. This floor is
+required by shared dropdowns, which use the native Popover API and its implicit invoker anchor,
+CSS `anchor()` positioning, and static block/inline position fallbacks. These browser-owned features
+put menus in the top layer without portals, measured coordinates, inline styles, or runtime CSS.
 
 ## Page Responsibilities
 
@@ -61,6 +68,17 @@ The production build is served with a strict Content Security Policy (`style-src
 - **No runtime CSS injection** — libraries that call `document.createElement('style')` are banned
 - **Custom toast system** — `sonner` was replaced with a Radix-based toast (`src/components/ui/Toast.tsx`) because sonner injects `<style>` elements
 - **Column widths** use a static Tailwind class map (`src/utils/columnWidth.ts`) instead of inline style props
+- **Shared dropdowns** use native popovers for top-layer placement and statically emitted Tailwind
+  anchor-positioning utilities, including `position-anchor: auto` to select each popover invoker as
+  its implicit anchor. Programmatic opens pass the trigger as the Popover API `source` so the browser
+  retains that invoker relationship. Runtime portals, measured coordinates, inline styles, and
+  injected stylesheets are prohibited. The required browser floor is documented under Browser
+  Support.
+
+`npm run build:prod-smoke` automatically applies a dropdown-specific static gate to the emitted
+bundle, production source, and package metadata. It detects the known Radix menu and
+`react-remove-scroll` defect signatures; it is not a substitute for strict-CSP browser-console
+validation.
 
 ## Security Model
 
