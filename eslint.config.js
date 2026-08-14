@@ -10,7 +10,7 @@ import importPlugin from 'eslint-plugin-import';
 
 export default [
   {
-    ignores: ['dist', 'build', 'node_modules', 'coverage'],
+    ignores: ['dist', 'build', 'node_modules', 'coverage', '.ai-session-handler'],
   },
 
   js.configs.recommended,
@@ -111,4 +111,3 @@ export default [
     },
   },
 ];
-

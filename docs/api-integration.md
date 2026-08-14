@@ -38,6 +38,22 @@ membership: `dateFrom`, `dateTo`, and `q`. Date filters are applied before the
 local description search so the stats and table rows are derived from the same
 filtered transaction list.
 
+`Find Transfers & Refunds` is a client-side discovery workflow owned by View
+detail. It scans the complete active transaction collection, anchored on each
+credit, and uses transaction-date exchange rates to derive deterministic
+possible refunds and transfers. Canonical, unfiltered saved-view membership is
+the exclusion boundary: a debit or credit outside the view may remain visible
+as `Not currently in this view` evidence, but only current members receive
+independent exclusion controls. Temporary View table filters do not narrow the
+evidence pool or change exclusion eligibility.
+
+Confirming the review sends the unique selected debit and credit IDs through
+the existing bulk exclusion endpoint. The server persists only those saved-view
+exclusions; it does not receive or store candidates, relationship metadata, or
+review state. Exclusions remain reversible through the existing Restore
+Excluded workflow. No recommendation or relationship API is involved, and this
+discovery is unrelated to transaction import duplicate review.
+
 Analytics URLs carry an explicit source scope. Missing `scope` still means all
 transactions for backward compatibility, while scoped saved-view analytics use
 `scope=view&viewId=<id>`. Saved-view analytics resolves data through the same

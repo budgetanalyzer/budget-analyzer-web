@@ -3,12 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewPage } from '@/features/views/pages/ViewPage';
+import { Transaction } from '@/types/transaction';
 import { SavedView, ViewTransaction } from '@/types/view';
 import { renderWithProviders } from '@/testing/test-utils';
 
 const hookMocks = vi.hoisted(() => ({
   useView: vi.fn(),
   useViewTransactions: vi.fn(),
+  useTransactions: vi.fn(),
+  useExchangeRatesMap: vi.fn(),
 }));
 
 const mutationMocks = vi.hoisted(() => ({
@@ -41,12 +44,12 @@ vi.mock('@/hooks/useViews', async (importOriginal) => {
   };
 });
 
+vi.mock('@/hooks/useTransactions', () => ({
+  useTransactions: hookMocks.useTransactions,
+}));
+
 vi.mock('@/hooks/useCurrencies', () => ({
-  useExchangeRatesMap: () => ({
-    exchangeRatesMap: new Map(),
-    pendingCurrencies: [],
-    isLoading: false,
-  }),
+  useExchangeRatesMap: hookMocks.useExchangeRatesMap,
 }));
 
 vi.mock('@/hooks/useMissingCurrencies', () => ({
@@ -116,14 +119,41 @@ function queryResult<T>(data: T) {
   };
 }
 
+function transaction(overrides: Partial<Transaction>): Transaction {
+  return {
+    id: 10,
+    accountId: 'checking',
+    bankName: 'Alpha Bank',
+    date: '2026-03-01',
+    currencyIsoCode: 'USD',
+    amount: -100,
+    type: 'DEBIT',
+    description: 'Outgoing transfer',
+    createdAt: '2026-03-01T00:00:00Z',
+    updatedAt: '2026-03-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function viewTransaction(
+  overrides: Partial<Transaction>,
+  membershipType: ViewTransaction['membershipType'] = 'MATCHED',
+): ViewTransaction {
+  return { ...transaction(overrides), membershipType };
+}
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderPage(initialEntry = '/views/view-1', viewOverride: Partial<SavedView> = {}) {
+function renderPage(
+  initialEntry = '/views/view-1',
+  viewOverride: Partial<SavedView> = {},
+  viewTransactionsOverride: ViewTransaction[] = transactions,
+) {
   hookMocks.useView.mockReturnValue(queryResult({ ...view, ...viewOverride }));
-  hookMocks.useViewTransactions.mockReturnValue(queryResult(transactions));
+  hookMocks.useViewTransactions.mockReturnValue(queryResult(viewTransactionsOverride));
 
   return renderWithProviders(
     <Routes>
@@ -145,6 +175,15 @@ function renderPage(initialEntry = '/views/view-1', viewOverride: Partial<SavedV
 
 beforeEach(() => {
   Object.values(mutationMocks).forEach((mock) => mock.mockReset());
+  hookMocks.useTransactions.mockReset();
+  hookMocks.useExchangeRatesMap.mockReset();
+  hookMocks.useTransactions.mockReturnValue(queryResult(transactions));
+  hookMocks.useExchangeRatesMap.mockReturnValue({
+    exchangeRatesMap: new Map(),
+    pendingCurrencies: [],
+    isLoading: false,
+    error: null,
+  });
 });
 
 describe('ViewPage analytics entry point', () => {
@@ -275,5 +314,137 @@ describe('ViewPage temporary transaction filters', () => {
         '/views/view-1?bankName=Alpha%20Bank&accountId=savings&type=CREDIT&minAmount=150&maxAmount=250',
       );
     });
+  });
+});
+
+describe('ViewPage transfer and refund discovery', () => {
+  it('opens and closes the review dialog from the saved-view header', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(hookMocks.useTransactions).toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
+
+    expect(
+      screen.getByRole('heading', { name: 'Review possible transfers and refunds' }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(
+      screen.queryByRole('heading', { name: 'Review possible transfers and refunds' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps active exchange-rate loading local to the review dialog', async () => {
+    hookMocks.useExchangeRatesMap.mockReturnValue({
+      exchangeRatesMap: new Map(),
+      pendingCurrencies: [],
+      isLoading: true,
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(screen.getByRole('link', { name: 'Analyze View' })).toBeInTheDocument();
+    expect(screen.getByText('Pinned grocery')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
+
+    expect(screen.getByText('Finding possible transfers and refunds...')).toBeInTheDocument();
+  });
+
+  it('isolates discovery errors and retries the full transaction and exchange-rate queries', async () => {
+    const refetchAllTransactions = vi.fn();
+    hookMocks.useTransactions.mockReturnValue({
+      data: transactions,
+      isLoading: false,
+      error: null,
+      refetch: refetchAllTransactions,
+    });
+    hookMocks.useExchangeRatesMap.mockReturnValue({
+      exchangeRatesMap: new Map(),
+      pendingCurrencies: [],
+      isLoading: false,
+      error: new Error('Exchange-rate discovery failed'),
+    });
+    const user = userEvent.setup();
+    const { queryClient } = renderPage();
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+
+    expect(screen.getByText('Pinned grocery')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Analyze View' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
+
+    expect(screen.getByText('Exchange-rate discovery failed')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(refetchAllTransactions).toHaveBeenCalledOnce();
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['exchangeRates'] });
+  });
+
+  it('uses an outside-view credit as evidence for an in-view debit', async () => {
+    const debit = viewTransaction({ id: 10 });
+    const outsideCredit = transaction({
+      id: 11,
+      accountId: 'savings',
+      bankName: 'Beta Bank',
+      date: '2026-03-02',
+      amount: 100,
+      type: 'CREDIT',
+      description: 'Incoming transfer',
+    });
+    hookMocks.useTransactions.mockReturnValue(queryResult([debit, outsideCredit]));
+    const user = userEvent.setup();
+    renderPage('/views/view-1', {}, [debit]);
+
+    await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
+
+    expect(screen.getByRole('heading', { name: 'Possible transfer' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Exclude debit transaction 10 from this view',
+      }),
+    ).toBeChecked();
+    expect(
+      screen.queryByRole('checkbox', {
+        name: 'Exclude credit transaction 11 from this view',
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Not currently in this view')).toBeInTheDocument();
+  });
+
+  it('keeps both canonical sides selectable when a URL filter hides one table row', async () => {
+    const debit = viewTransaction({ id: 10 });
+    const credit = viewTransaction({
+      id: 11,
+      accountId: 'savings',
+      bankName: 'Beta Bank',
+      date: '2026-03-02',
+      amount: 100,
+      type: 'CREDIT',
+      description: 'Incoming transfer',
+    });
+    hookMocks.useTransactions.mockReturnValue(queryResult([debit, credit]));
+    const user = userEvent.setup();
+    renderPage('/views/view-1?q=outgoing', {}, [debit, credit]);
+
+    expect(screen.getByText('Outgoing transfer')).toBeInTheDocument();
+    expect(screen.queryByText('Incoming transfer')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
+
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Exclude debit transaction 10 from this view',
+      }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Exclude credit transaction 11 from this view',
+      }),
+    ).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Exclude 2 from this view' })).toBeEnabled();
   });
 });

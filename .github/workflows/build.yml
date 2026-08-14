@@ -33,6 +33,9 @@ jobs:
       - name: Coverage gate
         run: npm run test:coverage
 
+      - name: CSP production smoke gate
+        run: npm run build:prod-smoke
+
       - name: Build
         run: npm run build:bundle
 

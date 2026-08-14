@@ -100,11 +100,13 @@ build exits non-zero if global coverage drops below `80%` statements, `80%`
 branches, `75%` functions, or `80%` lines. Use `npm run build:bundle` only
 when coverage has already been checked in the same flow.
 
-The `build:prod-smoke` build is used by orchestration to verify production CSP and browser security
-on the live origin. It automatically runs `check:csp:dropdown` after bundling, so known Radix menu,
-`react-remove-scroll`, runtime stylesheet-injection, source-import, and package-metadata blockers
-fail the build. The standalone check requires an existing `dist/` and does not rebuild it. Auth and
-API paths remain root-relative regardless of which build is used.
+The `build:prod-smoke` build runs in the repository GitHub Actions workflow and is also used by
+orchestration to verify production CSP and browser security on the live origin. It automatically
+runs `check:csp:dropdown` after bundling, so known Radix menu, `react-remove-scroll`, runtime
+stylesheet-injection, source-import, and package-metadata blockers fail the build. CI runs the
+standard bundle afterward so its uploaded `dist/` artifact remains rooted at `/`, not
+`/_prod-smoke/`. The standalone check requires an existing `dist/` and does not rebuild it. Auth
+and API paths remain root-relative regardless of which build is used.
 
 This gate is deliberately dropdown-specific. For the coordinated static verifier, run
 `./scripts/smoketest/audit-frontend-csp.sh` from the sibling orchestration repository. Manual

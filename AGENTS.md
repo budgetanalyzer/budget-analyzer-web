@@ -456,6 +456,9 @@ Required (see `.env.example`):
 
 **Style**: ESLint 9 (flat config) + Prettier (see config files)
 
+ESLint excludes runner-owned `.ai-session-handler/` artifacts; validate application and repository
+source with the package lint scripts rather than linting session diagnostics.
+
 **Key files**: `src/types/transaction.ts`, `src/types/apiError.ts`, `src/App.tsx` (routes)
 
 ## Discovery Commands
@@ -491,6 +494,11 @@ This application is served behind a strict Content Security Policy: `style-src '
 - Any mechanism that creates inline styles or dynamic style elements
 
 **Use Tailwind classes for all styling.** If a dynamic width/size is needed, add an entry to `src/utils/columnWidth.ts` (static Tailwind class map) rather than using inline style props.
+
+**Body scroll locking:** Acquire locks through `acquireBodyScrollLock()` from
+`src/utils/bodyScrollLock.ts` inside external-system effects. The shared utility
+reference-counts overlapping overlays and toggles the static `overflow-hidden`
+class without creating a DOM `style` attribute.
 
 **Toast notifications:** Use the custom `@/hooks/useToast` hook and `@/components/ui/Toast.tsx` (Radix-based). Do NOT use `sonner` — it was removed because it unconditionally injects `<style>` elements on import, violating strict CSP. There is no opt-out in sonner.
 

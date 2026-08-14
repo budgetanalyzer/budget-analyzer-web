@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { cn } from '@/utils/cn';
 import { X } from 'lucide-react';
+import { acquireBodyScrollLock } from '@/utils/bodyScrollLock';
 
 interface DialogProps {
   open?: boolean;
@@ -37,15 +38,9 @@ export function Dialog({ open: controlledOpen, onOpenChange, children }: DialogP
   };
 
   React.useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    if (!open) return;
 
-    return () => {
-      document.body.style.overflow = '';
-    };
+    return acquireBodyScrollLock();
   }, [open]);
 
   return <DialogContext.Provider value={{ open, setOpen }}>{children}</DialogContext.Provider>;

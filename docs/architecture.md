@@ -12,7 +12,11 @@
 This separation keeps server concerns (caching, refetching, optimistic updates) out of the global store.
 Redux intentionally does not store transaction filters, table sorting,
 pagination, selected transaction IDs, navigation history, analytics source, or
-saved-view selection.
+saved-view selection. View detail also keeps transfer/refund review selection
+and dialog state local. Raw active transactions and exchange rates remain
+React Query server state and feed a deterministic client-side candidate
+projection; candidates are not cached as a separate server or browser state.
+Only IDs the user confirms for exclusion become saved-view server state.
 
 ## Component Strategy
 
@@ -37,7 +41,7 @@ Transactions, saved views, and analytics are separate task surfaces:
 |------|----------------|
 | Transactions (`/`) | All-transaction management and filtering |
 | Views (`/views`) | Saved-view directory and entry point to view detail or view-scoped analytics |
-| View detail (`/views/:id`) | Saved-view membership management, including pinned and excluded rows |
+| View detail (`/views/:id`) | Saved-view membership management, including pinned and excluded rows, plus client-side transfer/refund review |
 | Analytics (`/analytics`) | Spending analysis for either all transactions or one saved view |
 
 Transaction filters are URL-backed so filtered lists remain refreshable and
@@ -60,6 +64,15 @@ Those drilldowns carry `dateFrom`, `dateTo`, `type`, `returnTo`, and
 `breadcrumbLabel` URL parameters so the operational page is filtered to the
 clicked analytics period and can return to the same analytics state.
 
+View detail derives possible transfers and refunds from the complete raw active
+transaction collection and transaction-date exchange rates. Canonical,
+unfiltered saved-view membership determines which candidate sides can be
+excluded; a transaction outside that membership may still appear as supporting
+evidence. Temporary table filters affect only the displayed table and stats.
+The review is a local UI projection until the user confirms selected IDs through
+the existing bulk exclusion mutation, after which normal query invalidation
+refreshes membership, counts, analytics, and the existing restore path.
+
 ## CSP Compliance
 
 The production build is served with a strict Content Security Policy (`style-src 'self'` — no `unsafe-inline`):
@@ -68,6 +81,9 @@ The production build is served with a strict Content Security Policy (`style-src
 - **No runtime CSS injection** — libraries that call `document.createElement('style')` are banned
 - **Custom toast system** — `sonner` was replaced with a Radix-based toast (`src/components/ui/Toast.tsx`) because sonner injects `<style>` elements
 - **Column widths** use a static Tailwind class map (`src/utils/columnWidth.ts`) instead of inline style props
+- **Body scroll locking** for dialogs and mobile overlays uses the shared, reference-counted
+  `acquireBodyScrollLock()` utility. It toggles the statically emitted `overflow-hidden` class and
+  never writes `document.body.style`, so overlapping locks remain correct without inline CSS.
 - **Shared dropdowns** use native popovers for top-layer placement and statically emitted Tailwind
   anchor-positioning utilities, including `position-anchor: auto` to select each popover invoker as
   its implicit anchor. Programmatic opens pass the trigger as the Popover API `source` so the browser

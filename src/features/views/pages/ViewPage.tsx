@@ -3,8 +3,9 @@ import { useMemo, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, LayoutGroup, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Hash, Pin, Calendar, Eye, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Hash, Pin, Calendar, Eye, BarChart3, Search } from 'lucide-react';
 import { useView, useViewTransactions } from '@/hooks/useViews';
+import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
 import { useAppSelector } from '@/store/hooks';
@@ -21,6 +22,7 @@ import { ViewSettingsMenu } from '@/features/views/components/ViewSettingsMenu';
 import { EditViewModal } from '@/features/views/components/EditViewModal';
 import { DeleteViewModal } from '@/features/views/components/DeleteViewModal';
 import { RestoreExcludedTransactionsModal } from '@/features/views/components/RestoreExcludedTransactionsModal';
+import { TransferRefundReviewDialog } from '@/features/views/components/TransferRefundReviewDialog';
 import { useTransactionFiltersSync } from '@/hooks/useTransactionFiltersSync';
 import { TransactionStatsGrid } from '@/features/transactions/components/TransactionStatsGrid';
 import { StatCardConfig } from '@/features/transactions/components/TransactionStatsGrid';
@@ -29,6 +31,7 @@ import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate, getDateRange } from '@/utils/dates';
 import { filterTransactions } from '@/utils/transactionFilters';
 import { buildAnalyticsReturnUrl } from '@/features/analytics/utils/urlState';
+import { findTransferRefundCandidates } from '@/features/views/utils/findTransferRefundCandidates';
 
 export function ViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -44,13 +47,19 @@ function ViewPageContent({ id }: { id: string }) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [isTransferRefundReviewOpen, setIsTransferRefundReviewOpen] = useState(false);
 
   const handleEditClick = useCallback(() => setIsEditModalOpen(true), []);
   const handleDeleteClick = useCallback(() => setIsDeleteModalOpen(true), []);
   const handleRestoreClick = useCallback(() => setIsRestoreModalOpen(true), []);
+  const handleTransferRefundReviewOpen = useCallback(() => setIsTransferRefundReviewOpen(true), []);
   const handleEditClose = useCallback(() => setIsEditModalOpen(false), []);
   const handleDeleteClose = useCallback(() => setIsDeleteModalOpen(false), []);
   const handleRestoreClose = useCallback(() => setIsRestoreModalOpen(false), []);
+  const handleTransferRefundReviewClose = useCallback(
+    () => setIsTransferRefundReviewOpen(false),
+    [],
+  );
 
   const {
     filters,
@@ -83,6 +92,13 @@ function ViewPageContent({ id }: { id: string }) {
     refetch: refetchTransactions,
   } = useViewTransactions(id);
 
+  const {
+    data: allTransactions,
+    isLoading: isAllTransactionsLoading,
+    error: allTransactionsError,
+    refetch: refetchAllTransactions,
+  } = useTransactions();
+
   const handleRetry = useCallback(() => {
     refetchView();
     refetchTransactions();
@@ -93,9 +109,23 @@ function ViewPageContent({ id }: { id: string }) {
     exchangeRatesMap,
     pendingCurrencies,
     isLoading: isExchangeRatesLoading,
+    error: exchangeRatesError,
   } = useExchangeRatesMap({
     displayCurrency,
   });
+
+  const transferRefundCandidates = useMemo(
+    () => findTransferRefundCandidates(allTransactions ?? [], transactions ?? [], exchangeRatesMap),
+    [allTransactions, exchangeRatesMap, transactions],
+  );
+
+  const handleTransferRefundDiscoveryRetry = useCallback(() => {
+    refetchAllTransactions();
+    queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
+  }, [queryClient, refetchAllTransactions]);
+
+  const isTransferRefundDiscoveryLoading = isAllTransactionsLoading || isExchangeRatesLoading;
+  const transferRefundDiscoveryError = allTransactionsError || exchangeRatesError || null;
 
   const disabledCurrencies = useMissingCurrencies();
 
@@ -225,7 +255,11 @@ function ViewPageContent({ id }: { id: string }) {
         title={view.name}
         description={`${transactions.length} transactions`}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={handleTransferRefundReviewOpen}>
+              <Search className="mr-2 h-4 w-4" />
+              Find Transfers &amp; Refunds
+            </Button>
             <Link
               to={analyzeViewUrl}
               className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -327,6 +361,19 @@ function ViewPageContent({ id }: { id: string }) {
           open={isRestoreModalOpen}
           onClose={handleRestoreClose}
           view={view}
+        />
+      )}
+
+      {isTransferRefundReviewOpen && (
+        <TransferRefundReviewDialog
+          viewId={view.id}
+          viewName={view.name}
+          candidates={transferRefundCandidates}
+          isLoading={isTransferRefundDiscoveryLoading}
+          error={transferRefundDiscoveryError}
+          onRetry={handleTransferRefundDiscoveryRetry}
+          onClose={handleTransferRefundReviewClose}
+          onComplete={handleTransferRefundReviewClose}
         />
       )}
     </div>
