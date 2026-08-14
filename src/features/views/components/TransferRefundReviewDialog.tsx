@@ -60,6 +60,7 @@ export function TransferRefundReviewDialog({
     [deselectedIds, eligibleIds],
   );
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const canConfirm = selectedIds.length > 0 && !isPending && !isLoading && !error;
 
   const handleSelectionChange = useCallback((transactionId: number, selected: boolean) => {
     setDeselectedIds((currentIds) => {
@@ -93,7 +94,7 @@ export function TransferRefundReviewDialog({
   }, [onRetry]);
 
   const handleConfirm = useCallback(() => {
-    if (selectedIds.length === 0 || isPending) return;
+    if (selectedIds.length === 0 || isPending || isLoading || error) return;
 
     bulkExclude(
       { viewId, ids: selectedIds },
@@ -122,7 +123,7 @@ export function TransferRefundReviewDialog({
         },
       },
     );
-  }, [bulkExclude, isPending, onClose, onComplete, selectedIds, viewId]);
+  }, [bulkExclude, error, isLoading, isPending, onClose, onComplete, selectedIds, viewId]);
 
   return (
     <Dialog open onOpenChange={handleOpenChange}>
@@ -168,11 +169,7 @@ export function TransferRefundReviewDialog({
           <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={handleConfirm}
-            disabled={isPending || selectedIds.length === 0}
-          >
+          <Button type="button" onClick={handleConfirm} disabled={!canConfirm}>
             {isPending ? 'Excluding...' : `Exclude ${selectedIds.length} from this view`}
           </Button>
         </DialogFooter>

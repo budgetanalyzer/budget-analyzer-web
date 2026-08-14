@@ -14,6 +14,10 @@ const hookMocks = vi.hoisted(() => ({
   useExchangeRatesMap: vi.fn(),
 }));
 
+const discoveryMocks = vi.hoisted(() => ({
+  findTransferRefundCandidates: vi.fn(),
+}));
+
 const mutationMocks = vi.hoisted(() => ({
   updateView: vi.fn(),
   pin: vi.fn(),
@@ -55,6 +59,21 @@ vi.mock('@/hooks/useCurrencies', () => ({
 vi.mock('@/hooks/useMissingCurrencies', () => ({
   useMissingCurrencies: () => [],
 }));
+
+vi.mock('@/features/views/utils/findTransferRefundCandidates', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/features/views/utils/findTransferRefundCandidates')>();
+
+  return {
+    ...actual,
+    findTransferRefundCandidates: (
+      ...args: Parameters<typeof actual.findTransferRefundCandidates>
+    ) => {
+      discoveryMocks.findTransferRefundCandidates(...args);
+      return actual.findTransferRefundCandidates(...args);
+    },
+  };
+});
 
 const view: SavedView = {
   id: 'view-1',
@@ -147,15 +166,8 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderPage(
-  initialEntry = '/views/view-1',
-  viewOverride: Partial<SavedView> = {},
-  viewTransactionsOverride: ViewTransaction[] = transactions,
-) {
-  hookMocks.useView.mockReturnValue(queryResult({ ...view, ...viewOverride }));
-  hookMocks.useViewTransactions.mockReturnValue(queryResult(viewTransactionsOverride));
-
-  return renderWithProviders(
+function ViewPageTestRoutes() {
+  return (
     <Routes>
       <Route
         path="/views/:id"
@@ -168,13 +180,24 @@ function renderPage(
       />
       <Route path="/analytics" element={<LocationProbe />} />
       <Route path="/transactions/:id" element={<LocationProbe />} />
-    </Routes>,
-    { initialEntries: [initialEntry] },
+    </Routes>
   );
+}
+
+function renderPage(
+  initialEntry = '/views/view-1',
+  viewOverride: Partial<SavedView> = {},
+  viewTransactionsOverride: ViewTransaction[] = transactions,
+) {
+  hookMocks.useView.mockReturnValue(queryResult({ ...view, ...viewOverride }));
+  hookMocks.useViewTransactions.mockReturnValue(queryResult(viewTransactionsOverride));
+
+  return renderWithProviders(<ViewPageTestRoutes />, { initialEntries: [initialEntry] });
 }
 
 beforeEach(() => {
   Object.values(mutationMocks).forEach((mock) => mock.mockReset());
+  discoveryMocks.findTransferRefundCandidates.mockReset();
   hookMocks.useTransactions.mockReset();
   hookMocks.useExchangeRatesMap.mockReset();
   hookMocks.useTransactions.mockReturnValue(queryResult(transactions));
@@ -318,25 +341,33 @@ describe('ViewPage temporary transaction filters', () => {
 });
 
 describe('ViewPage transfer and refund discovery', () => {
-  it('opens and closes the review dialog from the saved-view header', async () => {
+  it('discovers only while the ready review is open', async () => {
     const user = userEvent.setup();
     renderPage();
 
     expect(hookMocks.useTransactions).toHaveBeenCalled();
+    expect(discoveryMocks.findTransferRefundCandidates).not.toHaveBeenCalled();
+
     await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
 
     expect(
       screen.getByRole('heading', { name: 'Review possible transfers and refunds' }),
     ).toBeInTheDocument();
+    expect(discoveryMocks.findTransferRefundCandidates).toHaveBeenCalledOnce();
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(
       screen.queryByRole('heading', { name: 'Review possible transfers and refunds' }),
     ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filter by transaction type' }));
+    await user.click(screen.getByRole('button', { name: 'Credit' }));
+
+    expect(discoveryMocks.findTransferRefundCandidates).toHaveBeenCalledOnce();
   });
 
-  it('keeps active exchange-rate loading local to the review dialog', async () => {
+  it('waits for loading discovery inputs to become ready before scanning', async () => {
     hookMocks.useExchangeRatesMap.mockReturnValue({
       exchangeRatesMap: new Map(),
       pendingCurrencies: [],
@@ -344,14 +375,26 @@ describe('ViewPage transfer and refund discovery', () => {
       error: null,
     });
     const user = userEvent.setup();
-    renderPage();
+    const { rerender } = renderPage();
 
     expect(screen.getByRole('link', { name: 'Analyze View' })).toBeInTheDocument();
     expect(screen.getByText('Pinned grocery')).toBeInTheDocument();
+    expect(discoveryMocks.findTransferRefundCandidates).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
 
     expect(screen.getByText('Finding possible transfers and refunds...')).toBeInTheDocument();
+    expect(discoveryMocks.findTransferRefundCandidates).not.toHaveBeenCalled();
+
+    hookMocks.useExchangeRatesMap.mockReturnValue({
+      exchangeRatesMap: new Map(),
+      pendingCurrencies: [],
+      isLoading: false,
+      error: null,
+    });
+    rerender(<ViewPageTestRoutes />);
+
+    expect(discoveryMocks.findTransferRefundCandidates).toHaveBeenCalledOnce();
   });
 
   it('isolates discovery errors and retries the full transaction and exchange-rate queries', async () => {
@@ -369,19 +412,31 @@ describe('ViewPage transfer and refund discovery', () => {
       error: new Error('Exchange-rate discovery failed'),
     });
     const user = userEvent.setup();
-    const { queryClient } = renderPage();
+    const { queryClient, rerender } = renderPage();
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
     expect(screen.getByText('Pinned grocery')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Analyze View' })).toBeInTheDocument();
+    expect(discoveryMocks.findTransferRefundCandidates).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
 
     expect(screen.getByText('Exchange-rate discovery failed')).toBeInTheDocument();
+    expect(discoveryMocks.findTransferRefundCandidates).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(refetchAllTransactions).toHaveBeenCalledOnce();
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['exchangeRates'] });
+
+    hookMocks.useExchangeRatesMap.mockReturnValue({
+      exchangeRatesMap: new Map(),
+      pendingCurrencies: [],
+      isLoading: false,
+      error: null,
+    });
+    rerender(<ViewPageTestRoutes />);
+
+    expect(discoveryMocks.findTransferRefundCandidates).toHaveBeenCalledOnce();
   });
 
   it('uses an outside-view credit as evidence for an in-view debit', async () => {

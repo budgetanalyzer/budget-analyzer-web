@@ -114,18 +114,36 @@ function ViewPageContent({ id }: { id: string }) {
     displayCurrency,
   });
 
-  const transferRefundCandidates = useMemo(
-    () => findTransferRefundCandidates(allTransactions ?? [], transactions ?? [], exchangeRatesMap),
-    [allTransactions, exchangeRatesMap, transactions],
-  );
+  const isTransferRefundDiscoveryLoading = isAllTransactionsLoading || isExchangeRatesLoading;
+  const transferRefundDiscoveryError = allTransactionsError || exchangeRatesError || null;
+
+  const transferRefundCandidates = useMemo(() => {
+    if (
+      !isTransferRefundReviewOpen ||
+      isTransferRefundDiscoveryLoading ||
+      transferRefundDiscoveryError
+    ) {
+      return [];
+    }
+
+    return findTransferRefundCandidates(
+      allTransactions ?? [],
+      transactions ?? [],
+      exchangeRatesMap,
+    );
+  }, [
+    allTransactions,
+    exchangeRatesMap,
+    isTransferRefundDiscoveryLoading,
+    isTransferRefundReviewOpen,
+    transactions,
+    transferRefundDiscoveryError,
+  ]);
 
   const handleTransferRefundDiscoveryRetry = useCallback(() => {
     refetchAllTransactions();
     queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
   }, [queryClient, refetchAllTransactions]);
-
-  const isTransferRefundDiscoveryLoading = isAllTransactionsLoading || isExchangeRatesLoading;
-  const transferRefundDiscoveryError = allTransactionsError || exchangeRatesError || null;
 
   const disabledCurrencies = useMissingCurrencies();
 

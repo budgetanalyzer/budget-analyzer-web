@@ -15,8 +15,11 @@ pagination, selected transaction IDs, navigation history, analytics source, or
 saved-view selection. View detail also keeps transfer/refund review selection
 and dialog state local. Raw active transactions and exchange rates remain
 React Query server state and feed a deterministic client-side candidate
-projection; candidates are not cached as a separate server or browser state.
-Only IDs the user confirms for exclusion become saved-view server state.
+projection. The quadratic projection is derived on-demand only while the
+review dialog is open and its discovery inputs are ready, so ordinary
+saved-view navigation does not perform pair discovery. Candidates are not
+cached as a separate server or browser state. Only IDs the user confirms for
+exclusion become saved-view server state.
 
 ## Component Strategy
 

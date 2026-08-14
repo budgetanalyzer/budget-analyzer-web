@@ -56,8 +56,6 @@ const refundCandidate: TransferRefundCandidate = {
     updatedAt: '2026-01-05T00:00:00Z',
   },
   absoluteDayDistance: 2,
-  normalizedDebitAmountUsdCents: 9700,
-  normalizedCreditAmountUsdCents: 9646,
   amountDifferenceBasisPoints: 56,
   sharedDescriptionTokens: ['acme', 'market'],
   eligibleExclusionTransactionIds: [101, 101, 102],
@@ -91,8 +89,6 @@ const transferCandidate: TransferRefundCandidate = {
     updatedAt: '2026-02-11T00:00:00Z',
   },
   absoluteDayDistance: 1,
-  normalizedDebitAmountUsdCents: 25000,
-  normalizedCreditAmountUsdCents: 24930,
   amountDifferenceBasisPoints: 28,
   sharedDescriptionTokens: ['transfer'],
   eligibleExclusionTransactionIds: [201],
@@ -245,6 +241,21 @@ describe('TransferRefundReviewDialog', () => {
     expect(screen.getByRole('button', { name: 'Exclude 0 from this view' })).toBeDisabled();
   });
 
+  it('hides stale candidates and blocks confirmation while discovery is loading', async () => {
+    const user = userEvent.setup();
+    renderDialog({ isLoading: true });
+
+    expect(screen.getByText('Finding possible transfers and refunds...')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Possible refund' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Possible transfer' })).not.toBeInTheDocument();
+
+    const confirmButton = screen.getByRole('button', { name: 'Exclude 3 from this view' });
+    expect(confirmButton).toBeDisabled();
+    await user.click(confirmButton);
+
+    expect(hookMocks.bulkExclude).not.toHaveBeenCalled();
+  });
+
   it('explains the empty state without classifying credits', () => {
     renderDialog({ candidates: [] });
 
@@ -264,6 +275,21 @@ describe('TransferRefundReviewDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('hides stale candidates and blocks confirmation after discovery fails', async () => {
+    const user = userEvent.setup();
+    renderDialog({ error: new Error('Discovery failed') });
+
+    expect(screen.getByText('Discovery failed')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Possible refund' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Possible transfer' })).not.toBeInTheDocument();
+
+    const confirmButton = screen.getByRole('button', { name: 'Exclude 3 from this view' });
+    expect(confirmButton).toBeDisabled();
+    await user.click(confirmButton);
+
+    expect(hookMocks.bulkExclude).not.toHaveBeenCalled();
   });
 
   it('prevents every available dismissal while exclusion is pending', async () => {

@@ -44,19 +44,21 @@ function discover(
 }
 
 describe('findTransferRefundCandidates', () => {
-  it('finds a same-account refund and exposes normalized explanatory metrics', () => {
+  it('finds an exact non-USD refund without a rate using deterministic case normalization', () => {
     const debit = createTransaction(1, 'DEBIT', {
-      bankName: ' Example Bank ',
-      accountId: ' CHECKING ',
+      bankName: ' WISE ',
+      accountId: ' EUR-CHECKING ',
+      currencyIsoCode: 'eur',
       amount: -100,
-      description: 'CARD PURCHASE CAFE\u0301 #1234',
+      description: 'WISE CARD PURCHASE CAFE\u0301 #1234',
     });
     const credit = createTransaction(2, 'CREDIT', {
-      bankName: 'example bank',
-      accountId: 'checking',
+      bankName: 'Wise',
+      accountId: 'eur-checking',
       date: '2026-01-04',
-      amount: 98,
-      description: 'Posted refund Café 1234',
+      currencyIsoCode: 'EUR',
+      amount: 100,
+      description: 'Posted refund Wise Café 1234',
     });
 
     expect(discover([credit, debit])).toEqual([
@@ -66,25 +68,25 @@ describe('findTransferRefundCandidates', () => {
         debit,
         credit,
         absoluteDayDistance: 3,
-        normalizedDebitAmountUsdCents: 10_000,
-        normalizedCreditAmountUsdCents: 9_800,
-        amountDifferenceBasisPoints: 200,
-        sharedDescriptionTokens: ['1234', 'café'],
+        amountDifferenceBasisPoints: 0,
+        sharedDescriptionTokens: ['1234', 'café', 'wise'],
         eligibleExclusionTransactionIds: [1, 2],
       }),
     ]);
   });
 
-  it('finds transfers between known-different banks without requiring description evidence', () => {
+  it('finds an exact non-USD transfer without a rate or description evidence', () => {
     const debit = createTransaction(1, 'DEBIT', {
       bankName: 'Bank One',
       accountId: 'shared-id',
+      currencyIsoCode: 'EUR',
       description: 'Monthly sweep outgoing',
     });
     const credit = createTransaction(2, 'CREDIT', {
       bankName: 'Bank Two',
       accountId: 'shared-id',
       date: '2026-01-02',
+      currencyIsoCode: 'eur',
       description: 'Deposit received',
     });
 
@@ -94,6 +96,39 @@ describe('findTransferRefundCandidates', () => {
         sharedDescriptionTokens: [],
       }),
     ]);
+  });
+
+  it('compares equal same-currency amounts directly when rates differ by transaction date', () => {
+    const debit = createTransaction(1, 'DEBIT', {
+      currencyIsoCode: 'EUR',
+      amount: -100,
+      description: 'Merchant purchase',
+    });
+    const credit = createTransaction(2, 'CREDIT', {
+      date: '2026-01-02',
+      currencyIsoCode: 'EUR',
+      amount: 100,
+      description: 'Merchant refund',
+    });
+    const rates = buildExchangeRateMap([
+      {
+        baseCurrency: 'USD',
+        targetCurrency: 'EUR',
+        date: '2026-01-01',
+        rate: 2,
+      },
+      {
+        baseCurrency: 'USD',
+        targetCurrency: 'EUR',
+        date: '2026-01-02',
+        rate: 4,
+      },
+    ]);
+
+    expect(discover([debit, credit], [debit, credit], rates)[0]).toMatchObject({
+      kind: 'REFUND',
+      amountDifferenceBasisPoints: 0,
+    });
   });
 
   it('treats unequal account IDs at the same bank as a transfer relationship', () => {
@@ -143,8 +178,7 @@ describe('findTransferRefundCandidates', () => {
 
     expect(discover([debit, credit], [debit, credit], rates)[0]).toMatchObject({
       kind: 'TRANSFER',
-      normalizedDebitAmountUsdCents: 5_000,
-      normalizedCreditAmountUsdCents: 5_000,
+      amountDifferenceBasisPoints: 0,
       sharedDescriptionTokens: ['wise'],
     });
   });
@@ -156,10 +190,7 @@ describe('findTransferRefundCandidates', () => {
       date: '2026-01-02',
     });
 
-    expect(discover([debit, credit])[0]).toMatchObject({
-      normalizedDebitAmountUsdCents: 7_500,
-      normalizedCreditAmountUsdCents: 7_500,
-    });
+    expect(discover([debit, credit])[0]).toMatchObject({ amountDifferenceBasisPoints: 0 });
   });
 
   it('includes exact refund amount and date boundaries and rejects values beyond them', () => {
@@ -182,14 +213,16 @@ describe('findTransferRefundCandidates', () => {
     expect(discover([debit, beyondAmount], [beyondAmount])).toEqual([]);
   });
 
-  it('uses the inclusive USD 1 refund floor for smaller values', () => {
-    const debit = createTransaction(1, 'DEBIT', { amount: 10 });
+  it('uses the inclusive one-unit refund floor in the same comparison currency', () => {
+    const debit = createTransaction(1, 'DEBIT', { currencyIsoCode: 'EUR', amount: 10 });
     const exactBoundary = createTransaction(2, 'CREDIT', {
       date: '2026-01-02',
+      currencyIsoCode: 'EUR',
       amount: 9,
     });
     const beyondBoundary = createTransaction(3, 'CREDIT', {
       date: '2026-01-02',
+      currencyIsoCode: 'EUR',
       amount: 8.99,
     });
 
@@ -223,16 +256,22 @@ describe('findTransferRefundCandidates', () => {
     expect(discover([debit, beyondAmount])).toEqual([]);
   });
 
-  it('uses the inclusive USD 5 transfer floor for smaller values', () => {
-    const debit = createTransaction(1, 'DEBIT', { bankName: 'Bank One', amount: 20 });
+  it('uses the inclusive five-unit transfer floor in the same comparison currency', () => {
+    const debit = createTransaction(1, 'DEBIT', {
+      bankName: 'Bank One',
+      currencyIsoCode: 'EUR',
+      amount: 20,
+    });
     const exactBoundary = createTransaction(2, 'CREDIT', {
       bankName: 'Bank Two',
       date: '2026-01-02',
+      currencyIsoCode: 'EUR',
       amount: 15,
     });
     const beyondBoundary = createTransaction(3, 'CREDIT', {
       bankName: 'Bank Two',
       date: '2026-01-02',
+      currencyIsoCode: 'EUR',
       amount: 14.99,
     });
 
@@ -273,6 +312,16 @@ describe('findTransferRefundCandidates', () => {
   it('rejects zero-value rows even when their descriptions and accounts agree', () => {
     const debit = createTransaction(1, 'DEBIT', { amount: 0 });
     const credit = createTransaction(2, 'CREDIT', { amount: -0, date: '2026-01-02' });
+
+    expect(discover([debit, credit])).toEqual([]);
+  });
+
+  it('rejects rows with blank normalized currency codes', () => {
+    const debit = createTransaction(1, 'DEBIT', { currencyIsoCode: '  ' });
+    const credit = createTransaction(2, 'CREDIT', {
+      currencyIsoCode: '',
+      date: '2026-01-02',
+    });
 
     expect(discover([debit, credit])).toEqual([]);
   });
@@ -355,6 +404,42 @@ describe('findTransferRefundCandidates', () => {
 
     expect(forward.map(({ key }) => key)).toEqual(['REFUND:2:10']);
     expect(reversed.map(({ key }) => key)).toEqual(['REFUND:2:10']);
+  });
+
+  it('ranks competing native and USD edges by unitless amount difference', () => {
+    const debit = createTransaction(1, 'DEBIT', {
+      currencyIsoCode: 'EUR',
+      amount: 100,
+      description: 'Merchant purchase',
+    });
+    const closerNativeCredit = createTransaction(2, 'CREDIT', {
+      date: '2026-01-02',
+      currencyIsoCode: 'EUR',
+      amount: 99,
+      description: 'Merchant refund',
+    });
+    const fartherUsdCredit = createTransaction(3, 'CREDIT', {
+      date: '2026-01-02',
+      currencyIsoCode: 'USD',
+      amount: 49.25,
+      description: 'Merchant refund',
+    });
+    const rates = buildExchangeRateMap([
+      {
+        baseCurrency: 'USD',
+        targetCurrency: 'EUR',
+        date: '2026-01-01',
+        rate: 2,
+      },
+    ]);
+
+    expect(
+      discover(
+        [fartherUsdCredit, closerNativeCredit, debit],
+        [fartherUsdCredit, closerNativeCredit],
+        rates,
+      ).map(({ key }) => key),
+    ).toEqual(['REFUND:1:2']);
   });
 
   it('uses debit then credit ID as the final ambiguity tie-breakers', () => {

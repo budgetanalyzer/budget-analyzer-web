@@ -40,12 +40,15 @@ filtered transaction list.
 
 `Find Transfers & Refunds` is a client-side discovery workflow owned by View
 detail. It scans the complete active transaction collection, anchored on each
-credit, and uses transaction-date exchange rates to derive deterministic
-possible refunds and transfers. Canonical, unfiltered saved-view membership is
-the exclusion boundary: a debit or credit outside the view may remain visible
-as `Not currently in this view` evidence, but only current members receive
-independent exclusion controls. Temporary View table filters do not narrow the
-evidence pool or change exclusion eligibility.
+credit, to derive deterministic possible refunds and transfers. Candidate
+amount comparison follows two paths: same-currency pairs are compared directly
+in their original currency and do not require an exchange rate, while
+cross-currency pairs convert each side using its own transaction-date exchange
+rate. Canonical, unfiltered saved-view membership is the exclusion boundary: a
+debit or credit outside the view may remain visible as `Not currently in this
+view` evidence, but only current members receive independent exclusion
+controls. Temporary View table filters do not narrow the evidence pool or
+change exclusion eligibility.
 
 Confirming the review sends the unique selected debit and credit IDs through
 the existing bulk exclusion endpoint. The server persists only those saved-view

@@ -7,8 +7,6 @@ interface TransferRefundCandidateBase {
   debit: Transaction;
   credit: Transaction;
   absoluteDayDistance: number;
-  normalizedDebitAmountUsdCents: number;
-  normalizedCreditAmountUsdCents: number;
   amountDifferenceBasisPoints: number;
   sharedDescriptionTokens: string[];
   eligibleExclusionTransactionIds: number[];

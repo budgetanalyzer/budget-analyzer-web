@@ -11,31 +11,37 @@ import { compareLocalDates, getDaysBetween } from '@/utils/dates';
 type ExchangeRateMap = Map<string, Map<string, ExchangeRateResponse>>;
 type AccountRelationship = 'SAME' | 'DIFFERENT' | 'AMBIGUOUS';
 
-interface NormalizedTransaction {
+interface PreparedTransaction {
   transaction: Transaction;
-  amountUsdCents: number;
+  currencyCode: string;
+  absoluteAmount: number;
   descriptionTokens: Set<string>;
+}
+
+interface ComparisonAmounts {
+  debitAmountCents: number;
+  creditAmountCents: number;
+  amountDifferenceCents: number;
 }
 
 interface CandidateEdge {
   kind: TransferRefundCandidateKind;
-  debit: NormalizedTransaction;
-  credit: NormalizedTransaction;
+  debit: PreparedTransaction;
+  credit: PreparedTransaction;
   absoluteDayDistance: number;
-  amountDifferenceUsdCents: number;
   amountDifferenceBasisPoints: number;
   sharedDescriptionTokens: string[];
 }
 
-const USD_CENTS_PER_UNIT = 100;
+const CENTS_PER_COMPARISON_UNIT = 100;
 
 const REFUND_MAX_DAYS = 90;
 const REFUND_PERCENT_TOLERANCE = 0.03;
-const REFUND_FIXED_TOLERANCE_USD_CENTS = 100;
+const REFUND_FIXED_TOLERANCE_CENTS = 100;
 
 const TRANSFER_MAX_DAYS = 7;
 const TRANSFER_PERCENT_TOLERANCE = 0.05;
-const TRANSFER_FIXED_TOLERANCE_USD_CENTS = 500;
+const TRANSFER_FIXED_TOLERANCE_CENTS = 500;
 
 // These describe statement mechanics rather than a merchant or employer. Transfer terms are
 // intentionally retained because they can help explain a transfer candidate without gating it.
@@ -52,8 +58,12 @@ const DESCRIPTION_BOILERPLATE_TOKENS = new Set([
 ]);
 
 function normalizeIdentity(value: string | null | undefined): string | null {
-  const normalized = value?.normalize('NFKC').trim().toLocaleLowerCase();
+  const normalized = value?.normalize('NFKC').trim().toLowerCase();
   return normalized ? normalized : null;
+}
+
+function normalizeCurrencyCode(value: string): string {
+  return value.normalize('NFKC').trim().toUpperCase();
 }
 
 function getAccountRelationship(debit: Transaction, credit: Transaction): AccountRelationship {
@@ -79,7 +89,7 @@ function getAccountRelationship(debit: Transaction, credit: Transaction): Accoun
 }
 
 function getMeaningfulDescriptionTokens(description: string): Set<string> {
-  const normalizedDescription = description.normalize('NFKC').toLocaleLowerCase();
+  const normalizedDescription = description.normalize('NFKC').toLowerCase();
   const tokens = normalizedDescription.match(/[\p{L}\p{N}]+/gu) ?? [];
 
   return new Set(
@@ -91,25 +101,24 @@ function getSharedDescriptionTokens(debit: Set<string>, credit: Set<string>): st
   return [...debit].filter((token) => credit.has(token)).sort();
 }
 
-function normalizeAmountToUsdCents(
-  transaction: Transaction,
+function roundPositiveAmountToCents(amount: number): number | null {
+  const amountCents = Math.round(amount * CENTS_PER_COMPARISON_UNIT);
+  return Number.isFinite(amountCents) && amountCents > 0 ? amountCents : null;
+}
+
+function convertAmountToUsdCents(
+  preparedTransaction: PreparedTransaction,
   exchangeRates: ExchangeRateMap,
 ): number | null {
-  const absoluteAmount = Math.abs(transaction.amount);
-
-  if (!Number.isFinite(absoluteAmount) || absoluteAmount === 0) {
-    return null;
-  }
-
-  const currency = transaction.currencyIsoCode.trim().toLocaleUpperCase();
+  const { transaction, currencyCode, absoluteAmount } = preparedTransaction;
   let amountUsd = absoluteAmount;
 
-  if (currency !== 'USD') {
-    const exchangeRate = findNearestExchangeRate(transaction.date, currency, exchangeRates);
+  if (currencyCode !== 'USD') {
+    const exchangeRate = findNearestExchangeRate(transaction.date, currencyCode, exchangeRates);
     if (
       !exchangeRate ||
-      normalizeIdentity(exchangeRate.baseCurrency) !== 'usd' ||
-      normalizeIdentity(exchangeRate.targetCurrency) !== currency.toLocaleLowerCase() ||
+      normalizeCurrencyCode(exchangeRate.baseCurrency) !== 'USD' ||
+      normalizeCurrencyCode(exchangeRate.targetCurrency) !== currencyCode ||
       !Number.isFinite(exchangeRate.rate) ||
       exchangeRate.rate <= 0
     ) {
@@ -123,52 +132,91 @@ function normalizeAmountToUsdCents(
     return null;
   }
 
-  const amountUsdCents = Math.round(amountUsd * USD_CENTS_PER_UNIT);
-  return Number.isFinite(amountUsdCents) && amountUsdCents > 0 ? amountUsdCents : null;
+  return roundPositiveAmountToCents(amountUsd);
 }
 
-function normalizeTransactions(
-  transactions: Transaction[],
-  exchangeRates: ExchangeRateMap,
-): NormalizedTransaction[] {
+function prepareTransactions(transactions: Transaction[]): PreparedTransaction[] {
   return transactions.flatMap((transaction) => {
-    const amountUsdCents = normalizeAmountToUsdCents(transaction, exchangeRates);
-    if (amountUsdCents === null) {
+    const currencyCode = normalizeCurrencyCode(transaction.currencyIsoCode);
+    const absoluteAmount = Math.abs(transaction.amount);
+
+    if (!currencyCode || !Number.isFinite(absoluteAmount) || absoluteAmount === 0) {
       return [];
     }
 
     return [
       {
         transaction,
-        amountUsdCents,
+        currencyCode,
+        absoluteAmount,
         descriptionTokens: getMeaningfulDescriptionTokens(transaction.description),
       },
     ];
   });
 }
 
+function getUsdAmountCents(
+  transaction: PreparedTransaction,
+  exchangeRates: ExchangeRateMap,
+  usdAmountCache: Map<PreparedTransaction, number | null>,
+): number | null {
+  if (usdAmountCache.has(transaction)) {
+    return usdAmountCache.get(transaction) ?? null;
+  }
+
+  const amountUsdCents = convertAmountToUsdCents(transaction, exchangeRates);
+  usdAmountCache.set(transaction, amountUsdCents);
+  return amountUsdCents;
+}
+
+function getComparisonAmounts(
+  debit: PreparedTransaction,
+  credit: PreparedTransaction,
+  exchangeRates: ExchangeRateMap,
+  usdAmountCache: Map<PreparedTransaction, number | null>,
+): ComparisonAmounts | null {
+  const isSameCurrency = debit.currencyCode === credit.currencyCode;
+  const debitAmountCents = isSameCurrency
+    ? roundPositiveAmountToCents(debit.absoluteAmount)
+    : getUsdAmountCents(debit, exchangeRates, usdAmountCache);
+  const creditAmountCents = isSameCurrency
+    ? roundPositiveAmountToCents(credit.absoluteAmount)
+    : getUsdAmountCents(credit, exchangeRates, usdAmountCache);
+
+  if (debitAmountCents === null || creditAmountCents === null) {
+    return null;
+  }
+
+  return {
+    debitAmountCents,
+    creditAmountCents,
+    amountDifferenceCents: Math.abs(debitAmountCents - creditAmountCents),
+  };
+}
+
 function isAmountWithinTolerance(
-  amountDifferenceUsdCents: number,
-  referenceAmountUsdCents: number,
+  amountDifferenceCents: number,
+  referenceAmountCents: number,
   percentTolerance: number,
-  fixedToleranceUsdCents: number,
+  fixedToleranceCents: number,
 ): boolean {
   return (
-    amountDifferenceUsdCents <=
-    Math.max(referenceAmountUsdCents * percentTolerance, fixedToleranceUsdCents)
+    amountDifferenceCents <= Math.max(referenceAmountCents * percentTolerance, fixedToleranceCents)
   );
 }
 
 function getAmountDifferenceBasisPoints(
-  amountDifferenceUsdCents: number,
-  debitAmountUsdCents: number,
+  amountDifferenceCents: number,
+  debitAmountCents: number,
 ): number {
-  return Math.round((amountDifferenceUsdCents / debitAmountUsdCents) * 10_000);
+  return Math.round((amountDifferenceCents / debitAmountCents) * 10_000);
 }
 
 function buildCandidateEdge(
-  debit: NormalizedTransaction,
-  credit: NormalizedTransaction,
+  debit: PreparedTransaction,
+  credit: PreparedTransaction,
+  exchangeRates: ExchangeRateMap,
+  usdAmountCache: Map<PreparedTransaction, number | null>,
 ): CandidateEdge | null {
   const accountRelationship = getAccountRelationship(debit.transaction, credit.transaction);
   if (accountRelationship === 'AMBIGUOUS') {
@@ -177,10 +225,15 @@ function buildCandidateEdge(
 
   const signedDayDistance = getDaysBetween(debit.transaction.date, credit.transaction.date);
   const absoluteDayDistance = Math.abs(signedDayDistance);
-  const amountDifferenceUsdCents = Math.abs(debit.amountUsdCents - credit.amountUsdCents);
+  const comparisonAmounts = getComparisonAmounts(debit, credit, exchangeRates, usdAmountCache);
+  if (!comparisonAmounts) {
+    return null;
+  }
+
+  const { debitAmountCents, amountDifferenceCents } = comparisonAmounts;
   const amountDifferenceBasisPoints = getAmountDifferenceBasisPoints(
-    amountDifferenceUsdCents,
-    debit.amountUsdCents,
+    amountDifferenceCents,
+    debitAmountCents,
   );
   const sharedDescriptionTokens = getSharedDescriptionTokens(
     debit.descriptionTokens,
@@ -193,10 +246,10 @@ function buildCandidateEdge(
     signedDayDistance <= REFUND_MAX_DAYS &&
     sharedDescriptionTokens.length > 0 &&
     isAmountWithinTolerance(
-      amountDifferenceUsdCents,
-      debit.amountUsdCents,
+      amountDifferenceCents,
+      debitAmountCents,
       REFUND_PERCENT_TOLERANCE,
-      REFUND_FIXED_TOLERANCE_USD_CENTS,
+      REFUND_FIXED_TOLERANCE_CENTS,
     )
   ) {
     return {
@@ -204,7 +257,6 @@ function buildCandidateEdge(
       debit,
       credit,
       absoluteDayDistance,
-      amountDifferenceUsdCents,
       amountDifferenceBasisPoints,
       sharedDescriptionTokens,
     };
@@ -214,10 +266,10 @@ function buildCandidateEdge(
     accountRelationship === 'DIFFERENT' &&
     absoluteDayDistance <= TRANSFER_MAX_DAYS &&
     isAmountWithinTolerance(
-      amountDifferenceUsdCents,
-      debit.amountUsdCents,
+      amountDifferenceCents,
+      debitAmountCents,
       TRANSFER_PERCENT_TOLERANCE,
-      TRANSFER_FIXED_TOLERANCE_USD_CENTS,
+      TRANSFER_FIXED_TOLERANCE_CENTS,
     )
   ) {
     return {
@@ -225,7 +277,6 @@ function buildCandidateEdge(
       debit,
       credit,
       absoluteDayDistance,
-      amountDifferenceUsdCents,
       amountDifferenceBasisPoints,
       sharedDescriptionTokens,
     };
@@ -236,7 +287,7 @@ function buildCandidateEdge(
 
 function compareCandidateEdges(left: CandidateEdge, right: CandidateEdge): number {
   return (
-    left.amountDifferenceUsdCents - right.amountDifferenceUsdCents ||
+    left.amountDifferenceBasisPoints - right.amountDifferenceBasisPoints ||
     left.absoluteDayDistance - right.absoluteDayDistance ||
     right.sharedDescriptionTokens.length - left.sharedDescriptionTokens.length ||
     left.debit.transaction.id - right.debit.transaction.id ||
@@ -257,8 +308,6 @@ function toCandidate(
     debit,
     credit,
     absoluteDayDistance: edge.absoluteDayDistance,
-    normalizedDebitAmountUsdCents: edge.debit.amountUsdCents,
-    normalizedCreditAmountUsdCents: edge.credit.amountUsdCents,
     amountDifferenceBasisPoints: edge.amountDifferenceBasisPoints,
     sharedDescriptionTokens: edge.sharedDescriptionTokens,
     eligibleExclusionTransactionIds: [debit.id, credit.id].filter((transactionId) =>
@@ -279,9 +328,10 @@ export function findTransferRefundCandidates(
   const visibleTransactionIds = new Set(
     visibleViewTransactions.map((transaction) => transaction.id),
   );
-  const normalizedTransactions = normalizeTransactions(transactions, exchangeRates);
-  const debits = normalizedTransactions.filter(({ transaction }) => transaction.type === 'DEBIT');
-  const credits = normalizedTransactions.filter(({ transaction }) => transaction.type === 'CREDIT');
+  const preparedTransactions = prepareTransactions(transactions);
+  const debits = preparedTransactions.filter(({ transaction }) => transaction.type === 'DEBIT');
+  const credits = preparedTransactions.filter(({ transaction }) => transaction.type === 'CREDIT');
+  const usdAmountCache = new Map<PreparedTransaction, number | null>();
   const edges: CandidateEdge[] = [];
 
   for (const credit of credits) {
@@ -293,7 +343,7 @@ export function findTransferRefundCandidates(
         continue;
       }
 
-      const edge = buildCandidateEdge(debit, credit);
+      const edge = buildCandidateEdge(debit, credit, exchangeRates, usdAmountCache);
       if (edge) {
         edges.push(edge);
       }
