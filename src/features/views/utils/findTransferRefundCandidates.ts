@@ -10,6 +10,7 @@ import { compareLocalDates, getDaysBetween } from '@/utils/dates';
 
 type ExchangeRateMap = Map<string, Map<string, ExchangeRateResponse>>;
 type AccountRelationship = 'SAME' | 'DIFFERENT' | 'AMBIGUOUS';
+type CandidateEdgeMembership = 'ALL_VISIBLE' | 'USES_NON_VISIBLE';
 
 interface PreparedTransaction {
   transaction: Transaction;
@@ -31,6 +32,7 @@ interface CandidateEdge {
   absoluteDayDistance: number;
   amountDifferenceBasisPoints: number;
   sharedDescriptionTokens: string[];
+  membership: CandidateEdgeMembership;
 }
 
 const CENTS_PER_COMPARISON_UNIT = 100;
@@ -41,7 +43,6 @@ const REFUND_FIXED_TOLERANCE_CENTS = 100;
 
 const TRANSFER_MAX_DAYS = 7;
 const TRANSFER_PERCENT_TOLERANCE = 0.05;
-const TRANSFER_FIXED_TOLERANCE_CENTS = 500;
 
 // These describe statement mechanics rather than a merchant or employer. Transfer terms are
 // intentionally retained because they can help explain a transfer candidate without gating it.
@@ -217,6 +218,7 @@ function buildCandidateEdge(
   credit: PreparedTransaction,
   exchangeRates: ExchangeRateMap,
   usdAmountCache: Map<PreparedTransaction, number | null>,
+  membership: CandidateEdgeMembership,
 ): CandidateEdge | null {
   const accountRelationship = getAccountRelationship(debit.transaction, credit.transaction);
   if (accountRelationship === 'AMBIGUOUS') {
@@ -259,18 +261,14 @@ function buildCandidateEdge(
       absoluteDayDistance,
       amountDifferenceBasisPoints,
       sharedDescriptionTokens,
+      membership,
     };
   }
 
   if (
     accountRelationship === 'DIFFERENT' &&
     absoluteDayDistance <= TRANSFER_MAX_DAYS &&
-    isAmountWithinTolerance(
-      amountDifferenceCents,
-      debitAmountCents,
-      TRANSFER_PERCENT_TOLERANCE,
-      TRANSFER_FIXED_TOLERANCE_CENTS,
-    )
+    amountDifferenceCents <= debitAmountCents * TRANSFER_PERCENT_TOLERANCE
   ) {
     return {
       kind: 'TRANSFER',
@@ -279,10 +277,22 @@ function buildCandidateEdge(
       absoluteDayDistance,
       amountDifferenceBasisPoints,
       sharedDescriptionTokens,
+      membership,
     };
   }
 
   return null;
+}
+
+function getCandidateEdgeMembership(
+  debit: PreparedTransaction,
+  credit: PreparedTransaction,
+  visibleTransactionIds: Set<number>,
+): CandidateEdgeMembership {
+  return visibleTransactionIds.has(debit.transaction.id) &&
+    visibleTransactionIds.has(credit.transaction.id)
+    ? 'ALL_VISIBLE'
+    : 'USES_NON_VISIBLE';
 }
 
 function compareCandidateEdges(left: CandidateEdge, right: CandidateEdge): number {
@@ -290,6 +300,8 @@ function compareCandidateEdges(left: CandidateEdge, right: CandidateEdge): numbe
     left.amountDifferenceBasisPoints - right.amountDifferenceBasisPoints ||
     left.absoluteDayDistance - right.absoluteDayDistance ||
     right.sharedDescriptionTokens.length - left.sharedDescriptionTokens.length ||
+    Number(left.membership === 'USES_NON_VISIBLE') -
+      Number(right.membership === 'USES_NON_VISIBLE') ||
     left.debit.transaction.id - right.debit.transaction.id ||
     left.credit.transaction.id - right.credit.transaction.id
   );
@@ -298,6 +310,7 @@ function compareCandidateEdges(left: CandidateEdge, right: CandidateEdge): numbe
 function toCandidate(
   edge: CandidateEdge,
   visibleTransactionIds: Set<number>,
+  explicitlyExcludedTransactionIds: Set<number>,
 ): TransferRefundCandidate {
   const debit = edge.debit.transaction;
   const credit = edge.credit.transaction;
@@ -310,24 +323,31 @@ function toCandidate(
     absoluteDayDistance: edge.absoluteDayDistance,
     amountDifferenceBasisPoints: edge.amountDifferenceBasisPoints,
     sharedDescriptionTokens: edge.sharedDescriptionTokens,
-    eligibleExclusionTransactionIds: [debit.id, credit.id].filter((transactionId) =>
-      visibleTransactionIds.has(transactionId),
+    explicitlyExcludedTransactionIds: [debit.id, credit.id].filter((transactionId) =>
+      explicitlyExcludedTransactionIds.has(transactionId),
+    ),
+    eligibleExclusionTransactionIds: [debit.id, credit.id].filter(
+      (transactionId) =>
+        visibleTransactionIds.has(transactionId) &&
+        !explicitlyExcludedTransactionIds.has(transactionId),
     ),
   };
 }
 
 /**
- * Finds possible one-to-one refunds and internal transfers using only the supplied transaction,
- * visible saved-view membership, and exchange-rate snapshots.
+ * Finds possible one-to-one refunds and internal transfers using only the supplied transactions,
+ * visible and explicitly excluded saved-view membership, and exchange-rate snapshots.
  */
 export function findTransferRefundCandidates(
   transactions: Transaction[],
   visibleViewTransactions: ViewTransaction[],
   exchangeRates: ExchangeRateMap,
+  explicitlyExcludedIds: number[] = [],
 ): TransferRefundCandidate[] {
   const visibleTransactionIds = new Set(
     visibleViewTransactions.map((transaction) => transaction.id),
   );
+  const explicitlyExcludedTransactionIds = new Set(explicitlyExcludedIds);
   const preparedTransactions = prepareTransactions(transactions);
   const debits = preparedTransactions.filter(({ transaction }) => transaction.type === 'DEBIT');
   const credits = preparedTransactions.filter(({ transaction }) => transaction.type === 'CREDIT');
@@ -343,7 +363,8 @@ export function findTransferRefundCandidates(
         continue;
       }
 
-      const edge = buildCandidateEdge(debit, credit, exchangeRates, usdAmountCache);
+      const membership = getCandidateEdgeMembership(debit, credit, visibleTransactionIds);
+      const edge = buildCandidateEdge(debit, credit, exchangeRates, usdAmountCache, membership);
       if (edge) {
         edges.push(edge);
       }
@@ -364,7 +385,7 @@ export function findTransferRefundCandidates(
 
     retainedTransactionIds.add(debitId);
     retainedTransactionIds.add(creditId);
-    candidates.push(toCandidate(edge, visibleTransactionIds));
+    candidates.push(toCandidate(edge, visibleTransactionIds, explicitlyExcludedTransactionIds));
   }
 
   return candidates.sort(

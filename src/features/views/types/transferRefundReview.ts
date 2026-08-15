@@ -9,6 +9,7 @@ interface TransferRefundCandidateBase {
   absoluteDayDistance: number;
   amountDifferenceBasisPoints: number;
   sharedDescriptionTokens: string[];
+  explicitlyExcludedTransactionIds: number[];
   eligibleExclusionTransactionIds: number[];
 }
 

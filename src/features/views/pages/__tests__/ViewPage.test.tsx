@@ -9,6 +9,7 @@ import { renderWithProviders } from '@/testing/test-utils';
 
 const hookMocks = vi.hoisted(() => ({
   useView: vi.fn(),
+  useViewMembership: vi.fn(),
   useViewTransactions: vi.fn(),
   useTransactions: vi.fn(),
   useExchangeRatesMap: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('@/hooks/useViews', async (importOriginal) => {
   return {
     ...actual,
     useView: hookMocks.useView,
+    useViewMembership: hookMocks.useViewMembership,
     useViewTransactions: hookMocks.useViewTransactions,
     useUpdateView: () => ({ mutate: mutationMocks.updateView, isPending: false }),
     usePinTransaction: () => ({ mutate: mutationMocks.pin, isPending: false }),
@@ -200,6 +202,10 @@ beforeEach(() => {
   discoveryMocks.findTransferRefundCandidates.mockReset();
   hookMocks.useTransactions.mockReset();
   hookMocks.useExchangeRatesMap.mockReset();
+  hookMocks.useViewMembership.mockReset();
+  hookMocks.useViewMembership.mockReturnValue(
+    queryResult({ matched: [1, 2, 3], pinned: [], excluded: [] }),
+  );
   hookMocks.useTransactions.mockReturnValue(queryResult(transactions));
   hookMocks.useExchangeRatesMap.mockReturnValue({
     exchangeRatesMap: new Map(),
@@ -397,8 +403,33 @@ describe('ViewPage transfer and refund discovery', () => {
     expect(discoveryMocks.findTransferRefundCandidates).toHaveBeenCalledOnce();
   });
 
-  it('isolates discovery errors and retries the full transaction and exchange-rate queries', async () => {
+  it('waits for canonical membership before scanning', async () => {
+    hookMocks.useViewMembership.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+      refetch: vi.fn(),
+    });
+    const user = userEvent.setup();
+    const { rerender } = renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
+
+    expect(screen.getByText('Finding possible transfers and refunds...')).toBeInTheDocument();
+    expect(discoveryMocks.findTransferRefundCandidates).not.toHaveBeenCalled();
+
+    hookMocks.useViewMembership.mockReturnValue(
+      queryResult({ matched: [1, 2, 3], pinned: [], excluded: [99] }),
+    );
+    rerender(<ViewPageTestRoutes />);
+
+    expect(discoveryMocks.findTransferRefundCandidates).toHaveBeenCalledOnce();
+    expect(discoveryMocks.findTransferRefundCandidates.mock.calls[0]?.[3]).toEqual([99]);
+  });
+
+  it('isolates membership errors and retries every discovery input', async () => {
     const refetchAllTransactions = vi.fn();
+    const refetchMembership = vi.fn();
     hookMocks.useTransactions.mockReturnValue({
       data: transactions,
       isLoading: false,
@@ -409,7 +440,13 @@ describe('ViewPage transfer and refund discovery', () => {
       exchangeRatesMap: new Map(),
       pendingCurrencies: [],
       isLoading: false,
-      error: new Error('Exchange-rate discovery failed'),
+      error: null,
+    });
+    hookMocks.useViewMembership.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('Membership discovery failed'),
+      refetch: refetchMembership,
     });
     const user = userEvent.setup();
     const { queryClient, rerender } = renderPage();
@@ -421,19 +458,17 @@ describe('ViewPage transfer and refund discovery', () => {
 
     await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
 
-    expect(screen.getByText('Exchange-rate discovery failed')).toBeInTheDocument();
+    expect(screen.getByText('Membership discovery failed')).toBeInTheDocument();
     expect(discoveryMocks.findTransferRefundCandidates).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(refetchAllTransactions).toHaveBeenCalledOnce();
+    expect(refetchMembership).toHaveBeenCalledOnce();
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['exchangeRates'] });
 
-    hookMocks.useExchangeRatesMap.mockReturnValue({
-      exchangeRatesMap: new Map(),
-      pendingCurrencies: [],
-      isLoading: false,
-      error: null,
-    });
+    hookMocks.useViewMembership.mockReturnValue(
+      queryResult({ matched: [1, 2, 3], pinned: [], excluded: [] }),
+    );
     rerender(<ViewPageTestRoutes />);
 
     expect(discoveryMocks.findTransferRefundCandidates).toHaveBeenCalledOnce();
@@ -468,6 +503,44 @@ describe('ViewPage transfer and refund discovery', () => {
       }),
     ).not.toBeInTheDocument();
     expect(screen.getByText('Not currently in this view')).toBeInTheDocument();
+  });
+
+  it('passes canonical excluded IDs to discovery', async () => {
+    const excludedDebit = transaction({ id: 10 });
+    const visibleCredit = viewTransaction({
+      id: 11,
+      accountId: 'savings',
+      bankName: 'Beta Bank',
+      date: '2026-03-02',
+      amount: 100,
+      type: 'CREDIT',
+      description: 'Incoming transfer',
+    });
+    hookMocks.useTransactions.mockReturnValue(queryResult([excludedDebit, visibleCredit]));
+    hookMocks.useViewMembership.mockReturnValue(
+      queryResult({ matched: [11], pinned: [], excluded: [10] }),
+    );
+    const user = userEvent.setup();
+    renderPage('/views/view-1', { excludedCount: 1 }, [visibleCredit]);
+
+    await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
+
+    expect(discoveryMocks.findTransferRefundCandidates).toHaveBeenCalledWith(
+      [excludedDebit, visibleCredit],
+      [visibleCredit],
+      new Map(),
+      [10],
+    );
+    expect(
+      screen.queryByRole('checkbox', {
+        name: 'Exclude debit transaction 10 from this view',
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Exclude credit transaction 11 from this view',
+      }),
+    ).toBeChecked();
   });
 
   it('keeps both canonical sides selectable when a URL filter hides one table row', async () => {

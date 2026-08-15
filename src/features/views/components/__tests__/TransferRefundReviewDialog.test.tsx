@@ -58,6 +58,7 @@ const refundCandidate: TransferRefundCandidate = {
   absoluteDayDistance: 2,
   amountDifferenceBasisPoints: 56,
   sharedDescriptionTokens: ['acme', 'market'],
+  explicitlyExcludedTransactionIds: [],
   eligibleExclusionTransactionIds: [101, 101, 102],
 };
 
@@ -91,6 +92,7 @@ const transferCandidate: TransferRefundCandidate = {
   absoluteDayDistance: 1,
   amountDifferenceBasisPoints: 28,
   sharedDescriptionTokens: ['transfer'],
+  explicitlyExcludedTransactionIds: [],
   eligibleExclusionTransactionIds: [201],
 };
 

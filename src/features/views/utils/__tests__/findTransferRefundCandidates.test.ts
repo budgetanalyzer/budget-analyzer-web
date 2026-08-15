@@ -35,11 +35,13 @@ function discover(
   transactions: Transaction[],
   visibleTransactions: Transaction[] = transactions,
   exchangeRates = NO_RATES,
+  explicitlyExcludedIds: number[] = [],
 ) {
   return findTransferRefundCandidates(
     transactions,
     visibleTransactions.map(asViewTransaction),
     exchangeRates,
+    explicitlyExcludedIds,
   );
 }
 
@@ -70,6 +72,7 @@ describe('findTransferRefundCandidates', () => {
         absoluteDayDistance: 3,
         amountDifferenceBasisPoints: 0,
         sharedDescriptionTokens: ['1234', 'café', 'wise'],
+        explicitlyExcludedTransactionIds: [],
         eligibleExclusionTransactionIds: [1, 2],
       }),
     ]);
@@ -256,7 +259,7 @@ describe('findTransferRefundCandidates', () => {
     expect(discover([debit, beyondAmount])).toEqual([]);
   });
 
-  it('uses the inclusive five-unit transfer floor in the same comparison currency', () => {
+  it('uses only the inclusive five-percent transfer tolerance for small amounts', () => {
     const debit = createTransaction(1, 'DEBIT', {
       bankName: 'Bank One',
       currencyIsoCode: 'EUR',
@@ -266,17 +269,44 @@ describe('findTransferRefundCandidates', () => {
       bankName: 'Bank Two',
       date: '2026-01-02',
       currencyIsoCode: 'EUR',
-      amount: 15,
+      amount: 19,
     });
     const beyondBoundary = createTransaction(3, 'CREDIT', {
       bankName: 'Bank Two',
       date: '2026-01-02',
       currencyIsoCode: 'EUR',
-      amount: 14.99,
+      amount: 18.99,
     });
 
     expect(discover([debit, exactBoundary])).toHaveLength(1);
     expect(discover([debit, beyondBoundary])).toEqual([]);
+  });
+
+  it('rejects a large relative difference even when the cross-currency gap is under five USD', () => {
+    const debit = createTransaction(1, 'DEBIT', {
+      bankName: 'Bank One',
+      date: '2026-01-06',
+      currencyIsoCode: 'THB',
+      amount: 90,
+      description: 'Purchase',
+    });
+    const credit = createTransaction(2, 'CREDIT', {
+      bankName: 'Bank Two',
+      date: '2025-12-31',
+      currencyIsoCode: 'USD',
+      amount: 2.05,
+      description: 'Interest',
+    });
+    const rates = buildExchangeRateMap([
+      {
+        baseCurrency: 'USD',
+        targetCurrency: 'THB',
+        date: '2026-01-06',
+        rate: 31.22,
+      },
+    ]);
+
+    expect(discover([debit, credit], [debit, credit], rates)).toEqual([]);
   });
 
   it('omits cross-currency rows when a required usable rate is missing', () => {
@@ -355,7 +385,38 @@ describe('findTransferRefundCandidates', () => {
     expect(discover([outsideDebit, visibleCredit], [visibleCredit])[0]).toMatchObject({
       debit: outsideDebit,
       credit: visibleCredit,
+      explicitlyExcludedTransactionIds: [],
       eligibleExclusionTransactionIds: [2],
+    });
+  });
+
+  it('reports explicit exclusion evidence in debit-credit order without making it eligible', () => {
+    const excludedDebit = createTransaction(1, 'DEBIT', { bankName: 'Bank One' });
+    const visibleCredit = createTransaction(2, 'CREDIT', {
+      bankName: 'Bank Two',
+      date: '2026-01-02',
+    });
+
+    expect(
+      discover([excludedDebit, visibleCredit], [visibleCredit], NO_RATES, [1])[0],
+    ).toMatchObject({
+      debit: excludedDebit,
+      credit: visibleCredit,
+      explicitlyExcludedTransactionIds: [1],
+      eligibleExclusionTransactionIds: [2],
+    });
+  });
+
+  it('does not make an explicitly excluded ID eligible if membership inputs overlap', () => {
+    const debit = createTransaction(1, 'DEBIT', { bankName: 'Bank One' });
+    const credit = createTransaction(2, 'CREDIT', {
+      bankName: 'Bank Two',
+      date: '2026-01-02',
+    });
+
+    expect(discover([debit, credit], [debit, credit], NO_RATES, [2])[0]).toMatchObject({
+      explicitlyExcludedTransactionIds: [2],
+      eligibleExclusionTransactionIds: [1],
     });
   });
 
@@ -367,6 +428,16 @@ describe('findTransferRefundCandidates', () => {
     });
 
     expect(discover([debit, credit], [])).toEqual([]);
+  });
+
+  it('discards pairs when both sides are explicitly excluded and neither is visible', () => {
+    const debit = createTransaction(1, 'DEBIT', { bankName: 'Bank One' });
+    const credit = createTransaction(2, 'CREDIT', {
+      bankName: 'Bank Two',
+      date: '2026-01-02',
+    });
+
+    expect(discover([debit, credit], [], NO_RATES, [1, 2])).toEqual([]);
   });
 
   it('does not let an outside-view edge reserve a transaction needed by an in-view candidate', () => {
@@ -404,6 +475,45 @@ describe('findTransferRefundCandidates', () => {
 
     expect(forward.map(({ key }) => key)).toEqual(['REFUND:2:10']);
     expect(reversed.map(({ key }) => key)).toEqual(['REFUND:2:10']);
+  });
+
+  it('keeps financially stronger non-visible evidence ahead of an all-visible edge', () => {
+    const visibleDebit = createTransaction(10, 'DEBIT', { bankName: 'Bank One' });
+    const outsideCredit = createTransaction(11, 'CREDIT', {
+      bankName: 'Bank Two',
+      date: '2026-01-02',
+      amount: 100,
+    });
+    const visibleCredit = createTransaction(12, 'CREDIT', {
+      bankName: 'Bank Three',
+      date: '2026-01-02',
+      amount: 99,
+    });
+
+    expect(
+      discover([visibleCredit, outsideCredit, visibleDebit], [visibleDebit, visibleCredit]).map(
+        ({ key }) => key,
+      ),
+    ).toEqual(['TRANSFER:10:11']);
+  });
+
+  it('prefers an all-visible edge only when financial evidence is tied', () => {
+    const visibleDebit = createTransaction(10, 'DEBIT', { bankName: 'Bank One' });
+    const outsideCredit = createTransaction(1, 'CREDIT', {
+      bankName: 'Bank Two',
+      date: '2026-01-02',
+    });
+    const visibleCredit = createTransaction(20, 'CREDIT', {
+      bankName: 'Bank Three',
+      date: '2026-01-02',
+    });
+
+    const visibleTransactions = [visibleDebit, visibleCredit];
+    const forward = discover([outsideCredit, visibleDebit, visibleCredit], visibleTransactions);
+    const reversed = discover([visibleCredit, visibleDebit, outsideCredit], visibleTransactions);
+
+    expect(forward.map(({ key }) => key)).toEqual(['TRANSFER:10:20']);
+    expect(reversed.map(({ key }) => key)).toEqual(['TRANSFER:10:20']);
   });
 
   it('ranks competing native and USD edges by unitless amount difference', () => {

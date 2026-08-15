@@ -44,11 +44,13 @@ credit, to derive deterministic possible refunds and transfers. Candidate
 amount comparison follows two paths: same-currency pairs are compared directly
 in their original currency and do not require an exchange rate, while
 cross-currency pairs convert each side using its own transaction-date exchange
-rate. Canonical, unfiltered saved-view membership is the exclusion boundary: a
-debit or credit outside the view may remain visible as `Not currently in this
-view` evidence, but only current members receive independent exclusion
-controls. Temporary View table filters do not narrow the evidence pool or
-change exclusion eligibility.
+rate. Transfer candidates must be no more than seven absolute days apart and
+their comparison amounts must differ by no more than five percent; there is no
+fixed-amount tolerance. Canonical, unfiltered saved-view membership is the
+exclusion boundary: a debit or credit outside the view may remain visible as
+`Not currently in this view` evidence, but only current members receive
+independent exclusion controls. Temporary View table filters do not narrow the
+evidence pool or change exclusion eligibility.
 
 Confirming the review sends the unique selected debit and credit IDs through
 the existing bulk exclusion endpoint. The server persists only those saved-view

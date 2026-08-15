@@ -4,7 +4,7 @@ import { useParams, Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, LayoutGroup, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Hash, Pin, Calendar, Eye, BarChart3, Search } from 'lucide-react';
-import { useView, useViewTransactions } from '@/hooks/useViews';
+import { useView, useViewMembership, useViewTransactions } from '@/hooks/useViews';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
@@ -93,6 +93,13 @@ function ViewPageContent({ id }: { id: string }) {
   } = useViewTransactions(id);
 
   const {
+    data: membership,
+    isLoading: isMembershipLoading,
+    error: membershipError,
+    refetch: refetchMembership,
+  } = useViewMembership(id);
+
+  const {
     data: allTransactions,
     isLoading: isAllTransactionsLoading,
     error: allTransactionsError,
@@ -114,14 +121,17 @@ function ViewPageContent({ id }: { id: string }) {
     displayCurrency,
   });
 
-  const isTransferRefundDiscoveryLoading = isAllTransactionsLoading || isExchangeRatesLoading;
-  const transferRefundDiscoveryError = allTransactionsError || exchangeRatesError || null;
+  const isTransferRefundDiscoveryLoading =
+    isAllTransactionsLoading || isExchangeRatesLoading || isMembershipLoading;
+  const transferRefundDiscoveryError =
+    allTransactionsError || exchangeRatesError || membershipError || null;
 
   const transferRefundCandidates = useMemo(() => {
     if (
       !isTransferRefundReviewOpen ||
       isTransferRefundDiscoveryLoading ||
-      transferRefundDiscoveryError
+      transferRefundDiscoveryError ||
+      !membership
     ) {
       return [];
     }
@@ -130,20 +140,23 @@ function ViewPageContent({ id }: { id: string }) {
       allTransactions ?? [],
       transactions ?? [],
       exchangeRatesMap,
+      membership.excluded,
     );
   }, [
     allTransactions,
     exchangeRatesMap,
     isTransferRefundDiscoveryLoading,
     isTransferRefundReviewOpen,
+    membership,
     transactions,
     transferRefundDiscoveryError,
   ]);
 
   const handleTransferRefundDiscoveryRetry = useCallback(() => {
     refetchAllTransactions();
+    refetchMembership();
     queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
-  }, [queryClient, refetchAllTransactions]);
+  }, [queryClient, refetchAllTransactions, refetchMembership]);
 
   const disabledCurrencies = useMissingCurrencies();
 
