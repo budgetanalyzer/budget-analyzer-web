@@ -69,12 +69,20 @@ clicked analytics period and can return to the same analytics state.
 
 View detail derives possible transfers and refunds from the complete raw active
 transaction collection and transaction-date exchange rates. Canonical,
-unfiltered saved-view membership determines which candidate sides can be
-excluded; a transaction outside that membership may still appear as supporting
-evidence. Temporary table filters affect only the displayed table and stats.
-The review is a local UI projection until the user confirms selected IDs through
-the existing bulk exclusion mutation, after which normal query invalidation
-refreshes membership, counts, analytics, and the existing restore path.
+unfiltered saved-view membership gives each candidate side one of three roles:
+a visible member is eligible for an exclusion control, an active transaction
+outside the view criteria is supporting evidence labelled `Not currently in
+this view`, and an explicitly excluded transaction is supporting evidence
+labelled `Previously excluded from this view` and is never eligible for repeat
+exclusion. Candidates using explicit exclusion evidence are presented as
+completion work only when the possible counterpart remains visible. This allows
+the visible side to be handled after partial review or incremental data arrival,
+but the earlier exclusion remains membership state rather than proof or
+provenance of a relationship. Temporary table filters affect only the displayed
+table and stats. The review is a local UI projection until the user confirms
+selected visible IDs through the existing bulk exclusion mutation, after which
+normal query invalidation refreshes membership, counts, analytics, and the
+existing restore path.
 
 ## CSP Compliance
 

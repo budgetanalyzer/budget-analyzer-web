@@ -214,7 +214,7 @@ function CandidateGroup({
   isPending,
   onSelectionChange,
 }: CandidateGroupProps) {
-  const headingId = `candidate-group-${title.toLowerCase().replaceAll(' ', '-')}`;
+  const headingId = `candidate-group-${title.toLowerCase().replace(/ /g, '-')}`;
 
   return (
     <section aria-labelledby={headingId}>

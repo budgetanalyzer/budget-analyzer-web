@@ -508,6 +508,14 @@ npm run build:prod-smoke && rg -n "createElement\('style'\)|styleSheet\.cssText|
 ```
 If matches appear, the dependency violates CSP and must not be used.
 
+**Known baseline issue:** Existing Framer Motion and React DOM bundle signatures
+are tracked in
+[docs/issues/strict-csp-runtime-style-dependencies.md](docs/issues/strict-csp-runtime-style-dependencies.md).
+Those documented baseline matches alone do not block unrelated plan completion.
+Agents must still investigate new or changed matches, must not add runtime style
+injection, and must not treat this exception as proof that Framer Motion is CSP
+safe. Remove this exception when the issue is resolved.
+
 ## NOTES FOR AI AGENTS
 
 **CRITICAL - Prerequisites First**: Before implementing any plan or feature:
