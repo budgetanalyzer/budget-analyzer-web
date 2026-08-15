@@ -100,7 +100,7 @@ export function StatementFormatVisibilityTable({
 
   return (
     <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
-      <Table hideScrollbar={false}>
+      <Table>
         <TableHeader>
           <TableRow className="border-b bg-muted/50 hover:bg-muted/50">
             <TableHead className="h-14 font-semibold">Display Name</TableHead>

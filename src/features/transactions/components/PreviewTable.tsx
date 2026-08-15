@@ -55,7 +55,7 @@ export function PreviewTable({
   }
 
   return (
-    <Table hideScrollbar={false}>
+    <Table>
       <TableHeader>
         <TableRow>
           <TableHead className="w-[130px]">Date</TableHead>

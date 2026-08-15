@@ -1,5 +1,5 @@
 // src/components/DateRangeFilter.tsx
-import { Calendar } from 'lucide-react';
+import { useCallback, type ChangeEvent } from 'react';
 import { Input } from '@/components/ui/Input';
 
 interface DateRangeFilterProps {
@@ -9,31 +9,34 @@ interface DateRangeFilterProps {
 }
 
 export function DateRangeFilter({ from, to, onChange }: DateRangeFilterProps) {
-  const handleFromChange = (value: string) => {
-    onChange(value || null, to);
-  };
+  const handleFromChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      onChange(event.target.value || null, to);
+    },
+    [onChange, to],
+  );
 
-  const handleToChange = (value: string) => {
-    onChange(from, value || null);
-  };
+  const handleToChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      onChange(from, event.target.value || null);
+    },
+    [from, onChange],
+  );
 
   return (
     <div className="flex items-center gap-2">
-      <div className="relative">
-        <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="date"
-          value={from || ''}
-          onChange={(e) => handleFromChange(e.target.value)}
-          placeholder="From date"
-          className="w-[160px] pl-9"
-        />
-      </div>
+      <Input
+        type="date"
+        value={from || ''}
+        onChange={handleFromChange}
+        placeholder="From date"
+        className="w-[160px]"
+      />
       <span className="text-sm text-muted-foreground">to</span>
       <Input
         type="date"
         value={to || ''}
-        onChange={(e) => handleToChange(e.target.value)}
+        onChange={handleToChange}
         placeholder="To date"
         className="w-[160px]"
       />

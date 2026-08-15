@@ -32,7 +32,7 @@ export function StatementFormatWizardReadOnlyPreviewTable({
   }
 
   return (
-    <Table className="min-w-[760px]" hideScrollbar={false}>
+    <Table className="min-w-[760px]">
       <TableHeader>
         <TableRow>
           <TableHead className="w-[110px]">Date</TableHead>
