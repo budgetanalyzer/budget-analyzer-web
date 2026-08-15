@@ -48,6 +48,15 @@ export function TransferRefundReviewDialog({
   const { mutate: bulkExclude, isPending } = useBulkExcludeTransactions();
   const [deselectedIds, setDeselectedIds] = useState<Set<number>>(() => new Set());
 
+  const completionCandidates = useMemo(
+    () => candidates.filter((candidate) => candidate.explicitlyExcludedTransactionIds.length > 0),
+    [candidates],
+  );
+  const newCandidates = useMemo(
+    () => candidates.filter((candidate) => candidate.explicitlyExcludedTransactionIds.length === 0),
+    [candidates],
+  );
+
   const eligibleIds = useMemo(
     () =>
       Array.from(
@@ -151,16 +160,26 @@ export function TransferRefundReviewDialog({
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {candidates.map((candidate) => (
-                <CandidateReview
-                  key={candidate.key}
-                  candidate={candidate}
+            <div className="space-y-6">
+              {completionCandidates.length > 0 && (
+                <CandidateGroup
+                  title="Complete previous exclusions"
+                  description="A possible related transaction remains in this view while another transaction is already excluded. Review whether to exclude the remaining transaction."
+                  candidates={completionCandidates}
                   selectedIds={selectedIdSet}
                   isPending={isPending}
                   onSelectionChange={handleSelectionChange}
                 />
-              ))}
+              )}
+              {newCandidates.length > 0 && (
+                <CandidateGroup
+                  title="New possible transfers and refunds"
+                  candidates={newCandidates}
+                  selectedIds={selectedIdSet}
+                  isPending={isPending}
+                  onSelectionChange={handleSelectionChange}
+                />
+              )}
             </div>
           )}
         </div>
@@ -175,6 +194,46 @@ export function TransferRefundReviewDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface CandidateGroupProps {
+  title: string;
+  description?: string;
+  candidates: TransferRefundCandidate[];
+  selectedIds: ReadonlySet<number>;
+  isPending: boolean;
+  onSelectionChange: (transactionId: number, selected: boolean) => void;
+}
+
+function CandidateGroup({
+  title,
+  description,
+  candidates,
+  selectedIds,
+  isPending,
+  onSelectionChange,
+}: CandidateGroupProps) {
+  const headingId = `candidate-group-${title.toLowerCase().replaceAll(' ', '-')}`;
+
+  return (
+    <section aria-labelledby={headingId}>
+      <h2 id={headingId} className="text-base font-semibold">
+        {title}
+      </h2>
+      {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+      <div className="mt-3 space-y-4">
+        {candidates.map((candidate) => (
+          <CandidateReview
+            key={candidate.key}
+            candidate={candidate}
+            selectedIds={selectedIds}
+            isPending={isPending}
+            onSelectionChange={onSelectionChange}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -214,6 +273,9 @@ function CandidateReview({
           side="debit"
           transaction={candidate.debit}
           isEligible={candidate.eligibleExclusionTransactionIds.includes(candidate.debit.id)}
+          isExplicitlyExcluded={candidate.explicitlyExcludedTransactionIds.includes(
+            candidate.debit.id,
+          )}
           isSelected={selectedIds.has(candidate.debit.id)}
           isPending={isPending}
           onSelectionChange={onSelectionChange}
@@ -223,6 +285,9 @@ function CandidateReview({
           side="credit"
           transaction={candidate.credit}
           isEligible={candidate.eligibleExclusionTransactionIds.includes(candidate.credit.id)}
+          isExplicitlyExcluded={candidate.explicitlyExcludedTransactionIds.includes(
+            candidate.credit.id,
+          )}
           isSelected={selectedIds.has(candidate.credit.id)}
           isPending={isPending}
           onSelectionChange={onSelectionChange}
@@ -237,6 +302,7 @@ interface CandidateTransactionRowProps {
   side: CandidateSide;
   transaction: Transaction;
   isEligible: boolean;
+  isExplicitlyExcluded: boolean;
   isSelected: boolean;
   isPending: boolean;
   onSelectionChange: (transactionId: number, selected: boolean) => void;
@@ -247,6 +313,7 @@ function CandidateTransactionRow({
   side,
   transaction,
   isEligible,
+  isExplicitlyExcluded,
   isSelected,
   isPending,
   onSelectionChange,
@@ -299,7 +366,9 @@ function CandidateTransactionRow({
         </div>
       ) : (
         <p className="border-t pt-3 text-sm font-medium text-muted-foreground">
-          Not currently in this view
+          {isExplicitlyExcluded
+            ? 'Previously excluded from this view'
+            : 'Not currently in this view'}
         </p>
       )}
     </div>

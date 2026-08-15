@@ -491,6 +491,9 @@ describe('ViewPage transfer and refund discovery', () => {
 
     await user.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
 
+    expect(
+      screen.getByRole('heading', { name: 'New possible transfers and refunds' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Possible transfer' })).toBeInTheDocument();
     expect(
       screen.getByRole('checkbox', {
@@ -541,6 +544,16 @@ describe('ViewPage transfer and refund discovery', () => {
         name: 'Exclude credit transaction 11 from this view',
       }),
     ).toBeChecked();
+    expect(
+      screen.getByRole('heading', { name: 'Complete previous exclusions' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'A possible related transaction remains in this view while another transaction is already excluded. Review whether to exclude the remaining transaction.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Previously excluded from this view')).toBeInTheDocument();
+    expect(screen.queryByText('Not currently in this view')).not.toBeInTheDocument();
   });
 
   it('keeps both canonical sides selectable when a URL filter hides one table row', async () => {

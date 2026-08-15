@@ -49,8 +49,13 @@ their comparison amounts must differ by no more than five percent; there is no
 fixed-amount tolerance. Canonical, unfiltered saved-view membership is the
 exclusion boundary: a debit or credit outside the view may remain visible as
 `Not currently in this view` evidence, but only current members receive
-independent exclusion controls. Temporary View table filters do not narrow the
-evidence pool or change exclusion eligibility.
+independent exclusion controls. Explicitly excluded transactions may also remain
+as evidence when the possible counterpart is still a current member; the review
+groups these candidates under `Complete previous exclusions` and labels the
+evidence `Previously excluded from this view`. This wording describes membership
+only and does not imply that the relationship was previously confirmed. New
+possible relationships remain in a separate group. Temporary View table filters
+do not narrow the evidence pool or change exclusion eligibility.
 
 Confirming the review sends the unique selected debit and credit IDs through
 the existing bulk exclusion endpoint. The server persists only those saved-view

@@ -96,6 +96,23 @@ const transferCandidate: TransferRefundCandidate = {
   eligibleExclusionTransactionIds: [201],
 };
 
+const completionCandidate: TransferRefundCandidate = {
+  ...transferCandidate,
+  key: 'transfer-301-302',
+  debit: {
+    ...transferCandidate.debit,
+    id: 301,
+    description: 'Previously excluded transfer debit',
+  },
+  credit: {
+    ...transferCandidate.credit,
+    id: 302,
+    description: 'Remaining related transfer credit',
+  },
+  explicitlyExcludedTransactionIds: [301],
+  eligibleExclusionTransactionIds: [302],
+};
+
 const defaultProps = {
   viewId: 'view-1',
   viewName: 'Everyday spending',
@@ -148,6 +165,90 @@ afterEach(() => {
 });
 
 describe('TransferRefundReviewDialog', () => {
+  it('renders a new-only collection without an empty completion heading', () => {
+    renderDialog({ candidates: [refundCandidate, transferCandidate] });
+
+    expect(
+      screen.getByRole('heading', { name: 'New possible transfers and refunds' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Complete previous exclusions' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders completion-only evidence with precise membership status and eligible selection', async () => {
+    const user = userEvent.setup();
+    renderDialog({ candidates: [completionCandidate] });
+
+    const completionGroup = screen.getByRole('region', {
+      name: 'Complete previous exclusions',
+    });
+    expect(completionGroup).toHaveTextContent(
+      'A possible related transaction remains in this view while another transaction is already excluded. Review whether to exclude the remaining transaction.',
+    );
+    expect(
+      within(completionGroup).getByText('Previously excluded from this view'),
+    ).toBeInTheDocument();
+    expect(
+      within(completionGroup).queryByText('Not currently in this view'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'New possible transfers and refunds' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', {
+        name: 'Exclude debit transaction 301 from this view',
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Exclude credit transaction 302 from this view',
+      }),
+    ).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Exclude 1 from this view' })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Exclude 1 from this view' }));
+
+    expect(hookMocks.bulkExclude).toHaveBeenCalledWith(
+      { viewId: 'view-1', ids: [302] },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
+  it('groups completion work first while preserving new-candidate order and eligible IDs', async () => {
+    const user = userEvent.setup();
+    renderDialog({ candidates: [refundCandidate, completionCandidate, transferCandidate] });
+
+    const completionHeading = screen.getByRole('heading', {
+      name: 'Complete previous exclusions',
+    });
+    const newHeading = screen.getByRole('heading', {
+      name: 'New possible transfers and refunds',
+    });
+    expect(
+      completionHeading.compareDocumentPosition(newHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    const newGroup = screen.getByRole('region', { name: 'New possible transfers and refunds' });
+    const newCandidateRegions = within(newGroup).getAllByRole('region');
+    expect(newCandidateRegions[0]).toHaveAccessibleName('Possible refund');
+    expect(newCandidateRegions[1]).toHaveAccessibleName('Possible transfer');
+    expect(within(newGroup).getByText('Not currently in this view')).toBeInTheDocument();
+
+    const checkboxNames = screen
+      .getAllByRole('checkbox')
+      .map((checkbox) => checkbox.getAttribute('aria-label'));
+    expect(new Set(checkboxNames).size).toBe(checkboxNames.length);
+    expect(screen.getByRole('button', { name: 'Exclude 4 from this view' })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Exclude 4 from this view' }));
+
+    expect(hookMocks.bulkExclude).toHaveBeenCalledWith(
+      { viewId: 'view-1', ids: [101, 102, 302, 201] },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
   it('shows candidate labels, explanations, details, and original-currency amounts', () => {
     renderDialog();
 
