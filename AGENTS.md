@@ -456,9 +456,6 @@ Required (see `.env.example`):
 
 **Style**: ESLint 9 (flat config) + Prettier (see config files)
 
-ESLint excludes runner-owned `.ai-session-handler/` artifacts; validate application and repository
-source with the package lint scripts rather than linting session diagnostics.
-
 **Key files**: `src/types/transaction.ts`, `src/types/apiError.ts`, `src/App.tsx` (routes)
 
 ## Discovery Commands
