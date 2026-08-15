@@ -340,6 +340,11 @@ Features:
 - Pagination
 - Selection
 
+The shared `src/components/ui/Table.tsx` primitive owns horizontal overflow and
+shows the native horizontal scrollbar when a table is wider than its container.
+Feature tables must not hide that scrollbar; keep the behavior centralized in
+the shared primitive.
+
 ### Form Validation
 
 **Match OpenAPI spec** - Apply HTML5 validation (`maxLength`, `minLength`, `pattern`, `required`)
@@ -411,6 +416,9 @@ npm run format       # Format with Prettier
 ```
 
 **IMPORTANT**: Always use `npm run lint:fix` to auto-fix. Don't run `npm run lint` first - wastes time.
+
+ESLint ignores `.ai-session-handler/` because it contains ephemeral execution
+artifacts rather than repository source code.
 
 **Testing:**
 ```bash

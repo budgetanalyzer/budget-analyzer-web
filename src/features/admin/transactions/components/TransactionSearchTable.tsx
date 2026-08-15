@@ -300,7 +300,7 @@ export function TransactionSearchTable({
         {isFetching && data.length > 0 && (
           <div className="absolute left-0 right-0 top-0 h-0.5 animate-pulse bg-primary" />
         )}
-        <Table hideScrollbar={false}>
+        <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-b bg-muted/50 hover:bg-muted/50">

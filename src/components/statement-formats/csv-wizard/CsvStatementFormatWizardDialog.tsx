@@ -480,7 +480,7 @@ export function CsvStatementFormatWizardDialog({
 
               <div className="space-y-2">
                 <h3 className="text-sm font-medium">Sample rows</h3>
-                <Table className="min-w-[720px]" hideScrollbar={false}>
+                <Table className="min-w-[720px]">
                   <TableHeader>
                     <TableRow>
                       {headers.map((header) => (

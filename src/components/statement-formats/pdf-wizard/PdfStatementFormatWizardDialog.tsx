@@ -268,7 +268,7 @@ function CandidateSampleTable({ candidate }: CandidateSampleTableProps) {
   }
 
   return (
-    <Table className="min-w-[720px]" hideScrollbar={false}>
+    <Table className="min-w-[720px]">
       <TableHeader>
         <TableRow>
           {headers.map((header) => (
