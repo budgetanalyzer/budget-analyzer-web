@@ -18,6 +18,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { toggleAdminSidebar } from '@/store/uiSlice';
+import { acquireBodyScrollLock } from '@/utils/bodyScrollLock';
 import { cn } from '@/utils/cn';
 
 interface NavItem {
@@ -105,12 +106,9 @@ export function AdminLayout() {
 
   // Body scroll lock while mobile overlay is open
   useEffect(() => {
-    if (mobileOpen) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
+    if (!mobileOpen) return;
+
+    return acquireBodyScrollLock();
   }, [mobileOpen]);
 
   const handleToggle = useCallback(() => {

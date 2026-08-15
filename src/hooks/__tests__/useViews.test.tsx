@@ -10,11 +10,15 @@ import {
   useUnexcludeTransaction,
   useUpdateView,
   useView,
+  useExcludedViewTransactions,
+  useViewMembership,
+  useViewTransactions,
   useViews,
   viewKeys,
 } from '@/hooks/useViews';
 import { server } from '@/testing/mocks/server';
 import { createTestQueryClient } from '@/testing/test-utils';
+import type { Transaction } from '@/types/transaction';
 import type { SavedView } from '@/types/view';
 
 const savedView: SavedView = {
@@ -32,6 +36,25 @@ const savedView: SavedView = {
   transactionCount: 12,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-02T00:00:00Z',
+};
+
+const visibleTransaction: Transaction = {
+  id: 1,
+  accountId: 'checking',
+  bankName: 'Example Bank',
+  date: '2026-01-15',
+  currencyIsoCode: 'USD',
+  amount: -25,
+  type: 'DEBIT',
+  description: 'Visible purchase',
+  createdAt: '2026-01-15T00:00:00Z',
+  updatedAt: '2026-01-15T00:00:00Z',
+};
+
+const excludedTransaction: Transaction = {
+  ...visibleTransaction,
+  id: 3,
+  description: 'Excluded purchase',
 };
 
 function createWrapper(queryClient = createTestQueryClient()) {
@@ -97,6 +120,45 @@ describe('useViews', () => {
 
     expect(result.current.error?.status).toBe(503);
     expect(result.current.error?.message).toBe('View service unavailable');
+  });
+
+  it('shares canonical membership across membership and transaction projections', async () => {
+    const queryClient = createTestQueryClient();
+    let membershipRequestCount = 0;
+
+    queryClient.setQueryData(['transactions'], [visibleTransaction]);
+    queryClient.setQueryData(['transaction', excludedTransaction.id], excludedTransaction);
+    server.use(
+      http.get('/api/v1/views/:id/transactions', () => {
+        membershipRequestCount += 1;
+        return HttpResponse.json({ matched: [1], pinned: [], excluded: [3] });
+      }),
+    );
+
+    const { result } = renderHook(
+      () => ({
+        membership: useViewMembership('view-1'),
+        visible: useViewTransactions('view-1'),
+        excluded: useExcludedViewTransactions('view-1'),
+      }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.membership.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.visible.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.excluded.isSuccess).toBe(true));
+
+    expect(membershipRequestCount).toBe(1);
+    expect(queryClient.getQueryData(viewKeys.transactions('view-1'))).toEqual({
+      matched: [1],
+      pinned: [],
+      excluded: [3],
+    });
+    expect(result.current.membership.data?.excluded).toEqual([3]);
+    expect(result.current.visible.data).toEqual([
+      { ...visibleTransaction, membershipType: 'MATCHED' },
+    ]);
+    expect(result.current.excluded.data).toEqual([excludedTransaction]);
   });
 });
 

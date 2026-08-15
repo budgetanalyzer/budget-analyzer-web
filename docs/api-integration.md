@@ -38,6 +38,38 @@ membership: `dateFrom`, `dateTo`, and `q`. Date filters are applied before the
 local description search so the stats and table rows are derived from the same
 filtered transaction list.
 
+`Find Transfers & Refunds` is a client-side discovery workflow owned by View
+detail. It scans the complete active transaction collection, anchored on each
+credit, to derive deterministic possible refunds and transfers. Candidate
+amount comparison follows two paths: same-currency pairs are compared directly
+in their original currency and do not require an exchange rate, while
+cross-currency pairs convert each side using its own transaction-date exchange
+rate. Transfer candidates must be no more than seven absolute days apart and
+their comparison amounts must differ by no more than five percent; there is no
+fixed-amount tolerance. Canonical, unfiltered saved-view membership is the
+exclusion boundary and produces three presentation states. Current members are
+visible and eligible for independent exclusion controls. Active transactions
+outside the canonical view for another reason, such as not matching its
+criteria, may remain supporting evidence labelled `Not currently in this view`,
+but are not eligible for exclusion from that view. Explicitly excluded
+transactions may also remain as evidence when the possible counterpart is still
+a current member; they are labelled `Previously excluded from this view`, are
+never eligible for repeat exclusion, and place the candidate under `Complete
+previous exclusions`. Retaining this evidence lets the visible counterpart be
+handled after a partial review or incremental data arrival. The exclusion is
+membership state, not relationship provenance, so it does not confirm the
+possible relationship. New possible relationships remain in a separate group.
+Temporary View table filters do not narrow the evidence pool or change
+exclusion eligibility.
+
+Confirming the review sends the unique selected debit and credit IDs through
+the existing bulk exclusion endpoint. The server persists only those saved-view
+exclusions; it does not receive or store candidates, relationship metadata, or
+review or exclusion provenance. Exclusions remain reversible through the
+existing Restore Excluded workflow. No recommendation or relationship API is
+involved, and this discovery is unrelated to transaction import duplicate
+review.
+
 Analytics URLs carry an explicit source scope. Missing `scope` still means all
 transactions for backward compatibility, while scoped saved-view analytics use
 `scope=view&viewId=<id>`. Saved-view analytics resolves data through the same

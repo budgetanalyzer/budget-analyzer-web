@@ -724,8 +724,9 @@ backsliding.
 
 The main local build path, `npm run build`, runs `npm run test:coverage` before
 type-checking and bundling. GitHub Actions uses the same coverage gate in
-`.github/workflows/build.yml` before running the production bundle step. Use
-`npm run build:bundle` only when coverage has already passed in the same flow.
+`.github/workflows/build.yml`, runs the CSP production-smoke gate, and then creates the standard
+production bundle for artifact upload. Use `npm run build:bundle` only when coverage has already
+passed in the same flow.
 
 Use the report to find meaningful product-risk gaps, especially in auth,
 transactions, admin flows, analytics, saved views, and shared utilities. Do not

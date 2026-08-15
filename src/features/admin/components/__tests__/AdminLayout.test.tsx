@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 vi.mock('@/features/auth/hooks/useAuth');
 vi.mock('@/features/auth/hooks/usePermission');
@@ -11,6 +12,7 @@ import { renderWithProviders } from '@/testing/test-utils';
 
 const mockUseAuth = vi.mocked(useAuth);
 const mockUsePermission = vi.mocked(usePermission);
+const BODY_SCROLL_LOCK_CLASS = 'overflow-hidden';
 
 function renderLayout(initialPath: string = '/admin') {
   return renderWithProviders(<AdminLayout />, {
@@ -35,6 +37,10 @@ beforeEach(() => {
     logout: vi.fn(),
     refetch: vi.fn(),
   });
+});
+
+afterEach(() => {
+  document.body.classList.remove(BODY_SCROLL_LOCK_CLASS);
 });
 
 describe('AdminLayout nav gating', () => {
@@ -98,5 +104,48 @@ describe('AdminLayout nav active state', () => {
     const usersLink = screen.getByRole('link', { name: /Users/ });
     expect(usersLink.className).toContain('bg-primary/10');
     expect(usersLink.className).toContain('text-primary');
+  });
+});
+
+describe('AdminLayout mobile overlay body scroll lock', () => {
+  it('uses a static body class and removes it when closed', async () => {
+    const user = userEvent.setup();
+    const styleElementCount = document.querySelectorAll('style').length;
+    const { container } = renderLayout();
+
+    await user.click(screen.getByRole('button', { name: 'Open admin menu' }));
+
+    expect(document.body).toHaveClass(BODY_SCROLL_LOCK_CLASS);
+    expect(document.body).not.toHaveAttribute('style');
+    expect(container.querySelector('[style]')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('style')).toHaveLength(styleElementCount);
+
+    await user.click(screen.getByRole('button', { name: 'Open admin menu' }));
+
+    expect(document.body).not.toHaveClass(BODY_SCROLL_LOCK_CLASS);
+  });
+
+  it('removes the body class when Escape closes the overlay', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+
+    await user.click(screen.getByRole('button', { name: 'Open admin menu' }));
+    expect(document.body).toHaveClass(BODY_SCROLL_LOCK_CLASS);
+
+    await user.keyboard('{Escape}');
+
+    expect(document.body).not.toHaveClass(BODY_SCROLL_LOCK_CLASS);
+  });
+
+  it('removes the body class when the open overlay unmounts', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderLayout();
+
+    await user.click(screen.getByRole('button', { name: 'Open admin menu' }));
+    expect(document.body).toHaveClass(BODY_SCROLL_LOCK_CLASS);
+
+    unmount();
+
+    expect(document.body).not.toHaveClass(BODY_SCROLL_LOCK_CLASS);
   });
 });

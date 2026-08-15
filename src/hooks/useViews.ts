@@ -64,6 +64,19 @@ export const useView = (id: string): UseQueryResult<SavedView, ApiError> => {
 };
 
 /**
+ * Hook to fetch canonical transaction membership for a saved view.
+ */
+export const useViewMembership = (id: string): UseQueryResult<ViewMembershipResponse, ApiError> => {
+  return useQuery<ViewMembershipResponse, ApiError>({
+    queryKey: viewKeys.transactions(id),
+    queryFn: () => viewApi.getViewTransactions(id),
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+    enabled: !!id,
+  });
+};
+
+/**
  * Hook to fetch transactions for a saved view
  *
  * This hook:
@@ -79,13 +92,7 @@ export const useViewTransactions = (id: string): UseQueryResult<ViewTransaction[
   const queryClient = useQueryClient();
 
   // Step 1: Fetch view membership (transaction IDs)
-  const membershipQuery = useQuery<ViewMembershipResponse, ApiError>({
-    queryKey: viewKeys.transactions(id),
-    queryFn: () => viewApi.getViewTransactions(id),
-    staleTime: 1000 * 60 * 5,
-    retry: 1,
-    enabled: !!id,
-  });
+  const membershipQuery = useViewMembership(id);
 
   // Step 2: Get cached transactions
   const cachedTransactions = queryClient.getQueryData<Transaction[]>(['transactions']);
@@ -179,13 +186,7 @@ export const useExcludedViewTransactions = (
 ): UseQueryResult<Transaction[], ApiError> => {
   const queryClient = useQueryClient();
 
-  const membershipQuery = useQuery<ViewMembershipResponse, ApiError>({
-    queryKey: viewKeys.transactions(id),
-    queryFn: () => viewApi.getViewTransactions(id),
-    staleTime: 1000 * 60 * 5,
-    retry: 1,
-    enabled: !!id,
-  });
+  const membershipQuery = useViewMembership(id);
 
   const excludedIds = useMemo(() => membershipQuery.data?.excluded ?? [], [membershipQuery.data]);
 

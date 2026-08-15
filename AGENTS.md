@@ -492,6 +492,11 @@ This application is served behind a strict Content Security Policy: `style-src '
 
 **Use Tailwind classes for all styling.** If a dynamic width/size is needed, add an entry to `src/utils/columnWidth.ts` (static Tailwind class map) rather than using inline style props.
 
+**Body scroll locking:** Acquire locks through `acquireBodyScrollLock()` from
+`src/utils/bodyScrollLock.ts` inside external-system effects. The shared utility
+reference-counts overlapping overlays and toggles the static `overflow-hidden`
+class without creating a DOM `style` attribute.
+
 **Toast notifications:** Use the custom `@/hooks/useToast` hook and `@/components/ui/Toast.tsx` (Radix-based). Do NOT use `sonner` — it was removed because it unconditionally injects `<style>` elements on import, violating strict CSP. There is no opt-out in sonner.
 
 **Before adding any new UI dependency**, verify it does not inject styles at runtime. Check the bundled output:
@@ -499,6 +504,14 @@ This application is served behind a strict Content Security Policy: `style-src '
 npm run build:prod-smoke && rg -n "createElement\('style'\)|styleSheet\.cssText|eval\(" dist/
 ```
 If matches appear, the dependency violates CSP and must not be used.
+
+**Known baseline issue:** Existing Framer Motion and React DOM bundle signatures
+are tracked in
+[docs/issues/strict-csp-runtime-style-dependencies.md](docs/issues/strict-csp-runtime-style-dependencies.md).
+Those documented baseline matches alone do not block unrelated plan completion.
+Agents must still investigate new or changed matches, must not add runtime style
+injection, and must not treat this exception as proof that Framer Motion is CSP
+safe. Remove this exception when the issue is resolved.
 
 ## NOTES FOR AI AGENTS
 
