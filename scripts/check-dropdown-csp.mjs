@@ -5,15 +5,12 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 /*
- * Future direction: replace this narrow static regression gate only after a proper browser
- * integration harness provides equivalent coverage. Put that harness under e2e/, install
- * Playwright as a development dependency, and load the real production-smoke frontend while
- * intercepting the exact Session Gateway endpoints (/auth/v1/user and /auth/v1/session) plus only
- * the API routes required by each scenario. Treat those as browser integration tests, not full
- * system E2E tests, because authentication and backend services are mocked. Run representative
- * desktop and mobile viewports and assert real popover placement, viewport fallback, top-layer
- * clipping escape, absence of runtime style elements/attributes, and CSP console violations.
- * Do not promote the workspace-specific .ai-session-handler scripts into the repository harness.
+ * The repository Playwright harness under e2e/ loads the real production-smoke frontend and
+ * intercepts exact Session Gateway and scenario API requests. Keep this narrow static regression
+ * gate until npm run test:e2e:csp has explicit desktop and mobile dropdown coverage for real
+ * popover placement, viewport fallback, top-layer clipping escape, runtime style
+ * elements/attributes, and CSP violations. The current basic transaction selection audit does not
+ * prove that equivalence, so it does not replace this check.
  */
 
 const directDependency = '@radix-ui/react-dropdown-menu';

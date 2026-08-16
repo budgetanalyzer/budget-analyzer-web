@@ -63,7 +63,63 @@ npx vitest src/utils/__tests__/parseSearchTerms.test.ts
 
 # Run tests matching a pattern
 npx vitest --grep "renders correctly"
+
+# Type-check the external browser harness without launching Chromium
+npm run typecheck:e2e
+
+# Check the trusted production-smoke response and strict CSP header
+npm run test:e2e:harness
+
+# Strictly audit the implemented application workflow (may fail on real findings)
+npm run test:e2e:csp
 ```
+
+### External Browser Harness
+
+Playwright browser tests use the externally managed Tilt ingress at
+`https://app.budgetanalyzer.localhost/_prod-smoke/`; the harness does not start
+Vite, Tilt, NGINX, or another server. Users must provide that environment;
+agents must not start Tilt or Vite. Run
+`check-budget-analyzer-local-ca-trust` first. If the container trust copy is
+stale, run `ensure-budget-analyzer-local-ca-trust` and check again. Do not bypass
+HTTPS verification.
+
+Set `PLAYWRIGHT_BASE_URL` only to select another trusted, externally managed
+HTTPS production-smoke origin:
+
+```bash
+PLAYWRIGHT_BASE_URL=https://app.budgetanalyzer.localhost/_prod-smoke/ \
+  npm run test:e2e:csp
+```
+
+`test:e2e:harness` contains environment, fail-closed mock, and controlled
+detector self-tests. The controlled mutation proves that the detector rejects
+prohibited behavior; it deliberately does not assert that product code is
+clean. `test:e2e:csp` includes those detector checks plus strict application
+audits. A product audit returns nonzero when it observes a CSP violation,
+dynamic `<style>`, or transient/final DOM `style` attribute. Do not allowlist or
+snapshot-accept a current finding to make the audit pass.
+
+Failure traces, screenshots, and results remain local under
+`test-results/playwright/`; the HTML report is under `playwright-report/`.
+Both generated directories are excluded from source linting and formatting.
+
+Browser scenarios use the typed fixtures under `e2e/fixtures/`. The CSP monitor
+must be installed before navigation and observes policy events, transient and
+final DOM styling, and supporting console errors. Browser mocks fulfill only the
+exact auth endpoints and scenario-registered `/api/*` responses. Any other auth
+or API request is blocked and fails fixture teardown, so browser tests never
+fall through silently to protected services. Shared fixture data uses fixed IDs
+and timestamps and does not read real cookies or backend state.
+
+Vitest excludes `e2e/**`; Playwright specifications are collected only by the
+explicit browser commands. Unit coverage and ordinary build flows therefore do
+not require Tilt, the production-smoke route, or Chromium.
+
+Current application coverage is one authenticated desktop transaction-list
+workflow: render deterministic mocked data, select a row to reveal the bulk
+action bar, and clear the selection to dismiss it. It is not exhaustive route,
+form, mobile, dropdown, or cross-browser coverage.
 
 ---
 
@@ -74,11 +130,14 @@ npx vitest --grep "renders correctly"
 #### 1. vitest.config.ts
 
 ```typescript
+import { configDefaults, defineConfig } from 'vitest/config';
+
 export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/testing/setup.ts',
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],

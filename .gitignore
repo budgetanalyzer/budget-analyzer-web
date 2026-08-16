@@ -246,6 +246,8 @@ volumes/
 test-results/
 test-reports/
 junit/
+playwright-report/
+blob-report/
 .pytest_cache/
 .coverage
 htmlcov/

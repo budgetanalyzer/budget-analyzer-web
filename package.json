@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run test:coverage && npm run build:bundle",
-    "build:bundle": "tsc && vite build",
+    "build:bundle": "npm run typecheck:e2e && tsc && vite build",
     "build:prod-smoke": "tsc && vite build --base /_prod-smoke/ && npm run check:csp:dropdown",
     "check:csp:dropdown": "node scripts/check-dropdown-csp.mjs",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
@@ -14,8 +14,11 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e:csp": "playwright test e2e/csp",
+    "test:e2e:harness": "playwright test e2e/harness e2e/csp/detector.spec.ts",
     "test:ui": "vitest --ui",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
+    "typecheck:e2e": "tsc --project tsconfig.e2e.json",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"e2e/**/*.ts\" \"playwright.config.ts\""
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
@@ -36,6 +39,7 @@
     "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@testing-library/user-event": "^14.6.1",

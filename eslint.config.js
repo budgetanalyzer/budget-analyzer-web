@@ -10,7 +10,15 @@ import importPlugin from 'eslint-plugin-import';
 
 export default [
   {
-    ignores: ['dist', 'build', 'node_modules', 'coverage', '.ai-session-handler'],
+    ignores: [
+      'dist',
+      'build',
+      'node_modules',
+      'coverage',
+      '.ai-session-handler',
+      'playwright-report',
+      'test-results',
+    ],
   },
 
   js.configs.recommended,
