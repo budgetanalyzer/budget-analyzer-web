@@ -19,6 +19,13 @@ npm run dev
 Access at `https://app.budgetanalyzer.localhost` (not `http://localhost:3000`).
 Requires backend infrastructure — see [orchestration getting-started](https://github.com/budgetanalyzer/orchestration/blob/main/docs/development/getting-started.md).
 
+Run the strict production-browser CSP audit with `npm run test:e2e:csp` after
+the workstation-owned Tilt production-smoke route is available and locally
+trusted. The command uses deterministic browser mocks and may fail on real
+runtime CSP findings; see [docs/testing-guide.md](docs/testing-guide.md#external-browser-harness)
+for prerequisites, self-tests, and artifacts. Agents must not start Tilt or
+Vite for this audit.
+
 ## Features
 
 - Transaction management — list, search, sort, paginate, import CSV

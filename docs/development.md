@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - npm, yarn, or pnpm
 - Docker and Docker Compose (backend infrastructure must be running)
 
@@ -30,6 +30,9 @@ npm run build     # Coverage gate + production build
 npm run build:bundle  # Production bundle only
 npm run build:prod-smoke  # Prod-smoke build + dropdown CSP gate
 npm run check:csp:dropdown  # Check an existing dist/ for known dropdown blockers
+npm run typecheck:e2e  # Type-check Playwright configuration and E2E sources
+npm run test:e2e:harness  # Validate the external environment and browser fixture detectors
+npm run test:e2e:csp  # Run strict application browser CSP audits
 npm run preview   # Preview production build
 npm run lint      # Run ESLint
 npm run format    # Format with Prettier
@@ -37,6 +40,43 @@ npm test          # Run tests
 npm run test:coverage  # Run tests once with V8 coverage
 npm run test:ui   # Run tests with UI
 ```
+
+The Playwright harness targets
+`https://app.budgetanalyzer.localhost/_prod-smoke/` by default. It relies on the
+workstation-owned Tilt stack and never starts a server. Users must make that
+route available first; agents must not start Tilt or Vite. Check trust before
+running browser tests:
+
+```bash
+check-budget-analyzer-local-ca-trust
+# If the container trust copy is stale:
+ensure-budget-analyzer-local-ca-trust
+check-budget-analyzer-local-ca-trust
+
+npm run test:e2e:harness
+npm run test:e2e:csp
+```
+
+`test:e2e:harness` proves the trusted response-policy check, fail-closed mocks,
+and CSP detector independently. It does not claim that the application is CSP
+clean. `test:e2e:csp` runs strict, unallowlisted application workflows and
+returns nonzero for any observed CSP violation, dynamic `<style>` element, or
+DOM `style` attribute.
+
+Browser mocks intercept the exact `/auth/v1/user`, `/auth/v1/session`, and
+scenario-registered `/api/*` requests. Unexpected protected requests are
+blocked instead of reaching backend services. To select another externally
+managed production-smoke route, use a trusted HTTPS URL without disabling
+certificate verification:
+
+```bash
+PLAYWRIGHT_BASE_URL=https://app.budgetanalyzer.localhost/_prod-smoke/ \
+  npm run test:e2e:csp
+```
+
+Failure traces, screenshots, and result context remain local under
+`test-results/playwright/`; the HTML report is written to `playwright-report/`.
+Both directories are ignored and must not be committed.
 
 ## Environment Variables
 
@@ -109,9 +149,10 @@ standard bundle afterward so its uploaded `dist/` artifact remains rooted at `/`
 and API paths remain root-relative regardless of which build is used.
 
 This gate is deliberately dropdown-specific. For the coordinated static verifier, run
-`./scripts/smoketest/audit-frontend-csp.sh` from the sibling orchestration repository. Manual
-browser-console validation at `https://app.budgetanalyzer.localhost/_prod-smoke/` remains required
-as the stronger runtime CSP proof; neither static scan replaces it.
+`./scripts/smoketest/audit-frontend-csp.sh` from the sibling orchestration repository. The
+repository browser audit, `npm run test:e2e:csp`, supplies runtime evidence from the trusted
+production-smoke route; the current basic transaction workflow is not exhaustive. Neither static
+scan replaces broader runtime coverage.
 
 ### Container Releases
 
