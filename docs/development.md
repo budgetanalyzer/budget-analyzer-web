@@ -41,6 +41,10 @@ npm run test:coverage  # Run tests once with V8 coverage
 npm run test:ui   # Run tests with UI
 ```
 
+`typecheck:e2e` is an explicit agent/developer check for Playwright changes. It
+is intentionally not part of `build`, `build:bundle`, or the GitHub Actions
+workflows. The Tilt-dependent browser commands are also local-only.
+
 The Playwright harness targets
 `https://app.budgetanalyzer.localhost/_prod-smoke/` by default. It relies on the
 workstation-owned Tilt stack and never starts a server. Users must make that

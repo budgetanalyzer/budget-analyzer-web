@@ -127,8 +127,10 @@ tests never fall through silently to protected services. Shared fixture data
 uses fixed IDs and timestamps and does not read real cookies or backend state.
 
 Vitest excludes `e2e/**`; Playwright specifications are collected only by the
-explicit browser commands. Unit coverage and ordinary build flows therefore do
-not require Tilt, the production-smoke route, or Chromium.
+explicit browser commands. Agents changing Playwright configuration or E2E
+sources run `npm run typecheck:e2e` explicitly. Ordinary builds and CI
+workflows do not invoke the E2E type-check or Tilt-dependent browser commands,
+so they do not require Tilt, the production-smoke route, or Chromium.
 
 Current application coverage is one authenticated desktop transaction-list
 workflow: render deterministic mocked data, select a row to reveal the bulk

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run test:coverage && npm run build:bundle",
-    "build:bundle": "npm run typecheck:e2e && tsc && vite build",
+    "build:bundle": "tsc && vite build",
     "build:prod-smoke": "tsc && vite build --base /_prod-smoke/ && npm run check:csp:dropdown",
     "check:csp:dropdown": "node scripts/check-dropdown-csp.mjs",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",

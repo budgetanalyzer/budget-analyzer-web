@@ -425,6 +425,7 @@ artifacts rather than repository source code.
 npm test             # Run tests in watch mode
 npm run test:coverage  # Run tests once and print V8 coverage
 npm run test:ui      # Run tests with Vitest UI
+npm run typecheck:e2e  # Type-check Playwright config and E2E sources without Tilt
 
 # Single test file
 npx vitest src/utils/__tests__/parseSearchTerms.test.ts
@@ -432,6 +433,10 @@ npx vitest src/utils/__tests__/parseSearchTerms.test.ts
 # Test pattern
 npx vitest --grep "renders correctly"
 ```
+
+Agents changing Playwright configuration or files under `e2e/` must run
+`npm run typecheck:e2e` explicitly. Normal builds and CI workflows do not run
+this check or any Tilt-dependent browser test.
 
 ### Testing Setup
 
