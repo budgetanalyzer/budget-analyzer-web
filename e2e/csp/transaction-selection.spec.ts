@@ -1,4 +1,5 @@
 import { buildAuthenticatedUser } from 'e2e/fixtures/data';
+import { assertCspObservationsClean } from 'e2e/fixtures/cspObservations';
 import { registerTransactionPageResponses } from 'e2e/fixtures/scenarios';
 import { expect, test } from 'e2e/fixtures/test';
 
@@ -8,7 +9,7 @@ test.use({
   }),
 });
 
-test('authenticated transaction selection workflow has no prohibited runtime styling', async ({
+test('authenticated transaction selection has no CSP violations or prohibited stylesheets', async ({
   page,
   browserMocks,
   cspMonitor,
@@ -32,5 +33,13 @@ test('authenticated transaction selection workflow has no prohibited runtime sty
   await expect(selectionStatus).not.toBeVisible();
   browserMocks.assertNoUnexpectedRequests();
 
-  await cspMonitor.assertClean();
+  const snapshot = await cspMonitor.snapshot();
+  console.info(
+    `Authenticated transaction CSP audit: ${snapshot.cspViolations.length} CSP violations, ${snapshot.runtimeStylesheetAdditions.length} runtime-added stylesheets, ${snapshot.finalStyleElements.length} final stylesheets.`,
+  );
+  expect(snapshot.monitorVersion).toBe(1);
+  expect(snapshot.cspViolations).toEqual([]);
+  expect(snapshot.runtimeStylesheetAdditions).toEqual([]);
+  expect(snapshot.finalStyleElements).toEqual([]);
+  assertCspObservationsClean(snapshot);
 });

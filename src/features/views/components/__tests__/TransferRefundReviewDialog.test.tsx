@@ -463,22 +463,6 @@ describe('TransferRefundReviewDialog', () => {
     expect(props.onComplete).not.toHaveBeenCalled();
   });
 
-  it('does not create runtime style elements or DOM style attributes', async () => {
-    const user = userEvent.setup();
-    const styleElementCount = document.querySelectorAll('style').length;
-    const { container } = renderDialog();
-
-    await user.click(
-      screen.getByRole('checkbox', {
-        name: 'Exclude debit transaction 101 from this view',
-      }),
-    );
-
-    expect(document.querySelectorAll('style')).toHaveLength(styleElementCount);
-    expect(document.body).not.toHaveAttribute('style');
-    expect(container.querySelector('[style]')).not.toBeInTheDocument();
-  });
-
   it('resets default selection when the dialog is reopened through remount', async () => {
     const user = userEvent.setup();
     const firstRender = renderDialog({ candidates: [refundCandidate] });

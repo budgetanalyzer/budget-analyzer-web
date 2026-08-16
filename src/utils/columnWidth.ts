@@ -1,6 +1,5 @@
-// CSP-compliant column width utility. Replaces inline style={{ width: '...px' }}
-// props which produce DOM style="" attributes that violate strict style-src 'self'
-// CSP. Do NOT use inline style props for column widths — add entries here instead.
+// Repository-standard column width utility. Keep application-authored styling in
+// static Tailwind classes instead of React style props; add supported widths here.
 //
 // Static map so Tailwind JIT can scan the complete class strings.
 const WIDTH_CLASSES: Record<number, string> = {

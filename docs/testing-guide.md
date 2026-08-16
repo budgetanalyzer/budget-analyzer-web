@@ -93,12 +93,26 @@ PLAYWRIGHT_BASE_URL=https://app.budgetanalyzer.localhost/_prod-smoke/ \
 ```
 
 `test:e2e:harness` contains environment, fail-closed mock, and controlled
-detector self-tests. The controlled mutation proves that the detector rejects
-prohibited behavior; it deliberately does not assert that product code is
-clean. `test:e2e:csp` includes those detector checks plus strict application
-audits. A product audit returns nonzero when it observes a CSP violation,
-dynamic `<style>`, or transient/final DOM `style` attribute. Do not allowlist or
-snapshot-accept a current finding to make the audit pass.
+detector self-tests. It fails when the trusted production-smoke route or
+required response CSP is missing, a browser mock falls through, the monitor was
+not installed before navigation, an allowed control produces a security or
+stylesheet finding, or a prohibited control is not detected. The allowed
+controls prove that direct property assignment, `Object.assign(element.style,
+...)`, `style.setProperty(...)`, and `CSSStyleDeclaration.cssText` can apply and
+serialize as DOM style attributes without a CSP event in the exercised
+Chromium context. Separate blocked controls require an enforced CSP event for
+`setAttribute('style', ...)` and a repository stylesheet-guard finding for a
+transient runtime `<style>`.
+
+`test:e2e:csp` includes those detector checks plus strict application audits.
+An application audit returns nonzero when it observes any
+`securitypolicyviolation`, a runtime-added `<style>` element, or a `<style>`
+element still present in the final DOM. CSP-related console errors are retained
+as supporting diagnostics, not used as a substitute for policy events. The
+global CSP monitor neither collects nor asserts DOM style attributes: trusted
+client-side property writes are allowed by browser CSP even though the DOM
+serializes their result as a `style` attribute. Do not allowlist or
+snapshot-accept an executable finding to make the audit pass.
 
 Failure traces, screenshots, and results remain local under
 `test-results/playwright/`; the HTML report is under `playwright-report/`.
@@ -106,11 +120,11 @@ Both generated directories are excluded from source linting and formatting.
 
 Browser scenarios use the typed fixtures under `e2e/fixtures/`. The CSP monitor
 must be installed before navigation and observes policy events, transient and
-final DOM styling, and supporting console errors. Browser mocks fulfill only the
-exact auth endpoints and scenario-registered `/api/*` responses. Any other auth
-or API request is blocked and fails fixture teardown, so browser tests never
-fall through silently to protected services. Shared fixture data uses fixed IDs
-and timestamps and does not read real cookies or backend state.
+final stylesheet elements, and supporting console errors. Browser mocks fulfill
+only the exact auth endpoints and scenario-registered `/api/*` responses. Any
+other auth or API request is blocked and fails fixture teardown, so browser
+tests never fall through silently to protected services. Shared fixture data
+uses fixed IDs and timestamps and does not read real cookies or backend state.
 
 Vitest excludes `e2e/**`; Playwright specifications are collected only by the
 explicit browser commands. Unit coverage and ordinary build flows therefore do
@@ -118,8 +132,10 @@ not require Tilt, the production-smoke route, or Chromium.
 
 Current application coverage is one authenticated desktop transaction-list
 workflow: render deterministic mocked data, select a row to reveal the bulk
-action bar, and clear the selection to dismiss it. It is not exhaustive route,
-form, mobile, dropdown, or cross-browser coverage.
+action bar, and clear the selection to dismiss it. It reports zero CSP
+violations, zero runtime-added stylesheets, and zero final stylesheets in the
+current Chromium run. Playwright is configured only for desktop Chromium, so
+this is not exhaustive route, form, mobile, dropdown, or cross-browser proof.
 
 ---
 

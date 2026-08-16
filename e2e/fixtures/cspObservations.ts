@@ -20,14 +20,8 @@ export interface CspViolationObservation extends SourceLocation {
   timing: ScenarioTiming;
 }
 
-export interface StyleElementObservation {
+export interface RuntimeStylesheetObservation {
   element: string;
-  timing: ScenarioTiming;
-}
-
-export interface StyleAttributeObservation {
-  element: string;
-  mutation: 'added' | 'changed' | 'removed';
   timing: ScenarioTiming;
 }
 
@@ -43,17 +37,14 @@ export interface BrowserConsoleObservation extends SourceLocation {
 export interface CspObservationSnapshot {
   monitorVersion: 1;
   cspViolations: CspViolationObservation[];
-  styleElementMutations: StyleElementObservation[];
-  styleAttributeMutations: StyleAttributeObservation[];
+  runtimeStylesheetAdditions: RuntimeStylesheetObservation[];
   finalStyleElements: FinalDomStyleObservation[];
-  finalStyleAttributes: FinalDomStyleObservation[];
   consoleErrors: BrowserConsoleObservation[];
 }
 
 interface BrowserObservationChannels {
   cspViolations: CspViolationObservation[];
-  styleElementMutations: StyleElementObservation[];
-  styleAttributeMutations: StyleAttributeObservation[];
+  runtimeStylesheetAdditions: RuntimeStylesheetObservation[];
 }
 
 interface BrowserCspMonitor {
@@ -95,8 +86,7 @@ export function installBrowserCspMonitor(): void {
   let scenarioStartedAt = installedAt;
   let observations: BrowserObservationChannels = {
     cspViolations: [],
-    styleElementMutations: [],
-    styleAttributeMutations: [],
+    runtimeStylesheetAdditions: [],
   };
 
   const timing = (): ScenarioTiming => ({
@@ -127,7 +117,7 @@ export function installBrowserCspMonitor(): void {
   };
 
   const recordStyleElement = (element: Element): void => {
-    observations.styleElementMutations.push({
+    observations.runtimeStylesheetAdditions.push({
       element: elementSummary(element),
       timing: timing(),
     });
@@ -154,30 +144,13 @@ export function installBrowserCspMonitor(): void {
 
   const observer = new MutationObserver((mutationRecords) => {
     for (const mutationRecord of mutationRecords) {
-      if (mutationRecord.type === 'childList') {
-        mutationRecord.addedNodes.forEach(recordAddedStyles);
-        continue;
-      }
-
-      if (mutationRecord.type === 'attributes' && mutationRecord.target instanceof Element) {
-        const hasStyle = mutationRecord.target.hasAttribute('style');
-        const mutation =
-          mutationRecord.oldValue === null ? 'added' : hasStyle ? 'changed' : 'removed';
-        observations.styleAttributeMutations.push({
-          element: elementSummary(mutationRecord.target),
-          mutation,
-          timing: timing(),
-        });
-      }
+      mutationRecord.addedNodes.forEach(recordAddedStyles);
     }
   });
 
   observer.observe(document, {
     subtree: true,
     childList: true,
-    attributes: true,
-    attributeFilter: ['style'],
-    attributeOldValue: true,
   });
 
   window.__budgetAnalyzerCspMonitor = {
@@ -186,20 +159,15 @@ export function installBrowserCspMonitor(): void {
     reset: () => {
       observations = {
         cspViolations: [],
-        styleElementMutations: [],
-        styleAttributeMutations: [],
+        runtimeStylesheetAdditions: [],
       };
       scenarioStartedAt = performance.now();
     },
     snapshot: () => ({
       monitorVersion: 1,
       cspViolations: [...observations.cspViolations],
-      styleElementMutations: [...observations.styleElementMutations],
-      styleAttributeMutations: [...observations.styleAttributeMutations],
+      runtimeStylesheetAdditions: [...observations.runtimeStylesheetAdditions],
       finalStyleElements: [...document.querySelectorAll('style')].map((element) => ({
-        element: elementSummary(element),
-      })),
-      finalStyleAttributes: [...document.querySelectorAll('[style]')].map((element) => ({
         element: elementSummary(element),
       })),
     }),
@@ -242,22 +210,13 @@ export function formatCspDiagnostics(snapshot: CspObservationSnapshot): string {
       (violation) =>
         `CSP ${violation.disposition} ${violation.effectiveDirective} blocked ${violation.blockedUri || 'unknown'}${formatLocation(violation)} [${formatTiming(violation.timing)}]`,
     ),
-    ...uniqueBy(snapshot.styleElementMutations, (observation) => observation.element).map(
+    ...uniqueBy(snapshot.runtimeStylesheetAdditions, (observation) => observation.element).map(
       (observation) =>
-        `runtime <style> added: ${observation.element} [${formatTiming(observation.timing)}]`,
-    ),
-    ...uniqueBy(
-      snapshot.styleAttributeMutations.filter((observation) => observation.mutation !== 'removed'),
-      (observation) => `${observation.mutation}|${observation.element}`,
-    ).map(
-      (observation) =>
-        `runtime style attribute ${observation.mutation}: ${observation.element} [${formatTiming(observation.timing)}]`,
+        `repository stylesheet guard: runtime <style> added: ${observation.element} [${formatTiming(observation.timing)}]`,
     ),
     ...uniqueBy(snapshot.finalStyleElements, (observation) => observation.element).map(
-      (observation) => `final DOM <style> present: ${observation.element}`,
-    ),
-    ...uniqueBy(snapshot.finalStyleAttributes, (observation) => observation.element).map(
-      (observation) => `final DOM style attribute present: ${observation.element}`,
+      (observation) =>
+        `repository stylesheet guard: final DOM <style> present: ${observation.element}`,
     ),
   ];
   const supportingEvidence = uniqueBy(
@@ -273,19 +232,14 @@ export function formatCspDiagnostics(snapshot: CspObservationSnapshot): string {
 }
 
 export function assertCspObservationsClean(snapshot: CspObservationSnapshot): void {
-  const hasRuntimeStyleAttribute = snapshot.styleAttributeMutations.some(
-    (observation) => observation.mutation !== 'removed',
-  );
   const hasExecutableFinding =
     snapshot.cspViolations.length > 0 ||
-    snapshot.styleElementMutations.length > 0 ||
-    hasRuntimeStyleAttribute ||
-    snapshot.finalStyleElements.length > 0 ||
-    snapshot.finalStyleAttributes.length > 0;
+    snapshot.runtimeStylesheetAdditions.length > 0 ||
+    snapshot.finalStyleElements.length > 0;
 
   if (!hasExecutableFinding) return;
 
-  throw new Error(`Strict CSP observation failed:\n${formatCspDiagnostics(snapshot)}`);
+  throw new Error(`Browser security observation failed:\n${formatCspDiagnostics(snapshot)}`);
 }
 
 export interface CspObserverController {

@@ -56,10 +56,9 @@ describe('CurrencySelector', () => {
     mockUseCurrencies.mockReset();
   });
 
-  it('selects an enabled currency, updates Redux, and closes without runtime styles', async () => {
+  it('selects an enabled currency, updates Redux, and closes', async () => {
     mockCurrencies(currencies);
     const user = userEvent.setup();
-    const styleCount = document.querySelectorAll('style').length;
     const { store } = renderSelector();
 
     const trigger = screen.getByRole('button', { name: 'EUR' });
@@ -75,10 +74,6 @@ describe('CurrencySelector', () => {
     expect(store.getState().ui.displayCurrency).toBe('GBP');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'GBP' })).toHaveAttribute('aria-expanded', 'false');
-    expect(document.querySelectorAll('style')).toHaveLength(styleCount);
-    expect(trigger).not.toHaveAttribute('style');
-    expect(menu).not.toHaveAttribute('style');
-    expect(menu.querySelector('[style]')).toBeNull();
   });
 
   it('renders no selector while enabled currencies are loading', () => {

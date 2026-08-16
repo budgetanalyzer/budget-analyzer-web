@@ -86,10 +86,21 @@ existing restore path.
 
 ## CSP Compliance
 
-The production build is served with a strict Content Security Policy (`style-src 'self'` — no `unsafe-inline`):
+The production build is a statically served, client-rendered SPA with
+`style-src 'self'` and no `'unsafe-inline'`. In this context, strict CSP does
+not mean that the DOM can never contain a `style` attribute. Parser-created or
+server-rendered inline styles and direct `setAttribute('style', ...)` writes are
+blocked. Authorized client JavaScript may update individual properties through
+an element's `style` object; the browser permits those writes even though it
+serializes the result as a DOM `style` attribute.
 
-- **No inline `style={...}` props** — all styling uses Tailwind CSS classes
-- **No runtime CSS injection** — libraries that call `document.createElement('style')` are banned
+The repository applies separate styling conventions in addition to browser CSP:
+
+- **Tailwind-first application styling** — application code does not use React
+  `style` props; styling is expressed through statically emitted Tailwind/CSS
+  for consistency and maintainability
+- **No runtime stylesheet injection** — libraries that create dynamic `<style>`
+  elements, write stylesheet content, or insert CSSOM rules are prohibited
 - **Custom toast system** — `sonner` was replaced with a Radix-based toast (`src/components/ui/Toast.tsx`) because sonner injects `<style>` elements
 - **Column widths** use a static Tailwind class map (`src/utils/columnWidth.ts`) instead of inline style props
 - **Body scroll locking** for dialogs and mobile overlays uses the shared, reference-counted
@@ -98,14 +109,28 @@ The production build is served with a strict Content Security Policy (`style-src
 - **Shared dropdowns** use native popovers for top-layer placement and statically emitted Tailwind
   anchor-positioning utilities, including `position-anchor: auto` to select each popover invoker as
   its implicit anchor. Programmatic opens pass the trigger as the Popover API `source` so the browser
-  retains that invoker relationship. Runtime portals, measured coordinates, inline styles, and
-  injected stylesheets are prohibited. The required browser floor is documented under Browser
-  Support.
+  retains that invoker relationship. Runtime portals, measured coordinates, application-authored
+  inline styles, and injected stylesheets are prohibited. The required browser floor is documented
+  under Browser Support.
+
+Google's “strict CSP” guidance focuses principally on script trust through
+nonces or hashes. It does not make Tailwind or another sample technology a
+styling security requirement; the Tailwind-first and no-runtime-stylesheet
+rules above are repository decisions.
+
+`CSSStyleDeclaration.cssText` applies without a CSP violation in the exercised
+Chromium production-smoke context. That browser result is not generalized to
+untested engines, and `cssText` is not adopted as an application-authoring
+pattern. Stylesheet-content `cssText`, dynamic `<style>` elements, and
+`insertRule()` remain prohibited.
 
 `npm run build:prod-smoke` automatically applies a dropdown-specific static gate to the emitted
 bundle, production source, and package metadata. It detects the known Radix menu and
-`react-remove-scroll` defect signatures; it is not a substitute for strict-CSP browser-console
-validation.
+`react-remove-scroll` defect signatures; it is not a substitute for browser-policy validation.
+The Playwright audit treats `securitypolicyviolation` events and prohibited runtime or final
+stylesheets as executable findings. It intentionally does not infer violations from serialized DOM
+style attributes. Bundle matches are reviewed as capability inventory, including Motion's dormant
+`AnimatePresence mode="popLayout"` stylesheet helper and React DOM's generic renderer support.
 
 ## Security Model
 

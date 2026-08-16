@@ -56,7 +56,10 @@ React 19.2 | TypeScript | Vite | React Router 7.14 | TanStack Query | Redux Tool
 - **Server-side sessions** in Redis — 15-minute sliding expiry
 - **Per-request validation** — every API call validated before reaching backends
 - **Instant revocation** — delete the Redis key, session is immediately dead
-- **Strict CSP** — `style-src 'self'`, no inline styles or runtime CSS injection
+- **Strict CSP** — `style-src 'self'` blocks parser/attribute inline styles;
+  application styling remains Tailwind-first and runtime stylesheet injection
+  is prohibited. Trusted client JavaScript property writes may serialize as a
+  DOM `style` attribute without violating browser CSP.
 
 See [docs/architecture.md](docs/architecture.md) for full details.
 
