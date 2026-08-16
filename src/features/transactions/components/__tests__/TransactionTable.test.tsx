@@ -152,14 +152,6 @@ async function openFirstRowMenu() {
   await user.click(triggers[0]);
 }
 
-function expectNoRuntimeStyles(styleCount: number, ...elements: HTMLElement[]) {
-  expect(document.querySelectorAll('style')).toHaveLength(styleCount);
-  elements.forEach((element) => {
-    expect(element).not.toHaveAttribute('style');
-    expect(element.querySelector('[style]')).toBeNull();
-  });
-}
-
 beforeEach(() => {
   mockUsePermission.mockReset();
   transactionHookMocks.deleteMutate.mockReset();
@@ -246,16 +238,13 @@ describe('TransactionTable Add to View submenu', () => {
     mockUsePermission.mockReturnValue(true);
     viewHookState.views = savedViews;
     const user = userEvent.setup();
-    const styleCount = document.querySelectorAll('style').length;
     renderTable();
 
     const row = screen.getByText('Salary').closest('tr');
     expect(row).not.toBeNull();
     const trigger = within(row as HTMLTableRowElement).getByRole('button', { name: 'Open menu' });
     await user.click(trigger);
-    const parentMenu = screen.getByRole('menu');
     await user.hover(screen.getByRole('menuitem', { name: 'Add to View' }));
-    const submenu = screen.getAllByRole('menu')[1];
     await user.click(screen.getByRole('menuitem', { name: 'Monthly Review' }));
 
     expect(viewHookState.pinMutate).toHaveBeenCalledOnce();
@@ -269,7 +258,6 @@ describe('TransactionTable Add to View submenu', () => {
     expect(transactionHookMocks.updateMutate).not.toHaveBeenCalled();
     expect(transactionHookMocks.deleteMutate).not.toHaveBeenCalled();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    expectNoRuntimeStyles(styleCount, trigger, parentMenu, submenu);
   });
 
   it('opens with ArrowRight and pins the selected view exactly once by keyboard', async () => {

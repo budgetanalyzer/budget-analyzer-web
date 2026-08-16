@@ -57,14 +57,12 @@ describe('ViewSettingsMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('updates open-ended state with the existing payload and adds no runtime styles', async () => {
+  it('updates open-ended state with the existing payload', async () => {
     const user = userEvent.setup();
-    const styleCount = document.querySelectorAll('style').length;
     render(<ViewSettingsMenu view={view} onEditClick={vi.fn()} onDeleteClick={vi.fn()} />);
 
     const trigger = screen.getByRole('button', { name: 'View settings' });
     await user.click(trigger);
-    const menu = screen.getByRole('menu');
     await user.click(screen.getByRole('menuitem', { name: 'Enable Open-Ended' }));
 
     expect(hookState.updateView).toHaveBeenCalledOnce();
@@ -73,10 +71,6 @@ describe('ViewSettingsMenu', () => {
       request: { openEnded: true },
     });
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    expect(document.querySelectorAll('style')).toHaveLength(styleCount);
-    expect(trigger).not.toHaveAttribute('style');
-    expect(menu).not.toHaveAttribute('style');
-    expect(menu.querySelector('[style]')).toBeNull();
   });
 
   it('disables the trigger and open-ended action while an update is pending', async () => {

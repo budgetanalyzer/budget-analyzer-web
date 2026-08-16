@@ -425,6 +425,7 @@ artifacts rather than repository source code.
 npm test             # Run tests in watch mode
 npm run test:coverage  # Run tests once and print V8 coverage
 npm run test:ui      # Run tests with Vitest UI
+npm run typecheck:e2e  # Type-check Playwright config and E2E sources without Tilt
 
 # Single test file
 npx vitest src/utils/__tests__/parseSearchTerms.test.ts
@@ -432,6 +433,10 @@ npx vitest src/utils/__tests__/parseSearchTerms.test.ts
 # Test pattern
 npx vitest --grep "renders correctly"
 ```
+
+Agents changing Playwright configuration or files under `e2e/` must run
+`npm run typecheck:e2e` explicitly. Normal builds and CI workflows do not run
+this check or any Tilt-dependent browser test.
 
 ### Testing Setup
 
@@ -490,15 +495,35 @@ cat src/store/uiSlice.ts
 
 ## Strict CSP Compliance
 
-This application is served behind a strict Content Security Policy: `style-src 'self'` with NO `'unsafe-inline'` and NO `'unsafe-eval'`. Every piece of frontend code MUST comply.
+This statically served, client-rendered application is served behind a strict
+Content Security Policy: `style-src 'self'` with NO `'unsafe-inline'` and NO
+`'unsafe-eval'`. Every piece of frontend code MUST comply. Browser CSP semantics
+and repository styling conventions are distinct:
+
+- Parser-created or server-rendered `style="..."` attributes and direct
+  `setAttribute('style', ...)` writes are blocked by the current policy.
+- Authorized client JavaScript may update individual properties through
+  `element.style`, `Object.assign(element.style, ...)`, or
+  `style.setProperty(...)`. Those allowed writes serialize as a DOM `style`
+  attribute, so attribute presence alone is not proof of a violation.
+- `CSSStyleDeclaration.cssText` is browser-allowed in the exercised Chromium
+  context, but it is not an application-authoring pattern and must not be
+  generalized to untested engines.
 
 **Do NOT introduce any of the following:**
-- Inline `style={...}` props on React elements (produces DOM `style=""` attributes)
-- Libraries that call `document.createElement('style')` or inject `<style>` elements at runtime
-- Libraries that use `CSSStyleSheet.insertRule()`, `styleSheet.cssText`, or `eval()`/`new Function()` for CSS
-- Any mechanism that creates inline styles or dynamic style elements
 
-**Use Tailwind classes for all styling.** If a dynamic width/size is needed, add an entry to `src/utils/columnWidth.ts` (static Tailwind class map) rather than using inline style props.
+- React `style={...}` props in application code; use the repository's
+  Tailwind-first styling convention
+- Libraries that call `document.createElement('style')` or inject `<style>` elements at runtime
+- Libraries that use `CSSStyleSheet.insertRule()`, stylesheet-content
+  `cssText`, or `eval()`/`new Function()` for CSS
+- Any unapproved mechanism that creates or mutates runtime stylesheets
+
+**Use Tailwind classes for application-authored styling.** This is a repository
+consistency and maintainability rule, not a claim that every client-side style
+property write violates CSP. If a dynamic width/size is needed, add an entry to
+`src/utils/columnWidth.ts` (static Tailwind class map) rather than using a React
+style prop.
 
 **Body scroll locking:** Acquire locks through `acquireBodyScrollLock()` from
 `src/utils/bodyScrollLock.ts` inside external-system effects. The shared utility
@@ -508,18 +533,28 @@ class without creating a DOM `style` attribute.
 **Toast notifications:** Use the custom `@/hooks/useToast` hook and `@/components/ui/Toast.tsx` (Radix-based). Do NOT use `sonner` — it was removed because it unconditionally injects `<style>` elements on import, violating strict CSP. There is no opt-out in sonner.
 
 **Before adding any new UI dependency**, verify it does not inject styles at runtime. Check the bundled output:
+
 ```bash
 npm run build:prod-smoke && rg -n "createElement\('style'\)|styleSheet\.cssText|eval\(" dist/
 ```
-If matches appear, the dependency violates CSP and must not be used.
 
-**Known baseline issue:** Existing Framer Motion and React DOM bundle signatures
-are tracked in
-[docs/issues/strict-csp-runtime-style-dependencies.md](docs/issues/strict-csp-runtime-style-dependencies.md).
-Those documented baseline matches alone do not block unrelated plan completion.
-Agents must still investigate new or changed matches, must not add runtime style
-injection, and must not treat this exception as proof that Framer Motion is CSP
-safe. Remove this exception when the issue is resolved.
+Treat matches as capability inventory: investigate whether the path is
+reachable and whether it creates a stylesheet under the enforced policy. A new
+unconditional or reachable runtime stylesheet injector must not be used.
+
+**Known bundled capabilities:** Framer Motion is a third-party animation engine, not a
+React framework feature. Its ordinary client-side renderer property writes are
+allowed by the exercised browser policy. Its bundled `AnimatePresence
+mode="popLayout"` helper still creates a `<style>` element and calls
+`insertRule()`; current source does not use that mode. React DOM also contains
+generic renderer signatures. These baseline matches alone do not block
+unrelated work. Agents must still investigate new or changed matches, must not
+add runtime style injection, and must run the production-browser CSP audit when
+changing Motion usage or versions. `MotionConfig nonce` authorizes generated
+style blocks only when the response policy supplies the matching per-response
+nonce; the static production SPA does not currently do so. Current passing
+coverage is one Chromium transaction workflow, not proof for every route or
+Motion API.
 
 ## NOTES FOR AI AGENTS
 
@@ -530,11 +565,13 @@ safe. Remove this exception when the issue is resolved.
 4. Complete prerequisites first, then return to the original task
 
 **CSP compliance** (MANDATORY):
-- NEVER use inline `style={...}` props — use Tailwind classes
+
+- NEVER use React `style={...}` props in application code — use Tailwind classes
 - NEVER add libraries that inject styles at runtime (e.g., `sonner`)
 - Use `src/utils/columnWidth.ts` for dynamic column widths
 - Use `@/hooks/useToast` for toast notifications (NOT `sonner`)
-- Verify new UI dependencies: `npm run build:prod-smoke && rg "createElement\('style'\)" dist/`
+- Verify new UI dependencies with the production-smoke bundle scan, classify
+  matches, and run the browser CSP audit
 
 **Critical patterns**:
 - NO async/await in components - use React Query hooks with callbacks

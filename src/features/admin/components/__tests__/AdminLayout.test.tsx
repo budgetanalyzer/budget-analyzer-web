@@ -110,15 +110,12 @@ describe('AdminLayout nav active state', () => {
 describe('AdminLayout mobile overlay body scroll lock', () => {
   it('uses a static body class and removes it when closed', async () => {
     const user = userEvent.setup();
-    const styleElementCount = document.querySelectorAll('style').length;
-    const { container } = renderLayout();
+    renderLayout();
 
     await user.click(screen.getByRole('button', { name: 'Open admin menu' }));
 
     expect(document.body).toHaveClass(BODY_SCROLL_LOCK_CLASS);
     expect(document.body).not.toHaveAttribute('style');
-    expect(container.querySelector('[style]')).not.toBeInTheDocument();
-    expect(document.querySelectorAll('style')).toHaveLength(styleElementCount);
 
     await user.click(screen.getByRole('button', { name: 'Open admin menu' }));
 

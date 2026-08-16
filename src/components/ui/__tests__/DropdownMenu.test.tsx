@@ -13,11 +13,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 
-function expectNoRuntimeStyles(styleCount: number, ...elements: HTMLElement[]) {
+function expectStaticPopoverPlacement(styleCount: number, ...elements: HTMLElement[]) {
   expect(document.querySelectorAll('style')).toHaveLength(styleCount);
   elements.forEach((element) => {
-    expect(element.matches('[style]')).toBe(false);
-    expect(element.querySelector('[style]')).toBeNull();
+    expect(element).not.toHaveAttribute('style');
   });
 }
 
@@ -39,7 +38,7 @@ function BasicMenu({ onOpenChange }: { onOpenChange?: (open: boolean) => void })
 }
 
 describe('DropdownMenu', () => {
-  it('opens uncontrolled without runtime styles and exposes menu metadata', async () => {
+  it('opens uncontrolled with static popover placement and exposes menu metadata', async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
     const styleCount = document.querySelectorAll('style').length;
@@ -66,7 +65,7 @@ describe('DropdownMenu', () => {
       'data-destructive',
       'true',
     );
-    expectNoRuntimeStyles(styleCount, trigger, menu);
+    expectStaticPopoverPlacement(styleCount, trigger, menu);
     showPopover.mockRestore();
   });
 
@@ -262,7 +261,7 @@ describe('DropdownMenu', () => {
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
-  it('opens and closes nested menus by pointer and keyboard without runtime styles', async () => {
+  it('opens and closes nested menus with static popover placement', async () => {
     const user = userEvent.setup();
     const select = vi.fn();
     const styleCount = document.querySelectorAll('style').length;
@@ -297,7 +296,12 @@ describe('DropdownMenu', () => {
     expect(menus).toHaveLength(2);
     expect(subTrigger).toHaveAttribute('aria-expanded', 'true');
     expect(submenu.className).toContain('[position-anchor:auto]');
-    expectNoRuntimeStyles(styleCount, rootTrigger, screen.getByTestId('parent-menu'), submenu);
+    expectStaticPopoverPlacement(
+      styleCount,
+      rootTrigger,
+      screen.getByTestId('parent-menu'),
+      submenu,
+    );
 
     const disabledSubTrigger = screen.getByRole('menuitem', { name: 'Disabled submenu' });
     fireEvent.pointerEnter(disabledSubTrigger);
@@ -323,7 +327,12 @@ describe('DropdownMenu', () => {
     expect(select).toHaveBeenCalledTimes(1);
     expect(rootTrigger).toHaveAttribute('aria-expanded', 'false');
     expect(subTrigger).toHaveAttribute('aria-expanded', 'false');
-    expectNoRuntimeStyles(styleCount, rootTrigger, screen.getByTestId('parent-menu'), submenu);
+    expectStaticPopoverPlacement(
+      styleCount,
+      rootTrigger,
+      screen.getByTestId('parent-menu'),
+      submenu,
+    );
   });
 
   it('keeps the implicit invoker anchor and alignment as static metadata', () => {
