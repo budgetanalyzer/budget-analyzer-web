@@ -1,5 +1,5 @@
 // src/components/MissingExchangeRatesBanner.tsx
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { fadeVariants, fadeTransition } from '@/lib/animations';

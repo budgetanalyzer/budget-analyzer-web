@@ -1,7 +1,7 @@
 // src/features/transactions/pages/TransactionDetailPage.tsx
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
-import { motion, LayoutGroup } from 'framer-motion';
+import { motion, LayoutGroup } from 'motion/react';
 import { useTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { fadeInVariants, fadeTransition, layoutTransition } from '@/lib/animations';

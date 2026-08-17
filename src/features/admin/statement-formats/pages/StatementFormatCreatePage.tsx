@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useCallback } from 'react';
 import { ArrowLeft, PlusCircle } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/Button';
 import { MessageBanner } from '@/components/MessageBanner';
 import { StatementFormatForm } from '@/features/admin/statement-formats/components/StatementFormatForm';

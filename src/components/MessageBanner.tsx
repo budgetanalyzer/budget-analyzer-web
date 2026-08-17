@@ -1,5 +1,5 @@
 // src/components/MessageBanner.tsx
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { CheckCircle, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { fadeVariants, fadeTransition } from '@/lib/animations';

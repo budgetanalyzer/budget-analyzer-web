@@ -129,7 +129,8 @@ bundle, production source, and package metadata. It detects the known Radix menu
 `react-remove-scroll` defect signatures; it is not a substitute for browser-policy validation.
 The Playwright audit treats `securitypolicyviolation` events and prohibited runtime or final
 stylesheets as executable findings. It intentionally does not infer violations from serialized DOM
-style attributes. Bundle matches are reviewed as capability inventory, including Motion's dormant
+style attributes. The application consumes Motion 13 through its supported `motion/react` facade.
+Bundle matches are reviewed as capability inventory, including Motion's dormant
 `AnimatePresence mode="popLayout"` stylesheet helper and React DOM's generic renderer support.
 
 ## Security Model

@@ -1,5 +1,5 @@
 // src/features/transactions/components/StatCard.tsx
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { LucideIcon } from 'lucide-react';

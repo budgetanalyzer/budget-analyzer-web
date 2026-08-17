@@ -1,5 +1,5 @@
 // src/components/PageHeader.tsx
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { fadeInVariants, fadeTransition } from '@/lib/animations';
 import { ReactNode } from 'react';
 

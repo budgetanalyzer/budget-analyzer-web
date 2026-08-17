@@ -2,7 +2,7 @@
 // Centralized animation configuration for consistent motion throughout the app
 // All animations use opacity-only fades (no x/y movement) for simplicity and accessibility
 
-import { Transition, Variants } from 'framer-motion';
+import type { Transition, Variants } from 'motion/react';
 
 /**
  * Standard animation durations

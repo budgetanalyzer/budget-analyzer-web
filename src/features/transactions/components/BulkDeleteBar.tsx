@@ -1,5 +1,5 @@
 // src/features/transactions/components/BulkDeleteBar.tsx
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/Button';
 import { slideUpVariants, slideUpTransition } from '@/lib/animations';
 

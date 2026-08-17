@@ -2,7 +2,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { motion, LayoutGroup, AnimatePresence } from 'framer-motion';
+import { motion, LayoutGroup, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Hash, Pin, Calendar, Eye, BarChart3, Search } from 'lucide-react';
 import { useView, useViewMembership, useViewTransactions } from '@/hooks/useViews';
 import { useTransactions } from '@/hooks/useTransactions';

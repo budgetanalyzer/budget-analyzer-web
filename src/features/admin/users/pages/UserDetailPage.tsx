@@ -1,6 +1,6 @@
 // src/features/admin/users/pages/UserDetailPage.tsx
 import { useCallback, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'motion/react';
 import { Link, useParams } from 'react-router';
 import {
   Calendar,
