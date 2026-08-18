@@ -17,9 +17,11 @@ directly.
 
 ## Prerequisites First
 
-Before implementing a plan or feature, check its documented prerequisites. If a
-prerequisite is unsatisfied, stop and report it. Do not add a local workaround
-for a missing cross-repository dependency.
+Before implementing a plan or feature, check its documented prerequisites. Read
+the [development prerequisites](docs/development.md#prerequisites) when tools,
+local environment, setup, or runtime assumptions apply. If a prerequisite is
+unsatisfied, stop and report it. Do not add a local workaround for a missing
+cross-repository dependency.
 
 ## Documentation Discipline
 
@@ -28,6 +30,11 @@ Keep the nearest durable documentation current in the same change:
 - `AGENTS.md` for agent rules, guardrails, and discovery commands
 - `README.md` for repository purpose, minimal usage, and documentation links
 - `docs/` for architecture, configuration, APIs, behavior, and operations
+
+Update `AGENTS.md` when agent instructions, guardrails, workflows, or discovery
+commands change. When updating `AGENTS.md`, review the
+[AGENTS.md checkstyle](https://github.com/budgetanalyzer/orchestration/blob/main/docs/agents-md-checkstyle.md)
+and preserve or intentionally re-home unique repository guidance.
 
 Record durable contracts and decisions, not component walkthroughs, transient
 UI state, duplicated explanations, or unrelated formatting churn. The
@@ -41,10 +48,10 @@ placeholder, and retain numbered `## Phase N: Title` headings. Run a plan with:
 
 ```bash
 ai-session-handler run \
-  --plan /workspace/REPOSITORY/docs/plans/PLAN.md \
+  --plan docs/plans/PLAN.md \
   --max-phases 999 \
   --quiet \
-  --agent-cmd "/workspace/ai-session-handler/.venv/bin/ai-session-handler-codex-high --model MODEL"
+  --agent-cmd "../ai-session-handler/.venv/bin/ai-session-handler-codex-high --model MODEL"
 ```
 
 Omit `--model MODEL` to use the wrapper's configured or default model.
@@ -61,6 +68,24 @@ Omit `--model MODEL` to use the wrapper's configured or default model.
 | State placement                       | [State architecture](docs/state-architecture.md)                                                              |
 | Tests, coverage, Playwright           | [Testing guide](docs/testing-guide.md)                                                                        |
 | Hooks, lifecycle, effects             | [React hooks guide](docs/react-hooks-lifecycle-mental-model.md)                                               |
+
+Consult these owners when the corresponding work applies:
+
+- Read Development before changing setup, environment, build behavior, or
+  repository commands, and when a build or local-runtime prerequisite fails.
+- Read Architecture before changing application structure, browser support,
+  CSP policy, UI dependencies, Motion usage, or overlay behavior.
+- Read Authentication before changing sessions, roles, permissions, route
+  protection, or action gating.
+- Read API integration and the generated API specifications before changing
+  request behavior, endpoint usage, payloads, forms constrained by schemas, or
+  application error-code handling.
+- Read State architecture before choosing or changing placement in TanStack
+  Query, the URL, Redux, component state, or navigation state.
+- Read the Testing guide before adding or changing tests, coverage, Playwright,
+  or shared test infrastructure, and when a verifier or browser harness fails.
+- Read the React hooks guide before changing hooks, effects, subscriptions,
+  timers, listeners, or other lifecycle behavior.
 
 ## Implementation Guardrails
 
@@ -161,11 +186,34 @@ Application code must comply with `style-src 'self'` without `unsafe-inline` or
 
 - Never run `npm run dev`; the user controls the development server.
 - Use `npm run lint:fix`, not `npm run lint`, for agent validation.
-- Run formatting and tests in proportion to the change; command details and
-  coverage thresholds live in [Development](docs/development.md) and
-  [Testing](docs/testing-guide.md).
 - Never perform git write operations such as commit, push, checkout, or reset
   without an explicit user request. The user controls git operations.
+
+## Validation
+
+Before finishing, run the gates that apply to the changed surface:
+
+- Documentation-only changes: verify changed links and referenced paths, then
+  run `git diff --check`. Application tests are not required when runtime,
+  build, and test behavior are unchanged.
+- Application, test, and E2E source: format changed files with the repository's
+  Prettier configuration. Run `npm run format` only when its scope contains no
+  unrelated user work.
+- Production application changes: run `npm run lint:fix`, focused Vitest tests
+  while iterating, and `npm run build` before handoff. The build includes the
+  full coverage, TypeScript, and bundle gates.
+- Test-only changes: run `npm run lint:fix` and the affected tests. Run
+  `npm run test:coverage` when changing shared test infrastructure, coverage
+  configuration, or behavior exercised across features.
+- Changes to `playwright.config.ts` or `e2e/`: run `npm run lint:fix` and
+  `npm run typecheck:e2e`. Run browser tests only when the user-managed
+  environment is available and the Testing guide requires them.
+- UI dependency, Motion, overlay, or CSP-sensitive changes: also run the static
+  scan and browser-audit gates required by the Strict CSP section.
+
+If a required verifier cannot run because a tool, credential, service, browser,
+or user-managed environment is unavailable, report that explicitly. Do not
+claim the work is fully verified.
 
 ## Discovery Commands
 
