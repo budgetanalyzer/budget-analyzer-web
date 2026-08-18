@@ -1,371 +1,226 @@
-# API Integration
-
-## Overview
-
-All API requests use same-origin session cookies for authentication. The Session Gateway manages OAuth2 sessions server-side — no tokens are exposed to the browser. API calls are validated per-request via a session lookup in Redis before reaching backend services.
-
-## Connecting to Backend
-
-Ensure backend infrastructure is running (see [Development Guide](development.md)), then configure `.env`:
-
-```env
-VITE_API_BASE_URL=/api
-```
-
-All requests route through the gateway at `https://app.budgetanalyzer.localhost/api/*`.
-
-## Endpoints
-
-All endpoints accessed through the gateway:
-
-- `GET /api/v1/transactions` — List all transactions
-- `GET /api/v1/transactions/{id}` — Get single transaction
-- `POST /api/v1/transactions/preview` — Preview one or more ordered statement files before import. The grouped response includes one `previewImportToken`, `fileImport` re-import status, and transaction list per source file.
-- `POST /api/v1/transactions/batch` — Import ordered groups of reviewed preview rows. Each file group requires its own `previewImportToken` and may set per-row `allowDuplicate: true` when the user explicitly imports a duplicate row.
-- `GET /api/v1/currencies` — List currencies
-- `GET /api/v1/exchange-rates` — Get exchange rates
-
-**API Documentation**: `https://app.budgetanalyzer.localhost/api/docs`
-
-## Saved Views
-
-Saved-view criteria mirror the user-facing transaction filters supported by the backend contract. The frontend sends date bounds as `dateFrom` and `dateTo`, preserves the selected transaction `type` (`DEBIT` or `CREDIT`), and does not send the retired `startDate` or `endDate` fields.
-
-`searchText` is a saved-view description filter. The Transactions and View table search boxes filter the already loaded rows locally with a case-insensitive substring match against transaction descriptions only; use the explicit bank filter when the saved view should persist a bank criterion.
-
-View detail also supports URL-backed table filters for the visible saved-view
-membership: `dateFrom`, `dateTo`, and `q`. Date filters are applied before the
-local description search so the stats and table rows are derived from the same
-filtered transaction list.
-
-`Find Transfers & Refunds` is a client-side discovery workflow owned by View
-detail. It scans the complete active transaction collection, anchored on each
-credit, to derive deterministic possible refunds and transfers. Candidate
-amount comparison follows two paths: same-currency pairs are compared directly
-in their original currency and do not require an exchange rate, while
-cross-currency pairs convert each side using its own transaction-date exchange
-rate. Transfer candidates must be no more than seven absolute days apart and
-their comparison amounts must differ by no more than five percent; there is no
-fixed-amount tolerance. Canonical, unfiltered saved-view membership is the
-exclusion boundary and produces three presentation states. Current members are
-visible and eligible for independent exclusion controls. Active transactions
-outside the canonical view for another reason, such as not matching its
-criteria, may remain supporting evidence labelled `Not currently in this view`,
-but are not eligible for exclusion from that view. Explicitly excluded
-transactions may also remain as evidence when the possible counterpart is still
-a current member; they are labelled `Previously excluded from this view`, are
-never eligible for repeat exclusion, and place the candidate under `Complete
-previous exclusions`. Retaining this evidence lets the visible counterpart be
-handled after a partial review or incremental data arrival. The exclusion is
-membership state, not relationship provenance, so it does not confirm the
-possible relationship. New possible relationships remain in a separate group.
-Temporary View table filters do not narrow the evidence pool or change
-exclusion eligibility.
-
-Confirming the review sends the unique selected debit and credit IDs through
-the existing bulk exclusion endpoint. The server persists only those saved-view
-exclusions; it does not receive or store candidates, relationship metadata, or
-review or exclusion provenance. Exclusions remain reversible through the
-existing Restore Excluded workflow. No recommendation or relationship API is
-involved, and this discovery is unrelated to transaction import duplicate
-review.
-
-Analytics URLs carry an explicit source scope. Missing `scope` still means all
-transactions for backward compatibility, while scoped saved-view analytics use
-`scope=view&viewId=<id>`. Saved-view analytics resolves data through the same
-canonical membership endpoint as view detail, so pinned transactions are
-included and excluded transactions are omitted. Analytics drilldown links route
-to the operational surface for that source: all-transaction analytics link to
-`/?dateFrom=...&dateTo=...`, and saved-view analytics link to
-`/views/<id>?dateFrom=...&dateTo=...`. Both include `returnTo` and
-`breadcrumbLabel` so the filtered operational page can navigate back to the
-same analytics state.
-
-When reconciling saved-view membership with cached transactions, the frontend
-first removes excluded IDs and de-duplicates visible membership IDs before
-fetching any missing transaction details. If an inconsistent membership payload
-places the same visible ID in multiple groups, the row is rendered once.
-
-Successful transaction imports, edits, and deletions invalidate the complete
-saved-view query family. Saved-view membership and transaction counts depend on
-the active transaction set, so inactive views refetch their current membership
-when they are next opened.
-
-View detail and saved-view cards expose normal analytics links built as
-`/analytics?scope=view&viewId=<id>&viewMode=monthly&transactionType=debit`.
-The analytics page fills the year from the latest transaction year when the URL
-does not provide one.
-
-Saved views support bulk membership updates through `POST /api/v1/views/{id}/pin` and `POST /api/v1/views/{id}/exclude`. Both endpoints accept:
-
-```json
-{
-  "ids": [1, 2, 3]
-}
-```
-
-Both endpoints return:
-
-```json
-{
-  "updatedCount": 2,
-  "notFoundIds": [999]
-}
-```
-
-`notFoundIds` are transaction IDs that are missing, deleted, or not owned by the caller.
-
-After a successful bulk saved-view membership update, the frontend invalidates
-the saved-view detail, saved-view transactions, and saved-view list queries. It
-does not apply optimistic count updates because the bulk response does not
-include an updated saved view.
-
-The saved-view transaction table supports row selection. Its "select all"
-checkbox selects the current page; when all page rows are selected, the table
-can expand selection to every transaction in the current visible/search-filtered
-view result. The floating bulk action bar can pin or exclude the selected
-transactions. Bulk pin sends only selected transactions that are not already
-pinned; bulk exclude sends the selected transaction IDs. Partial successes are
-shown as warning toast feedback with the number of transactions that were not
-found or unavailable.
-
-Visible saved-view membership changes happen from the view table: matched rows
-can be pinned or excluded, pinned rows can be unpinned or excluded, and selected
-visible rows can be bulk pinned or bulk excluded. Excluded transactions are
-intentionally absent from the table; when a view has exclusions, the View detail
-header shows a Restore Excluded action and the criteria summary's excluded badge
-opens the same restore modal. The modal lists only excluded transactions and
-restores them one at a time. Restoring waits for the saved-view detail,
-saved-view transaction membership, and saved-view list queries to refresh before
-the restore action completes, so the background view reflects the restored row
-without a manual page refresh.
-
-## Transaction Import Review
-
-Statement imports use a two-step review flow:
-
-1. The browser's native file picker supplies one or more statement files in selection order. `POST /api/v1/transactions/preview?statementFormatId=<id>&accountId=<optional-account-id>` sends them as repeated multipart `files` parts and returns an ordered result group per file.
-2. `POST /api/v1/transactions/batch` submits the ordered reviewed file groups as JSON, pairing each transaction list with its source file's `previewImportToken`.
-
-Grouped transaction preview overrides the API client's general 10-second Axios
-timeout with a 60-second endpoint timeout because the request combines multipart
-upload and statement parsing. Other API requests retain the general timeout.
-
-Cancelling from the import controls, statement-format wizard, or transaction
-review ends the complete import workflow. The frontend clears selected files,
-format, account ID, wizard state, preview data, and pending mutation state so the
-entry action returns to `Import Transactions` and the next attempt starts fresh.
-
-The import format dropdown is populated from `GET /api/v1/statement-formats`
-without query parameters, so formats hidden by the current user are omitted by
-the API default. Statement-format management screens call the same list endpoint
-with `includeHidden=true` and use `POST /api/v1/statement-formats/{id}/hide` or
-`POST /api/v1/statement-formats/{id}/unhide` for current-user visibility
-changes. The user-facing management screen is available at `/statement-formats`
-for users with `statementformats:read`, and its hide/restore actions require
-`statementformats:write`. Hidden is a current-user import-list preference;
-disabled is a global catalog state, so management screens may show disabled
-formats without offering enable/disable controls. The import UI shows enabled
-formats whose default currency is available, sorted by API-provided
-`displayName`, disambiguates duplicate visible names with `System` or `Custom`,
-and submits the selected `id` as the `statementFormatId` query parameter. Users
-with `statementformats:write` also see `New format`, which opens a user
-statement-format wizard entry point without submitting a sentinel option to the
-preview API. The wizard accepts a CSV or text-based PDF sample, immediately
-routes to the matching parser setup flow after file selection, and saves the
-resulting user-scoped format. After the wizard saves a format, the import
-controls stay open, the existing account ID is preserved, the saved format is
-selected by `id`, and inline success feedback prompts the user to choose the
-actual statement file before running normal preview. PDF wizard analysis shows
-a dedicated unsupported-file state for backend rejection reasons and clear
-scanned/no-text/table-detection failures. PDF preview diagnostics are shown only
-when they are user-facing; parser revision, header-token, candidate, and rule
-internals stay hidden.
-
-The service currently defaults to a `25MB` limit for each repeated file part
-and a `25MB` limit for the combined multipart body. Deployments and gateways
-may configure different limits, so the frontend does not enforce a fixed file
-count or size. If the upload is rejected with HTTP `413`, its body may not use
-the backend JSON error shape; the frontend instead shows the neutral import-page
-message `The selected files exceed the upload size limit.`
-
-Each item in the preview response's ordered `files` array includes:
-
-- `sourceFile` and `statementFormatId` — the source identity and format used for parsing.
-- `previewImportToken` — opaque token required for the batch request. Treat it as client state only; do not parse it.
-- `fileImport` — file-level re-import status for the current user and uploaded bytes.
-- `transactions[].duplicate` and `transactions[].duplicateReason` — advisory row-level duplicate metadata.
-
-The service hashes each source file's bytes for exact-file import history.
-`fileImport.alreadyImported` means the current user imported bytes with that
-same hash before. This status is an advisory exact-reimport warning orthogonal
-to row-level duplicate detection: the combined review dialog identifies each
-affected source file and its previous import, but does not block import. Source
-grouping is retained internally for this warning and token-backed submission;
-it is not exposed as a way to organize transactions.
-
-Duplicate reasons map to UI labels:
-
-| `duplicateReason`      | Meaning                                                   | UI label          |
-| ---------------------- | --------------------------------------------------------- | ----------------- |
-| `EXISTING_TRANSACTION` | Row matches an existing active owner-owned transaction    | Already imported  |
-| `IN_BATCH`             | Row matches a row from a completed earlier source file    | Matches earlier file |
-
-Rows within their own source file are not compared with each other. All source
-groups appear as one continuous transaction review set without row-level file
-attribution, while edits and removals remain associated with the correct
-ordered group for batch submission. Duplicate preview rows stay visible and
-are skipped by default. A row is imported despite duplicate metadata only when
-the batch payload sets `allowDuplicate: true` for that row. Preview warnings
-are advisory: the backend re-evaluates the edited grouped batch and remains
-authoritative about which rows are duplicates. If every visible row would be
-skipped, the UI disables the import action and leaves Cancel as the way out of
-the review dialog. Preview-only fields such as `duplicate` and
-`duplicateReason` are never sent in the batch request.
-
-Batch request shape:
-
-```json
-{
-  "files": [
-    {
-      "previewImportToken": "v2.january-token",
-      "transactions": [
-        {
-          "date": "2026-05-01",
-          "description": "Coffee",
-          "amount": 4.5,
-          "type": "DEBIT",
-          "category": "Dining",
-          "bankName": "Test Bank",
-          "currencyIsoCode": "USD",
-          "accountId": "checking-123"
-        },
-        {
-          "date": "2026-05-01",
-          "description": "Coffee duplicate",
-          "amount": 4.5,
-          "type": "DEBIT",
-          "category": "Dining",
-          "bankName": "Test Bank",
-          "currencyIsoCode": "USD",
-          "accountId": "checking-123",
-          "allowDuplicate": true
-        }
-      ]
-    },
-    {
-      "previewImportToken": "v2.february-token",
-      "transactions": []
-    }
-  ]
-}
-```
-
-Every preview file remains in the request in its original order, including an
-empty reviewed transaction group. An empty group is valid in a mixed import and
-receives an ordered zero-count result, but the complete batch must create at
-least one transaction. If every group is empty or every submitted row is
-skipped as a duplicate, the backend returns
-`BATCH_IMPORT_NO_TRANSACTIONS_CREATED`.
-
-The batch response reports:
-
-- `created`, `duplicatesSkipped`, and `duplicatesImported` — aggregate counts
-  across the complete request. The frontend closes the review dialog and uses
-  these aggregates for its success feedback.
-- `files` — ordered per-source `sourceFile`, counts, and created transactions;
-  this preserves API provenance without adding a post-import file results view.
-
-Relevant 422 import error codes are mapped by `formatApiError`. Preview errors
-appear in the import-page banner; batch errors appear as a toast while the
-review dialog remains open:
-
-| Code                                   | User-facing handling                                                       |
-| -------------------------------------- | -------------------------------------------------------------------------- |
-| `MISSING_ORIGINAL_FILENAME`            | Explain that a filename is required so the user can reselect the files.    |
-| `BATCH_IMPORT_NO_TRANSACTIONS_CREATED` | Explain that every submitted row was skipped; review or cancel the import. |
-| `BATCH_IMPORT_SOURCE_MISMATCH`          | Prompt the user to preview the files together again.                       |
-| `PREVIEW_IMPORT_TOKEN_INVALID`         | Explain that the preview is invalid or expired and prompt another preview. |
-| `PREVIEW_IMPORT_TOKEN_EXPIRED`         | Explain that the preview expired and prompt another preview.               |
-
-## Axios Configuration
-
-```typescript
-const apiClient = axios.create({
-  baseURL: '/api',
-  withCredentials: true, // Include session cookies
-});
-
-// No manual Authorization header needed —
-// the gateway validates the session and injects identity headers
-```
-
-### 401 Handling
-
-An API 401 means the current session is absent, expired, or revoked. The Axios
-response interceptor asks the shared auth navigation utility for one replacement
-navigation to `/oauth2/authorization/idp`, preserving the browser's current
-same-origin path, query, and hash as `returnUrl`. Concurrent 401 responses share
-the navigation latch, so only one OAuth2 navigation starts per document.
-
-Navigation does not change the request contract: every unauthorized request
-still rejects independently as an `ApiError`. Structured JSON 401 bodies retain
-their API error fields; empty, text, and HTML bodies normalize to an
-`UNAUTHORIZED` error with a stable user-safe message. A 403 remains a normal
-authorization failure and never starts login. The interceptor has no fulfilled
-401 path: navigation is a side effect, not a replacement for rejecting the
-failed request.
-
-### Collection Response Contracts
-
-TypeScript response generics do not validate network data. At the API adapter
-boundary, documented top-level array responses are therefore accepted as
-`unknown` and returned only after `Array.isArray` succeeds. This applies to
-enabled/all currencies, exchange rates, current-user transactions, statement
-formats, and saved views.
-
-A malformed HTTP 200 collection body is rejected as a retryable HTTP 502
-`ApiError` with type `INTERNAL_ERROR` and code
-`INVALID_COLLECTION_RESPONSE`. The error message never includes the response
-payload. Adapters do not coerce malformed data to `[]` or unwrap undocumented
-envelopes, so React Query records an error instead of caching a plausible empty
-list. The assertion validates only the top-level collection shape; item-level
-fields remain governed by the OpenAPI contract. Object and paginated endpoints,
-including cross-user transaction search, retain their documented adapters.
-
-## Error Format
-
-The app expects the generated `ApiErrorResponse` shape and normalizes Axios failures to `ApiError` in `src/api/client.ts`:
-
-```json
-{
-  "type": "APPLICATION_ERROR",
-  "message": "All submitted rows were skipped as duplicates.",
-  "code": "BATCH_IMPORT_NO_TRANSACTIONS_CREATED"
-}
-```
-
-Validation errors may include `fieldErrors`:
-
-```json
-{
-  "type": "VALIDATION_ERROR",
-  "message": "Validation failed",
-  "fieldErrors": [
-    {
-      "field": "transactions[0].description",
-      "message": "must not be blank",
-      "index": 0
-    }
-  ]
-}
-```
-
-Specific 422 application errors include `code`; user-facing copy for those codes belongs in `src/utils/errorMessages.ts`.
-
-## Error Handling Strategy
-
-- Network error recovery with retry
-- User-friendly error messages
-- Error boundaries for graceful degradation
+# Frontend API Integration
+
+This document owns the SPA's request adapters, response normalization, cache
+integration, and feature-specific API behavior. It is not an endpoint inventory.
+Endpoint paths, methods, parameters, and payload schemas are owned by the
+generated specifications:
+
+- [Unified backend API](api/budget-analyzer-api.yaml) for transactions, saved
+  views, currencies, statement formats, exchange rates, and users.
+- [Session Gateway API](api/session-gateway-api.yaml) for current-user,
+  heartbeat, and logout behavior.
+
+Authentication lifecycle and permission gating belong to
+[Authentication and authorization](authentication.md). Environment setup and
+the ingress URL belong to [Development](development.md).
+
+## Shared API Client
+
+`src/api/client.ts` exports the Axios instance used by backend adapters under
+`src/api/`.
+
+- `VITE_API_BASE_URL` selects the base URL and defaults to `/api`.
+- Requests include credentials and default to JSON with a 10-second timeout.
+- No browser `Authorization` header is added. The opaque session cookie is
+  validated at ingress and identity headers are added before the request reaches
+  a backend service.
+- Endpoint adapters return response data to TanStack Query hooks; React
+  components do not call Axios directly.
+
+`src/api/auth.ts` uses a separate credentialed Axios instance rooted at `/` for
+Session Gateway paths. This prevents `/auth/*` from being prefixed by the
+backend API base URL.
+
+### Error normalization
+
+The shared backend client rejects failures as `ApiError` from
+`src/types/apiError.ts`:
+
+- A structured API response with string `type` and `message` fields preserves
+  the HTTP status, response fields, optional application `code`, and optional
+  `fieldErrors`.
+- An unstructured HTTP response becomes an `INTERNAL_ERROR` at the received
+  status.
+- A request that receives no response becomes a retryable HTTP 503
+  `SERVICE_UNAVAILABLE` error with user-safe copy.
+- A failure before a request is sent becomes an HTTP 500 `INTERNAL_ERROR`.
+
+An API 401 also asks the shared auth navigation utility to start one replacement
+navigation to OAuth2 with the current same-origin path, query, and hash as
+`returnUrl`. Parallel 401s share the navigation latch, but each request still
+rejects independently. Structured 401 bodies are retained; empty, text, and
+HTML bodies become a stable `UNAUTHORIZED` response. A 403 is normalized like
+any other authorization error and does not start login. See
+[Authentication and authorization](authentication.md#api-401-after-bootstrap).
+
+### Collection response validation
+
+TypeScript response generics do not validate network data. Adapters for
+documented top-level arrays accept `unknown` and call
+`src/api/collectionResponse.ts`. This currently covers:
+
+- current-user transactions and saved views;
+- enabled or all currencies and exchange rates; and
+- statement formats.
+
+A non-array HTTP 200 response is rejected as HTTP 502 `INTERNAL_ERROR` with
+code `INVALID_COLLECTION_RESPONSE`. Adapters neither coerce it to `[]` nor
+unwrap an undocumented envelope, so TanStack Query cannot cache a malformed
+response as a plausible empty list. This guard validates only the top-level
+collection shape; item fields remain governed by the generated OpenAPI schema.
+Object and paginated endpoints keep their documented response adapters.
+
+### User-facing error messages
+
+`src/utils/errorMessages.ts` is the single frontend map for application error
+codes that require stable user-facing copy. `formatApiError` uses that map for
+HTTP 422 errors and otherwise uses the normalized server message. Keep the map
+synchronized with the generated unified specification when backend application
+codes change.
+
+Error banners and toasts are presentation choices at the feature boundary:
+query/load failures normally remain visible in an `ErrorBanner`, while mutation
+failures use the custom toast system when the initiating dialog or control stays
+mounted. Repository test conventions and MSW ownership are documented in the
+[Testing guide](testing-guide.md).
+
+## TanStack Query Boundary
+
+TanStack Query owns server data, cache lifetime, retries, errors, and
+invalidation. API adapters own transport details; hooks own query keys and
+mutation-driven cache changes; components supply callbacks. Do not copy API
+responses into Redux or implement request lifecycle state in effects.
+
+Most current-user collections use a five-minute stale time and one retry. Query
+keys and feature-specific invalidation rules live with their hooks, including
+`src/hooks/useTransactions.ts` and `src/hooks/useViews.ts`. The complete state
+placement rules are in [State architecture](state-architecture.md).
+
+## Saved-View Integration Contracts
+
+### Criteria, membership, and local filters
+
+Saved-view criteria use the backend names `dateFrom` and `dateTo`, preserve
+`type` as `DEBIT` or `CREDIT`, and do not send the retired `startDate` or
+`endDate` fields. `searchText` is a persisted description criterion. The
+Transactions and View table `q` inputs are local, case-insensitive description
+filters over already loaded rows; a saved bank criterion uses the explicit bank
+filter.
+
+`GET /v1/views/{id}/transactions` is the canonical membership source. It
+returns matched, pinned, and excluded transaction IDs. The frontend:
+
+1. removes excluded IDs from visible membership;
+2. de-duplicates IDs, with pinned membership taking precedence if an
+   inconsistent payload lists an ID in both visible groups;
+3. reuses cached current-user transactions; and
+4. fetches missing visible transaction details individually.
+
+Excluded transactions remain outside the visible table and are loaded
+separately only for restore workflows. Pin, unpin, exclude, restore, and bulk
+membership successes invalidate the view detail, membership, and list queries.
+Bulk responses can report unavailable IDs, so the frontend shows partial
+success feedback and does not invent optimistic counts.
+
+Transaction imports, edits, and deletes invalidate the complete saved-view
+query family because saved criteria and membership counts depend on the active
+transaction collection.
+
+Temporary view-table filters and analytics source/navigation parameters are URL
+state rather than API criteria. Their contract is documented in
+[State architecture](state-architecture.md#url-backed-route-state).
+
+### Transfer and refund discovery
+
+`Find Transfers & Refunds` is entirely client-side. It scans active
+transactions while requiring at least one side of a candidate to be visible in
+the canonical view. Same-currency amounts are compared directly; cross-currency
+amounts are normalized with each transaction date's exchange rate.
+
+The deterministic matcher retains one-to-one pairs. Refunds require the same
+known bank and account, a credit zero to 90 days after the debit, shared
+meaningful description text, and an amount difference within the greater of 3
+percent or one comparison unit. Transfers require different banks or different
+known accounts at the same bank, no more than seven absolute days, and no more
+than a 5 percent amount difference.
+
+Transactions outside current visible membership can remain evidence, but only
+currently visible, not-already-excluded IDs are eligible for exclusion. The
+review sends selected unique IDs through the existing bulk exclusion endpoint.
+The server stores only saved-view exclusions: it receives no candidate,
+relationship, review, or provenance data. Restore uses the normal unexclude
+endpoint. This workflow is unrelated to import duplicate detection.
+
+## Transaction Import Review Contracts
+
+### Ordered preview and batch
+
+Statement import is a two-request protocol:
+
+1. `POST /v1/transactions/preview` sends selected files in browser selection
+   order as repeated multipart `files` parts with `statementFormatId` and an
+   optional `accountId` query parameter.
+2. `POST /v1/transactions/batch` sends the reviewed file groups in the same
+   order. Every group carries the opaque `previewImportToken` issued for that
+   source file.
+
+The preview adapter overrides the shared 10-second timeout with 60 seconds and
+lets Axios provide the multipart boundary. Other API requests retain the shared
+timeout. The frontend does not parse preview tokens.
+
+Every preview group remains in the batch request, including a group whose rows
+were all removed during review. An empty group is valid in a mixed import, but
+the complete batch must create at least one transaction. Before submission,
+`src/api/transactionApi.ts` reconstructs each row from supported request fields
+and includes `allowDuplicate` only when it is explicitly `true`; preview-only
+metadata is never sent.
+
+### Duplicate and source-file semantics
+
+Each preview file group contains `sourceFile`, `statementFormatId`,
+`previewImportToken`, `fileImport`, and its transaction rows.
+`fileImport.alreadyImported` is an advisory exact-byte re-import warning for the
+current user. It is independent from row-level duplicate detection.
+
+Row duplicate metadata is also advisory:
+
+| Reason                 | Frontend meaning                                          |
+| ---------------------- | --------------------------------------------------------- |
+| `EXISTING_TRANSACTION` | Matches an existing active current-user transaction       |
+| `IN_BATCH`             | Matches a row from an earlier completed source-file group |
+
+Duplicate rows remain reviewable and are skipped by default. A row is imported
+despite its warning only when the reviewed batch explicitly sets
+`allowDuplicate: true`. The backend re-evaluates the edited batch and remains
+authoritative. If all visible rows would be skipped, the import action stays
+disabled.
+
+The batch response's aggregate `created`, `duplicatesSkipped`, and
+`duplicatesImported` counts drive success feedback. Its ordered per-file
+results preserve source provenance without creating a separate post-import
+results model. A successful batch invalidates current-user transactions,
+transaction count, and all saved-view queries.
+
+### Statement-format visibility and upload failures
+
+The normal import selector calls `GET /v1/statement-formats` without
+`includeHidden`, so the backend omits formats hidden by the current user.
+Management screens request `includeHidden=true`; hide and unhide are
+current-user visibility operations, while disabled is global catalogue state.
+Creating a format through the CSV or PDF wizard is permission-gated as described
+in [Authentication and authorization](authentication.md#permissions-are-for-actions-and-features).
+
+Deployments can choose multipart limits, so the frontend enforces no fixed file
+count or size. A preview HTTP 413 may be generated before the request reaches a
+backend JSON handler; the adapter normalizes it to the neutral message
+`The selected files exceed the upload size limit.`
+
+The import error codes `MISSING_ORIGINAL_FILENAME`,
+`BATCH_IMPORT_NO_TRANSACTIONS_CREATED`, `BATCH_IMPORT_SOURCE_MISMATCH`,
+`PREVIEW_IMPORT_TOKEN_INVALID`, and `PREVIEW_IMPORT_TOKEN_EXPIRED` have stable
+copy in `src/utils/errorMessages.ts`. Preview failures appear at the import
+surface; batch failures leave the review open and use a toast.
+
+For application structure and client/backend boundaries, see
+[Architecture](architecture.md). For request and feature tests, see the
+[Testing guide](testing-guide.md).
