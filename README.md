@@ -1,78 +1,65 @@
 # Budget Analyzer Web
 
-> "Archetype: interface. Role: React SPA; bridges users to the backend system."
->
-> — [AGENTS.md](AGENTS.md#tree-position)
-
 [![Build](https://github.com/budgetanalyzer/budget-analyzer-web/actions/workflows/build.yml/badge.svg)](https://github.com/budgetanalyzer/budget-analyzer-web/actions/workflows/build.yml)
 
-React 19 SPA for managing and analyzing financial transactions. Session-based authentication via same-origin cookies — no JWTs in the browser.
+React 19 single-page application for managing and analyzing financial
+transactions. It provides the browser interface to the Budget Analyzer backend
+and uses same-origin, server-side sessions.
+
+## Features
+
+- Transaction search, sorting, pagination, editing, deletion, and statement import
+- Saved transaction views and multi-currency analytics
+- Fine-grained user and administrator workflows
+- Statement-format and currency management
+- Responsive light and dark interfaces
 
 ## Quick Start
+
+Install dependencies and create the local environment file:
 
 ```bash
 npm install
 cp .env.example .env
-npm run dev
 ```
 
-Access at `https://app.budgetanalyzer.localhost` (not `http://localhost:3000`).
-Requires backend infrastructure — see [orchestration getting-started](https://github.com/budgetanalyzer/orchestration/blob/main/docs/development/getting-started.md).
+The supported application runtime is provided by the sibling
+[orchestration repository](https://github.com/budgetanalyzer/orchestration/blob/main/docs/development/getting-started.md).
+After that environment is healthy, open
+`https://app.budgetanalyzer.localhost`; do not use the Vite port directly.
 
-Run the strict production-browser CSP audit with `npm run test:e2e:csp` after
-the workstation-owned Tilt production-smoke route is available and locally
-trusted. The command uses deterministic browser mocks and may fail on real
-runtime CSP findings; see [docs/testing-guide.md](docs/testing-guide.md#external-browser-harness)
-for prerequisites, self-tests, and artifacts. Agents must not start Tilt or
-Vite for this audit.
+See the [development guide](docs/development.md) for prerequisites, commands,
+environment variables, and build variants.
 
-## Features
+## Technology
 
-- Transaction management — list, search, sort, paginate, import CSV
-- Multi-currency support with exchange rates
-- Real-time analytics — credits, debits, net balance
-- Role-based access control with fine-grained permissions
-- Dark mode with localStorage persistence
-- Responsive mobile-first design
-
-## Tech Stack
-
-React 19.2 | TypeScript | Vite | React Router 7.14 | TanStack Query | Redux Toolkit | TanStack Table | Tailwind CSS | Shadcn/UI | Axios | Vitest
+React, TypeScript, Vite, React Router, TanStack Query, Redux Toolkit, TanStack
+Table, Tailwind CSS, Axios, Vitest, Testing Library, MSW, and Playwright.
 
 ## Documentation
 
-| Topic | Link |
-|-------|------|
-| Development setup, scripts, environment variables | [docs/development.md](docs/development.md) |
-| API endpoints, error format, axios config | [docs/api-integration.md](docs/api-integration.md) |
-| Architecture, state management, CSP, security model, permissions | [docs/architecture.md](docs/architecture.md) |
-| Authentication flows, session heartbeat, troubleshooting | [docs/authentication.md](docs/authentication.md) |
-| State architecture deep-dive | [docs/state-architecture.md](docs/state-architecture.md) |
-| Testing patterns | [docs/testing-guide.md](docs/testing-guide.md) |
-
-## Security Model (Summary)
-
-- **Session cookies** (HttpOnly, Secure, SameSite=Strict) — no tokens in browser JS
-- **Server-side sessions** in Redis — 15-minute sliding expiry
-- **Per-request validation** — every API call validated before reaching backends
-- **Instant revocation** — delete the Redis key, session is immediately dead
-- **Strict CSP** — `style-src 'self'` blocks parser/attribute inline styles;
-  application styling remains Tailwind-first and runtime stylesheet injection
-  is prohibited. Trusted client JavaScript property writes may serialize as a
-  DOM `style` attribute without violating browser CSP.
-
-See [docs/architecture.md](docs/architecture.md) for full details.
+| Concern                                          | Owner                                                                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Documentation index                              | [docs/README.md](docs/README.md)                                                                              |
+| Setup, commands, environment, and builds         | [docs/development.md](docs/development.md)                                                                    |
+| Structure, browser support, and CSP              | [docs/architecture.md](docs/architecture.md)                                                                  |
+| Authentication, sessions, roles, and permissions | [docs/authentication.md](docs/authentication.md)                                                              |
+| Frontend API behavior                            | [docs/api-integration.md](docs/api-integration.md)                                                            |
+| Endpoint schemas and payloads                    | [Unified API](docs/api/budget-analyzer-api.yaml) and [Session Gateway API](docs/api/session-gateway-api.yaml) |
+| State ownership                                  | [docs/state-architecture.md](docs/state-architecture.md)                                                      |
+| Test policy, coverage, and Playwright            | [docs/testing-guide.md](docs/testing-guide.md)                                                                |
+| React hooks, lifecycle, and effects              | [docs/react-hooks-lifecycle-mental-model.md](docs/react-hooks-lifecycle-mental-model.md)                      |
 
 ## Related Repositories
 
-| Repository | Role |
-|------------|------|
-| [orchestration](https://github.com/budgetanalyzer/orchestration) | Infrastructure, CI/CD, system docs |
-| [session-gateway](https://github.com/budgetanalyzer/session-gateway) | OAuth2 + session management |
-| [permission-service](https://github.com/budgetanalyzer/permission-service) | Roles and permissions |
-| [transaction-service](https://github.com/budgetanalyzer/transaction-service) | Transaction CRUD |
-| [currency-service](https://github.com/budgetanalyzer/currency-service) | Currencies and exchange rates |
-| [service-common](https://github.com/budgetanalyzer/service-common) | Shared Java libraries |
+| Repository                                                                   | Role                                            |
+| ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| [orchestration](https://github.com/budgetanalyzer/orchestration)             | Infrastructure, CI/CD, and system documentation |
+| [session-gateway](https://github.com/budgetanalyzer/session-gateway)         | OAuth2 and session management                   |
+| [permission-service](https://github.com/budgetanalyzer/permission-service)   | Roles and permissions                           |
+| [transaction-service](https://github.com/budgetanalyzer/transaction-service) | Transaction and saved-view APIs                 |
+| [currency-service](https://github.com/budgetanalyzer/currency-service)       | Currency and exchange-rate APIs                 |
+| [service-common](https://github.com/budgetanalyzer/service-common)           | Shared backend libraries                        |
 
 ## License
 
