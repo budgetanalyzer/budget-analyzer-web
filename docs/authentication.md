@@ -1,481 +1,236 @@
-# Authentication Integration Guide
+# Authentication and Authorization
 
-## Overview
+This document owns the frontend authentication, session, role, and permission
+contracts. Endpoint and payload schemas remain authoritative in the generated
+[Session Gateway API](api/session-gateway-api.yaml). General request handling is
+documented in [API integration](api-integration.md).
 
-Budget Analyzer uses a **Session Gateway pattern** with **Istio ext_authz** for per-request validation. This means:
-- JWTs are never exposed to the browser (XSS protection)
-- Session cookies are HttpOnly, Secure, and SameSite
-- Auth lifecycle flows are handled server-side by the Session Gateway
-- Per-request session validation is handled by ext_authz at the Istio ingress layer
-- Frontend bootstraps the session through `/auth/v1/user` and redirects to login/logout
+## Security Boundary
 
-## Architecture
+Budget Analyzer uses a server-side session pattern:
 
-```
+```text
+Frontend document and assets:
+  Browser -> Istio ingress -> NGINX -> frontend
+
+Authentication paths:
+  Browser -> Istio ingress -> Session Gateway
+
 API requests:
-  Browser → Istio Ingress (:443) → ext_authz (:9002) → NGINX (:8080) → Backend Services
-
-Auth paths (/oauth2/*, /login/oauth2/*, /logout, /user, /auth/*):
-  Browser → Istio Ingress (:443) → Session Gateway (:8081)
-
-Frontend pages:
-  Browser → Istio Ingress (:443) → NGINX (:8080) → Vite (:3000)
+  Browser -> Istio ingress -> ext_authz -> NGINX -> backend service
 ```
 
-### Component Roles
+The Session Gateway owns the OAuth2/OIDC lifecycle, stores identity-provider
+tokens server-side, and gives the browser only an opaque session cookie. The
+public cookie defaults to `BA_SESSION` and is `HttpOnly`, `Secure`, and
+`SameSite=Strict`; deployments can configure the cookie name and SameSite
+policy. Frontend code cannot and must not inspect the cookie or store tokens in
+`localStorage` or `sessionStorage`.
 
-| Component | Port | Role |
-|-----------|------|------|
-| Istio Ingress Gateway | 443 (HTTPS) | SSL termination, ext_authz enforcement on `/api/*`, auth-path rate limiting, routing |
-| ext_authz | 9002 (HTTP) | Per-request session validation via Redis lookup, identity header injection |
-| Session Gateway | 8081 (HTTP) | OAuth2 flows, session lifecycle, token storage, session hash creation in Redis |
-| NGINX Gateway | 8080 (HTTP) | Request routing, backend rate limiting, load balancing |
-| Permission Service | 8086 (HTTP) | Roles/permissions resolution (called by Session Gateway) |
+For `/api/*`, ext_authz validates the Redis-backed session and injects identity
+headers before NGINX routes the request. Backend services remain authoritative
+for authorization and resource ownership. Frontend permission checks improve
+navigation and affordances; they are not a security boundary.
 
-## Development Setup
+The broader routing and trust boundaries are owned by
+[Architecture](architecture.md). Local access URLs and environment setup are
+owned by [Development](development.md).
 
-### Access URLs
+## Authentication Lifecycle
 
-**Development:**
-- Frontend: `https://app.budgetanalyzer.localhost` (Istio Ingress Gateway)
-- DO NOT use `http://localhost:3000` (Vite dev server) - authentication won't work
+### Login and protected-route bootstrap
 
-**Production:**
-- Frontend: Load balancer domain (e.g., `https://budgetanalyzer.com`)
+`useAuth` in `src/features/auth/hooks/useAuth.ts` stores the current user in a
+TanStack Query entry keyed by `['auth', 'currentUser']`. It calls
+`GET /auth/v1/user` with credentials, uses a five-minute stale time, and does
+not retry automatically.
 
-### Request Flow (Development)
+`AuthenticatedRoute` wraps the complete user and admin application tree:
 
-For frontend pages:
-1. Browser requests `https://app.budgetanalyzer.localhost/`
-2. Istio Ingress Gateway terminates SSL
-3. Istio routes to NGINX (8080)
-4. NGINX proxies to Vite dev server (3000)
-5. Vite serves React app with HMR
+1. While the current-user request is pending, it renders only the
+   authentication loading state. Protected layouts, permission guards, and
+   feature hooks do not mount.
+2. A successful user response mounts the protected route tree.
+3. An empty 401 becomes an unauthenticated result and starts one replacement
+   navigation to `/oauth2/authorization/idp`.
+4. Network failures and non-401 responses remain in the SPA as an
+   authentication-availability error with a Retry action. They do not start
+   OAuth2 and protected children remain unmounted.
 
-For API requests:
-1. Browser requests `https://app.budgetanalyzer.localhost/api/transactions`
-2. Istio Ingress calls ext_authz (9002)
-3. ext_authz looks up session in Redis (`session:{id}`)
-4. If valid: ext_authz injects `X-User-Id`, `X-Roles`, `X-Permissions` headers
-5. Istio routes to NGINX (8080) with injected identity headers
-6. NGINX routes to appropriate backend service
-7. Backend service reads identity from headers and enforces data-level authorization
+The automatic login navigation carries the requested pathname, query, and hash
+as `returnUrl`. `src/features/auth/utils/loginRedirect.ts` accepts only
+same-origin absolute paths that begin with one `/` and rejects protocol-relative
+and `/\\` paths. A document-wide latch prevents Strict Mode, route bootstrap,
+and concurrent API 401s from starting duplicate automatic navigations.
 
-## Authentication Flows
+`/login`, `/peace`, `/oops`, and `/unauthorized` are public SPA routes. The
+frontend document and static assets are also public at ingress; authentication
+is established by the SPA boundary before protected application code mounts.
 
-### Login Flow
+### Explicit login and logout
 
-```typescript
-// User clicks login button
-const { login } = useAuth();
-login(); // Redirects to /oauth2/authorization/idp
+`login(returnUrl?)` starts the Session Gateway flow at
+`/oauth2/authorization/idp`. The gateway handles the identity-provider redirect,
+callback, server-side session creation, cookie issuance, and return to the SPA.
 
-// Session Gateway handles:
-// 1. Redirect to IdP login
-// 2. OAuth callback (/login/oauth2/code/idp)
-// 3. Exchange authorization code for tokens
-// 4. Store session data in Redis session hash
-// 5. Call permission-service to resolve roles/permissions
-// 6. Write session data to Redis hash (session:{id})
-// 7. Set session cookie (HttpOnly, Secure, SameSite)
-// 8. Redirect back to frontend
-```
+`logout()` clears the frontend Query cache and navigates to `/logout`. The
+Session Gateway clears the server session and browser cookie and completes the
+identity-provider logout redirect chain. Session-expiry paths also use
+`/logout`, so cleanup stays centralized.
 
-#### Protected-route bootstrap
+### API 401 after bootstrap
 
-Protected user and admin routes share one authentication boundary:
+The shared API response interceptor treats a later 401 as an absent, expired,
+or revoked session. It starts the same latched replacement navigation with a
+safe `returnUrl`, but every failed request still rejects as an `ApiError`.
+Concurrent 401 responses therefore cause one navigation without becoming
+successful query results. A 403 is an authorization failure and never starts
+login.
 
-1. The ingress serves the public frontend document, and the SPA requests
-   `GET /auth/v1/user` before mounting any protected layout, permission guard,
-   or feature data hook.
-2. A 200 user response mounts the protected route tree. While the request is
-   pending, the boundary renders only its authentication loading state.
-3. A 401 means no valid session. The boundary starts one replacement navigation
-   to `/oauth2/authorization/idp`, using the requested local pathname, query,
-   and hash as the encoded `returnUrl`.
-4. Network errors and non-401 responses such as 500/503 remain in-app
-   availability errors with a Retry action. They do not start OAuth2 or mount
-   protected UI.
+See [API integration](api-integration.md#error-normalization) for the complete
+client error contract.
 
-Automatic return URLs must be same-origin absolute paths: they start with one
-`/` and cannot start with `//` or `/\\`. Unsafe or external values are omitted,
-so the Session Gateway uses its default post-login destination. One shared
-in-document latch prevents Strict Mode effects, route bootstrap, and concurrent
-API failures from starting duplicate automatic navigations.
+## Heartbeat, Inactivity, and Expiry
 
-`/login`, `/peace`, `/oops`, and `/unauthorized` remain public frontend routes.
+`SessionHeartbeatProvider`, mounted by `src/App.tsx`, enables
+`useSessionHeartbeat` only for an authenticated user. The hook calls
+`GET /auth/v1/session`, which validates the Redis-backed session and extends its
+sliding TTL without contacting the identity provider. The deployment default
+session TTL is 15 minutes.
 
-### Logout Flow
+Frontend behavior is:
 
-```typescript
-// User clicks logout button
-const { logout } = useAuth();
-logout(); // Navigates to /logout
+- Send one heartbeat when the provider becomes enabled.
+- On later intervals, send a heartbeat only if mouse, keyboard, click, touch,
+  or captured scroll activity occurred since the previous check. API requests
+  alone do not extend the session.
+- Schedule a non-dismissable warning from the response's Unix-seconds
+  `expiresAt`. Continue sends another heartbeat; reaching zero navigates to
+  `/logout`.
+- Publish successful expiry updates through the `session-heartbeat`
+  `BroadcastChannel`, allowing other tabs to dismiss and reschedule their
+  warnings.
+- Retry a network failure or HTTP 502 once immediately. If that retry fails,
+  show a warning toast. A 401 navigates to `/logout`.
 
-// Session Gateway handles:
-// 1. Delete session hash from Redis
-// 2. Clear session cookie
-// 3. Redirect to IdP logout
-// 4. Redirect back to frontend
-```
+The default interval is two minutes and the warning begins two minutes before
+expiry. `VITE_HEARTBEAT_INTERVAL_MS` and
+`VITE_WARNING_BEFORE_EXPIRY_SECONDS` override those frontend defaults; the
+environment-variable inventory belongs to
+[Development](development.md#environment-variables).
 
-### Check Authentication Status
+## Current User Contract
 
-```typescript
-// On app load, check if user is authenticated
-const { user, error, isAuthenticated, isLoading, refetch } = useAuth();
+The frontend consumes this subset of the `/auth/v1/user` response:
 
-// Internally calls GET /auth/v1/user endpoint (routed to Session Gateway)
-// Returns user info if session is valid
-// Returns null only for a sessionless 401; other failures populate error
-```
-
-### Session Heartbeat
-
-The frontend periodically calls `GET /auth/v1/session` to keep the session alive. Implemented via `SessionHeartbeatProvider` (mounted in `App.tsx`) which uses the `useSessionHeartbeat` hook.
-
-**What it provides:**
-- **Sliding session TTL**: Each heartbeat resets the 15-minute session expiry
-- **Local session validation**: Heartbeat validates the Redis-backed session only; it does not call Auth0
-- **Inactivity warning**: A non-dismissable modal with a live countdown timer appears before session expiry, allowing the user to click "Continue" to extend the session. If the countdown reaches zero, the user is automatically redirected to `/logout`
-
-**Response:**
-```json
-{
-  "userId": "user123",
-  "roles": ["ADMIN", "USER"],
-  "expiresAt": 1711720800
-}
-```
-
-The frontend derives remaining time as `expiresAt - Math.floor(Date.now() / 1000)`.
-
-**Server response behavior:**
-- 200: Session is valid and the server extends the Redis session TTL
-- 401: No valid session — redirect to login
-- 502: Transient gateway/backend error — retry on next interval
-
-**Frontend behavior:**
-- Heartbeat fires immediately on mount, then every 2 minutes by default if user is active
-- If user is inactive (no mouse, keyboard, click, scroll, or touch events), heartbeat is skipped
-- Scroll tracking uses capture phase to detect scrolling in overflow containers (not just window scroll)
-- A warning modal with a live countdown timer appears 2 minutes before session expiry (based on `expiresAt` from server)
-- Expiry warnings are synced across tabs via `BroadcastChannel` — if one tab extends the session, other tabs reschedule their warning timers
-- On network error or 502 transient error, retries once; if retry fails, shows a toast warning
-- On 401, redirects to `/oauth2/authorization/idp`
-
-**Configuration (environment variables, all optional):**
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VITE_HEARTBEAT_INTERVAL_MS` | `120000` (2 min) | Interval between heartbeat calls |
-| `VITE_WARNING_BEFORE_EXPIRY_SECONDS` | `120` (2 min) | Show warning this many seconds before expiry |
-
-**Key files:**
-- `src/components/SessionHeartbeatProvider.tsx` — composition: auth check + heartbeat + modal
-- `src/hooks/useSessionHeartbeat.ts` — core heartbeat + warning timer logic
-- `src/hooks/useActivityTracking.ts` — window event-based activity detection
-- `src/hooks/useCountdown.ts` — live countdown timer hook
-- `src/components/InactivityWarningModal.tsx` — non-dismissable warning dialog with countdown and auto-redirect
-
-## API Client Configuration
-
-### Axios Configuration
-
-```typescript
-// All requests include session cookies
-const apiClient = axios.create({
-  baseURL: '/api',
-  withCredentials: true, // Include session cookies
-});
-
-// No need to manually add Authorization header
-// ext_authz validates the session and injects identity headers
-```
-
-### Error Handling
-
-An API 401 asks the shared auth navigation utility to start one replacement
-navigation to OAuth2 with the current local path, query, and hash as the safe
-`returnUrl`. Every failed request still rejects independently as an `ApiError`,
-including empty and proxy-shaped 401 responses. Parallel 401s do not start
-parallel navigations. A 403 remains an authorization error and does not trigger
-login. This handles a session that expires or is revoked after protected route
-bootstrap without converting the failed API request into successful query data.
-
-## Configuration Files
-
-### Frontend (.env)
-
-```bash
-# API base URL - all API requests go here
-VITE_API_BASE_URL=/api
-
-# Access app via Istio Ingress Gateway in development
-# https://app.budgetanalyzer.localhost
-```
-
-### Routing (Istio Ingress Gateway)
-
-The Istio Ingress Gateway routes requests based on path:
-
-- `/auth/*`, `/oauth2/*`, `/login/oauth2/*`, `/logout`, `/user` → Session Gateway (8081)
-- `/api/*` → NGINX (8080), with ext_authz enforcement
-- `/login`, `/*` → NGINX (8080), frontend (no auth required)
-
-Session Gateway does **not** proxy API or frontend requests. It only handles auth lifecycle paths.
-Frontend documents and static assets deliberately remain public at the ingress;
-the SPA route boundary protects the application tree after the document loads.
-Unauthorized `/api/*` requests remain HTTP 401 responses rather than ingress or
-OAuth redirects. The SPA owns the resulting browser navigation into OAuth2.
-
-## User Info Structure
-
-```typescript
+```ts
 interface User {
-  sub: string;             // User ID (IdP subject)
+  sub: string;
   email: string;
   name?: string;
-  picture?: string;        // Profile picture URL
+  picture?: string;
   authenticated: boolean;
-  roles: UserRole[];       // Resolved by permission-service (layout-level)
-  permissions: string[];   // Resolved by permission-service (action-level)
+  roles: ('USER' | 'ADMIN')[];
+  permissions: string[];
 }
 ```
 
-`roles` drives layout decisions (which chrome surrounds the page).
-`permissions` drives action-level UI gating (which buttons, forms, tiles, and
-queries render).
+Roles decide which layout chrome surrounds a page. Permissions decide whether
+an action, feature route, tile, or navigation affordance is available. The
+values come from the current-user query; there is no separate frontend role or
+permission cache.
 
-## Frontend Permission Checks
+## Roles and Permissions
 
-The frontend follows the bulletproof-react split between **roles** (layout)
-and **permissions** (actions). See the "Authorization: Roles vs Permissions"
-section in `AGENTS.md` for the convention and the full table of gated sites.
+### Roles are for layout
 
-### Gating tools
+Use `isAdmin(user.roles)` from `src/features/auth/utils/role.ts` only for
+layout-level decisions. `AdminRoute` uses it to select the admin application
+shell; `Layout` and `LoginPage` use it for role-aware navigation. Never use an
+admin role check to gate a specific action. If an action is admin-only, gate it
+with the permission that authorizes that action.
 
-Three complementary layers, each with a single idiomatic tool:
+### Permissions are for actions and features
 
-1. **`AdminRoute`** (`src/features/admin/components/AdminRoute.tsx`) — role-based
-   chrome guard. Decides whether the admin shell even loads. Layout-level only;
-   never use it to gate a specific action.
-2. **`<PermissionGuard permission="...">`**
-   (`src/features/auth/components/PermissionGuard.tsx`) — route/subtree
-   permission guard. Wrap a route `element` (omit `fallback` → redirects to
-   `/unauthorized`) or an inline subtree (pass `fallback={null}` → hides the
-   subtree). Because denied children never mount, their data hooks never fire —
-   no wasted API calls, no `enabled` flag needed on the underlying query.
-3. **`usePermission('<permission:string>')`**
-   (`src/features/auth/hooks/usePermission.ts`) — inline affordance check. Use
-   inside components that render a **single** boolean-gated button/row/nav item,
-   or that build a nav list imperatively (e.g., `AdminLayout.tsx`).
+Permission checks are exact string matches against `user.permissions`. Unknown
+or misspelled strings fail closed.
 
-**Rule of thumb:** `<PermissionGuard>` for *"should this page exist for me?"*,
-`usePermission` for *"should this affordance render?"*. For multi-permission
-gates or imperative checks, use `usePermission` directly.
+- `PermissionGuard` in
+  `src/features/auth/components/PermissionGuard.tsx` owns route and subtree
+  gating. Without a `fallback`, denial redirects to `/unauthorized`; with
+  `fallback={null}`, denial hides the inline subtree. Denied children never
+  mount, so their data hooks never fire.
+- `usePermission(permission)` in
+  `src/features/auth/hooks/usePermission.ts` owns individual buttons, rows,
+  and imperatively assembled navigation items.
+- `hasPermission(user, permission)` in
+  `src/features/auth/utils/permissions.ts` is the equivalent plain function for
+  non-component code.
 
-**Helpers:**
+Use `PermissionGuard` for "should this page or subtree exist for me?" and
+`usePermission` for "should this affordance render?". Do not add a React Query
+`enabled` condition when a guard already prevents the query-owning child from
+mounting. Use `enabled` only when one component must run a gated query alongside
+other unconditional work.
 
-- `hasPermission(user, permission)` —
-  `src/features/auth/utils/permissions.ts`. Plain function for non-component
-  code paths.
-- `isAdmin(user.roles)` — `src/features/auth/utils/role.ts`. Used only by
-  `AdminRoute`, `Layout`, and `LoginPage` for layout-level decisions. Never
-  use it to gate an action.
+Read-only table bodies and cells are not independently permission-gated. If a
+user reaches a page they cannot read, the backend 403 must remain observable as
+an error rather than being converted into an empty-table state. Gate distinct
+cross-user pages or features at their route or subtree boundary.
 
-### Permission taxonomy
+### Self scope and cross-user scope
 
-Backend-owned (permission-service), mirrored in `src/testing/mocks/handlers.ts`. Gating
-sites use inline string literals; a typo fails safe by returning `false`.
+The permission catalogue is backend-owned. The frontend uses inline literals
+such as:
 
-| Resource | Read (self) | Read (cross-user) | Write | Delete |
-|---|---|---|---|---|
-| Transactions | `transactions:read` | `transactions:read:any` | `transactions:write` (+ `:any`) | `transactions:delete` (+ `:any`) |
-| Currencies | `currencies:read` | — | `currencies:write` | — (rolled into `:write`) |
-| Statement Formats | `statementformats:read` | — | `statementformats:write` | — (rolled into `:write`) |
-| Users | `users:read` | — | `users:write` | — |
+| Resource          | Current-user scope                                               | Cross-user scope                                                             |
+| ----------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Transactions      | `transactions:read`, `transactions:write`, `transactions:delete` | `transactions:read:any`, `transactions:write:any`, `transactions:delete:any` |
+| Currencies        | `currencies:read`, `currencies:write`                            | Not applicable                                                               |
+| Statement formats | `statementformats:read`, `statementformats:write`                | Not applicable                                                               |
+| Users             | `users:read`, `users:write`                                      | Not applicable                                                               |
 
-`:any` variants widen scope from "my own resources" to "across all users" and
-gate the admin cross-user features (search page, dashboard tile, sidebar item).
-User-facing self-scope features check the unscoped variants.
+An `:any` suffix widens a transaction operation from the current user's
+resources to resources across users. Use it only for a distinct cross-user
+feature, such as admin transaction search. User-facing import, edit, delete,
+and selection affordances use the unscoped permission.
 
-The user statement-format visibility page is route-gated with
-`statementformats:read` and is discoverable from the Preferences menu only for
-users with that permission. Its hide/restore actions and the transaction import
-`New format` affordance are gated with
-`usePermission('statementformats:write')`, matching the CSV/PDF wizard and
-current-user visibility endpoints. Users without write permission can still
-import with existing visible formats and can read their visibility state.
+### Grant-time read invariant
 
-#### Permission hierarchy (invariant)
+Backend role bundles grant read access alongside write or delete access for the
+same resource. Write and delete remain independent of each other. Frontend
+checks do not expand permissions at runtime: edit routes can require the write
+permission directly, and `hasPermission` remains a literal membership check.
+If a bundle contains write or delete without the corresponding read permission,
+fix the backend grant rather than adding frontend inference or redundant gates.
 
-Permissions have an implied `:read` dependency: a grant of `:write` presumes
-`:read` on the same resource, and a grant of `:delete` also presumes `:read`.
-`:write` and `:delete` are independent of each other — neither implies the
-other, and roles that hold one without the other (e.g. an auditor with
-`transactions:delete` but no `transactions:write`) are legitimate and
-supported (see `TransactionTable.test.tsx` for the locked-in combinations).
-The dependency is enforced **at grant time** by the permission-service seed
-data
-(`permission-service/src/main/resources/db/migration/V2__seed_default_data.sql`) —
-every role bundle that includes `:write` or `:delete` on a resource also
-includes `:read` on that resource. There is no runtime expansion anywhere: neither the backend
-(`@PreAuthorize("hasAuthority('…')")` is an exact-string match) nor the
-frontend (`hasPermission` in `src/features/auth/utils/permissions.ts` is a
-literal `Array.includes` check). The invariant is what makes those literal
-checks correct, because invalid subsets (e.g. `:write` without `:read`) are
-never issued.
+### Rules-of-hooks constraint
 
-This has two practical consequences:
+`usePermission` is a hook and cannot be called inside `.filter()`, loops, or
+callbacks. Use either:
 
-1. **Route and component guards encode the minimum permission a site needs,
-   not every permission it happens to touch.** The `/admin/currencies/:id`
-   edit route requires only `currencies:write`, even though the page opens
-   with a `GET` protected by `currencies:read`, because any user holding
-   `:write` is guaranteed to also hold `:read`. Do not double-gate on
-   `:read` + `:write` "defensively".
-2. **Do not add runtime expansion.** No `hasEffectivePermission` helper, no
-   "if write then read" branch in `hasPermission`. If a new resource needs a
-   new permission, add the row to the seed migration above and grant `:read`
-   alongside any `:write` or `:delete`. Drift is a grant-time bug, not a
-   frontend bug.
+- `PermissionGuard` around the complete subtree, or
+- top-level `usePermission` calls followed by conditional spreads when building
+  a list, as in `src/features/admin/components/AdminLayout.tsx`.
 
-Permissions are populated from the `/auth/v1/user` response and refreshed via
-React Query — no separate cache.
+## Authentication Troubleshooting
 
-### Rules-of-hooks trap
+- **Authentication fails on the Vite port:** use the ingress URL documented in
+  [Development](development.md); the direct Vite server does not provide the
+  authentication routing boundary.
+- **The cookie is absent from `document.cookie`:** this is expected for the
+  HttpOnly session cookie. Inspect browser storage/network tooling instead of
+  adding JavaScript cookie detection.
+- **Bootstrap shows “Authentication unavailable”:** inspect
+  `/auth/v1/user`. Only a 401 starts login; network errors and 5xx responses are
+  retryable availability failures.
+- **An API request returns 403:** the session is valid but the operation is not
+  authorized. Do not turn the response into a login redirect.
+- **The session warning appears unexpectedly:** inspect activity tracking,
+  heartbeat responses, `expiresAt`, and the two heartbeat environment values.
+  A heartbeat 401 deliberately takes the logout path.
 
-`usePermission` is a hook, so it cannot be called inside `.filter()` or other
-callbacks. Two safe patterns:
-
-- **`<PermissionGuard>`** — preferred when the check gates a whole subtree; the
-  hook call lives inside the guard component.
-- **Top-of-component `usePermission` + conditional spread** — use when building
-  a nav list imperatively. See `AdminLayout.tsx` for the pattern.
-
-The migration rationale is documented in the sections above.
-
-## Production Deployment
-
-### Environment Variables
-
-```bash
-# Production .env
-VITE_API_BASE_URL=/api
-```
-
-### Build Process
-
-```bash
-# Coverage gate + build static files (served at /)
-npm run build
-
-# Build static files only when coverage already passed in this flow
-npm run build:bundle
-
-# Build for production-smoke verification (served at /_prod-smoke/)
-npm run build:prod-smoke
-
-# Output: dist/ directory
-# NGINX serves these files in production
-```
-
-The standard `npm run build` command runs the Vitest coverage gate before
-type-checking and bundling. It fails if global coverage drops below `80%`
-statements, `80%` branches, `75%` functions, or `80%` lines.
-
-The `build:prod-smoke` command produces a bundle whose assets and router basename
-are set to `/_prod-smoke/`. This is used only by orchestration to verify
-production CSP and browser security behavior on the real public origin — it is
-not a separate application mode. Auth and API paths remain root-relative (`/api`,
-`/oauth2/authorization/idp`, `/logout`) regardless of which build is used.
-
-### Production Entry Point
-
-Single entry point: Istio Ingress Gateway (port 443)
-- All browser traffic enters through Istio Ingress
-- Session Gateway and NGINX are internal services, not directly accessible
-
-## Security Features
-
-### Session Cookies
-
-- **HttpOnly**: JavaScript cannot access cookies (XSS protection)
-- **Secure**: HTTPS only (in production)
-- **SameSite=Strict**: CSRF protection
-- **15-minute timeout**: Sliding session expiration
-
-### Token Management
-
-- Session data stored server-side in Redis session hash (`session:{id}`)
-- ext_authz reads session hashes directly from Redis for per-request validation
-- Frontend heartbeat (`GET /auth/v1/session`) extends the Redis session TTL for active users
-- No tokens in browser localStorage/sessionStorage
-- No tokens in browser JavaScript
-
-### Defense in Depth
-
-1. **Session Gateway**: Manages auth lifecycle, prevents token exposure to browser
-2. **ext_authz (Istio Ingress)**: Validates every API request via Redis session lookup, injects identity headers
-3. **Backend Services**: Enforce data-level authorization using identity headers
-
-### Instant Session Revocation
-
-Delete the Redis session key → next request immediately fails at ext_authz. No token expiry window to wait out.
-
-## Common Issues
-
-### "Not authenticated" even after login
-
-**Cause**: Accessing Vite dev server directly (http://localhost:3000)
-**Solution**: Access via Istio Ingress Gateway (https://app.budgetanalyzer.localhost)
-
-### CORS errors
-
-**Cause**: Making requests to different origins
-**Solution**: All requests should go to same origin (Istio Ingress Gateway, port 443)
-
-### Session expires immediately
-
-**Cause**: Cookies not being sent
-**Solution**: Ensure `withCredentials: true` in axios config
-
-## Testing Authentication
-
-### Manual Testing
-
-1. Navigate to `https://app.budgetanalyzer.localhost/login`
-2. Click "Sign in"
-3. Login with your credentials
-4. Check browser DevTools → Application → Cookies
-5. Should see `SESSION` cookie with HttpOnly flag
-6. Navigate to `https://app.budgetanalyzer.localhost/admin`
-7. Should see admin panel (if user has ADMIN role)
-
-### Automated Testing
-
-```typescript
-// Mock authenticated user
-vi.mock('@/features/admin/hooks/useAuth', () => ({
-  useAuth: () => ({
-    user: {
-      sub: 'test-user',
-      email: 'test@example.com',
-      authenticated: true,
-      roles: ['ADMIN'],
-      permissions: ['transactions:read:any', 'users:read', 'users:write'],
-    },
-    isAuthenticated: true,
-    isLoading: false,
-  }),
-}));
-```
-
-## References
-
-See the [orchestration repository](https://github.com/budgetanalyzer/orchestration) for:
-- [Security Architecture](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/security-architecture.md)
-- [Session-Based Edge Authorization Pattern](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/session-edge-authorization-pattern.md)
-- [Port Reference](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/port-reference.md)
-- Session Gateway Repository
+Authentication test conventions and browser-harness prerequisites belong to
+the [Testing guide](testing-guide.md). API endpoint and payload changes must be
+checked against the generated [Session Gateway API](api/session-gateway-api.yaml)
+and [unified backend API](api/budget-analyzer-api.yaml).

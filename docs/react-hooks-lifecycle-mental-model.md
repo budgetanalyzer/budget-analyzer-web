@@ -1,429 +1,195 @@
-# React Hooks: Understanding the Lifecycle Mental Model Shift
+# React Hooks, Lifecycle, and Effects
 
-This document explains the mental model shift from class component lifecycle methods to React hooks, specifically `useState` and `useEffect`.
+This guide owns the repository's React lifecycle and effect conventions. Read it
+before adding or changing hooks, effects, subscriptions, timers, or state derived
+from other values. State placement beyond component lifecycle belongs to
+[State architecture](state-architecture.md).
 
-## The Fundamental Hooks
+## Render, Commit, and Synchronize
 
-### `useState` - Managing Component State
+Think in terms of rendering and synchronization rather than class lifecycle
+methods:
 
-`useState` lets you add **state** (data that can change) to functional components.
+1. React calls the component to calculate UI from the current props and state.
+   That render is a snapshot and must stay pure: it must not change the DOM,
+   start timers, subscribe to events, or perform requests.
+2. A state setter queues another render. It does not change the state snapshot
+   already visible to the running event handler or render.
+3. React commits the calculated changes to the DOM.
+4. Effects run after a commit to synchronize a non-React system with the
+   committed props and state.
 
-**Syntax:**
-```typescript
-const [value, setValue] = useState(initialValue);
+Event handlers are not part of rendering. They run because a specific
+interaction occurred and are the normal place for submissions, mutations, and
+other user-triggered work.
+
+`useState` stores information that must survive renders and whose change must
+render new UI:
+
+```tsx
+const [open, setOpen] = useState(false);
 ```
 
-**Example:**
-```typescript
-const [globalFilter, setGlobalFilter] = useState('');
-const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+Calling `setOpen(true)` requests another render. When the next render runs,
+`open` contains the new snapshot. Use a lazy initializer when calculating the
+initial value is expensive or reads a browser preference:
+
+```tsx
+const [preference, setPreference] = useState(() => readInitialPreference());
 ```
 
-**What it does:**
-1. Returns an array with 2 elements:
-   - `globalFilter` - the current state value
-   - `setGlobalFilter` - function to update the state
-2. When you call `setGlobalFilter('new value')`, React:
-   - Updates the state
-   - Re-renders the component with the new value
+Hooks must be called unconditionally at the top level of a component or custom
+hook. Do not call them in branches, loops, callbacks, or after an early return.
 
-**Simple Example:**
-```typescript
-function Counter() {
-  const [count, setCount] = useState(0);  // Initial value: 0
+## Effects Synchronize External Systems
 
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => setCount(count + 1)}>Increment</button>
-    </div>
-  );
-}
-```
+An effect is appropriate when a rendered component must connect to, update, or
+disconnect from something React does not control. Examples include DOM and
+browser APIs, event listeners, timers, `BroadcastChannel`, and third-party
+imperative widgets.
 
----
-
-### `useEffect` - Side Effects & Lifecycle
-
-`useEffect` lets you perform **side effects** in functional components - things like:
-- Fetching data
-- Subscribing to events
-- Updating the DOM directly
-- Setting timers
-
-**Syntax:**
-```typescript
+```tsx
 useEffect(() => {
-  // Code to run (the "effect")
+  const handleResize = () => setWidth(window.innerWidth);
 
-  return () => {
-    // Optional cleanup function
-  };
-}, [dependencies]);
-```
-
-**The dependency array controls when the effect runs:**
-
-1. **No array** - Runs after every render
-   ```typescript
-   useEffect(() => {
-     console.log('Runs after every render');
-   });
-   ```
-
-2. **Empty array `[]`** - Runs only once after initial render (like `componentDidMount`)
-   ```typescript
-   useEffect(() => {
-     console.log('Runs once on mount');
-   }, []);
-   ```
-
-3. **With dependencies** - Runs when dependencies change
-   ```typescript
-   useEffect(() => {
-     console.log('Runs when count changes');
-   }, [count]);
-   ```
-
-**Example with Cleanup:**
-```typescript
-useEffect(() => {
-  // Subscribe to something
-  const subscription = api.subscribe(data => {
-    setData(data);
-  });
-
-  // Cleanup function (runs before next effect or on unmount)
-  return () => {
-    subscription.unsubscribe();
-  };
+  window.addEventListener('resize', handleResize);
+  return () => window.removeEventListener('resize', handleResize);
 }, []);
 ```
 
----
+The setup runs after the component is committed. If a dependency changes,
+React first runs the previous cleanup with the old values and then runs setup
+with the new values. Cleanup also runs when the component unmounts. Anything
+that installs or acquires a resource must release that same resource: remove
+listeners, clear timers, unsubscribe, close channels, and release locks.
 
-## The Mental Model Shift
+In development Strict Mode, React runs an extra setup-cleanup-setup cycle on
+mount to expose incomplete cleanup. Code must behave correctly under that
+cycle. Consequently, `[]` means an effect is tied to each mount; it does not
+mean a setup can be assumed to execute only once for the lifetime of the
+application.
 
-### Old Mental Model (Class Components)
+### Dependencies
 
-You thought in terms of **lifecycle methods**:
+The dependency list describes every reactive value read by the effect: props,
+state, and functions or variables declared in the component. React compares
+each dependency with its previous value using `Object.is`.
 
-```javascript
-class UserProfile extends React.Component {
-  componentDidMount() {
-    // Runs once after first render
-    this.fetchUser(this.props.userId);
-  }
+- No dependency list: setup runs after every commit.
+- `[]`: setup runs when that component instance mounts, with cleanup on
+  unmount.
+- `[roomId, enabled]`: setup runs on mount and again when either value changes.
 
-  componentDidUpdate(prevProps) {
-    // Runs after every update
-    if (prevProps.userId !== this.props.userId) {
-      this.fetchUser(this.props.userId);
-    }
-  }
+Do not omit a dependency to control timing. Change the code so the value is no
+longer reactive, define an effect-only helper inside the effect, or stabilize a
+function with `useCallback` when stable identity is part of the design. The
+hooks linter is a correctness check, not an obstacle to bypass.
 
-  componentWillUnmount() {
-    // Cleanup
-    this.subscription.unsubscribe();
-  }
-}
+Split unrelated synchronization into separate effects. Keep setup and teardown
+for one external resource together in the same effect.
+
+## Current Repository Examples
+
+- [`useActivityTracking`](../src/hooks/useActivityTracking.ts) subscribes to
+  window activity events and removes every listener in cleanup.
+- [`useCountdown`](../src/hooks/useCountdown.ts) synchronizes displayed time
+  with the clock and clears its interval whenever the inputs change or the hook
+  unmounts.
+- [`Dialog`](../src/components/ui/Dialog.tsx) acquires the shared body scroll
+  lock only while open and returns its release function; its keyboard listener
+  is installed and removed by a separate effect.
+- [`useSessionHeartbeat`](../src/hooks/useSessionHeartbeat.ts) coordinates
+  timers, a `BroadcastChannel`, session refreshes, and browser navigation. Its
+  cleanup clears timers and closes the channel. This is session-lifecycle
+  coordination, not a pattern for caching ordinary API data.
+
+These examples demonstrate external-system synchronization. They are not a
+reason to move calculations or event-driven work into effects.
+
+## Work That Does Not Need an Effect
+
+### Derived values
+
+If a value can be calculated from current props, state, or query data, calculate
+it during render. Do not store a second copy and synchronize it with an effect.
+
+```tsx
+const visibleTransactions = transactions.filter(matchesFilters);
+const total = visibleTransactions.reduce(sumAmounts, 0);
 ```
 
-You had to think: "What lifecycle am I in?"
+Use `useMemo` only when the calculation is measurably expensive or a stable
+reference is required by another API:
 
----
-
-### New Mental Model (Hooks)
-
-Instead, think about **synchronization** - keeping your component in sync with props/state:
-
-```javascript
-function UserProfile({ userId }) {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    // This effect synchronizes the user data with the userId
-    fetchUser(userId).then(setUser);
-  }, [userId]); // "Keep this effect in sync with userId"
-
-  return <div>{user?.name}</div>;
-}
+```tsx
+const visibleTransactions = useMemo(
+  () => transactions.filter(matchesFilters),
+  [transactions, matchesFilters],
+);
 ```
 
-The mental shift: **"What does this effect need to stay synchronized with?"** rather than "What lifecycle phase am I in?"
+Filtered TanStack Table rows are also derived state. Read the table's row model
+during render or when an action needs it. Do not copy filtered rows into parent
+state from an effect; that creates an extra render, two sources of truth, and a
+stale intermediate state.
 
----
+### Event-driven work
 
-## Mapping Class Lifecycles to `useEffect`
+If work happens because the user clicked, submitted, selected, or imported
+something, run it in that event's callback. Do not set a flag and watch the flag
+with an effect.
 
-### 1. `componentDidMount` (run once on mount)
-
-**Class:**
-```javascript
-componentDidMount() {
-  console.log('Mounted!');
-}
+```tsx
+const handleSubmit = useCallback(() => {
+  createTransaction(formValues, {
+    onSuccess: handleSuccess,
+    onError: handleError,
+  });
+}, [createTransaction, formValues, handleError, handleSuccess]);
 ```
 
-**Hooks:**
-```javascript
-useEffect(() => {
-  console.log('Mounted!');
-}, []); // Empty array = no dependencies = runs once
-```
+Repository components stay synchronous and use TanStack Query mutation
+callbacks rather than `async` component handlers with `mutateAsync`.
 
----
+### Initial state and reset behavior
 
-### 2. `componentDidUpdate` (run on specific prop/state changes)
+Initialize state in `useState`, including a lazy initializer when appropriate.
+If the whole component state should reset when an identity changes, prefer a
+meaningful React `key` at the ownership boundary. Do not add an effect merely
+to copy props into state.
 
-**Class:**
-```javascript
-componentDidUpdate(prevProps, prevState) {
-  if (prevProps.userId !== this.props.userId) {
-    this.fetchUser(this.props.userId);
-  }
-  if (prevState.filter !== this.state.filter) {
-    this.applyFilter(this.state.filter);
-  }
-}
-```
+## Server State Belongs in TanStack Query
 
-**Hooks:**
-```javascript
-// Separate effects for separate concerns!
-useEffect(() => {
-  fetchUser(userId);
-}, [userId]); // Runs when userId changes
+Manual request effects are a valid low-level React technique, but they are not
+the application pattern in this repository. Effects alone do not provide the
+cache ownership, request deduplication, retries, invalidation, or race handling
+the application needs.
 
-useEffect(() => {
-  applyFilter(filter);
-}, [filter]); // Runs when filter changes
-```
+Use TanStack Query hooks for backend and Session Gateway data. For example,
+[`useAuth`](../src/features/auth/hooks/useAuth.ts) owns the current-user query,
+and [`useTransactions`](../src/hooks/useTransactions.ts) owns transaction
+queries. Components consume query state during render and trigger mutations
+from event callbacks. See [API integration](api-integration.md) for the client
+boundary and [State architecture](state-architecture.md) for state ownership.
 
-**Key insight:** With hooks, you split by **concern** (what you're synchronizing), not by **lifecycle phase**.
+## Decision Checklist
 
----
+Before writing an effect, ask:
 
-### 3. `componentWillUnmount` (cleanup)
+1. What external system is being synchronized?
+2. What setup must be undone, and does cleanup fully mirror it?
+3. Does setup need every reactive value listed as a dependency?
+4. Could this instead be calculated during render?
+5. Did a user event cause it, making the event handler the correct owner?
+6. Is it server state, making a TanStack Query hook the correct owner?
 
-**Class:**
-```javascript
-componentDidMount() {
-  this.subscription = api.subscribe(this.handleData);
-}
+If there is no external system, an effect is usually the wrong abstraction.
 
-componentWillUnmount() {
-  this.subscription.unsubscribe();
-}
-```
+## Further Reading
 
-**Hooks:**
-```javascript
-useEffect(() => {
-  const subscription = api.subscribe(handleData);
-
-  // Return a cleanup function
-  return () => {
-    subscription.unsubscribe();
-  };
-}, []); // Setup and teardown happen together!
-```
-
-**Key insight:** Setup and cleanup are **co-located** in the same effect.
-
----
-
-### 4. Both `componentDidMount` AND `componentDidUpdate`
-
-**Class:**
-```javascript
-componentDidMount() {
-  document.title = this.props.title;
-}
-
-componentDidUpdate(prevProps) {
-  if (prevProps.title !== this.props.title) {
-    document.title = this.props.title;
-  }
-}
-```
-
-Notice the **duplication**? You had to write the same logic twice!
-
-**Hooks:**
-```javascript
-useEffect(() => {
-  document.title = title;
-}, [title]); // Runs on mount AND whenever title changes
-```
-
-**Key insight:** `useEffect` runs on mount AND when dependencies change - no duplication needed!
-
----
-
-## The Real Mental Model Shift
-
-### Old way (lifecycle-based):
-- "When does my component mount/update/unmount?"
-- Split logic across multiple lifecycle methods
-- Easy to forget to update both mount and update
-
-### New way (synchronization-based):
-- "What external things does my component need to stay in sync with?"
-- Each effect handles ONE concern
-- Runs on mount AND updates automatically
-
----
-
-## Practical Examples
-
-### Example 1: Update Page Title Based on Data
-
-```javascript
-export function TransactionsPage() {
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
-
-  // Effect: Keep document title in sync with transaction count
-  useEffect(() => {
-    document.title = `Transactions (${filteredTransactions.length})`;
-
-    // Cleanup: restore original title when component unmounts
-    return () => {
-      document.title = 'Budget Analyzer';
-    };
-  }, [filteredTransactions.length]); // Re-run when count changes
-
-  // This runs:
-  // 1. On mount (initial count)
-  // 2. Every time filteredTransactions.length changes
-  // 3. Cleanup runs before each new effect and on unmount
-}
-```
-
----
-
-### Example 2: Multiple Independent Effects
-
-Instead of one giant `componentDidUpdate` checking everything, split into focused effects:
-
-```javascript
-function UserDashboard({ userId, theme }) {
-  // Effect 1: Sync user data with userId
-  useEffect(() => {
-    fetchUser(userId).then(setUser);
-  }, [userId]);
-
-  // Effect 2: Sync theme with localStorage
-  useEffect(() => {
-    localStorage.setItem('theme', theme);
-    document.body.className = theme;
-  }, [theme]);
-
-  // Effect 3: Setup/teardown analytics
-  useEffect(() => {
-    analytics.trackPageView();
-    return () => analytics.cleanup();
-  }, []); // Only on mount/unmount
-}
-```
-
-Each effect is **independent** and focuses on **one concern**.
-
----
-
-### Example 3: Fetching Data
-
-**Old way (with duplication):**
-```javascript
-class UserProfile extends React.Component {
-  componentDidMount() {
-    this.fetchAndSetUser(this.props.userId);
-  }
-
-  componentDidUpdate(prevProps) {
-    if (prevProps.userId !== this.props.userId) {
-      this.fetchAndSetUser(this.props.userId); // Same logic repeated!
-    }
-  }
-
-  fetchAndSetUser(userId) {
-    fetch(`/api/users/${userId}`)
-      .then(res => res.json())
-      .then(user => this.setState({ user }));
-  }
-}
-```
-
-**New way (no duplication):**
-```javascript
-function UserProfile({ userId }) {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    fetch(`/api/users/${userId}`)
-      .then(res => res.json())
-      .then(setUser);
-  }, [userId]); // Automatically runs on mount AND when userId changes
-
-  return <div>{user?.name}</div>;
-}
-```
-
----
-
-## How React Query Simplifies This Further
-
-In this codebase, you rarely see `useEffect` because **React Query handles it for you**!
-
-```javascript
-// Instead of manually using useState + useEffect:
-function TransactionsPage() {
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    setLoading(true);
-    fetch('/api/transactions')
-      .then(res => res.json())
-      .then(data => {
-        setTransactions(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        setError(err);
-        setLoading(false);
-      });
-  }, []);
-
-  // ... render logic
-}
-
-// React Query does all of this for you:
-function TransactionsPage() {
-  const { data: transactions, isLoading, error } = useTransactions();
-
-  // That's it! React Query handles:
-  // - useState for data, loading, error
-  // - useEffect for fetching
-  // - Caching, refetching, and more
-}
-```
-
-So `useQuery` is essentially a powerful combination of `useState` + `useEffect` + caching logic, which is why the code is so clean!
-
----
-
-## Key Takeaways
-
-1. **Think synchronization, not lifecycle phases** - "What does this effect need to stay in sync with?"
-
-2. **Split by concern, not by lifecycle** - Multiple small, focused effects instead of one giant lifecycle method
-
-3. **Co-locate setup and cleanup** - They live together in the same `useEffect`
-
-4. **Dependencies are key** - The dependency array tells React when to re-run the effect
-
-5. **No duplication** - `useEffect` automatically runs on mount AND when dependencies change
-
-6. **Custom hooks abstract patterns** - Libraries like React Query encapsulate common `useState` + `useEffect` patterns
+- React: [`useEffect` reference](https://react.dev/reference/react/useEffect)
+- React: [Synchronizing with Effects](https://react.dev/learn/synchronizing-with-effects)
+- React: [Lifecycle of Reactive Effects](https://react.dev/learn/lifecycle-of-reactive-effects)
+- React: [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect)
+- React: [Separating Events from Effects](https://react.dev/learn/separating-events-from-effects)
+- TanStack Query: [React overview](https://tanstack.com/query/latest/docs/framework/react/overview)

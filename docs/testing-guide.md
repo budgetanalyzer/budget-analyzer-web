@@ -1,914 +1,321 @@
 # Testing Guide
 
-This is the source of truth for test placement, shared test utilities, API
-mocking, behavior-focused coverage, and review guardrails in the Budget
-Analyzer web application.
-
----
-
-## Testing Stack
-
-- **Test Runner:** Vitest (fast, Vite-native)
-- **Testing Library:** React Testing Library (`@testing-library/react`) and
-  `@testing-library/user-event`
-- **Assertions:** Vitest matchers + jest-dom matchers
-- **API Mocking:** MSW (Mock Service Worker)
-- **Environment:** jsdom (simulates browser environment in Node)
-
----
+This document owns repository test policy, shared utilities, coverage, and the
+external Playwright harness. Local installation and builds belong to
+[Development](development.md); browser support and CSP semantics belong to
+[Architecture](architecture.md).
 
 ## Testing Policy
 
 Write tests that would fail for a real product regression. Prefer
-integration-style component or page tests when confidence comes from routing,
-permissions, forms, API calls, URL state, or React Query behavior working
-together. Use focused unit tests for shared utilities, complex hooks, and pure
-logic with meaningful edge cases.
+integration-style component or page tests when confidence depends on routing,
+permissions, forms, HTTP requests, URL state, or React Query behavior working
+together. Use focused unit tests for pure utilities, complex hooks, and
+product-owned edge cases.
 
-Do not add tests just to assert behavior already guaranteed by React, the
-browser, TypeScript, or a library. Avoid class snapshots, native button click
-behavior, trivial render smoke tests, static label maps, and presentational
-Tailwind details unless they protect an explicit product contract.
+Repository rules:
 
-Before submitting a change, check:
+- Production-code tests are colocated under the nearest `__tests__/` directory.
+- `src/testing/` contains shared test infrastructure only, not tests for
+  production modules.
+- New behavior needs a meaningful test or an explicit reason it does not need
+  one.
+- API-facing behavior normally uses MSW. Use a direct module mock only when its
+  narrower boundary is intentional.
+- User workflows prefer `@testing-library/user-event`; reserve `fireEvent` for
+  low-level synthetic events that `user-event` does not model well.
+- Assert user-visible behavior and frontend-owned contracts, not native browser,
+  React, TypeScript, or third-party implementation behavior.
+- Avoid snapshots and Tailwind/class assertions unless they protect an explicit
+  product contract.
 
-- New behavior has either a meaningful test or an explicit reason it does not
-  need one.
-- No tests were added only to assert native browser, React, TypeScript, or
-  third-party library behavior.
-- New API-facing behavior uses MSW unless a direct module mock is intentionally
-  narrower and still proves the behavior under test.
+## Unit and Component Test Infrastructure
 
----
+Vitest runs in jsdom with global APIs, CSS processing, and the
+`America/Los_Angeles` timezone configured in `vitest.config.ts`. The stack is:
 
-## Running Tests
+- Vitest and V8 coverage
+- React Testing Library and jest-dom matchers
+- `@testing-library/user-event` for user workflows
+- MSW for the HTTP boundary
+- jsdom for component and hook tests
 
-### Basic Commands
+`src/testing/setup.ts` runs before every test file. It installs jest-dom,
+starts the MSW server, resets handlers and mutable mock state after each test,
+and closes the server after the suite. It also supplies focused jsdom shims for
+`matchMedia` and the HTML Popover API. The popover shim models open state,
+toggle events, Escape, and light dismissal so application behavior can be
+tested; it does not emulate browser layout or anchor positioning.
+
+Shared infrastructure:
+
+| Path | Responsibility |
+| --- | --- |
+| `src/testing/setup.ts` | Global matchers, browser shims, and MSW lifecycle |
+| `src/testing/mocks/handlers.ts` | Default auth/API responses and resettable mock state |
+| `src/testing/mocks/server.ts` | Shared Node MSW server |
+| `src/testing/test-utils.tsx` | Fresh Query Client, Redux store, and provider-aware render helper |
+
+`createTestQueryClient()` disables query and mutation retries and disables
+refetch-on-window-focus by default. `createTestStore()` creates an isolated
+Redux store. `renderWithProviders()` returns the Testing Library result plus the
+Query Client and store it used; pass `initialEntries` for a memory router and
+`router: 'dom'` only for code that still imports router hooks from
+`react-router-dom`.
+
+## Running Vitest
 
 ```bash
-# Run tests in watch mode (development)
+# Watch mode
 npm test
 
-# Run tests once (CI/production)
+# Full suite once
 npm test -- --run
 
-# Generate coverage report
+# Full suite once with enforced coverage
 npm run test:coverage
 
-# Run with UI interface
+# Interactive Vitest UI
 npm run test:ui
 
-# Run a single test file
-npx vitest src/utils/__tests__/parseSearchTerms.test.ts
+# One file once
+npx vitest run src/utils/__tests__/parseSearchTerms.test.ts
 
-# Run tests matching a pattern
-npx vitest --grep "renders correctly"
-
-# Type-check the external browser harness without launching Chromium
-npm run typecheck:e2e
-
-# Check the trusted production-smoke response and strict CSP header
-npm run test:e2e:harness
-
-# Strictly audit the implemented application workflow (may fail on real findings)
-npm run test:e2e:csp
+# Tests whose full names match a pattern
+npx vitest run -t "renders correctly"
 ```
 
-### External Browser Harness
+Focused Vitest runs are useful while iterating. Run the proportionate broader
+suite before handoff, especially when changing shared providers, mocks, routing,
+or global setup.
 
-Playwright browser tests use the externally managed Tilt ingress at
-`https://app.budgetanalyzer.localhost/_prod-smoke/`; the harness does not start
-Vite, Tilt, NGINX, or another server. Users must provide that environment;
-agents must not start Tilt or Vite. Run
-`check-budget-analyzer-local-ca-trust` first. If the container trust copy is
-stale, run `ensure-budget-analyzer-local-ca-trust` and check again. Do not bypass
-HTTPS verification.
+## Test Placement
 
-Set `PLAYWRIGHT_BASE_URL` only to select another trusted, externally managed
-HTTPS production-smoke origin:
+Place a test beside its production owner:
+
+```text
+src/components/BackButton.tsx
+src/components/__tests__/BackButton.test.tsx
+
+src/hooks/useTransactions.ts
+src/hooks/__tests__/useTransactions.test.tsx
+
+src/utils/parseSearchTerms.ts
+src/utils/__tests__/parseSearchTerms.test.ts
+```
+
+Feature tests stay in the owning feature. Shared component, hook, API, store,
+and utility tests stay beside the corresponding top-level module. Reusable
+providers, render helpers, mock handlers, and fixtures belong under
+`src/testing/`; do not create a general production-test directory there.
+
+## Writing Repository Tests
+
+### Example 1: Colocated Component Behavior Test
+
+`src/components/__tests__/BackButton.test.tsx` is the current compact reference:
+it renders real routes, drives navigation with `user-event`, and asserts visible
+navigation outcomes rather than internal state. Prefer role, label, and visible
+text queries. Use `findBy*` for content that appears asynchronously and
+`queryBy*` for absence.
+
+When URL-backed state changes before derived or animated content renders, wait
+for the final visible result with `findBy*` or `waitFor()`. Test URL-state hooks
+through their public handlers in a small route harness, including context
+parameters that must be preserved and filters that must be cleared together.
+
+Choose the test boundary according to the contract:
+
+- Page/component tests: route guards, permission gates, forms, loading/error/
+  empty states, URL behavior, mutations, and cache-visible workflows.
+- Hook tests: query keys, `enabled` behavior, invalidation, derived hook state,
+  and surfaced errors.
+- API module tests: paths, methods, query parameters, and request payloads.
+- Utility tests: LocalDate/timezone behavior, search semantics, currency
+  conversion fallbacks, reconciliation rules, and API error mappings.
+
+Keep repository-specific semantics visible. For example, saved-view membership
+tests cover excluded IDs, visible duplicate IDs, restored IDs, and missing
+visible IDs. Do not replace such product rules with generic render assertions.
+
+## MSW (Mock Service Worker)
+
+Use MSW for API-facing behavior so production HTTP code remains on its real
+Axios path while the test controls the response. Default handlers live in
+`src/testing/mocks/handlers.ts`; override only the behavior needed by a test:
+
+```typescript
+server.use(
+  http.get('/api/v1/transactions', () =>
+    HttpResponse.json({ type: 'UPSTREAM_FAILURE', message: 'Unavailable' }, { status: 503 }),
+  ),
+);
+```
+
+When request shape is part of the frontend contract, inspect the URL, query
+parameters, or body inside the handler and assert it after the user action.
+Keep API module tests responsible for transport shape and hook tests responsible
+for React Query behavior so the same contract is not copied across layers.
+
+Direct module mocks are appropriate when the HTTP boundary is irrelevant—for
+example, isolating a page from an already-tested hook or avoiding a retry delay
+that is not under test. Some hooks explicitly configure retries, which override
+`createTestQueryClient()` defaults; allow enough time for that behavior or use a
+focused mock when retries are outside the scenario.
+
+For multipart workflows in jsdom, assert stable frontend-owned behavior: the
+selected filename, request URL/query parameters, presence of a request body, and
+success or error state. Axios plus MSW may not reliably expose an uploaded
+`File` through `request.formData()` in jsdom. A direct API-module test can use a
+temporary Axios adapter to verify that `FormData` remains multipart without
+sending it through MSW.
+
+Do not broadly silence `console.error` or `console.warn`; they commonly reveal
+React, accessibility, and request failures. Use a focused spy only for a known,
+intentional noisy path.
+
+## Coverage
+
+```bash
+npm run test:coverage
+```
+
+Vitest prints the text report and writes HTML plus JSON summary artifacts under
+`coverage/`. Global thresholds in `vitest.config.ts` are:
+
+| Metric | Minimum |
+| --- | ---: |
+| Statements | 80% |
+| Branches | 80% |
+| Functions | 75% |
+| Lines | 80% |
+
+The command exits nonzero when any threshold is missed. `npm run build` uses
+this gate before type-checking and bundling, and `.github/workflows/build.yml`
+runs the same gate explicitly. Build sequencing belongs to
+[Development](development.md#standard-build).
+
+Coverage excludes declarations, colocated tests, shared test infrastructure,
+feature type modules and named shared type-only files, configuration files, and
+`src/main.tsx`. Use the report to find product-risk gaps; do not add trivial
+tests merely to raise a percentage. Raise thresholds only after reviewing the
+report and adding behavior-focused coverage.
+
+## External Browser Harness
+
+Playwright exercises the externally managed production-smoke application. It
+never starts Vite, Tilt, NGINX, or another server.
+
+### Prerequisites
+
+Before running browser tests:
+
+1. Install repository dependencies with `npm install`.
+2. Ensure the Playwright Chromium matching the locked package is available;
+   `npx playwright install --list` shows installed browsers, and
+   `npx playwright install chromium` installs it when needed.
+3. Ask the user to provide a healthy workstation-owned Tilt stack and
+   `https://app.budgetanalyzer.localhost/_prod-smoke/` route. Agents must not
+   start Tilt or Vite.
+4. Verify local CA trust with `check-budget-analyzer-local-ca-trust`. If the
+   container copy is stale, run `ensure-budget-analyzer-local-ca-trust` and
+   check again. Do not disable HTTPS or certificate verification.
+
+The default base URL is configured in `playwright.config.ts`. An override must
+be an absolute, trusted HTTPS URL:
 
 ```bash
 PLAYWRIGHT_BASE_URL=https://app.budgetanalyzer.localhost/_prod-smoke/ \
   npm run test:e2e:csp
 ```
 
-`test:e2e:harness` contains environment, fail-closed mock, and controlled
-detector self-tests. It fails when the trusted production-smoke route or
-required response CSP is missing, a browser mock falls through, the monitor was
-not installed before navigation, an allowed control produces a security or
-stylesheet finding, or a prohibited control is not detected. The allowed
-controls prove that direct property assignment, `Object.assign(element.style,
-...)`, `style.setProperty(...)`, and `CSSStyleDeclaration.cssText` can apply and
-serialize as DOM style attributes without a CSP event in the exercised
-Chromium context. Separate blocked controls require an enforced CSP event for
-`setAttribute('style', ...)` and a repository stylesheet-guard finding for a
-transient runtime `<style>`.
+Playwright currently uses one desktop Chromium project, one worker, no retries,
+and `ignoreHTTPSErrors: false`.
 
-`test:e2e:csp` includes those detector checks plus strict application audits.
-An application audit returns nonzero when it observes any
-`securitypolicyviolation`, a runtime-added `<style>` element, or a `<style>`
-element still present in the final DOM. CSP-related console errors are retained
-as supporting diagnostics, not used as a substitute for policy events. The
-global CSP monitor neither collects nor asserts DOM style attributes: trusted
-client-side property writes are allowed by browser CSP even though the DOM
-serializes their result as a `style` attribute. Do not allowlist or
-snapshot-accept an executable finding to make the audit pass.
-
-Failure traces, screenshots, and results remain local under
-`test-results/playwright/`; the HTML report is under `playwright-report/`.
-Both generated directories are excluded from source linting and formatting.
-
-Browser scenarios use the typed fixtures under `e2e/fixtures/`. The CSP monitor
-must be installed before navigation and observes policy events, transient and
-final stylesheet elements, and supporting console errors. Browser mocks fulfill
-only the exact auth endpoints and scenario-registered `/api/*` responses. Any
-other auth or API request is blocked and fails fixture teardown, so browser
-tests never fall through silently to protected services. Shared fixture data
-uses fixed IDs and timestamps and does not read real cookies or backend state.
-
-Vitest excludes `e2e/**`; Playwright specifications are collected only by the
-explicit browser commands. Agents changing Playwright configuration or E2E
-sources run `npm run typecheck:e2e` explicitly. Ordinary builds and CI
-workflows do not invoke the E2E type-check or Tilt-dependent browser commands,
-so they do not require Tilt, the production-smoke route, or Chromium.
-
-Current application coverage is one authenticated desktop transaction-list
-workflow: render deterministic mocked data, select a row to reveal the bulk
-action bar, and clear the selection to dismiss it. It reports zero CSP
-violations, zero runtime-added stylesheets, and zero final stylesheets in the
-current Chromium run. Playwright is configured only for desktop Chromium, so
-this is not exhaustive route, form, mobile, dropdown, or cross-browser proof.
-
----
-
-## Test Setup Architecture
-
-### Configuration Files
-
-#### 1. vitest.config.ts
-
-```typescript
-import { configDefaults, defineConfig } from 'vitest/config';
-
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './src/testing/setup.ts',
-    exclude: [...configDefaults.exclude, 'e2e/**'],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html', 'json-summary'],
-      include: ['src/**/*.{ts,tsx}'],
-      exclude: [
-        'src/**/*.d.ts',
-        'src/**/__tests__/**',
-        'src/features/**/types/**',
-        'src/main.tsx',
-        'src/testing/**',
-        'src/types/{auth,currency,session,statementFormat,transaction,transactionSearch,user,view}.ts',
-        '*.config.{ts,js}',
-        '.*rc.{ts,js}',
-      ],
-      thresholds: {
-        statements: 80,
-        branches: 80,
-        functions: 75,
-        lines: 80,
-      },
-    },
-    // ... path aliases, css handling
-  },
-});
-```
-
-#### 2. src/testing/setup.ts
-
-This file runs before all tests:
-
-```typescript
-import { expect, beforeAll, afterEach, afterAll } from 'vitest';
-import '@testing-library/jest-dom';
-import * as matchers from '@testing-library/jest-dom/matchers';
-import { resetMockHandlerState } from '@/testing/mocks/handlers';
-import { server } from '@/testing/mocks/server';
-
-// Extend Vitest's expect with jest-dom matchers
-expect.extend(matchers);
-
-// MSW server lifecycle
-beforeAll(() => server.listen());
-afterEach(() => {
-  server.resetHandlers();
-  resetMockHandlerState();
-});
-afterAll(() => server.close());
-```
-
-**What this does:**
-- Adds jest-dom matchers like `.toBeInTheDocument()`
-- Starts MSW server before any tests run
-- Resets MSW handlers between tests (prevents test pollution)
-- Closes MSW server after all tests complete
-
----
-
-## Test Placement
-
-Production-code tests live beside the code they verify in `__tests__`
-directories. Shared test infrastructure lives under `src/testing/`.
-
-Use this split consistently:
-
-- `src/utils/parseSearchTerms.ts` -> `src/utils/__tests__/parseSearchTerms.test.ts`
-- `src/hooks/useTransactions.ts` -> `src/hooks/__tests__/useTransactions.test.tsx`
-- `src/testing/setup.ts` for global Vitest setup
-- `src/testing/mocks/` for MSW handlers and server setup
-- `src/testing/test-utils.tsx` for shared provider helpers
-
-Do not add production-code tests under `src/testing/`. The old `src/test/`
-directory is no longer used.
-
-Use feature ownership as the default placement guide:
-
-- Feature page/component tests belong under the owning feature's `__tests__`
-  directory.
-- Shared component, hook, API, store, and utility tests belong under the
-  nearest shared module's `__tests__` directory.
-- Shared providers, render helpers, mock servers, and reusable fixtures belong
-  under `src/testing/`.
-
----
-
-## MSW (Mock Service Worker)
-
-MSW intercepts HTTP requests and returns mock responses **without actually hitting the network**.
-
-### How MSW Works
-
-```
-Your Test
-    ↓
-Component makes API call (fetch/axios)
-    ↓
-MSW intercepts the request
-    ↓
-MSW returns mock response
-    ↓
-Component receives mock data
-    ↓
-Test assertions
-```
-
-### MSW Setup Files
-
-#### src/testing/mocks/handlers.ts
-
-Define mock API endpoints:
-
-```typescript
-import { http, HttpResponse } from 'msw';
-
-export const handlers = [
-  http.get('/api/transactions', () => {
-    return HttpResponse.json([
-      {
-        id: '1',
-        accountId: 'acc1',
-        bankName: 'Test Bank',
-        date: '2024-01-01',
-        amount: 100.5,
-        type: 'debit',
-        description: 'Test transaction',
-      },
-    ]);
-  }),
-];
-```
-
-#### src/testing/mocks/server.ts
-
-Set up MSW for Node.js (tests):
-
-```typescript
-import { setupServer } from 'msw/node';
-import { handlers } from './handlers';
-
-export const server = setupServer(...handlers);
-```
-
-### Why Use MSW
-
-**Without MSW:**
-- Tests can make real API calls and fail with network errors
-- No backend running in test environment
-- Unreliable, slow tests
-
-**With MSW:**
-- API calls intercepted and mocked
-- Fast, reliable responses
-- No network dependency
-
-Use MSW for API-facing behavior by default. It keeps the app code on its real
-HTTP path while letting tests assert request URLs, query params, payloads, and
-response handling. A direct module mock is acceptable when it is intentionally
-narrower than HTTP behavior, such as isolating a page from an already-tested
-hook or avoiding a retry delay that is not part of the behavior under test.
-
----
-
-## Test Examples
-
-### Example 1: Colocated Component Behavior Test
-
-```typescript
-// src/components/__tests__/BackButton.test.tsx
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { Link, MemoryRouter, Route, Routes } from 'react-router';
-import { BackButton } from '@/components/BackButton';
-
-function DetailPage() {
-  return <BackButton />;
-}
-
-function ListPage() {
-  return <Link to="/transactions/1">Open detail</Link>;
-}
-
-describe('BackButton', () => {
-  it('uses browser history after in-app navigation', async () => {
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <Routes>
-          <Route path="/" element={<ListPage />} />
-          <Route path="/transactions/:id" element={<DetailPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    await userEvent.click(screen.getByRole('link', { name: /Open detail/ }));
-    await userEvent.click(screen.getByRole('button', { name: /Back/ }));
-
-    expect(screen.getByRole('link', { name: /Open detail/ })).toBeInTheDocument();
-  });
-});
-```
-
-### Example 2: Testing Hooks with React Query
-
-```typescript
-// src/hooks/__tests__/useTransactions.test.tsx
-import { describe, it, expect } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { useTransactions } from '@/hooks/useTransactions';
-import { createTestQueryClient } from '@/testing/test-utils';
-import type { ReactNode } from 'react';
-
-describe('useTransactions', () => {
-  function createWrapper() {
-    const queryClient = createTestQueryClient();
-
-    return function Wrapper({ children }: { children: ReactNode }) {
-      return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
-    };
-  }
-
-  it('fetches transactions successfully', async () => {
-    const { result } = renderHook(() => useTransactions(), { wrapper: createWrapper() });
-
-    // Initial state: loading
-    expect(result.current.isLoading).toBe(true);
-
-    // Wait for success
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    // Check data
-    expect(result.current.data).toBeDefined();
-    expect(Array.isArray(result.current.data)).toBe(true);
-  });
-});
-```
-
-**Key points:**
-- `renderHook()` - For testing custom hooks
-- `wrapper` - Provides React Query context
-- `waitFor()` - Waits for async operations
-- MSW returns mock data automatically
-
----
-
-## Common Testing Patterns
-
-### Pattern 1: Querying Elements
-
-```typescript
-import { render, screen } from '@testing-library/react';
-
-render(<MyComponent />);
-
-// By role (preferred - most accessible)
-screen.getByRole('button', { name: /submit/i });
-screen.getByRole('textbox', { name: /email/i });
-
-// By label text
-screen.getByLabelText('Email address');
-
-// By placeholder
-screen.getByPlaceholderText('Enter email...');
-
-// By text content
-screen.getByText('Hello World');
-
-// By test ID (last resort)
-screen.getByTestId('submit-button');
-```
-
-**Query variants:**
-- `getBy*` - Throws error if not found (use for assertions)
-- `queryBy*` - Returns null if not found (use for checking absence)
-- `findBy*` - Async, waits for element (use for async rendering)
-
-### Pattern 2: User Interactions
-
-```typescript
-import userEvent from '@testing-library/user-event';
-
-await userEvent.click(button);
-await userEvent.type(input, 'test');
-await userEvent.clear(input);
-```
-
-Prefer `userEvent` for workflows users actually perform: clicking, typing,
-selecting options, clearing fields, and keyboard navigation. Keep `fireEvent`
-for lower-level events where `userEvent` is a poor fit, such as synthetic
-window activity, timer-adjacent hooks, focused DOM events like backdrop clicks,
-or rare library-specific keyboard workarounds.
-
-This repo's custom `Select` primitive currently exposes the trigger and menu
-items as buttons in tests. Use the visible labels with `userEvent.click()`,
-matching the component's rendered roles:
-
-```typescript
-await user.click(screen.getByRole('button', { name: /Status/ }));
-await user.click(screen.getByRole('button', { name: 'Disabled' }));
-```
-
-This repo's custom `Dialog` primitive currently does not expose a semantic
-`role="dialog"`. Query dialogs by the visible heading or body copy, then use the
-visible action buttons.
-
-For URL-backed filter hooks, test parsing and serialization with a small route
-harness that renders `useLocation()` output. Assert the user-visible URL state
-after calling the hook's public handlers, including preserved context params and
-params that must be cleared together.
-
-For saved-view membership utilities, keep tests focused on frontend-owned
-reconciliation semantics: excluded IDs are absent from visible rows and missing
-fetches, visible duplicate IDs render once, restored IDs reappear when they
-leave the excluded set, and missing visible IDs are returned for detail fetches.
-
-### Pattern 3: Async Testing
-
-```typescript
-import { waitFor, waitForElementToBeRemoved } from '@testing-library/react';
-
-// Wait for condition
-await waitFor(() => {
-  expect(screen.getByText('Success')).toBeInTheDocument();
-});
-
-// Wait for element to appear
-const element = await screen.findByText('Loaded');
-
-// Wait for element to disappear
-await waitForElementToBeRemoved(() => screen.queryByText('Loading...'));
-```
-
-When a workflow updates URL state and then renders derived or animated content,
-wait for the final user-visible content with `findBy*` or `waitFor()` instead
-of asserting synchronously after the URL assertion.
-
-### Pattern 4: Testing Error States
-
-```typescript
-it('displays error message on API failure', async () => {
-  // Override MSW handler for this test only
-  server.use(
-    http.get('/api/transactions', () => {
-      return HttpResponse.json(
-        { error: 'Server error' },
-        { status: 500 }
-      );
-    })
-  );
-
-  render(<TransactionsPage />);
-
-  await waitFor(() => {
-    expect(screen.getByText(/error/i)).toBeInTheDocument();
-  });
-});
-```
-
----
-
-## Testing Best Practices
-
-### When To Choose Test Type
-
-Use page or component integration tests for workflows where the product risk is
-in pieces working together: permission gates, route guards, URL parsing and
-serialization, API request shaping, loading/error/empty states, form
-validation, mutation success or failure, and cache invalidation.
-
-Use hook tests for React Query behavior such as query keys, `enabled` gating,
-surfaced errors, derived hook state, and invalidation. Use direct API module
-tests for request paths, methods, query params, and payload shape. Use utility
-tests for product-owned boundaries such as LocalDate handling, currency
-conversion fallbacks, search/filter semantics, and API error-message mapping.
-
-### ✅ DO: Test User Behavior
-
-```typescript
-// ✅ GOOD: Test what users see and do
-import userEvent from '@testing-library/user-event';
-
-it('allows user to filter transactions', async () => {
-  render(<TransactionsPage />);
-
-  const searchBox = screen.getByPlaceholderText('Search transactions...');
-  await userEvent.type(searchBox, 'CREDIT');
-
-  expect(screen.getByText('Total: 5 transactions')).toBeInTheDocument();
-});
-```
-
-### ❌ DON'T: Test Implementation Details
-
-```typescript
-// ❌ BAD: Testing internal state
-it('updates state when typing', () => {
-  const { rerender } = render(<SearchBox />);
-  expect(component.state.query).toBe(''); // Testing internal state
-});
-```
-
-### ✅ DO: Use Semantic Queries
-
-```typescript
-// ✅ GOOD: Query by role/label (accessible)
-screen.getByRole('button', { name: 'Submit' });
-screen.getByLabelText('Email');
-```
-
-### ❌ DON'T: Rely on Test IDs
-
-```typescript
-// ❌ BAD: Test IDs as first choice
-screen.getByTestId('submit-btn'); // Only use as last resort
-```
-
-### ✅ DO: Test Loading and Error States
-
-```typescript
-it('shows loading spinner', () => {
-  render(<TransactionsPage />);
-  expect(screen.getByText('Loading...')).toBeInTheDocument();
-});
-
-it('shows error message on failure', async () => {
-  server.use(/* error handler */);
-  render(<TransactionsPage />);
-  await waitFor(() => {
-    expect(screen.getByText(/error/i)).toBeInTheDocument();
-  });
-});
-```
-
-### ✅ DO: Clean Up Between Tests
-
-```typescript
-afterEach(() => {
-  // MSW resets automatically via setup.ts
-  // React Testing Library cleans up automatically
-
-  // Manual cleanup if needed:
-  vi.clearAllMocks();
-  localStorage.clear();
-});
-```
-
----
-
-## Mocking Strategies
-
-### Mock Functions
-
-```typescript
-import { vi } from 'vitest';
-
-// Create mock function
-const mockFn = vi.fn();
-
-// Mock with return value
-const mockFn = vi.fn().mockReturnValue(42);
-
-// Mock with implementation
-const mockFn = vi.fn((x) => x * 2);
-
-// Assertions
-expect(mockFn).toHaveBeenCalled();
-expect(mockFn).toHaveBeenCalledWith('arg');
-expect(mockFn).toHaveBeenCalledTimes(2);
-```
-
-### Mock Modules
-
-```typescript
-// Mock entire module
-vi.mock('@/api/transactionApi', () => ({
-  transactionApi: {
-    getTransactions: vi.fn().mockResolvedValue([]),
-  },
-}));
-
-// Use in test
-import { transactionApi } from '@/api/transactionApi';
-expect(transactionApi.getTransactions).toHaveBeenCalled();
-```
-
-### Mock API with MSW (Preferred)
-
-```typescript
-// Override handler for specific test
-import { server } from '@/testing/mocks/server';
-import { http, HttpResponse } from 'msw';
-
-it('handles 404 error', async () => {
-  server.use(
-    http.get('/api/transactions/:id', () => {
-      return HttpResponse.json(
-        { error: 'Not found' },
-        { status: 404 }
-      );
-    })
-  );
-
-  // Test that uses this endpoint
-});
-```
-
-For API-facing workflow tests, assert frontend-owned request shape in the MSW
-handler when the payload or query params are part of the contract:
-
-```typescript
-let requestBody: unknown;
-
-server.use(
-  http.post('/api/v1/currencies', async ({ request }) => {
-    requestBody = await request.json();
-    return HttpResponse.json({ id: 1, currencyCode: 'EUR' }, { status: 201 });
-  }),
-);
-
-// After the user submits the form:
-expect(requestBody).toEqual({ currencyCode: 'EUR', providerSeriesId: 'DEXUSEU' });
-```
-
-For multipart upload workflows, assert the stable frontend-owned pieces: the
-selected filename in the UI, request URL/query params, that a request body was
-sent, and the success/error behavior. In jsdom, Axios + MSW can be unreliable
-for reading the uploaded `File` back out of `request.formData()`.
-
-For direct API module tests that need to verify Axios keeps a `FormData` payload
-as multipart, prefer a temporary Axios adapter mock and inspect the transformed
-config. Avoid sending the real `FormData` upload through MSW just to assert
-headers; that path can stall in jsdom even when the browser behavior is valid.
-
-Some hooks set their own React Query `retry` value. That explicit hook option
-overrides `createTestQueryClient()` defaults, so error-state tests may need a
-longer `findBy*` timeout or a focused hook mock when the retry delay is not part
-of the behavior under test.
-
-Keep routine diagnostic `console.log` output out of production code that runs
-under page tests. If a test must suppress known debug output from a third-party
-or intentionally noisy dependency, use a focused spy for `console.log` in that
-test file. Do not broadly silence `console.error` or `console.warn`; those
-usually reveal React, accessibility, or API-test failures.
-
-For direct API module tests, use MSW to assert paths, methods, query params, and
-payloads at the API boundary. Keep React Query hook tests focused on query keys,
-`enabled` behavior, invalidation, and surfaced error state so they do not
-duplicate every request-shape assertion already covered by the API module tests.
-
----
-
-## Test Organization
-
-### File Structure
-
-```
-src/
-├── components/
-│   ├── BackButton.tsx
-│   └── __tests__/
-│       └── BackButton.test.tsx
-├── testing/
-│   ├── setup.ts              # Global test setup
-│   ├── test-utils.tsx        # Shared provider render helpers
-│   └── mocks/
-│       ├── handlers.ts       # MSW handlers
-│       └── server.ts         # MSW server setup
-└── utils/
-    ├── parseSearchTerms.ts
-    └── __tests__/
-        └── parseSearchTerms.test.ts
-```
-
-### Test Naming
-
-```typescript
-describe('ComponentName', () => {
-  describe('feature/behavior', () => {
-    it('should do something specific', () => {
-      // Test
-    });
-  });
-});
-```
-
-**Examples:**
-```typescript
-describe('TransactionTable', () => {
-  describe('filtering', () => {
-    it('filters rows when search query changes', () => {});
-    it('shows empty state when no matches found', () => {});
-  });
-
-  describe('sorting', () => {
-    it('sorts by amount when column header clicked', () => {});
-  });
-});
-```
-
----
-
-## Shared Test Utilities
-
-Use `src/testing/test-utils.tsx` when a test needs React Query, Redux, or an
-optional memory router. Prefer a local helper only when a page needs custom
-route declarations or unusually specific provider wiring.
-
-```typescript
-import { screen } from '@testing-library/react';
-import { renderWithProviders } from '@/testing/test-utils';
-import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage';
-
-it('renders the transactions page', () => {
-  const { queryClient, store } = renderWithProviders(<TransactionsPage />, {
-    initialEntries: ['/transactions'],
-  });
-
-  expect(screen.getByText(/transactions/i)).toBeInTheDocument();
-  queryClient.clear();
-  expect(store.getState().ui.displayCurrency).toBe('USD');
-});
-```
-
-`createTestQueryClient()` creates a Query Client with retries disabled.
-`createTestStore()` creates a fresh Redux store for each test.
-`renderWithProviders()` returns the normal Testing Library render result plus
-the `queryClient` and `store` it used.
-Pass `router: 'dom'` only for components that still import router hooks from
-`react-router-dom`; the default router matches the app's `react-router` usage.
-
----
-
-## Coverage Reports
-
-Run `npm run test:coverage` to generate the initial V8 coverage report. The
-text report prints in the terminal, and detailed artifacts are written under
-`coverage/`.
-
-Coverage has modest global thresholds configured in `vitest.config.ts`:
-`80%` statements, `80%` branches, `75%` functions, and `80%` lines.
-`npm run test:coverage` exits non-zero if any global metric falls below those
-values, so CI/build checks that run coverage will fail on meaningful
-backsliding.
-
-The main local build path, `npm run build`, runs `npm run test:coverage` before
-type-checking and bundling. GitHub Actions uses the same coverage gate in
-`.github/workflows/build.yml`, runs the CSP production-smoke gate, and then creates the standard
-production bundle for artifact upload. Use `npm run build:bundle` only when coverage has already
-passed in the same flow.
-
-Use the report to find meaningful product-risk gaps, especially in auth,
-transactions, admin flows, analytics, saved views, and shared utilities. Do not
-add tests just to increase a percentage for trivial UI primitives, native
-browser behavior, library behavior, or TypeScript-only contracts.
-
-For analytics coverage, prefer assertions that protect interpretation and
-navigation: URL defaults and redirects, transaction-type filtering, amount
-aggregation, date bounds in drilldown links, and source-specific return paths.
-Do not assert chart/card layout or Tailwind classes unless they become part of
-a user-visible behavior contract.
-
-For shared utility coverage, focus on product semantics and boundary behavior:
-currency formatting/conversion fallbacks, exchange-rate lookup behavior,
-LocalDate and timezone boundaries that affect filters, and OpenAPI-backed API
-error mappings. Avoid tests for static class maps, simple label helpers, or
-library wrappers unless they protect a real regression.
-
-Coverage excludes shared test infrastructure, colocated test files,
-declaration files, type-only modules, config files, and the `src/main.tsx`
-bootstrap entrypoint. Raise thresholds deliberately after reviewing the current
-report and adding behavior-focused coverage for real product-risk gaps.
-
----
-
-## Debugging Tests
-
-### View Test Output
+### Commands and Responsibilities
 
 ```bash
-# Verbose output
-npm test -- --reporter=verbose
+# Required after changing playwright.config.ts or e2e/
+npm run typecheck:e2e
 
-# UI mode (interactive)
-npm run test:ui
+# Environment, fail-closed fixture, and detector self-tests
+npm run test:e2e:harness
+
+# Detector self-tests plus strict application CSP workflows
+npm run test:e2e:csp
 ```
 
-### Debug in VS Code
+`typecheck:e2e` is intentionally separate from normal builds and CI.
+Tilt-dependent browser commands are local-only and should not be run for a
+documentation-only change.
 
-Add to `.vscode/launch.json`:
+`test:e2e:harness` distinguishes harness correctness from application proof:
 
-```json
-{
-  "type": "node",
-  "request": "launch",
-  "name": "Debug Vitest Tests",
-  "runtimeExecutable": "npm",
-  "runtimeArgs": ["test", "--", "--run"],
-  "console": "integratedTerminal",
-  "internalConsoleOptions": "neverOpen"
-}
-```
+- `e2e/harness/environment.spec.ts` verifies the exact production-smoke route,
+  HTTP 200 response, strict CSP directives, and absence of unsafe sources.
+- `e2e/harness/fixture-fail-closed.spec.ts` proves unexpected protected
+  requests are blocked and missing pre-navigation monitoring fails clearly.
+- `e2e/csp/detector.spec.ts` uses controlled allowed and prohibited operations
+  to prove the CSP and runtime-stylesheet detector.
 
-### Common Issues
+Passing these self-tests means the environment and detector work; it does not
+mean the application is CSP-clean. `test:e2e:csp` also collects application
+workflows under `e2e/csp/`, and a real finding must not be allowlisted or
+snapshot-accepted merely to make the command pass.
 
-**Issue: Tests fail with "window is not defined"**
-- Solution: Check that `environment: 'jsdom'` is set in vitest.config.ts
+### Fail-Closed Browser Fixtures
 
-**Issue: MSW not intercepting requests**
-- Solution: Verify `server.listen()` is called in setup.ts
-- Check handler paths match your API calls
+Typed fixtures under `e2e/fixtures/` install the CSP monitor and browser mocks
+before navigation. Mocks fulfill only exact `GET /auth/v1/user`,
+`GET /auth/v1/session`, and scenario-registered `/api/*` requests. Any other
+protected auth/API request is fulfilled with the harness failure status,
+recorded, and reported during fixture teardown rather than reaching a backend
+service. Shared fixture data uses deterministic IDs and timestamps and never
+reads real cookies or backend state.
 
-**Issue: React Query tests timeout**
-- Solution: Disable retries in test QueryClient
+The monitor records:
 
-**Issue: Stale state between tests**
-- Solution: Use `beforeEach()` to reset state/mocks
+- `securitypolicyviolation` events;
+- every runtime-added `<style>` element, including one removed before teardown;
+- `<style>` elements present in the final DOM; and
+- relevant CSP console errors as supporting diagnostics.
 
----
+Executable failures are policy events or runtime/final stylesheet findings.
+Console messages support diagnosis but do not replace policy events. The
+monitor deliberately does not collect DOM `style` attributes: allowed client
+property writes serialize to that attribute in Chromium without a CSP
+violation. Controlled detector cases separately prove allowed property writes
+and `CSSStyleDeclaration.cssText`, blocked `setAttribute('style', ...)`, and the
+repository ban on transient runtime stylesheets. See
+[Architecture](architecture.md#content-security-policy) for the distinction
+between browser policy and stricter repository authoring rules.
 
-## Quick Reference
+### Current Coverage and Temporary Gate
 
-### Essential Testing Library Queries
+The only application workflow currently covered is an authenticated desktop
+transaction list with deterministic mocked data: select one row, observe the
+bulk-action bar, and clear the selection. The Playwright project is desktop
+Chromium only. This is not exhaustive route, form, mobile, dropdown,
+cross-browser, or Motion-API evidence.
 
-| Method | Use Case | Example |
-|--------|----------|---------|
-| `getByRole` | Semantic elements | `getByRole('button')` |
-| `getByLabelText` | Form inputs | `getByLabelText('Email')` |
-| `getByText` | Text content | `getByText('Hello')` |
-| `findBy*` | Async elements | `await findByText('Loaded')` |
-| `queryBy*` | Check absence | `queryByText('Gone')` |
+In particular, the browser suite does not yet cover desktop and mobile dropdown
+interaction, real placement and viewport fallback, top-layer clipping escape,
+CSP violations, and prohibited runtime/final stylesheets for those workflows.
+Until that equivalent coverage exists, the temporary dropdown gate remains in
+`npm run build:prod-smoke`; see
+[Development](development.md#production-smoke-build-and-dropdown-gate).
 
-### Essential Assertions
+### Artifacts
 
-```typescript
-// jest-dom matchers (from setup.ts)
-expect(element).toBeInTheDocument();
-expect(element).toBeVisible();
-expect(element).toHaveTextContent('text');
-expect(element).toBeDisabled();
-expect(element).toHaveClass('active');
+Traces, screenshots, and result context are written under
+`test-results/playwright/`. The HTML report is written to
+`playwright-report/`. Both paths are ignored and remain local.
 
-// Vitest matchers
-expect(mockFn).toHaveBeenCalled();
-expect(value).toBe(42);
-expect(array).toEqual([1, 2, 3]);
-expect(value).toBeTruthy();
-```
+## Upstream References
 
----
-
-## Further Reading
-
-- [Vitest Documentation](https://vitest.dev/)
-- [React Testing Library](https://testing-library.com/react)
-- [MSW Documentation](https://mswjs.io/)
+- [Vitest](https://vitest.dev/guide/)
+- [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
+- [user-event](https://testing-library.com/docs/user-event/intro/)
+- [MSW](https://mswjs.io/docs/)
 - [Testing React Query](https://tanstack.com/query/latest/docs/framework/react/guides/testing)
-- See also: `docs/state-architecture.md` for understanding what to test
+- [Playwright Test](https://playwright.dev/docs/intro)
