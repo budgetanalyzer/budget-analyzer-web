@@ -21,33 +21,14 @@ Learn how state management works in this application, including:
 
 ---
 
-### ⚡ [useEffect Guide](./useEffect-guide.md)
-A comprehensive guide to React's `useEffect` hook, including:
-- What useEffect is and how it works
-- The three parts: effect function, cleanup, dependencies
-- Real-world examples from the codebase
-- Common pitfalls and how to avoid them
-- When NOT to use useEffect
+### 🔄 [React Hooks, Lifecycle, and Effects](./react-hooks-lifecycle-mental-model.md)
+A concise guide to render snapshots, state, effects, dependencies, cleanup,
+derived values, event handling, and TanStack Query ownership.
 
 **Read this if you're wondering:**
-- How does useEffect work?
-- Why is my effect running too often (or not at all)?
-- How do I sync state between components?
-
----
-
-### 🔄 [React Hooks Lifecycle Mental Model](./react-hooks-lifecycle-mental-model.md)
-A guide for transitioning from class components to hooks, including:
-- Explanation of `useState` and `useEffect`
-- Mental model shift from lifecycle methods to synchronization
-- Mapping lifecycle methods to `useEffect` patterns
-- Multiple practical examples
-- How React Query simplifies common patterns
-
-**Read this if you're wondering:**
-- How do I replicate `componentDidMount` with hooks?
-- What's the difference between lifecycle thinking and synchronization thinking?
-- Why don't I see many `useEffect` calls in this codebase?
+- When does an effect run and clean up?
+- Does this work belong in an effect, render, or an event handler?
+- Why does this application use TanStack Query for server state?
 
 ---
 
@@ -73,15 +54,11 @@ Complete testing setup and best practices, including:
    - Understand where data lives and flows
    - See the big picture of the app
 
-2. **Then read:** [useEffect Guide](./useEffect-guide.md)
-   - Master one of React's most important hooks
-   - Learn how parent/child components sync
+2. **Then read:** [React Hooks, Lifecycle, and Effects](./react-hooks-lifecycle-mental-model.md)
+   - Understand render snapshots and external-system synchronization
+   - Decide between effects, derived values, event handlers, and queries
 
-3. **Coming from class components?** [React Hooks Lifecycle Mental Model](./react-hooks-lifecycle-mental-model.md)
-   - Understand the mental shift from lifecycle methods to hooks
-   - Map `componentDidMount`/`componentDidUpdate` to `useEffect`
-
-4. **Finally:** [Testing Guide](./testing-guide.md)
+3. **Finally:** [Testing Guide](./testing-guide.md)
    - Learn how to write and run tests
    - Understand the MSW setup
 
@@ -91,8 +68,8 @@ Complete testing setup and best practices, including:
 |----------|-------|
 | Where are transactions stored? | [State Architecture](./state-architecture.md#1-react-query---server-state-where-transactions-live) |
 | How does filtering update stats? | [State Architecture](./state-architecture.md#user-types-in-search-box) |
-| What is useEffect? | [useEffect Guide](./useEffect-guide.md#what-is-useeffect) |
-| How do I replicate componentDidMount? | [React Hooks Lifecycle](./react-hooks-lifecycle-mental-model.md#1-componentdidmount-run-once-on-mount) |
+| When should I use an effect? | [React Hooks and Effects](./react-hooks-lifecycle-mental-model.md#effects-synchronize-external-systems) |
+| How do dependencies and cleanup work? | [React Hooks and Effects](./react-hooks-lifecycle-mental-model.md#dependencies) |
 | How do I test components? | [Testing Guide](./testing-guide.md#example-1-colocated-component-behavior-test) |
 | How does MSW work? | [Testing Guide](./testing-guide.md#msw-mock-service-worker) |
 | When should I use Redux? | [State Architecture](./state-architecture.md#2-redux---ui-state-only) |
@@ -113,17 +90,6 @@ const [globalFilter, setGlobalFilter] = useState('');
 
 // Redux for global UI preferences
 const theme = useAppSelector(state => state.ui.theme);
-```
-
-### useEffect Example
-```typescript
-// Sync filtered data from child to parent
-useEffect(() => {
-  if (onFilteredRowsChange) {
-    const filteredRows = table.getFilteredRowModel().rows;
-    onFilteredRowsChange(filteredRows);
-  }
-}, [globalFilter, transactions]);
 ```
 
 ### Testing Example
@@ -200,8 +166,7 @@ When you make significant code changes:
 | Guide | Last Updated | Status |
 |-------|--------------|--------|
 | State Architecture | 2025-10-22 | ✅ Complete |
-| useEffect Guide | 2025-10-22 | ✅ Complete |
-| React Hooks Lifecycle Mental Model | 2025-10-22 | ✅ Complete |
+| React Hooks, Lifecycle, and Effects | 2026-05-19 | ✅ Complete |
 | Testing Guide | 2026-05-19 | ✅ Complete |
 
 ---
@@ -212,4 +177,4 @@ When you make significant code changes:
 
 🧪 **Want to write tests?** Jump to the [Testing Guide](./testing-guide.md) to learn the testing setup.
 
-⚡ **Confused about effects?** Check out the [useEffect Guide](./useEffect-guide.md) for detailed explanations.
+⚡ **Working with hooks?** Read [React Hooks, Lifecycle, and Effects](./react-hooks-lifecycle-mental-model.md).

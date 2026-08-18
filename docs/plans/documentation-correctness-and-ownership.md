@@ -328,7 +328,7 @@ count.
 test and browser-audit contracts, and delegates setup, builds, and CSP meaning
 to their owners.
 
-## Phase 5: Replace Generic React Effect Tutorials
+## Phase 5: Consolidate and Correct React Hooks Guidance
 
 ### Workspace
 
@@ -336,30 +336,38 @@ to their owners.
 
 ### Goal
 
-Replace the two long generic React tutorials with one short repository-specific
-effects guide that teaches the rules this codebase actually follows.
+Consolidate the two overlapping React hooks tutorials into one concise,
+corrected guide that gives agents enough React lifecycle and effect context to
+understand and follow this codebase's decisions.
 
 ### Scope
 
 - `docs/useEffect-guide.md` and
   `docs/react-hooks-lifecycle-mental-model.md`.
-- A concise replacement guide, `docs/react-effects.md`.
-- Links from documentation files that currently reference the superseded
-  guides.
-- Current local examples of external-system synchronization and cleanup.
+- `docs/react-hooks-lifecycle-mental-model.md` as the retained React-specific
+  guide.
+- Links from `AGENTS.md` and documentation files that direct agents to the
+  retained guide when working with hooks.
+- Concise foundational guidance about render, state, effects, dependencies,
+  cleanup, derived values, event handling, and TanStack Query ownership.
+- Current local examples of external-system synchronization and cleanup, plus
+  small corrected examples where a local source link would not explain the
+  rule on its own.
 
 ### Non-goals
 
 - Refactoring hooks or components.
-- Teaching general React hooks, class lifecycle migration, manual request
-  fetching, or effect-based derived-state synchronization.
+- Providing an exhaustive React reference or duplicating API-level details that
+  are better maintained by the official React documentation.
+- Teaching manual request fetching or effect-based derived-state
+  synchronization as application patterns.
 - Curating source-code comments such as the `useDebounce` tutorial or URL
   builder examples; that is Plan 4.
 
 ### Required context
 
-- Read both existing tutorials and identify the repository guidance that the
-  audit requires preserving before deleting anything.
+- Read both existing tutorials and identify useful mental models, rules,
+  examples, and repository guidance to preserve before deleting anything.
 - Inspect current effects under `src/hooks/`, auth session handling, and shared
   overlay primitives to choose small, accurate local examples.
 - Use current official React guidance for external-system synchronization and
@@ -367,41 +375,59 @@ effects guide that teaches the rules this codebase actually follows.
 
 ### Execution steps
 
-1. Extract the durable local rules from both tutorials: effects synchronize
-   external systems, installed resources need cleanup, server state belongs in
-   TanStack Query, and derived values and event handling do not require effects.
-2. Create `docs/react-effects.md` with a decision-oriented explanation, links
-   to a few current repository examples, and links to official React and
-   TanStack Query documentation.
-3. Explicitly reject stale patterns from the old guides, including manual API
-   fetching in effects and `onFilteredRowsChange`-style synchronization of
-   derived table state.
-4. Update all inbound links to the replacement guide, then delete
-   `docs/useEffect-guide.md` and
-   `docs/react-hooks-lifecycle-mental-model.md` only after confirming no durable
-   repository rule or unique maintenance guidance would be lost.
+1. Inventory both tutorials and retain the useful lifecycle mental model,
+   effect timing and dependency guidance, cleanup guidance, common pitfalls,
+   and decision rules rather than discarding material solely because it is
+   general React knowledge.
+2. Rewrite `docs/react-hooks-lifecycle-mental-model.md` as the single concise
+   guide. Explain the render-and-synchronize mental model, when state and
+   effects run, dependency and cleanup behavior, and the distinction between
+   external systems, derived values, and event-driven work.
+3. Preserve the durable repository rules: effects synchronize external
+   systems, installed resources need cleanup, server state belongs in TanStack
+   Query, and derived values and event handling do not require effects. Support
+   them with a few current source links, small corrected examples, and links to
+   official React and TanStack Query guidance.
+4. Correct or replace misleading examples. Present manual fetching in effects
+   only as general React context, if needed to explain why this application
+   delegates server state to TanStack Query; do not present it as an
+   application pattern. Remove the stale `onFilteredRowsChange` example and
+   explain why derived table state should not be synchronized through an
+   effect.
+5. Add a concise `AGENTS.md` instruction directing agents working with React
+   hooks or lifecycle behavior to the retained guide. Update other inbound
+   links, then delete `docs/useEffect-guide.md` only after all useful, correct
+   guidance has been merged.
 
 ### Implementation notes
 
-Prefer links to current source over copied multi-screen snippets so examples do
-not drift. The replacement should explain project decisions, not duplicate the
-React documentation in abbreviated form.
+Keep enough React explanation for the guide to be useful without requiring an
+agent to reconstruct the repository's reasoning from rules alone. Prefer links
+to current source over copied multi-screen snippets so examples do not drift,
+but retain short examples when they materially clarify a lifecycle or effect
+decision. Clearly label the difference between valid general React techniques
+and the narrower patterns selected by this application.
 
 ### Validation
 
-- Search all Markdown for links or references to the two removed filenames and
-  for `onFilteredRowsChange`.
+- Search all Markdown for links or references to the removed
+  `docs/useEffect-guide.md` filename and for `onFilteredRowsChange`.
+- Confirm `AGENTS.md` directs hook-related work to
+  `docs/react-hooks-lifecycle-mental-model.md` and all links resolve.
 - Confirm each linked local source example exists and still demonstrates the
   stated rule.
-- Confirm the replacement includes all four preserved repository rules and no
-  manual-fetch or derived-state effect example.
+- Confirm the consolidated guide includes the lifecycle and dependency context,
+  all four preserved repository rules, and no manual-fetch or derived-state
+  effect presented as an approved application pattern.
 - Run `git diff --check`.
 
 ### Completion criteria
 
-One concise effects guide replaces both generic tutorials, every inbound link
-uses the new path, and all repository-specific effect and server-state guidance
-is preserved without stale examples.
+`docs/react-hooks-lifecycle-mental-model.md` is a concise but self-sufficient
+guide for agents, `AGENTS.md` and other inbound links direct hook-related work
+to it, the redundant `docs/useEffect-guide.md` is removed, and useful React
+context plus all repository-specific effect and server-state guidance is
+preserved without stale or misleading examples.
 
 ## Phase 6: Simplify Entry Points and Audit All References
 

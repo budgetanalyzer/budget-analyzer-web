@@ -300,6 +300,9 @@ The frontend authorization plan is at
 
 ### useEffect Usage
 
+Before changing React hooks or lifecycle behavior, read
+[React Hooks, Lifecycle, and Effects](docs/react-hooks-lifecycle-mental-model.md).
+
 **ONLY for external systems** (DOM, timers, event listeners, browser APIs, third-party libs)
 
 **NEVER for:** derived state, event handlers, data transforms, state initialization
