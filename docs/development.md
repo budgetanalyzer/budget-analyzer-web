@@ -1,171 +1,166 @@
 # Development Guide
 
+This document owns local setup, repository commands, environment variables,
+build variants, and container behavior. See [Architecture](architecture.md) for
+application structure and CSP semantics, and [Testing](testing-guide.md) for test
+policy and the Playwright operating guide.
+
 ## Prerequisites
 
 - Node.js 20+
-- npm, yarn, or pnpm
-- Docker and Docker Compose (backend infrastructure must be running)
+- npm 10+ for the supported orchestration/Tilt workflow
+- The sibling repositories and platform prerequisites required by the
+  [orchestration setup](https://github.com/budgetanalyzer/orchestration/blob/main/docs/development/getting-started.md)
 
-**Backend infrastructure setup**: See [getting-started.md](https://github.com/budgetanalyzer/orchestration/blob/main/docs/development/getting-started.md)
+This repository uses `package-lock.json`; use npm so dependency resolution stays
+consistent with CI and the container builds.
 
-## Installation
+## Installation and Local Runtime
+
+Install the frontend dependencies and create a local environment file:
 
 ```bash
 npm install
 cp .env.example .env
-npm run dev
 ```
 
-**IMPORTANT**: Access the app via `https://app.budgetanalyzer.localhost`, NOT directly via Vite (`http://localhost:3000`). Run `../orchestration/scripts/bootstrap/setup-k8s-tls.sh` on the host first to generate SSL certificates.
+The supported full-stack runtime is owned by the sibling orchestration
+repository. Its host-managed `./setup.sh` and `tilt up` flow creates the local
+cluster, TLS, ingress, backend services, and the Vite workload. Do not start
+Tilt, Vite, or another development server on a user's behalf.
 
-## Docker Runtime
+Once the workloads are healthy, open:
 
-The Docker development runtime runs Vite as UID/GID `1001` (non-root). Keep container-oriented changes compatible with `npm run dev -- --host 0.0.0.0 --port 3000` under that user because Tilt relies on that path for the Kubernetes HMR workflow.
-
-## Available Scripts
-
-```bash
-npm run dev       # Start development server
-npm run build     # Coverage gate + production build
-npm run build:bundle  # Production bundle only
-npm run build:prod-smoke  # Prod-smoke build + dropdown CSP gate
-npm run check:csp:dropdown  # Check an existing dist/ for known dropdown blockers
-npm run typecheck:e2e  # Type-check Playwright configuration and E2E sources
-npm run test:e2e:harness  # Validate the external environment and browser fixture detectors
-npm run test:e2e:csp  # Run strict application browser CSP audits
-npm run preview   # Preview production build
-npm run lint      # Run ESLint
-npm run format    # Format with Prettier
-npm test          # Run tests
-npm run test:coverage  # Run tests once with V8 coverage
-npm run test:ui   # Run tests with UI
+```text
+https://app.budgetanalyzer.localhost
 ```
 
-`typecheck:e2e` is an explicit agent/developer check for Playwright changes. It
-is intentionally not part of `build`, `build:bundle`, or the GitHub Actions
-workflows. The Tilt-dependent browser commands are also local-only.
+Do not browse directly to `http://localhost:3000`. Authentication, protected API
+routing, TLS, and same-origin behavior depend on the Istio ingress route. The
+sibling [local-environment guide](https://github.com/budgetanalyzer/orchestration/blob/main/docs/development/local-environment.md)
+owns platform startup, local CA trust, Tilt, and ingress troubleshooting.
 
-The Playwright harness targets
-`https://app.budgetanalyzer.localhost/_prod-smoke/` by default. It relies on the
-workstation-owned Tilt stack and never starts a server. Users must make that
-route available first; agents must not start Tilt or Vite. Check trust before
-running browser tests:
+The development `Dockerfile` runs Vite as non-root UID/GID `1001` on port
+`3000`. Tilt relies on `npm run dev -- --host 0.0.0.0 --port 3000` and syncs
+frontend changes into that workload for HMR.
 
-```bash
-check-budget-analyzer-local-ca-trust
-# If the container trust copy is stale:
-ensure-budget-analyzer-local-ca-trust
-check-budget-analyzer-local-ca-trust
+## Repository Commands
 
-npm run test:e2e:harness
-npm run test:e2e:csp
-```
+The scripts in `package.json` are:
 
-`test:e2e:harness` proves the trusted response-policy check, fail-closed mocks,
-and CSP detector independently. It does not claim that the application is CSP
-clean. `test:e2e:csp` runs strict, unallowlisted application workflows and
-returns nonzero for any observed CSP violation, dynamic `<style>` element, or
-DOM `style` attribute.
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start Vite on port `3000`; user-managed local runtime only |
+| `npm run preview` | Preview the most recent Vite build locally |
+| `npm run build` | Run the coverage gate, TypeScript check, and standard production bundle |
+| `npm run build:bundle` | Run the TypeScript check and standard production bundle without coverage |
+| `npm run build:prod-smoke` | Build at `/_prod-smoke/` and run the temporary dropdown CSP gate |
+| `npm run check:csp:dropdown` | Scan an existing `dist/`, source imports, and package metadata for known dropdown blockers |
+| `npm run lint` | Check ESLint with zero warnings; used by CI |
+| `npm run lint:fix` | Apply ESLint fixes, then fail on remaining errors or warnings; required agent workflow |
+| `npm run format` | Format application, E2E, and Playwright source covered by the script |
+| `npm test` | Run Vitest in watch mode |
+| `npm run test:coverage` | Run Vitest once with V8 coverage and enforce thresholds |
+| `npm run test:ui` | Start the Vitest UI |
+| `npm run typecheck:e2e` | Type-check Playwright configuration and E2E sources |
+| `npm run test:e2e:harness` | Run Playwright environment, fail-closed fixture, and CSP-detector self-tests |
+| `npm run test:e2e:csp` | Run detector self-tests and strict application CSP workflows |
 
-Browser mocks intercept the exact `/auth/v1/user`, `/auth/v1/session`, and
-scenario-registered `/api/*` requests. Unexpected protected requests are
-blocked instead of reaching backend services. To select another externally
-managed production-smoke route, use a trusted HTTPS URL without disabling
-certificate verification:
-
-```bash
-PLAYWRIGHT_BASE_URL=https://app.budgetanalyzer.localhost/_prod-smoke/ \
-  npm run test:e2e:csp
-```
-
-Failure traces, screenshots, and result context remain local under
-`test-results/playwright/`; the HTML report is written to `playwright-report/`.
-Both directories are ignored and must not be committed.
+Use `npm run lint:fix` for agent changes; do not run `npm run lint` first. Changes
+to `playwright.config.ts` or `e2e/` require an explicit
+`npm run typecheck:e2e`. Focused and full-suite commands, browser prerequisites,
+and artifacts are documented in the [Testing Guide](testing-guide.md).
 
 ## Environment Variables
 
-Edit `.env` to configure your environment:
+Vite reads variables from `.env` and its standard mode-specific files. The
+checked-in `.env.example` documents the supported frontend variables:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VITE_API_BASE_URL` | `/api` | Base path for all API calls |
-| `VITE_HEARTBEAT_INTERVAL_MS` | `120000` (2 min) | Interval between session heartbeat calls |
-| `VITE_WARNING_BEFORE_EXPIRY_SECONDS` | `120` (2 min) | Show inactivity warning this many seconds before session expiry |
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | `/api` | Same-origin base path used by the Axios client |
+| `VITE_HEARTBEAT_INTERVAL_MS` | `120000` | Interval between active-session heartbeat calls |
+| `VITE_WARNING_BEFORE_EXPIRY_SECONDS` | `120` | Lead time for the inactivity-expiry warning |
+
+Keep `VITE_API_BASE_URL=/api` for the local ingress topology. Auth routes use
+root-relative session-gateway paths and are not derived from this variable.
+Authentication behavior is documented in
+[Authentication and Authorization](authentication.md); transport behavior is
+documented in [API Integration](api-integration.md).
 
 ## Project Structure
 
-```
-src/
-├── api/                    # API client and endpoints
-├── components/            # Reusable components
-│   ├── ui/               # Base UI components (Shadcn)
-│   └── ...               # Feature components
-├── features/             # Feature modules (auth, admin, etc.)
-├── hooks/                # Custom React hooks
-├── pages/                # Page components
-├── store/                # Redux store
-├── types/                # TypeScript types
-└── lib/                  # Utilities
-```
+Feature pages, components, hooks, and utilities live under `src/features/`.
+Shared infrastructure lives in top-level directories such as `src/api/`,
+`src/components/`, `src/hooks/`, `src/lib/`, `src/store/`, `src/types/`, and
+`src/utils/`; shared test support lives in `src/testing/`. Pages remain inside
+their owning features rather than a separate top-level page directory.
 
-## Code Quality
-
-- **ESLint** for code quality
-- **Prettier** for formatting
-- **TypeScript** for type safety
-- **Vitest** for unit testing
-- **React Testing Library** for component testing
-
-## Development vs Production URLs
-
-**Development:**
-- Access: `https://app.budgetanalyzer.localhost`
-- Auth/API traffic routes through the same origin — Session Gateway handles auth, NGINX routes API calls to backend services
-
-**Production:**
-- Access: Load balancer domain (e.g., `https://budgetanalyzer.com`)
-- Same routing architecture via gateway
+[Architecture](architecture.md#application-structure) owns the detailed source
+boundaries and feature organization.
 
 ## Build & Deployment
 
-### Production Build
+All Vite build variants replace `dist/` with their output.
+
+### Standard Build
 
 ```bash
-npm run build         # Coverage gate + standard production build (served at /)
-npm run build:bundle  # Standard production bundle only (served at /)
-npm run build:prod-smoke  # Prod-smoke verification build (served at /_prod-smoke/)
+npm run build
 ```
 
-Output lands in `dist/`. NGINX serves these files in production.
+`build` runs `npm run test:coverage` and then `npm run build:bundle`.
+`build:bundle` runs `tsc` followed by `vite build` and produces assets served
+from `/`. The coverage gate requires `80%` statements, `80%` branches, `75%`
+functions, and `80%` lines; the [Testing Guide](testing-guide.md#coverage) owns
+coverage interpretation and exclusions.
 
-The standard `npm run build` path runs `npm run test:coverage` before
-type-checking and bundling. Coverage thresholds are enforced by Vitest, so the
-build exits non-zero if global coverage drops below `80%` statements, `80%`
-branches, `75%` functions, or `80%` lines. Use `npm run build:bundle` only
-when coverage has already been checked in the same flow.
+The build workflow in `.github/workflows/build.yml` installs with `npm ci`,
+lints, runs coverage, builds and checks the production-smoke variant, then
+rebuilds the standard `/` bundle for the uploaded `dist/` artifact.
 
-The `build:prod-smoke` build runs in the repository GitHub Actions workflow and is also used by
-orchestration to verify production CSP and browser security on the live origin. It automatically
-runs `check:csp:dropdown` after bundling, so known Radix menu, `react-remove-scroll`, runtime
-stylesheet-injection, source-import, and package-metadata blockers fail the build. CI runs the
-standard bundle afterward so its uploaded `dist/` artifact remains rooted at `/`, not
-`/_prod-smoke/`. The standalone check requires an existing `dist/` and does not rebuild it. Auth
-and API paths remain root-relative regardless of which build is used.
+### Production-Smoke Build and Dropdown Gate
 
-This gate is deliberately dropdown-specific. For the coordinated static verifier, run
-`./scripts/smoketest/audit-frontend-csp.sh` from the sibling orchestration repository. The
-repository browser audit, `npm run test:e2e:csp`, supplies runtime evidence from the trusted
-production-smoke route; the current basic transaction workflow is not exhaustive. Neither static
-scan replaces broader runtime coverage.
+```bash
+npm run build:prod-smoke
+```
 
-### Container Releases
+This variant runs `tsc`, builds with the base path `/_prod-smoke/`, and then
+runs `scripts/check-dropdown-csp.mjs`. Auth and API requests remain
+root-relative. The sibling Tilt stack serves the resulting bundle at
+`https://app.budgetanalyzer.localhost/_prod-smoke/` while the normal `/` route
+continues to serve the Vite development application.
 
-The local `Dockerfile` powers the Vite/HMR path used by Tilt. Release image publishing (GHCR, tag and dispatch contract) is owned by orchestration — see [CI/CD Workflows](https://github.com/budgetanalyzer/orchestration/blob/main/docs/ci-cd.md).
-`Dockerfile.production` still runs the full `npm run build` coverage gate, but
-its Node build stage uses BuildKit's native build platform. The final NGINX
-runtime image is built for the requested target platform, such as `linux/arm64`,
-without running Vitest under target-architecture emulation.
+The dropdown check scans emitted text assets for known stylesheet-injection,
+Radix menu, and `react-remove-scroll` signatures. It also rejects the former
+Radix dropdown dependency in production source imports, `package.json`, and
+`package-lock.json`. The standalone `npm run check:csp:dropdown` command expects
+`dist/` to exist and fails closed if it cannot scan it.
 
-### Static Hosting
+This is an active, temporary dropdown-specific gate, not a general CSP proof.
+It remains until equivalent desktop and mobile dropdown browser coverage exists.
+The [Architecture CSP section](architecture.md#content-security-policy) owns the
+policy meaning and removal condition; the
+[external browser harness](testing-guide.md#external-browser-harness) owns
+runtime evidence and current coverage limits.
 
-The `dist/` output can be deployed to any static hosting: Vercel, Netlify, AWS S3 + CloudFront, GitHub Pages.
+### Production Container
+
+`Dockerfile.production` is the release image definition:
+
+1. A Node 20 build stage installs with `npm ci` and runs the full
+   coverage-gated `npm run build`.
+2. An unprivileged NGINX image serves the static bundle on port `3000` using
+   `nginx.production.conf`.
+
+The Node stage is pinned to BuildKit's native build platform. The release
+workflow can therefore build the requested `linux/arm64` runtime image without
+running Vitest through target-architecture emulation. NGINX provides the SPA
+fallback, a `/health` endpoint, immutable caching for `/assets/`, and no-cache
+headers for application routes.
+
+`.github/workflows/publish-release.yml` publishes the GHCR image for strict
+`vX.Y.Z` tags or an explicit manual source ref and Docker label. It does not
+publish `latest` and prints the digest-pinned image reference. Deployment and
+release-inventory procedures are owned by the sibling
+[orchestration CI/CD guide](https://github.com/budgetanalyzer/orchestration/blob/main/docs/ci-cd.md).
