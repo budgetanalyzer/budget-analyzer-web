@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { ExchangeRateResponse } from '@/types/currency';
 import { convertCurrency, formatCurrency } from '@/utils/currency';
 import { Badge } from '@/components/ui/Badge';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { fadeInVariants, fadeTransition } from '@/lib/animations';
 
 interface TransactionAmountBadgeProps {

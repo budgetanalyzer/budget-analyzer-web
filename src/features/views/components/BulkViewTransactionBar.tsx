@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { EyeOff, Pin } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { slideUpTransition, slideUpVariants } from '@/lib/animations';

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/Select';
 import { usePreviewTransactions } from '@/features/transactions/hooks/usePreviewTransactions';
 import { TransactionPreviewModal } from '@/features/transactions/components/TransactionPreviewModal';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { collapseFromRightVariants, collapseTransition } from '@/lib/animations';
 import { PreviewResponse } from '@/types/transaction';
 import { useStatementFormats } from '@/hooks/useStatementFormats';

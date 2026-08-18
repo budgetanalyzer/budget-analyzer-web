@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Bookmark } from 'lucide-react';
 import { useViews } from '@/hooks/useViews';
 import { PageHeader } from '@/components/PageHeader';

@@ -1,5 +1,5 @@
 // src/components/CurrencyConversionCard.tsx
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { IconLabel } from '@/components/IconLabel';
 import { ExchangeRateInfo } from '@/features/transactions/components/ExchangeRateInfo';

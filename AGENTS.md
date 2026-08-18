@@ -535,16 +535,19 @@ class without creating a DOM `style` attribute.
 **Before adding any new UI dependency**, verify it does not inject styles at runtime. Check the bundled output:
 
 ```bash
-npm run build:prod-smoke && rg -n "createElement\('style'\)|styleSheet\.cssText|eval\(" dist/
+npm run build:prod-smoke && \
+  rg -n "createElement\([\"']style[\"']\)|insertRule\(|styleSheet\.cssText|eval\(" dist/
 ```
 
 Treat matches as capability inventory: investigate whether the path is
 reachable and whether it creates a stylesheet under the enforced policy. A new
 unconditional or reachable runtime stylesheet injector must not be used.
 
-**Known bundled capabilities:** Framer Motion is a third-party animation engine, not a
-React framework feature. Its ordinary client-side renderer property writes are
-allowed by the exercised browser policy. Its bundled `AnimatePresence
+**Known bundled capabilities:** Motion 13 is a third-party animation engine, not a
+React framework feature. Application code uses its supported `motion/react`
+facade; the transitive `framer-motion` package remains the React implementation.
+Its ordinary client-side renderer property writes are allowed by the exercised
+browser policy. Its bundled `AnimatePresence
 mode="popLayout"` helper still creates a `<style>` element and calls
 `insertRule()`; current source does not use that mode. React DOM also contains
 generic renderer signatures. These baseline matches alone do not block

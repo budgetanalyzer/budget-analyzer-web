@@ -27,7 +27,7 @@ export default defineConfig({
         manualChunks: {
           dates: ['date-fns'],
           http: ['axios'],
-          motion: ['framer-motion'],
+          motion: ['motion/react'],
           react: ['react', 'react-dom', 'react-router', 'react-router-dom'],
           query: ['@tanstack/react-query'],
           state: ['@reduxjs/toolkit', 'react-redux'],

@@ -1,7 +1,7 @@
 // src/features/analytics/components/YearlySpendingCard.tsx
 import { Card, CardContent } from '@/components/ui/Card';
 import { formatCurrency } from '@/utils/currency';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { fadeInVariants, fadeTransition } from '@/lib/animations';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router';

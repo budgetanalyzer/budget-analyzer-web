@@ -1,5 +1,5 @@
 // src/features/analytics/pages/AnalyticsPage.tsx
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useView, useViews, useViewTransactions } from '@/hooks/useViews';

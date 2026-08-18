@@ -129,8 +129,20 @@ bundle, production source, and package metadata. It detects the known Radix menu
 `react-remove-scroll` defect signatures; it is not a substitute for browser-policy validation.
 The Playwright audit treats `securitypolicyviolation` events and prohibited runtime or final
 stylesheets as executable findings. It intentionally does not infer violations from serialized DOM
-style attributes. Bundle matches are reviewed as capability inventory, including Motion's dormant
-`AnimatePresence mode="popLayout"` stylesheet helper and React DOM's generic renderer support.
+style attributes. The application consumes Motion 13 through its supported `motion/react` facade.
+The transitive `framer-motion` package remains its React implementation rather than an application
+import boundary. Inspect emitted capabilities with a quote-robust scan:
+
+```bash
+rg -n "createElement\([\"']style[\"']\)|insertRule\(|styleSheet\.cssText|eval\(" dist/
+```
+
+Matches are capability inventory, not an allowlist. The Motion 13 bundle contains the dormant
+`AnimatePresence mode="popLayout"` `<style>` and `insertRule()` path; application source does not
+select that mode, and runtime stylesheet injection remains prohibited. React DOM also contains its
+generic renderer support for author-supplied style resources. The Motion 13.1.0 migration baseline
+for the emitted Motion chunk is 129,867 bytes raw and 42,415 bytes with `gzip -9`; those sizes are
+review context, not an exact build gate.
 
 ## Security Model
 
