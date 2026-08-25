@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -48,6 +48,15 @@ function createWrapper(queryClient = createTestQueryClient()) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
+}
+
+function createDeferredPromise() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
 }
 
 describe('static saved-view queries', () => {
@@ -228,12 +237,27 @@ describe('static saved-view mutations', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: viewKeys.membership('view-1') });
   });
 
-  it('adds unique positive IDs with both arrays and refreshes stale addition resources', async () => {
+  it('awaits stale addition refreshes without retrying or rewriting IDs', async () => {
     const queryClient = createTestQueryClient();
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const transactionRefresh = createDeferredPromise();
+    const membershipRefresh = createDeferredPromise();
+    const invalidateSpy = vi
+      .spyOn(queryClient, 'invalidateQueries')
+      .mockImplementation((filters) => {
+        const queryKey = filters?.queryKey;
+        if (queryKey === transactionKeys.list()) {
+          return transactionRefresh.promise;
+        }
+        if (JSON.stringify(queryKey) === JSON.stringify(viewKeys.membership('view-1'))) {
+          return membershipRefresh.promise;
+        }
+        return Promise.resolve();
+      });
     let requestBody: unknown;
+    let requestCount = 0;
     server.use(
       http.patch('/api/v1/views/:id/transactions', async ({ request }) => {
+        requestCount += 1;
         requestBody = await request.json();
         return HttpResponse.json(
           {
@@ -251,10 +275,26 @@ describe('static saved-view mutations', () => {
     });
     const request = createAddViewTransactionsRequest([7, 7, 0, -2, 11.5, 3]);
 
-    await expect(result.current.mutateAsync({ viewId: 'view-1', request })).rejects.toMatchObject({
-      response: { code: 'SAVED_VIEW_MEMBERSHIP_STALE' },
+    const mutationResult = expect(
+      result.current.mutateAsync({ viewId: 'view-1', request }),
+    ).rejects.toMatchObject({ response: { code: 'SAVED_VIEW_MEMBERSHIP_STALE' } });
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(4));
+
+    expect(result.current.isPending).toBe(true);
+    expect(requestCount).toBe(1);
+    expect(requestBody).toEqual({ addTransactionIds: [7, 3], removeTransactionIds: [] });
+
+    await act(async () => transactionRefresh.resolve());
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+
+    await act(async () => {
+      membershipRefresh.resolve();
+      await mutationResult;
     });
 
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(requestCount).toBe(1);
     expect(requestBody).toEqual({ addTransactionIds: [7, 3], removeTransactionIds: [] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: transactionKeys.list() });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: viewKeys.list() });

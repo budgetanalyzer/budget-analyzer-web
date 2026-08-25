@@ -33,9 +33,19 @@ import { renderWithProviders } from '@/testing/test-utils';
 import { buildExchangeRateMap } from '@/utils/currency';
 import { projectDisplayAmount } from '@/utils/displayAmount';
 import { server } from '@/testing/mocks/server';
+import { transactionKeys, viewKeys } from '@/queryKeys';
 
 const mockUsePermission = vi.mocked(usePermission);
 const noop = vi.fn();
+
+function createDeferredPromise() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
 
 const transactions: Transaction[] = [
   {
@@ -558,6 +568,86 @@ describe('TransactionTable add-to-view selection', () => {
         name: 'Select transaction 2 to add to Static collection',
       }),
     );
+    expect(screen.getByRole('button', { name: 'Add transactions' })).toBeEnabled();
+  });
+
+  it('keeps stale recovery attached when selection changes during delayed refreshes', async () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
+    const rows = [
+      ...transactions,
+      {
+        ...transactions[0],
+        id: 3,
+        description: 'Transaction 3',
+      },
+    ];
+    const transactionRefresh = createDeferredPromise();
+    const membershipRefresh = createDeferredPromise();
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', () =>
+        HttpResponse.json(
+          {
+            type: 'APPLICATION_ERROR',
+            code: 'SAVED_VIEW_MEMBERSHIP_STALE',
+            message: 'Snapshot changed',
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    const { queryClient } = renderTable({
+      rows,
+      options: { addMode: { memberTransactionIds: [1] } },
+    });
+    const invalidateSpy = vi
+      .spyOn(queryClient, 'invalidateQueries')
+      .mockImplementation((filters) => {
+        const queryKey = filters?.queryKey;
+        if (queryKey === transactionKeys.list()) {
+          return transactionRefresh.promise;
+        }
+        if (
+          JSON.stringify(queryKey) ===
+          JSON.stringify(viewKeys.membership('11111111-1111-4111-8111-111111111111'))
+        ) {
+          return membershipRefresh.promise;
+        }
+        return Promise.resolve();
+      });
+
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Select transaction 2 to add to Static collection',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Add transactions' }));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(4));
+
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Select transaction 3 to add to Static collection',
+      }),
+    );
+    expect(screen.getByText('2 transactions selected to add')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Adding...' })).toBeDisabled();
+
+    await act(async () => transactionRefresh.resolve());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Adding...' })).toBeDisabled());
+
+    await act(async () => membershipRefresh.resolve());
+    expect(
+      await screen.findByText(/Membership and transactions were refreshed; review your selection/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('2 transactions selected to add')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add transactions' })).toBeDisabled();
+
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Select transaction 3 to add to Static collection',
+      }),
+    );
+    expect(screen.getByText('1 transaction selected to add')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add transactions' })).toBeEnabled();
   });
 

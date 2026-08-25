@@ -201,16 +201,22 @@ export function TransactionTable({
     setSelectAllMatching(false);
   }, []);
 
+  const resetAddTransactionsAfterSelectionChange = useCallback(() => {
+    if (!isAddingTransactions) {
+      resetAddTransactions();
+    }
+  }, [isAddingTransactions, resetAddTransactions]);
+
   const handleClearSelection = useCallback(() => {
     setRowSelection({});
     setSelectAllMatching(false);
-    resetAddTransactions();
-  }, [resetAddTransactions]);
+    resetAddTransactionsAfterSelectionChange();
+  }, [resetAddTransactionsAfterSelectionChange]);
 
   const handleSelectAllMatching = useCallback(() => {
     setSelectAllMatching(true);
-    resetAddTransactions();
-  }, [resetAddTransactions]);
+    resetAddTransactionsAfterSelectionChange();
+  }, [resetAddTransactionsAfterSelectionChange]);
 
   const handleAddTransactions = useCallback(() => {
     if (!addSelectionPurpose || selectedPurposeIds.length === 0) {
@@ -384,7 +390,7 @@ export function TransactionTable({
     onRowSelectionChange: (updater) => {
       const newSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
       setRowSelection(newSelection);
-      resetAddTransactions();
+      resetAddTransactionsAfterSelectionChange();
       // Reset "select all matching" when selection changes manually
       if (selectAllMatching) {
         setSelectAllMatching(false);

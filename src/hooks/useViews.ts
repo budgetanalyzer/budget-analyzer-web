@@ -19,10 +19,10 @@ const VIEW_STALE_TIME = 1000 * 60 * 5;
 function invalidateKeys(
   queryClient: ReturnType<typeof useQueryClient>,
   keys: readonly (readonly unknown[])[],
-): void {
-  keys.forEach((queryKey) => {
-    queryClient.invalidateQueries({ queryKey });
-  });
+): Promise<void> {
+  return Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey }))).then(
+    () => undefined,
+  );
 }
 
 export const useViews = (): UseQueryResult<SavedViewMetadata[], ApiError> =>
@@ -114,7 +114,7 @@ export const useCreateView = () => {
     },
     onError: (error) => {
       if (error.response.code === 'SAVED_VIEW_MEMBERSHIP_STALE') {
-        invalidateKeys(queryClient, savedViewInvalidationKeys.staleCreation());
+        void invalidateKeys(queryClient, savedViewInvalidationKeys.staleCreation());
       }
     },
   });
@@ -126,7 +126,7 @@ export const useUpdateView = () => {
   return useMutation<SavedViewMetadata, ApiError, { id: string; request: UpdateSavedViewRequest }>({
     mutationFn: ({ id, request }) => viewApi.updateView(id, request),
     onSuccess: (updatedView) => {
-      invalidateKeys(queryClient, savedViewInvalidationKeys.rename(updatedView.id));
+      void invalidateKeys(queryClient, savedViewInvalidationKeys.rename(updatedView.id));
     },
   });
 };
@@ -174,14 +174,14 @@ export const useUpdateViewTransactions = () => {
   return useMutation<void, ApiError, UpdateViewTransactionsVariables>({
     mutationFn: ({ viewId, request }) => viewApi.updateViewTransactions(viewId, request),
     onSuccess: (_response, { viewId }) => {
-      invalidateKeys(queryClient, savedViewInvalidationKeys.membership(viewId));
+      void invalidateKeys(queryClient, savedViewInvalidationKeys.membership(viewId));
     },
     onError: (error, { viewId, request }) => {
       if (
         request.addTransactionIds.length > 0 &&
         error.response.code === 'SAVED_VIEW_MEMBERSHIP_STALE'
       ) {
-        invalidateKeys(queryClient, savedViewInvalidationKeys.staleAddition(viewId));
+        return invalidateKeys(queryClient, savedViewInvalidationKeys.staleAddition(viewId));
       }
     },
   });
