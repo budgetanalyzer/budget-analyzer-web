@@ -5,7 +5,10 @@ import { Route, Routes, useLocation } from 'react-router';
 import { Transaction } from '@/types/transaction';
 import type { SavedViewMetadata } from '@/types/view';
 import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { renderWithProviders } from '@/testing/test-utils';
+
+vi.mock('@/features/auth/hooks/useAuth');
 
 Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
   configurable: true,
@@ -22,6 +25,8 @@ const hookMocks = vi.hoisted(() => ({
 const currencyHookState = vi.hoisted(() => ({
   exchangeRatesMap: new Map(),
 }));
+
+const mockUseAuth = vi.mocked(useAuth);
 
 vi.mock('@/hooks/useTransactions', () => ({
   useTransactions: hookMocks.useTransactions,
@@ -78,6 +83,24 @@ function queryResult<T>(data: T) {
   };
 }
 
+function mockPermissions(permissions: string[]) {
+  mockUseAuth.mockReturnValue({
+    user: {
+      sub: 'user-1',
+      email: 'user@example.com',
+      authenticated: true,
+      roles: ['USER'],
+      permissions,
+    },
+    error: null,
+    isLoading: false,
+    isAuthenticated: true,
+    login: vi.fn(),
+    logout: vi.fn(),
+    refetch: vi.fn(),
+  });
+}
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
@@ -103,11 +126,14 @@ function renderPage(initialEntry: string) {
 }
 
 beforeEach(() => {
+  mockUseAuth.mockReset();
   hookMocks.useTransactions.mockReset();
   hookMocks.useViews.mockReset();
   hookMocks.useView.mockReset();
   hookMocks.useViewTransactions.mockReset();
   currencyHookState.exchangeRatesMap = new Map();
+
+  mockPermissions(['views:read']);
 
   hookMocks.useTransactions.mockReturnValue(queryResult([transaction({ amount: 100 })]));
   hookMocks.useViews.mockReturnValue(queryResult([groceriesView]));
@@ -125,6 +151,26 @@ describe('AnalyticsPage source resolution', () => {
     expect(screen.getByText('$100.00')).toBeInTheDocument();
     expect(screen.queryByText('$25.00')).not.toBeInTheDocument();
     expect(hookMocks.useTransactions).toHaveBeenCalledWith({ enabled: true });
+  });
+
+  it('canonicalizes a denied saved-view deep link without mounting saved-view queries', async () => {
+    mockPermissions([]);
+
+    renderPage(
+      '/analytics?scope=view&viewId=view-1&viewMode=monthly&transactionType=debit&year=2026',
+    );
+
+    expect(await screen.findByText('Monthly spending breakdown for 2026')).toBeInTheDocument();
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+    expect(screen.queryByText('$25.00')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Source' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2026',
+    );
+    expect(hookMocks.useTransactions).toHaveBeenCalledWith({ enabled: true });
+    expect(hookMocks.useViews).not.toHaveBeenCalled();
+    expect(hookMocks.useView).not.toHaveBeenCalled();
+    expect(hookMocks.useViewTransactions).not.toHaveBeenCalled();
   });
 
   it('uses canonical view transactions for view-scoped analytics', () => {
