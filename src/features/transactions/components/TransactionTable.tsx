@@ -423,7 +423,7 @@ export function TransactionTable({
         onAmountFilterChange={onAmountFilterChange}
         onClearAllFilters={onClearAllFilters}
         contextualAction={
-          !isAddToViewPurpose && canCreateViews && viewTransactionIds ? (
+          !isAddToViewPurpose && canCreateViews && viewTransactionIds !== undefined ? (
             <SaveAsViewButton
               transactionIds={viewTransactionIds}
               isTransactionIdsReady={isViewTransactionIdsReady}

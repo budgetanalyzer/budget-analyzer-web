@@ -8,14 +8,20 @@ const transactionHookMocks = vi.hoisted(() => ({
   deleteMutate: vi.fn(),
   updateMutate: vi.fn(),
 }));
+const saveAsViewButtonProps = vi.hoisted(() => ({
+  current: undefined as { transactionIds: number[]; isTransactionIdsReady: boolean } | undefined,
+}));
 
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/components/SaveAsViewButton', () => ({
-  SaveAsViewButton: ({ isTransactionIdsReady }: { isTransactionIdsReady: boolean }) => (
-    <button type="button" disabled={!isTransactionIdsReady}>
-      Save as View
-    </button>
-  ),
+  SaveAsViewButton: (props: { transactionIds: number[]; isTransactionIdsReady: boolean }) => {
+    saveAsViewButtonProps.current = props;
+    return (
+      <button type="button" disabled={!props.isTransactionIdsReady}>
+        Save as View
+      </button>
+    );
+  },
 }));
 vi.mock('@/hooks/useTransactions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/useTransactions')>();
@@ -188,6 +194,7 @@ beforeEach(() => {
   mockUsePermission.mockReset();
   transactionHookMocks.deleteMutate.mockReset();
   transactionHookMocks.updateMutate.mockReset();
+  saveAsViewButtonProps.current = undefined;
 });
 
 describe('TransactionTable permission gating', () => {
@@ -230,9 +237,10 @@ describe('TransactionTable permission gating', () => {
 
   it('removes saved-view and transaction actions when permissions are denied', async () => {
     mockUsePermission.mockReturnValue(false);
-    renderTable();
+    renderTable({ options: { includeViewAction: true } });
 
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Save as View' })).not.toBeInTheDocument();
 
     await openFirstRowMenu();
     expect(screen.queryByRole('menuitem', { name: /Edit/ })).not.toBeInTheDocument();
@@ -447,6 +455,29 @@ describe('TransactionTable presentation pagination and amount readiness', () => 
       screen.getByText('2 transactions were excluded because conversion to USD is unavailable.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save as View' })).toBeEnabled();
+  });
+
+  it('shows saving for a settled unfiltered snapshot and passes its exact ids', () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
+    renderTable({ options: { includeViewAction: true } });
+
+    expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save as View' })).toBeEnabled();
+    expect(saveAsViewButtonProps.current).toEqual({
+      transactionIds: [1, 2],
+      isTransactionIdsReady: true,
+    });
+  });
+
+  it('passes an initially empty settled snapshot to the creation action', () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
+    renderTable({ rows: [], options: { includeViewAction: true } });
+
+    expect(screen.getByRole('button', { name: 'Save as View' })).toBeEnabled();
+    expect(saveAsViewButtonProps.current).toEqual({
+      transactionIds: [],
+      isTransactionIdsReady: true,
+    });
   });
 });
 
