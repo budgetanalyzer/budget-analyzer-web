@@ -98,58 +98,100 @@ placement rules are in [State architecture](state-architecture.md).
 
 ## Saved-View Integration Contracts
 
-### Criteria, membership, and local filters
+### Static membership and local filters
 
-Saved-view criteria use the backend names `dateFrom` and `dateTo`, preserve
-`type` as `DEBIT` or `CREDIT`, and do not send the retired `startDate` or
-`endDate` fields. `searchText` is a persisted description criterion. The
-Transactions and View table `q` inputs are local, case-insensitive description
-filters over already loaded rows; a saved bank criterion uses the explicit bank
-filter.
+Saved views are static transaction collections. Creation sends a name and the
+exact currently visible transaction ID array; an empty array is valid. Cloning
+sends another independent `{name, transactionIds}` request and does not persist
+the source view, filters, sort order, or other lineage. Rename uses `PATCH` with
+`{name}` only.
 
-`GET /v1/views/{id}/transactions` is the canonical membership source. It
-returns matched, pinned, and excluded transaction IDs. The frontend:
+`GET /v1/views/{id}/transactions` returns the complete deterministically ordered
+`transactionIds` membership. `useViewTransactions` intersects that order with
+the complete active current-user transaction snapshot. Missing snapshot IDs are
+reported diagnostically and skipped; the frontend never fans out individual
+transaction requests for them.
 
-1. removes excluded IDs from visible membership;
-2. de-duplicates IDs, with pinned membership taking precedence if an
-   inconsistent payload lists an ID in both visible groups;
-3. reuses cached current-user transactions; and
-4. fetches missing visible transaction details individually.
+Successful membership changes invalidate list metadata, detail metadata, and
+membership. A `SAVED_VIEW_MEMBERSHIP_STALE` creation or addition also refreshes
+the complete transaction snapshot without retrying the mutation or dropping IDs.
+Transaction edits and imports do not change static membership. Transaction
+deletion invalidates view resources because the backend owns membership cleanup.
 
-Excluded transactions remain outside the visible table and are loaded
-separately only for restore workflows. Pin, unpin, exclude, restore, and bulk
-membership successes invalidate the view detail, membership, and list queries.
-Bulk responses can report unavailable IDs, so the frontend shows partial
-success feedback and does not invent optimistic counts.
+Membership removal sends one atomic `PATCH` delta with both required arrays:
+`{addTransactionIds: [], removeTransactionIds: [...]}`. IDs are unique positive
+integers. The `204` response has no count or response body; removing an unknown
+ID is idempotent success. The frontend therefore closes a removal workflow and
+invalidates metadata and membership only after the request succeeds, without
+inventing partial-success or updated-count semantics.
 
-Transaction imports, edits, and deletes invalidate the complete saved-view
-query family because saved criteria and membership counts depend on the active
-transaction collection.
+Membership addition uses the same endpoint once per reviewed selection with
+`{addTransactionIds: [...], removeTransactionIds: []}`. The frontend removes
+known members and duplicate IDs before submission. A stale addition keeps the
+mode and remaining selection, refreshes the complete transaction snapshot plus
+view metadata and membership, and requires another user selection change before
+resubmission; it is never retried automatically.
 
-Temporary view-table filters and analytics source/navigation parameters are URL
-state rather than API criteria. Their contract is documented in
+Transfer/refund assistance compares ordinary transactions against the current
+member-ID set. A nonmember may be displayed as supporting evidence but is not
+selectable, and the frontend records no inference about whether it belonged to
+the view previously. Candidate removal submits only current member IDs. Same-
+currency comparisons stay in that currency; cross-currency comparisons project
+each amount to USD using the exact transaction-date rate and omit pairs whose
+required conversion is unavailable.
+
+View-table filters and analytics source/navigation parameters are URL state and
+do not change collection membership. Ordinary Transactions-page and saved-view
+filters are applied to the already loaded browser snapshot; they are not
+backend criteria and are never sent to the current-user transaction or saved-
+view endpoints. Their contract is documented in
 [State architecture](state-architecture.md#url-backed-route-state).
 
-### Transfer and refund discovery
+## Selected-Currency Amount Contracts
 
-`Find Transfers & Refunds` is entirely client-side. It scans active
-transactions while requiring at least one side of a candidate to be visible in
-the canonical view. Same-currency amounts are compared directly; cross-currency
-amounts are normalized with each transaction date's exchange rate.
+Ordinary current-user transaction surfaces project each stored amount through
+the shared discriminated display-amount contract. The projection normalizes the
+native amount to a positive magnitude. Currency Service returns a dense row for
+each date in the requested inclusive range; conversion uses only a row whose
+effective `date` exactly equals the transaction LocalDate. The frontend never
+searches another date. A missing or invalid exact row produces an unavailable
+result; consumers must not relabel or aggregate the native value as selected
+currency.
 
-The deterministic matcher retains one-to-one pairs. Refunds require the same
-known bank and account, a credit zero to 90 days after the debit, shared
-meaningful description text, and an amount difference within the greater of 3
-percent or one comparison unit. Transfers require different banks or different
-known accounts at the same bank, no more than seven absolute days, and no more
-than a 5 percent amount difference.
+An available result retains zero, one, or two rate legs. Each leg preserves the
+effective transaction `date` and Currency Service's `publishedDate`. When the
+publication precedes the effective date, the UI describes Currency Service's
+weekend/holiday carry-forward rather than a client-side nearest-date lookup.
+Non-USD conversions use USD as the explicit two-leg bridge.
 
-Transactions outside current visible membership can remain evidence, but only
-currently visible, not-already-excluded IDs are eligible for exclusion. The
-review sends selected unique IDs through the existing bulk exclusion endpoint.
-The server stores only saved-view exclusions: it receives no candidate,
-relationship, review, or provenance data. Restore uses the normal unexclude
-endpoint. This workflow is unrelated to import duplicate detection.
+Transaction lists and static saved views build one projection per transaction
+at their page boundary. Each available result is quantized once at the selected
+ISO currency's minor-unit precision before it becomes authoritative for amount
+filtering, sorting, cells, and per-transaction summing; saved-view creation IDs
+come from that same filtered collection. Detail and delete surfaces always
+disclose the positive native magnitude and ISO code, then render the selected-
+currency value only when the projection is available.
+
+Analytics counts every qualifying debit or credit but sums only available,
+already-quantized display values. A mixed period is visibly partial and exposes
+its unavailable count. A period containing transactions whose amounts are all
+unavailable has no monetary total, while an empty period remains a real zero.
+
+The display preference remains Redux state. When a URL contains amount bounds,
+`amountCurrency` records the enabled display currency that gives those numbers
+meaning. The parsing, deep-link synchronization, invalid-currency, legacy-link,
+and currency-change clearing rules belong to
+[State architecture](state-architecture.md#transaction-and-saved-view-filters).
+
+## Administrative Transaction Search Exception
+
+Cross-user administrative search remains a backend-filtered, backend-sorted,
+paged request. Its amount bounds and `sort=amount` compare each transaction's
+stored signed numeric amount without FX normalization. `currencyIsoCode` is an
+independent exact filter: an amount-only search may span currencies, while
+combining it with bounds makes the numeric comparison currency-specific. The
+table formats every returned amount in its stored ISO currency and does not use
+the selected display-currency projection or preference.
 
 ## Transaction Import Review Contracts
 

@@ -1,25 +1,21 @@
-import { motion, AnimatePresence } from 'motion/react';
-import { EyeOff, Pin } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { slideUpTransition, slideUpVariants } from '@/lib/animations';
 
-interface BulkViewTransactionBarProps {
+interface RemoveViewTransactionsBarProps {
   selectedCount: number;
-  isPinDisabled: boolean;
   isVisible: boolean;
   onClearSelection: () => void;
-  onPin: () => void;
-  onExclude: () => void;
+  onRemove: () => void;
 }
 
-export function BulkViewTransactionBar({
+export function RemoveViewTransactionsBar({
   selectedCount,
-  isPinDisabled,
   isVisible,
   onClearSelection,
-  onPin,
-  onExclude,
-}: BulkViewTransactionBarProps) {
+  onRemove,
+}: RemoveViewTransactionsBarProps) {
   return (
     <AnimatePresence>
       {isVisible && (
@@ -39,13 +35,9 @@ export function BulkViewTransactionBar({
               <Button variant="outline" size="sm" onClick={onClearSelection}>
                 Clear selection
               </Button>
-              <Button variant="outline" size="sm" onClick={onPin} disabled={isPinDisabled}>
-                <Pin className="mr-2 h-4 w-4" />
-                Pin
-              </Button>
-              <Button variant="destructive" size="sm" onClick={onExclude}>
-                <EyeOff className="mr-2 h-4 w-4" />
-                Exclude
+              <Button variant="destructive" size="sm" onClick={onRemove}>
+                <X className="mr-2 h-4 w-4" />
+                Remove from view
               </Button>
             </div>
           </div>

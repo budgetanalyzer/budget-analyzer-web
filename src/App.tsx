@@ -259,17 +259,21 @@ function App() {
             <Route
               path="views"
               element={
-                <LazyRoute>
-                  <ViewsPage />
-                </LazyRoute>
+                <PermissionGuard permission="views:read">
+                  <LazyRoute>
+                    <ViewsPage />
+                  </LazyRoute>
+                </PermissionGuard>
               }
             />
             <Route
               path="views/:id"
               element={
-                <LazyRoute>
-                  <ViewPage />
-                </LazyRoute>
+                <PermissionGuard permission="views:read">
+                  <LazyRoute>
+                    <ViewPage />
+                  </LazyRoute>
+                </PermissionGuard>
               }
             />
             <Route

@@ -1,4 +1,5 @@
 import type { Transaction } from '@/types/transaction';
+import type { DisplayAmount } from '@/types/displayAmount';
 import type { TransactionFilterValues } from '@/types/transactionFilters';
 import { compareLocalDates } from '@/utils/dates';
 import { filterTransactionsByTableSearch } from '@/utils/transactionSearch';
@@ -63,4 +64,41 @@ export function filterTransactions<T extends Transaction>(
   }
 
   return filtered;
+}
+
+export interface DisplayAmountFilterResult<T extends Transaction> {
+  transactions: T[];
+  unavailableAmountCount: number;
+}
+
+export function filterTransactionsByDisplayAmount<T extends Transaction>(
+  transactions: T[],
+  filters: TransactionFilterValues,
+  displayAmounts: ReadonlyMap<number, DisplayAmount>,
+): DisplayAmountFilterResult<T> {
+  const filtersWithoutAmount: TransactionFilterValues = {
+    ...filters,
+    amountFilter: { min: null, max: null },
+  };
+  const otherwiseMatching = filterTransactions(transactions, filtersWithoutAmount);
+  const { min, max } = filters.amountFilter;
+
+  if (min === null && max === null) {
+    return { transactions: otherwiseMatching, unavailableAmountCount: 0 };
+  }
+
+  let unavailableAmountCount = 0;
+  const filtered = otherwiseMatching.filter((transaction) => {
+    const displayAmount = displayAmounts.get(transaction.id);
+    if (!displayAmount?.available) {
+      unavailableAmountCount += 1;
+      return false;
+    }
+
+    return (
+      (min === null || displayAmount.value >= min) && (max === null || displayAmount.value <= max)
+    );
+  });
+
+  return { transactions: filtered, unavailableAmountCount };
 }

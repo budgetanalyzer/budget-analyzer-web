@@ -1,7 +1,7 @@
 // src/features/transactions/components/EditableTransactionRow.tsx
 import { useState, useCallback, memo } from 'react';
 import { Transaction } from '@/types/transaction';
-import { ExchangeRateResponse } from '@/types/currency';
+import type { DisplayAmount } from '@/types/displayAmount';
 import { TableRow, TableCell } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -13,23 +13,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { TransactionAmountBadge } from '@/features/transactions/components/TransactionAmountBadge';
 import { formatLocalDate } from '@/utils/dates';
-import { MoreVertical, Pencil, Trash2, Check, X, FolderPlus } from 'lucide-react';
-import { useViews, usePinTransaction } from '@/hooks/useViews';
-import { toast } from '@/hooks/useToast';
-import { formatApiError } from '@/utils/errorMessages';
+import { MoreVertical, Pencil, Trash2, Check, X } from 'lucide-react';
 
 interface EditableTransactionRowProps {
   transaction: Transaction;
-  displayCurrency: string;
-  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
-  isExchangeRatesLoading: boolean;
+  displayAmount: DisplayAmount;
+  isAmountLoading: boolean;
   onSave: (id: number, data: { description?: string; accountId?: string }) => void;
   onDelete: (transaction: Transaction) => void;
   onRowClick: (transaction: Transaction) => void;
@@ -39,14 +32,16 @@ interface EditableTransactionRowProps {
   canEdit: boolean;
   canDelete: boolean;
   isSelected: boolean;
+  selectionDisabled?: boolean;
+  selectionLabel?: string;
+  selectionStatus?: string;
   onSelectionChange: (checked: boolean) => void;
 }
 
 export const EditableTransactionRow = memo(function EditableTransactionRow({
   transaction,
-  displayCurrency,
-  exchangeRatesMap,
-  isExchangeRatesLoading,
+  displayAmount,
+  isAmountLoading,
   onSave,
   onDelete,
   onRowClick,
@@ -56,15 +51,14 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
   canEdit,
   canDelete,
   isSelected,
+  selectionDisabled = false,
+  selectionLabel,
+  selectionStatus,
   onSelectionChange,
 }: EditableTransactionRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editingDescription, setEditingDescription] = useState('');
   const [editingAccountId, setEditingAccountId] = useState('');
-
-  // Fetch views for "Add to View" submenu
-  const { data: views, isLoading: isLoadingViews } = useViews();
-  const { mutate: pinTransaction, isPending: isPinning } = usePinTransaction();
 
   const handleStartEdit = useCallback(() => {
     setIsEditing(true);
@@ -126,23 +120,6 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
     }
   }, [isEditing, onRowClick, transaction]);
 
-  const handlePinToView = useCallback(
-    (viewId: string, viewName: string) => {
-      pinTransaction(
-        { viewId, txnId: transaction.id },
-        {
-          onSuccess: () => {
-            toast.success(`Added to "${viewName}"`);
-          },
-          onError: (error) => {
-            toast.error(formatApiError(error, 'Failed to add to view'));
-          },
-        },
-      );
-    },
-    [pinTransaction, transaction.id],
-  );
-
   return (
     <TableRow
       onClick={handleRowClick}
@@ -157,7 +134,12 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
       {/* Checkbox */}
       {canSelect && (
         <TableCell className={columnWidths.select} onClick={(e) => e.stopPropagation()}>
-          <Checkbox checked={isSelected} onCheckedChange={onSelectionChange} disabled={isEditing} />
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={onSelectionChange}
+            disabled={isEditing || selectionDisabled}
+            aria-label={selectionLabel}
+          />
         </TableCell>
       )}
 
@@ -177,7 +159,14 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
             autoFocus
           />
         ) : (
-          <div className="truncate">{transaction.description}</div>
+          <div className="flex items-center gap-2">
+            <div className="truncate">{transaction.description}</div>
+            {selectionStatus && (
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                {selectionStatus}
+              </span>
+            )}
+          </div>
         )}
       </TableCell>
 
@@ -211,17 +200,13 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
 
       {/* Amount */}
       <TableCell className={columnWidths.amount}>
-        {isExchangeRatesLoading ? (
+        {isAmountLoading ? (
           <div className="flex items-center justify-end gap-2">
             <Skeleton className="h-5 w-24" />
           </div>
         ) : (
           <TransactionAmountBadge
-            amount={transaction.amount}
-            date={transaction.date}
-            currencyCode={transaction.currencyIsoCode}
-            displayCurrency={displayCurrency}
-            exchangeRatesMap={exchangeRatesMap}
+            displayAmount={displayAmount}
             isCredit={transaction.type === 'CREDIT'}
           />
         )}
@@ -286,32 +271,6 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
                     Edit
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger disabled={isLoadingViews || isPinning}>
-                    <FolderPlus className="mr-2 h-4 w-4" />
-                    Add to View
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    {isLoadingViews ? (
-                      <DropdownMenuItem disabled>Loading views...</DropdownMenuItem>
-                    ) : views && views.length > 0 ? (
-                      views.map((view) => (
-                        <DropdownMenuItem
-                          key={view.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePinToView(view.id, view.name);
-                          }}
-                          disabled={isPinning}
-                        >
-                          {view.name}
-                        </DropdownMenuItem>
-                      ))
-                    ) : (
-                      <DropdownMenuItem disabled>No views available</DropdownMenuItem>
-                    )}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
                 {canDelete && (
                   <>
                     <DropdownMenuSeparator />

@@ -1,8 +1,9 @@
 // src/features/analytics/hooks/useAnalyticsData.ts
 import { useMemo } from 'react';
 import { Transaction } from '@/types/transaction';
-import { convertCurrency } from '@/utils/currency';
 import { ExchangeRateResponse } from '@/types/currency';
+import type { DisplayAmount } from '@/types/displayAmount';
+import { projectDisplayAmount } from '@/utils/displayAmount';
 import {
   getCurrentYear,
   createMonthDate,
@@ -15,15 +16,17 @@ export interface MonthlySpending {
   year: number;
   month: number;
   monthLabel: string;
-  totalSpending: number;
+  totalSpending: number | null;
   transactionCount: number;
+  unavailableAmountCount: number;
 }
 
 export interface YearlySpending {
   year: number;
   yearLabel: string;
-  totalSpending: number;
+  totalSpending: number | null;
   transactionCount: number;
+  unavailableAmountCount: number;
 }
 
 export interface AnalyticsData {
@@ -45,6 +48,17 @@ export function useAnalyticsData(
   selectedYear: number,
   transactionType: 'debit' | 'credit' = 'debit',
 ): AnalyticsData {
+  const displayAmounts = useMemo<ReadonlyMap<number, DisplayAmount>>(
+    () =>
+      new Map(
+        (transactions ?? []).map((transaction) => [
+          transaction.id,
+          projectDisplayAmount(transaction, displayCurrency, exchangeRatesMap),
+        ]),
+      ),
+    [displayCurrency, exchangeRatesMap, transactions],
+  );
+
   // Calculate earliest and latest years from transactions
   const { earliestYear, latestYear } = useMemo(() => {
     if (!transactions || transactions.length === 0) {
@@ -77,16 +91,20 @@ export function useAnalyticsData(
         monthLabel: formatMonthYear(createMonthDate(selectedYear, i + 1)),
         totalSpending: 0,
         transactionCount: 0,
+        unavailableAmountCount: 0,
       }));
     }
 
     // Group transactions by month and calculate totals
-    const monthlyData = new Map<string, { total: number; count: number }>();
+    const monthlyData = new Map<
+      string,
+      { total: number; count: number; unavailableCount: number }
+    >();
 
     // Initialize all 12 months for selected year
     for (let month = 0; month < 12; month++) {
       const key = `${selectedYear}-${String(month + 1).padStart(2, '0')}`;
-      monthlyData.set(key, { total: 0, count: 0 });
+      monthlyData.set(key, { total: 0, count: 0, unavailableCount: 0 });
     }
 
     // Process each transaction
@@ -107,19 +125,16 @@ export function useAnalyticsData(
 
       const monthKey = getMonthKey(transaction.date);
 
-      // Convert amount to display currency using the proper conversion utility
-      const amountInDisplayCurrency = convertCurrency(
-        Math.abs(transaction.amount),
-        transaction.date,
-        transaction.currencyIsoCode,
-        displayCurrency,
-        exchangeRatesMap,
-      );
-
-      const existing = monthlyData.get(monthKey) || { total: 0, count: 0 };
+      const displayAmount = displayAmounts.get(transaction.id);
+      const existing = monthlyData.get(monthKey) ?? {
+        total: 0,
+        count: 0,
+        unavailableCount: 0,
+      };
       monthlyData.set(monthKey, {
-        total: existing.total + amountInDisplayCurrency,
+        total: existing.total + (displayAmount?.available ? displayAmount.value : 0),
         count: existing.count + 1,
+        unavailableCount: existing.unavailableCount + (displayAmount?.available ? 0 : 1),
       });
     });
 
@@ -127,17 +142,22 @@ export function useAnalyticsData(
     return Array.from({ length: 12 }, (_, i) => {
       const month = i + 1;
       const monthKey = `${selectedYear}-${String(month).padStart(2, '0')}`;
-      const data = monthlyData.get(monthKey) || { total: 0, count: 0 };
+      const data = monthlyData.get(monthKey) ?? {
+        total: 0,
+        count: 0,
+        unavailableCount: 0,
+      };
 
       return {
         year: selectedYear,
         month,
         monthLabel: formatMonthYear(createMonthDate(selectedYear, month)),
-        totalSpending: data.total,
+        totalSpending: data.count > 0 && data.unavailableCount === data.count ? null : data.total,
         transactionCount: data.count,
+        unavailableAmountCount: data.unavailableCount,
       };
     });
-  }, [transactions, selectedYear, displayCurrency, exchangeRatesMap, transactionType]);
+  }, [displayAmounts, selectedYear, transactionType, transactions]);
 
   // Calculate yearly spending across all years
   const yearlySpending = useMemo<YearlySpending[]>(() => {
@@ -146,7 +166,10 @@ export function useAnalyticsData(
     }
 
     // Group transactions by year and calculate totals
-    const yearlyData = new Map<number, { total: number; count: number }>();
+    const yearlyData = new Map<
+      number,
+      { total: number; count: number; unavailableCount: number }
+    >();
 
     // Process each transaction
     transactions.forEach((transaction) => {
@@ -159,19 +182,16 @@ export function useAnalyticsData(
         return;
       }
 
-      // Convert amount to display currency using the proper conversion utility
-      const amountInDisplayCurrency = convertCurrency(
-        Math.abs(transaction.amount),
-        transaction.date,
-        transaction.currencyIsoCode,
-        displayCurrency,
-        exchangeRatesMap,
-      );
-
-      const existing = yearlyData.get(transactionYear) || { total: 0, count: 0 };
+      const displayAmount = displayAmounts.get(transaction.id);
+      const existing = yearlyData.get(transactionYear) ?? {
+        total: 0,
+        count: 0,
+        unavailableCount: 0,
+      };
       yearlyData.set(transactionYear, {
-        total: existing.total + amountInDisplayCurrency,
+        total: existing.total + (displayAmount?.available ? displayAmount.value : 0),
         count: existing.count + 1,
+        unavailableCount: existing.unavailableCount + (displayAmount?.available ? 0 : 1),
       });
     });
 
@@ -180,11 +200,12 @@ export function useAnalyticsData(
       .map(([year, data]) => ({
         year,
         yearLabel: year.toString(),
-        totalSpending: data.total,
+        totalSpending: data.unavailableCount === data.count ? null : data.total,
         transactionCount: data.count,
+        unavailableAmountCount: data.unavailableCount,
       }))
       .sort((a, b) => a.year - b.year);
-  }, [transactions, displayCurrency, exchangeRatesMap, transactionType]);
+  }, [displayAmounts, transactionType, transactions]);
 
   // Extract years that have transactions (memoized based on yearlySpending)
   const yearsWithTransactions = useMemo<number[]>(() => {

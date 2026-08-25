@@ -13,4 +13,5 @@ export interface TransactionFilterValues {
     min: number | null;
     max: number | null;
   };
+  amountCurrency: string | null;
 }

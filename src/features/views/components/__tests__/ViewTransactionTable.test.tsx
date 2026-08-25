@@ -1,71 +1,45 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { useLocation } from 'react-router';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 import { ViewTransactionTable } from '@/features/views/components/ViewTransactionTable';
+import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
-import { ViewTransaction } from '@/types/view';
+import type { DisplayAmount } from '@/types/displayAmount';
+import type { Transaction } from '@/types/transaction';
 import type { TransactionFilterValues } from '@/types/transactionFilters';
-import type { ExchangeRateResponse } from '@/types/currency';
-import { buildExchangeRateMap } from '@/utils/currency';
+import { projectDisplayAmount } from '@/utils/displayAmount';
 
-const mutationMocks = vi.hoisted(() => ({
-  pinMutate: vi.fn(),
-  unpinMutate: vi.fn(),
-  excludeMutate: vi.fn(),
-  bulkPinMutate: vi.fn(),
-  bulkExcludeMutate: vi.fn(),
-}));
+vi.mock('@/features/auth/hooks/usePermission');
 
-vi.mock('@/hooks/useViews', () => ({
-  usePinTransaction: () => ({ mutate: mutationMocks.pinMutate, isPending: false }),
-  useUnpinTransaction: () => ({ mutate: mutationMocks.unpinMutate, isPending: false }),
-  useExcludeTransaction: () => ({ mutate: mutationMocks.excludeMutate, isPending: false }),
-  useBulkPinTransactions: () => ({ mutate: mutationMocks.bulkPinMutate, isPending: false }),
-  useBulkExcludeTransactions: () => ({
-    mutate: mutationMocks.bulkExcludeMutate,
-    isPending: false,
-  }),
-}));
+const mockUsePermission = vi.mocked(usePermission);
 
-const transactions: ViewTransaction[] = [
+const transactions: Transaction[] = [
   {
     id: 1,
-    accountId: 'account-1',
-    bankName: 'Alpha Bank',
-    date: '2026-01-03',
+    accountId: 'checking',
+    bankName: 'Example Bank',
+    date: '2026-01-15',
     currencyIsoCode: 'USD',
-    amount: -14.25,
+    amount: 10,
     type: 'DEBIT',
-    description: 'Coffee shop purchase',
-    membershipType: 'MATCHED',
-    createdAt: '2026-01-03T00:00:00Z',
-    updatedAt: '2026-01-03T00:00:00Z',
+    description: 'Coffee',
+    createdAt: '2026-01-15T00:00:00Z',
+    updatedAt: '2026-01-15T00:00:00Z',
   },
   {
     id: 2,
-    accountId: 'account-2',
-    bankName: 'Coffee Credit Union',
-    date: '2026-01-04',
+    accountId: 'savings',
+    bankName: 'Second Bank',
+    date: '2026-01-16',
     currencyIsoCode: 'USD',
-    amount: -42,
-    type: 'DEBIT',
-    description: 'Hardware store',
-    membershipType: 'MATCHED',
-    createdAt: '2026-01-04T00:00:00Z',
-    updatedAt: '2026-01-04T00:00:00Z',
-  },
-  {
-    id: 3,
-    accountId: 'account-3',
-    bankName: 'Beta Bank',
-    date: '2026-01-05',
-    currencyIsoCode: 'USD',
-    amount: -8.5,
-    type: 'DEBIT',
-    description: 'Grocery market',
-    membershipType: 'PINNED',
-    createdAt: '2026-01-05T00:00:00Z',
-    updatedAt: '2026-01-05T00:00:00Z',
+    amount: 20,
+    type: 'CREDIT',
+    description: 'Salary',
+    createdAt: '2026-01-16T00:00:00Z',
+    updatedAt: '2026-01-16T00:00:00Z',
   },
 ];
 
@@ -76,499 +50,232 @@ const emptyFilters: TransactionFilterValues = {
   accountIdFilter: null,
   typeFilter: null,
   amountFilter: { min: null, max: null },
+  amountCurrency: null,
 };
 
-const paginatedTransactions: ViewTransaction[] = Array.from({ length: 21 }, (_, index) => ({
-  ...transactions[0],
-  id: index + 1,
-  description: `Transaction ${index + 1}`,
-}));
+const callbacks = {
+  onSearchChange: vi.fn(),
+  onDateFilterChange: vi.fn(),
+  onBankNameFilterChange: vi.fn(),
+  onAccountIdFilterChange: vi.fn(),
+  onTypeFilterChange: vi.fn(),
+  onAmountFilterChange: vi.fn(),
+  onClearAllFilters: vi.fn(),
+};
 
-type ExchangeRatesMap = Map<string, Map<string, ExchangeRateResponse>>;
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+}
 
-function renderViewTransactionTable({
+function renderTable({
   rows = transactions,
-  viewId = 'view-1',
   filters = emptyFilters,
-  availableBankNames = ['Alpha Bank', 'Beta Bank', 'Coffee Credit Union'],
-  availableAccountIds = ['account-1', 'account-2', 'account-3'],
-  onSearchChange = vi.fn(),
-  onDateFilterChange = vi.fn(),
-  onBankNameFilterChange = vi.fn(),
-  onAccountIdFilterChange = vi.fn(),
-  onTypeFilterChange = vi.fn(),
-  onAmountFilterChange = vi.fn(),
-  onClearAllFilters = vi.fn(),
-  exchangeRatesMap = new Map(),
+  displayAmounts = new Map(
+    rows.map((transaction) => [
+      transaction.id,
+      projectDisplayAmount(transaction, 'USD', new Map()),
+    ]),
+  ),
+  isAmountFilterLoading = false,
+  unavailableAmountFilterCount = 0,
 }: {
-  rows?: ViewTransaction[];
-  viewId?: string;
+  rows?: Transaction[];
   filters?: TransactionFilterValues;
-  availableBankNames?: string[];
-  availableAccountIds?: string[];
-  onSearchChange?: (query: string) => void;
-  onDateFilterChange?: (from: string | null, to: string | null) => void;
-  onBankNameFilterChange?: (bankName: string | null) => void;
-  onAccountIdFilterChange?: (accountId: string | null) => void;
-  onTypeFilterChange?: (type: 'DEBIT' | 'CREDIT' | null) => void;
-  onAmountFilterChange?: (min: number | null, max: number | null) => void;
-  onClearAllFilters?: () => void;
-  exchangeRatesMap?: ExchangeRatesMap;
+  displayAmounts?: ReadonlyMap<number, DisplayAmount>;
+  isAmountFilterLoading?: boolean;
+  unavailableAmountFilterCount?: number;
 } = {}) {
-  const result = renderWithProviders(
-    <ViewTransactionTable
-      transactions={rows}
-      viewId={viewId}
-      filters={filters}
-      availableBankNames={availableBankNames}
-      availableAccountIds={availableAccountIds}
-      onSearchChange={onSearchChange}
-      onDateFilterChange={onDateFilterChange}
-      onBankNameFilterChange={onBankNameFilterChange}
-      onAccountIdFilterChange={onAccountIdFilterChange}
-      onTypeFilterChange={onTypeFilterChange}
-      onAmountFilterChange={onAmountFilterChange}
-      onClearAllFilters={onClearAllFilters}
-      displayCurrency="USD"
-      exchangeRatesMap={exchangeRatesMap}
-      isExchangeRatesLoading={false}
-    />,
-    { initialEntries: [`/views/${viewId}`] },
+  return renderWithProviders(
+    <>
+      <ViewTransactionTable
+        transactions={rows}
+        viewId="view-1"
+        filters={filters}
+        availableBankNames={['Example Bank', 'Second Bank']}
+        availableAccountIds={['checking', 'savings']}
+        {...callbacks}
+        displayCurrency="USD"
+        displayAmounts={displayAmounts}
+        isDisplayAmountLoading={false}
+        isAmountFilterLoading={isAmountFilterLoading}
+        unavailableAmountFilterCount={unavailableAmountFilterCount}
+      />
+      <LocationProbe />
+    </>,
+    { initialEntries: ['/views/view-1?q=coffee'] },
   );
-
-  return {
-    onSearchChange,
-    onDateFilterChange,
-    onBankNameFilterChange,
-    onAccountIdFilterChange,
-    onTypeFilterChange,
-    onAmountFilterChange,
-    onClearAllFilters,
-    ...result,
-  };
 }
 
-function expectDescriptionOrder(expectedDescriptions: string[]) {
-  const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
-
-  expectedDescriptions.forEach((description, index) => {
-    expect(within(rows[index]).getByText(description)).toBeInTheDocument();
+describe('ViewTransactionTable', () => {
+  beforeEach(() => {
+    mockUsePermission.mockReset();
+    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
   });
-}
 
-beforeEach(() => {
-  Object.values(mutationMocks).forEach((mock) => mock.mockReset());
-});
+  it('hides membership actions without views:write and preserves row navigation', async () => {
+    mockUsePermission.mockReturnValue(false);
+    renderTable();
 
-afterEach(() => {
-  vi.useRealTimers();
-});
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove from view' })).not.toBeInTheDocument();
 
-describe('ViewTransactionTable sorting', () => {
-  const mixedCurrencyTransactions: ViewTransaction[] = [
-    {
+    await userEvent.click(screen.getByText('Coffee'));
+    expect(screen.getByTestId('location')).toHaveTextContent('/transactions/1?');
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      'returnTo=%2Fviews%2Fview-1%3Fq%3Dcoffee',
+    );
+  });
+
+  it('shows row and selection removal actions with views:write', () => {
+    renderTable();
+
+    expect(
+      screen.getByRole('checkbox', { name: 'Select all transactions on this page' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Remove from view' })).toHaveLength(2);
+  });
+
+  it('removes all filtered members rather than only the visible page', async () => {
+    const rows = Array.from({ length: 25 }, (_, index) => ({
       ...transactions[0],
-      id: 10,
-      amount: -1_000,
-      currencyIsoCode: 'JPY',
-      description: 'JPY view debit',
-    },
-    {
-      ...transactions[1],
-      id: 11,
-      date: transactions[0].date,
-      amount: -20,
-      currencyIsoCode: 'USD',
-      description: 'USD view debit',
-    },
-  ];
-  const exchangeRatesMap = buildExchangeRateMap([
-    {
-      baseCurrency: 'USD',
-      targetCurrency: 'JPY',
-      date: transactions[0].date,
-      rate: 100,
-    },
-  ]);
-
-  it('sorts signed mixed-currency amounts by USD equivalents in both directions', async () => {
-    renderViewTransactionTable({ rows: mixedCurrencyTransactions, exchangeRatesMap });
-
-    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
-    expectDescriptionOrder(['USD view debit', 'JPY view debit']);
-
-    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
-    expectDescriptionOrder(['JPY view debit', 'USD view debit']);
-  });
-
-  it('returns to the first page when a new sort is selected', async () => {
-    renderViewTransactionTable({ rows: paginatedTransactions });
-
-    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(screen.getByText('Showing 21 to 21 of 21 transactions')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
-
-    expect(screen.getByText('Showing 1 to 20 of 21 transactions')).toBeInTheDocument();
-  });
-});
-
-describe('ViewTransactionTable search', () => {
-  it('submits the typed search text when Enter is pressed', async () => {
-    const onSearchChange = vi.fn();
-    renderViewTransactionTable({ onSearchChange });
-
-    const searchInput = screen.getByPlaceholderText('Search descriptions ↵');
-    await userEvent.type(searchInput, 'coffee{Enter}');
-
-    expect(onSearchChange).toHaveBeenCalledWith('coffee');
-  });
-
-  it('shows the filtered empty state when an applied search has no rows', () => {
-    renderViewTransactionTable({
-      rows: [],
-      filters: { ...emptyFilters, globalFilter: 'coffee' },
-    });
-
-    expect(screen.getByText('No transactions match these filters.')).toBeInTheDocument();
-    expect(screen.queryByText('No transactions in this view.')).not.toBeInTheDocument();
-  });
-
-  it('clears the applied search when the clear button is clicked', async () => {
-    const onSearchChange = vi.fn();
-    renderViewTransactionTable({
-      filters: { ...emptyFilters, globalFilter: 'coffee' },
-      onSearchChange,
-    });
-
-    await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
-
-    expect(onSearchChange).toHaveBeenCalledWith('');
-  });
-
-  it('resets the draft search input when the view changes', async () => {
-    const onSearchChange = vi.fn();
-    const { rerender } = renderViewTransactionTable({
-      filters: { ...emptyFilters, globalFilter: 'coffee' },
-      onSearchChange,
-    });
-
-    const searchInput = screen.getByPlaceholderText('Search descriptions ↵');
-    await userEvent.clear(searchInput);
-    await userEvent.type(searchInput, 'unsubmitted draft');
-
-    expect(searchInput).toHaveValue('unsubmitted draft');
-
-    rerender(
-      <ViewTransactionTable
-        transactions={transactions}
-        viewId="view-2"
-        filters={emptyFilters}
-        availableBankNames={['Alpha Bank', 'Beta Bank', 'Coffee Credit Union']}
-        availableAccountIds={['account-1', 'account-2', 'account-3']}
-        onSearchChange={onSearchChange}
-        onDateFilterChange={vi.fn()}
-        onBankNameFilterChange={vi.fn()}
-        onAccountIdFilterChange={vi.fn()}
-        onTypeFilterChange={vi.fn()}
-        onAmountFilterChange={vi.fn()}
-        onClearAllFilters={vi.fn()}
-        displayCurrency="USD"
-        exchangeRatesMap={new Map()}
-        isExchangeRatesLoading={false}
-      />,
+      id: index + 1,
+      description: `Transaction ${index + 1}`,
+    }));
+    let requestBody: unknown;
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', async ({ request }) => {
+        requestBody = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      }),
     );
+    renderTable({ rows });
 
-    expect(screen.getByPlaceholderText('Search descriptions ↵')).toHaveValue('');
-  });
-});
-
-describe('ViewTransactionTable date filters', () => {
-  it('renders the active date filters', () => {
-    renderViewTransactionTable({
-      filters: {
-        ...emptyFilters,
-        dateFilter: { from: '2026-01-01', to: '2026-01-31' },
-      },
-    });
-
-    expect(screen.getByDisplayValue('2026-01-01')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('2026-01-31')).toBeInTheDocument();
-  });
-
-  it('calls the date filter callback when a date changes', async () => {
-    const onDateFilterChange = vi.fn();
-    renderViewTransactionTable({ onDateFilterChange });
-
-    await userEvent.type(screen.getByPlaceholderText('From date'), '2026-01-01');
-
-    expect(onDateFilterChange).toHaveBeenCalledWith('2026-01-01', null);
-  });
-
-  it('clears search and date filters from the clear action', async () => {
-    const onClearAllFilters = vi.fn();
-    renderViewTransactionTable({
-      filters: {
-        ...emptyFilters,
-        globalFilter: 'coffee',
-        dateFilter: { from: '2026-01-01', to: '2026-01-31' },
-      },
-      onClearAllFilters,
-    });
-
-    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
-
-    expect(onClearAllFilters).toHaveBeenCalled();
-  });
-});
-
-describe('ViewTransactionTable shared filters', () => {
-  it('passes bank, account, and type selections to the shared callbacks', async () => {
-    const onBankNameFilterChange = vi.fn();
-    const onAccountIdFilterChange = vi.fn();
-    const onTypeFilterChange = vi.fn();
-    renderViewTransactionTable({
-      onBankNameFilterChange,
-      onAccountIdFilterChange,
-      onTypeFilterChange,
-    });
-
-    await userEvent.click(screen.getByRole('button', { name: 'Filter by bank' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Beta Bank' }));
-    expect(onBankNameFilterChange).toHaveBeenCalledWith('Beta Bank');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Filter by account' }));
-    await userEvent.click(screen.getByRole('button', { name: 'account-2' }));
-    expect(onAccountIdFilterChange).toHaveBeenCalledWith('account-2');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Filter by transaction type' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Credit' }));
-    expect(onTypeFilterChange).toHaveBeenCalledWith('CREDIT');
-  });
-
-  it('uses every filter dimension for the filtered empty state without a contextual action', () => {
-    renderViewTransactionTable({
-      rows: [],
-      filters: {
-        ...emptyFilters,
-        amountFilter: { min: 100, max: null },
-      },
-    });
-
-    expect(screen.getByText('No transactions match these filters.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /save as view/i })).not.toBeInTheDocument();
-  });
-
-  it('preserves unrelated search and amount drafts when an applied filter changes', () => {
-    vi.useFakeTimers();
-    const onAmountFilterChange = vi.fn();
-    const { rerender } = renderViewTransactionTable({ onAmountFilterChange });
-
-    fireEvent.change(screen.getByPlaceholderText('Search descriptions ↵'), {
-      target: { value: 'unsubmitted draft' },
-    });
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Minimum amount' }), {
-      target: { value: '25' },
-    });
-
-    rerender(
-      <ViewTransactionTable
-        transactions={transactions}
-        viewId="view-1"
-        filters={{ ...emptyFilters, typeFilter: 'CREDIT' }}
-        availableBankNames={['Alpha Bank', 'Beta Bank', 'Coffee Credit Union']}
-        availableAccountIds={['account-1', 'account-2', 'account-3']}
-        onSearchChange={vi.fn()}
-        onDateFilterChange={vi.fn()}
-        onBankNameFilterChange={vi.fn()}
-        onAccountIdFilterChange={vi.fn()}
-        onTypeFilterChange={vi.fn()}
-        onAmountFilterChange={onAmountFilterChange}
-        onClearAllFilters={vi.fn()}
-        displayCurrency="USD"
-        exchangeRatesMap={new Map()}
-        isExchangeRatesLoading={false}
-      />,
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Select all transactions on this page' }),
     );
-
-    expect(screen.getByPlaceholderText('Search descriptions ↵')).toHaveValue('unsubmitted draft');
-    expect(screen.getByRole('spinbutton', { name: 'Minimum amount' })).toHaveValue(25);
-
-    act(() => vi.advanceTimersByTime(400));
-    expect(onAmountFilterChange).toHaveBeenCalledWith(25, null);
-  });
-
-  it('resets pagination and bulk selection when an applied filter changes', async () => {
-    const { rerender } = renderViewTransactionTable({ rows: paginatedTransactions });
-
-    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 21' }));
-    expect(screen.getByText('Showing 21 to 21 of 21 transactions')).toBeInTheDocument();
-    expect(screen.getByText('1 transaction selected')).toBeInTheDocument();
-
-    rerender(
-      <ViewTransactionTable
-        transactions={paginatedTransactions}
-        viewId="view-1"
-        filters={{ ...emptyFilters, typeFilter: 'CREDIT' }}
-        availableBankNames={['Alpha Bank', 'Beta Bank', 'Coffee Credit Union']}
-        availableAccountIds={['account-1', 'account-2', 'account-3']}
-        onSearchChange={vi.fn()}
-        onDateFilterChange={vi.fn()}
-        onBankNameFilterChange={vi.fn()}
-        onAccountIdFilterChange={vi.fn()}
-        onTypeFilterChange={vi.fn()}
-        onAmountFilterChange={vi.fn()}
-        onClearAllFilters={vi.fn()}
-        displayCurrency="USD"
-        exchangeRatesMap={new Map()}
-        isExchangeRatesLoading={false}
-      />,
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Select all 25 transactions matching this filter',
+      }),
     );
-
-    expect(screen.getByText('Showing 1 to 20 of 21 transactions')).toBeInTheDocument();
-    expect(screen.queryByText('1 transaction selected')).not.toBeInTheDocument();
-  });
-});
-
-describe('ViewTransactionTable bulk actions', () => {
-  it('renders select checkboxes for the header and rows', () => {
-    renderViewTransactionTable();
-
-    expect(screen.getByRole('checkbox', { name: 'Select all rows on page' })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Select transaction 1' })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Select transaction 2' })).toBeInTheDocument();
-  });
-
-  it('shows and clears the bulk action bar when rows are selected', async () => {
-    renderViewTransactionTable();
-
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-
-    expect(screen.getByText('1 transaction selected')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
-
-    await waitFor(() => {
-      expect(screen.queryByText('1 transaction selected')).not.toBeInTheDocument();
-    });
-  });
-
-  it('opens the bulk pin confirmation modal', async () => {
-    renderViewTransactionTable();
-
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Pin' }));
-
-    expect(screen.getByRole('heading', { name: 'Pin Transactions' })).toBeInTheDocument();
     expect(
-      screen.getByText(
-        'Pin 1 transaction to this view? Pinned transactions stay in the view regardless of filters.',
+      screen.getByText('All 25 transactions matching this filter are selected.'),
+    ).toBeInTheDocument();
+
+    const removalBar = screen.getByText('25 transactions selected').parentElement;
+    expect(removalBar).not.toBeNull();
+    await userEvent.click(within(removalBar!).getByRole('button', { name: 'Remove from view' }));
+    const dialog = screen.getByRole('heading', { name: 'Remove from view' }).parentElement
+      ?.parentElement;
+    expect(dialog).not.toBeNull();
+    expect(within(dialog!).getByText(/Remove 25 transactions from this view/)).toBeInTheDocument();
+    await userEvent.click(within(dialog!).getByRole('button', { name: 'Remove from view' }));
+
+    await waitFor(() =>
+      expect(requestBody).toEqual({
+        addTransactionIds: [],
+        removeTransactionIds: rows.map(({ id }) => id),
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText('All 25 transactions matching this filter are selected.'),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it('opens row removal without navigating away', async () => {
+    renderTable();
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Remove from view' })[0]);
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1?q=coffee');
+    expect(screen.getByText(/Remove 1 transaction from this view/)).toBeInTheDocument();
+  });
+
+  it('retains bulk selection after cancellation and mutation failure', async () => {
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', () =>
+        HttpResponse.json(
+          { type: 'INTERNAL_ERROR', message: 'Membership update failed' },
+          { status: 500 },
+        ),
       ),
+    );
+    renderTable();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
+    const selectionStatus = screen.getByText('1 transaction selected');
+    const removalBar = selectionStatus.parentElement;
+    expect(removalBar).not.toBeNull();
+    await userEvent.click(within(removalBar!).getByRole('button', { name: 'Remove from view' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(selectionStatus).toBeInTheDocument();
+
+    await userEvent.click(within(removalBar!).getByRole('button', { name: 'Remove from view' }));
+    const dialog = screen.getByRole('heading', { name: 'Remove from view' }).parentElement
+      ?.parentElement;
+    expect(dialog).not.toBeNull();
+    await userEvent.click(within(dialog!).getByRole('button', { name: 'Remove from view' }));
+
+    await waitFor(() =>
+      expect(within(dialog!).getByRole('button', { name: 'Remove from view' })).toBeEnabled(),
+    );
+    expect(selectionStatus).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Select transaction 1' })).toBeChecked();
+  });
+
+  it('renders empty collection and filtered-empty messages', () => {
+    const first = renderTable({ rows: [] });
+    expect(screen.getByText('No transactions in this view.')).toBeInTheDocument();
+
+    first.unmount();
+    renderTable({ rows: [], filters: { ...emptyFilters, globalFilter: 'missing' } });
+    expect(screen.getByText('No transactions match these filters.')).toBeInTheDocument();
+  });
+
+  it('forwards local search changes', async () => {
+    callbacks.onSearchChange.mockReset();
+    renderTable();
+
+    const search = screen.getByPlaceholderText('Search descriptions ↵');
+    await userEvent.clear(search);
+    await userEvent.type(search, 'salary{Enter}');
+    expect(callbacks.onSearchChange).toHaveBeenLastCalledWith('salary');
+  });
+
+  it('shows unresolved and unavailable amount-filter states', () => {
+    const loading = renderTable({ isAmountFilterLoading: true });
+    expect(screen.getByText('Loading filtered amounts...')).toBeInTheDocument();
+
+    loading.unmount();
+    renderTable({ unavailableAmountFilterCount: 2 });
+    expect(
+      screen.getByText('2 transactions were excluded because conversion to USD is unavailable.'),
     ).toBeInTheDocument();
   });
 
-  it('confirms bulk pin with the view ID and selected IDs', async () => {
-    renderViewTransactionTable();
-
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Pin' }));
-    const pinButtons = screen.getAllByRole('button', { name: 'Pin' });
-    await userEvent.click(pinButtons[pinButtons.length - 1]);
-
-    expect(mutationMocks.bulkPinMutate).toHaveBeenCalledWith(
-      { viewId: 'view-1', ids: [1] },
-      expect.objectContaining({
-        onSuccess: expect.any(Function),
-        onError: expect.any(Function),
-      }),
+  it('sorts unavailable selected-currency amounts last in both directions', async () => {
+    const rows = [
+      transactions[0],
+      { ...transactions[1], id: 3, currencyIsoCode: 'GBP', description: 'Unavailable' },
+      transactions[1],
+    ];
+    const displayAmounts = new Map(
+      rows.map((transaction) => [
+        transaction.id,
+        projectDisplayAmount(transaction, 'USD', new Map()),
+      ]),
     );
-  });
+    renderTable({ rows, displayAmounts });
 
-  it('opens the bulk exclude confirmation modal', async () => {
-    renderViewTransactionTable();
+    await userEvent.click(screen.getByRole('button', { name: 'Amount' }));
+    let tableRows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+    expect(tableRows[tableRows.length - 1]).toHaveTextContent('Unavailable');
 
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Exclude' }));
-
-    expect(screen.getByRole('heading', { name: 'Exclude Transactions' })).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Exclude 1 transaction from this view? Excluded transactions can be restored from the Restore Excluded action.',
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it('confirms bulk exclude with the view ID and selected IDs', async () => {
-    renderViewTransactionTable();
-
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Exclude' }));
-    const excludeButtons = screen.getAllByRole('button', { name: 'Exclude' });
-    await userEvent.click(excludeButtons[excludeButtons.length - 1]);
-
-    expect(mutationMocks.bulkExcludeMutate).toHaveBeenCalledWith(
-      { viewId: 'view-1', ids: [1] },
-      expect.objectContaining({
-        onSuccess: expect.any(Function),
-        onError: expect.any(Function),
-      }),
-    );
-  });
-
-  it('clears selection after a successful bulk action', async () => {
-    mutationMocks.bulkPinMutate.mockImplementation((_variables, options) => {
-      options.onSuccess({ updatedCount: 1, notFoundIds: [] });
-    });
-    renderViewTransactionTable();
-
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Pin' }));
-    const pinButtons = screen.getAllByRole('button', { name: 'Pin' });
-    await userEvent.click(pinButtons[pinButtons.length - 1]);
-
-    await waitFor(() => {
-      expect(screen.queryByText('1 transaction selected')).not.toBeInTheDocument();
-    });
-  });
-
-  it('disables bulk pin when only already pinned rows are selected', async () => {
-    renderViewTransactionTable();
-
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 3' }));
-
-    expect(screen.getByRole('button', { name: 'Pin' })).toBeDisabled();
-  });
-});
-
-describe('ViewTransactionTable row membership actions', () => {
-  it('pins a matched transaction from the row actions menu', async () => {
-    renderViewTransactionTable();
-
-    await userEvent.click(screen.getAllByRole('button', { name: 'Actions' })[1]);
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Pin to View' }));
-
-    expect(mutationMocks.pinMutate).toHaveBeenCalledWith({ viewId: 'view-1', txnId: 2 });
-    expect(mutationMocks.unpinMutate).not.toHaveBeenCalled();
-  });
-
-  it('unpins a pinned transaction from the row actions menu', async () => {
-    renderViewTransactionTable();
-
-    await userEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]);
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Unpin' }));
-
-    expect(mutationMocks.unpinMutate).toHaveBeenCalledWith({ viewId: 'view-1', txnId: 3 });
-    expect(mutationMocks.pinMutate).not.toHaveBeenCalled();
-  });
-
-  it('excludes a visible transaction from the row actions menu', async () => {
-    renderViewTransactionTable();
-
-    await userEvent.click(screen.getAllByRole('button', { name: 'Actions' })[1]);
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Exclude' }));
-
-    expect(mutationMocks.excludeMutate).toHaveBeenCalledWith({ viewId: 'view-1', txnId: 2 });
+    await userEvent.click(screen.getByRole('button', { name: 'Amount' }));
+    tableRows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+    expect(tableRows[tableRows.length - 1]).toHaveTextContent('Unavailable');
   });
 });

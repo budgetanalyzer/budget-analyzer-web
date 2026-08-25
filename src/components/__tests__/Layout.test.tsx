@@ -53,6 +53,20 @@ describe('Layout', () => {
 
     expect(screen.getByText('user profile')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Login' })).not.toBeInTheDocument();
+    expect(screen.queryByText('view selector')).not.toBeInTheDocument();
+  });
+
+  it('mounts the query-owning view selector only with views:read', () => {
+    mockAuthenticatedUser({
+      sub: 'user-1',
+      email: 'user@example.com',
+      authenticated: true,
+      roles: ['USER'],
+      permissions: ['views:read'],
+    });
+
+    renderWithProviders(<Layout />, { initialEntries: ['/'] });
+    expect(screen.getByText('view selector')).toBeInTheDocument();
   });
 
   it('retains the authenticated admin redirect to the admin layout', () => {

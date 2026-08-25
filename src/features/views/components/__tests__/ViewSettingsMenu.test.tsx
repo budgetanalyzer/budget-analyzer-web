@@ -1,90 +1,48 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 import { ViewSettingsMenu } from '@/features/views/components/ViewSettingsMenu';
-import type { SavedView } from '@/types/view';
 
-const hookState = vi.hoisted(() => ({
-  isPending: false,
-  updateView: vi.fn(),
-}));
+vi.mock('@/features/auth/hooks/usePermission');
 
-vi.mock('@/hooks/useViews', () => ({
-  useUpdateView: () => ({ mutate: hookState.updateView, isPending: hookState.isPending }),
-}));
-
-const view: SavedView = {
-  id: 'view-1',
-  name: 'Groceries',
-  criteria: {},
-  openEnded: false,
-  pinnedCount: 1,
-  excludedCount: 0,
-  transactionCount: 8,
-  createdAt: '2026-01-01T00:00:00Z',
-  updatedAt: '2026-01-01T00:00:00Z',
-};
+const mockUsePermission = vi.mocked(usePermission);
 
 describe('ViewSettingsMenu', () => {
   beforeEach(() => {
-    hookState.isPending = false;
-    hookState.updateView.mockReset();
+    mockUsePermission.mockReset();
   });
 
-  it('keeps controlled state synchronized for dismissal and Edit/Delete actions', async () => {
-    const onEditClick = vi.fn();
+  it('gates rename and delete independently and dispatches their callbacks', async () => {
+    mockUsePermission.mockReturnValue(true);
+    const onRenameClick = vi.fn();
     const onDeleteClick = vi.fn();
     const user = userEvent.setup();
-    render(
-      <ViewSettingsMenu view={view} onEditClick={onEditClick} onDeleteClick={onDeleteClick} />,
-    );
+    render(<ViewSettingsMenu onRenameClick={onRenameClick} onDeleteClick={onDeleteClick} />);
+
     const trigger = screen.getByRole('button', { name: 'View settings' });
-
     await user.click(trigger);
-    expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    await user.click(document.body);
-    expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-
-    await user.click(trigger);
-    await user.click(screen.getByRole('menuitem', { name: 'Edit View' }));
-    expect(onEditClick).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Rename View' }));
+    expect(onRenameClick).toHaveBeenCalledOnce();
 
     await user.click(trigger);
     await user.click(screen.getByRole('menuitem', { name: 'Delete View' }));
-    expect(onDeleteClick).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(onDeleteClick).toHaveBeenCalledOnce();
   });
 
-  it('updates open-ended state with the existing payload', async () => {
-    const user = userEvent.setup();
-    render(<ViewSettingsMenu view={view} onEditClick={vi.fn()} onDeleteClick={vi.fn()} />);
+  it('shows delete without rename for delete-only permission', async () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'views:delete');
+    render(<ViewSettingsMenu onRenameClick={vi.fn()} onDeleteClick={vi.fn()} />);
 
-    const trigger = screen.getByRole('button', { name: 'View settings' });
-    await user.click(trigger);
-    await user.click(screen.getByRole('menuitem', { name: 'Enable Open-Ended' }));
+    await userEvent.click(screen.getByRole('button', { name: 'View settings' }));
 
-    expect(hookState.updateView).toHaveBeenCalledOnce();
-    expect(hookState.updateView).toHaveBeenCalledWith({
-      id: 'view-1',
-      request: { openEnded: true },
-    });
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Rename View' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Delete View' })).toBeInTheDocument();
   });
 
-  it('disables the trigger and open-ended action while an update is pending', async () => {
-    const user = userEvent.setup();
-    const { rerender } = render(
-      <ViewSettingsMenu view={view} onEditClick={vi.fn()} onDeleteClick={vi.fn()} />,
-    );
-
-    const trigger = screen.getByRole('button', { name: 'View settings' });
-    await user.click(trigger);
-    hookState.isPending = true;
-    rerender(<ViewSettingsMenu view={view} onEditClick={vi.fn()} onDeleteClick={vi.fn()} />);
-
-    expect(trigger).toBeDisabled();
-    expect(screen.getByRole('menuitem', { name: 'Enable Open-Ended' })).toBeDisabled();
+  it('does not render when both action permissions are denied', () => {
+    mockUsePermission.mockReturnValue(false);
+    render(<ViewSettingsMenu onRenameClick={vi.fn()} onDeleteClick={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'View settings' })).not.toBeInTheDocument();
   });
 });

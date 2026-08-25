@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useViews } from '@/hooks/useViews';
-import { SavedView } from '@/types/view';
+import type { SavedViewMetadata } from '@/types/view';
 import { ViewsPage } from '@/features/views/pages/ViewsPage';
 import { renderWithProviders } from '@/testing/test-utils';
 import { ApiError } from '@/types/apiError';
@@ -13,19 +13,10 @@ vi.mock('@/hooks/useViews', () => ({
 
 const mockUseViews = vi.mocked(useViews);
 
-const savedViews: SavedView[] = [
+const savedViews: SavedViewMetadata[] = [
   {
     id: 'view-groceries',
     name: 'Groceries',
-    criteria: {
-      dateFrom: '2026-01-01',
-      dateTo: '2026-01-31',
-      searchText: 'market',
-      type: 'DEBIT',
-    },
-    openEnded: false,
-    pinnedCount: 2,
-    excludedCount: 1,
     transactionCount: 12,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-02T00:00:00Z',
@@ -104,8 +95,7 @@ describe('ViewsPage', () => {
     expect(screen.getByRole('heading', { name: 'Saved Views' })).toBeInTheDocument();
     expect(screen.getByText('Groceries')).toBeInTheDocument();
     expect(screen.getByText('12 transactions')).toBeInTheDocument();
-    expect(screen.getByText('2 pinned')).toBeInTheDocument();
-    expect(screen.getByText('1 excluded')).toBeInTheDocument();
+    expect(screen.getByText(/Updated/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View details for Groceries' })).toHaveAttribute(
       'href',
       '/views/view-groceries',

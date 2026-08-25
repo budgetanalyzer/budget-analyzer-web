@@ -52,6 +52,27 @@ The application separates state by lifetime and authority:
 [State Architecture](state-architecture.md) owns the placement rules and
 feature-specific URL, navigation, Redux, and local-state contracts.
 
+## Current-User Transaction Snapshot
+
+Current-user `GET /v1/transactions` returns the complete active collection as a
+plain array. TanStack Query caches that snapshot, and ordinary transaction,
+saved-view, and analytics surfaces filter, sort, project display amounts, and
+aggregate it in the browser. Transaction-table pagination is presentation only;
+it does not request another transport page or reduce the collection used by
+selection and totals.
+
+Static saved views load ordered membership IDs separately and intersect them
+with this shared transaction cache. A missing ID is reported as snapshot skew
+and omitted from the derived member objects; it does not trigger a per-ID
+transaction fetch.
+
+Cross-user administrative transaction search is the deliberate exception. It
+remains a backend-filtered, backend-sorted paged response whose amount bounds
+and amount sorting use stored native numeric values rather than the user's
+display-currency projection. This architecture introduces neither transport
+pagination for the current-user snapshot nor a client or server performance
+benchmark; future scaling changes require a separately designed contract.
+
 ## Integration and Security Boundaries
 
 Development and production preserve the same same-origin routing shape:

@@ -34,6 +34,7 @@ export function MonthlySpendingGrid({
           monthLabel={month.monthLabel}
           totalSpending={month.totalSpending}
           transactionCount={month.transactionCount}
+          unavailableAmountCount={month.unavailableAmountCount}
           currency={currency}
           viewMode={viewMode}
           transactionType={transactionType}

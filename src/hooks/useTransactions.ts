@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, UseQueryResult } from '@tanstack
 import { Transaction, TransactionUpdateRequest } from '@/types/transaction';
 import { transactionApi } from '@/api/transactionApi';
 import { ApiError } from '@/types/apiError';
-import { viewKeys } from '@/hooks/useViews';
+import { transactionKeys, viewKeys } from '@/queryKeys';
 
 interface UseTransactionsOptions {
   enabled?: boolean;
@@ -15,7 +15,7 @@ export const useTransactions = (
   const { enabled = true } = options;
 
   return useQuery<Transaction[], ApiError>({
-    queryKey: ['transactions'],
+    queryKey: transactionKeys.list(),
     queryFn: () => transactionApi.getTransactions(),
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: 1,
@@ -25,7 +25,7 @@ export const useTransactions = (
 
 export const useTransaction = (id: number): UseQueryResult<Transaction, ApiError> => {
   return useQuery<Transaction, ApiError>({
-    queryKey: ['transaction', id],
+    queryKey: transactionKeys.detail(id),
     queryFn: () => transactionApi.getTransaction(id),
     staleTime: 1000 * 60 * 5,
     retry: 1,
@@ -40,22 +40,22 @@ export const useDeleteTransaction = () => {
     mutationFn: (id: number) => transactionApi.deleteTransaction(id),
     onSuccess: (_data, deletedId) => {
       // Optimistically update cache by removing the deleted transaction
-      queryClient.setQueryData<Transaction[]>(['transactions'], (oldData) => {
+      queryClient.setQueryData<Transaction[]>(transactionKeys.list(), (oldData) => {
         if (!oldData) return oldData;
         return oldData.filter((transaction) => transaction.id !== deletedId);
       });
 
       queryClient.invalidateQueries({
-        queryKey: ['transaction', deletedId],
+        queryKey: transactionKeys.detail(deletedId),
         exact: true,
         refetchType: 'none',
       });
       queryClient.removeQueries({
-        queryKey: ['transaction', deletedId],
+        queryKey: transactionKeys.detail(deletedId),
         exact: true,
         type: 'inactive',
       });
-      queryClient.invalidateQueries({ queryKey: ['transactionCount'] });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.count() });
       queryClient.invalidateQueries({ queryKey: viewKeys.all });
     },
   });
@@ -68,7 +68,7 @@ export const useUpdateTransaction = () => {
     mutationFn: ({ id, data }) => transactionApi.updateTransaction(id, data),
     onSuccess: (updatedTransaction) => {
       // Update the transactions list cache
-      queryClient.setQueryData<Transaction[]>(['transactions'], (oldData) => {
+      queryClient.setQueryData<Transaction[]>(transactionKeys.list(), (oldData) => {
         if (!oldData) return oldData;
         return oldData.map((transaction) =>
           transaction.id === updatedTransaction.id ? updatedTransaction : transaction,
@@ -77,10 +77,9 @@ export const useUpdateTransaction = () => {
 
       // Update the single transaction cache
       queryClient.setQueryData<Transaction>(
-        ['transaction', updatedTransaction.id],
+        transactionKeys.detail(updatedTransaction.id),
         updatedTransaction,
       );
-      queryClient.invalidateQueries({ queryKey: viewKeys.all });
     },
   });
 };

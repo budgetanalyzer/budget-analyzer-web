@@ -1,71 +1,54 @@
-// src/features/views/components/ViewTransactionTable.tsx
 import { useCallback, useMemo, useState } from 'react';
 import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  ColumnDef,
-  flexRender,
-  SortingState,
-  RowSelectionState,
+  type ColumnDef,
+  type Row,
+  type RowSelectionState,
+  type SortingState,
+  type Table as ReactTable,
   type Updater,
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
 } from '@tanstack/react-table';
-import { ViewTransaction } from '@/types/view';
-import { ExchangeRateResponse } from '@/types/currency';
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableCell,
-} from '@/components/ui/Table';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Checkbox } from '@/components/ui/Checkbox';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { TransactionFilterBar } from '@/components/TransactionFilterBar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/DropdownMenu';
-import { TransactionAmountBadge } from '@/features/transactions/components/TransactionAmountBadge';
-import { BulkViewTransactionBar } from '@/features/views/components/BulkViewTransactionBar';
-import {
-  BulkViewTransactionAction,
-  BulkViewTransactionModal,
-} from '@/features/views/components/BulkViewTransactionModal';
-import { formatLocalDate, compareLocalDates } from '@/utils/dates';
 import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Pin,
-  PinOff,
-  EyeOff,
-  MoreHorizontal,
+  X,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
-import { cn } from '@/utils/cn';
-import { usePinTransaction, useUnpinTransaction, useExcludeTransaction } from '@/hooks/useViews';
-import { columnWidthClass } from '@/utils/columnWidth';
-import type { TransactionType } from '@/types/transaction';
+import { TransactionFilterBar } from '@/components/TransactionFilterBar';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Skeleton } from '@/components/ui/Skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/Table';
+import { TransactionAmountBadge } from '@/features/transactions/components/TransactionAmountBadge';
+import { usePermission } from '@/features/auth/hooks/usePermission';
+import { RemoveViewTransactionsBar } from '@/features/views/components/RemoveViewTransactionsBar';
+import { RemoveViewTransactionsModal } from '@/features/views/components/RemoveViewTransactionsModal';
+import type { DisplayAmount } from '@/types/displayAmount';
+import type { Transaction, TransactionType } from '@/types/transaction';
 import type { TransactionFilterValues } from '@/types/transactionFilters';
+import { columnWidthClass } from '@/utils/columnWidth';
+import { compareLocalDates, formatLocalDate } from '@/utils/dates';
 import { hasActiveTransactionFilters } from '@/utils/transactionFilters';
-import { convertCurrency } from '@/utils/currency';
 
-type ViewTransactionTableRow = ViewTransaction & {
-  amountInUsd: number;
-};
+type ViewTransactionTableRow = Transaction & { displayAmount: DisplayAmount };
 
 interface ViewTransactionTableProps {
-  transactions: ViewTransaction[];
+  transactions: Transaction[];
   viewId: string;
   filters: TransactionFilterValues;
   availableBankNames: string[];
@@ -78,17 +61,10 @@ interface ViewTransactionTableProps {
   onAmountFilterChange: (min: number | null, max: number | null) => void;
   onClearAllFilters: () => void;
   displayCurrency: string;
-  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
-  isExchangeRatesLoading: boolean;
-}
-
-interface ViewTransactionTableContentProps {
-  transactions: ViewTransaction[];
-  viewId: string;
-  filters: TransactionFilterValues;
-  displayCurrency: string;
-  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
-  isExchangeRatesLoading: boolean;
+  displayAmounts: ReadonlyMap<number, DisplayAmount>;
+  isDisplayAmountLoading: boolean;
+  isAmountFilterLoading: boolean;
+  unavailableAmountFilterCount: number;
 }
 
 export function ViewTransactionTable({
@@ -105,188 +81,110 @@ export function ViewTransactionTable({
   onAmountFilterChange,
   onClearAllFilters,
   displayCurrency,
-  exchangeRatesMap,
-  isExchangeRatesLoading,
+  displayAmounts,
+  isDisplayAmountLoading,
+  isAmountFilterLoading,
+  unavailableAmountFilterCount,
 }: ViewTransactionTableProps) {
-  return (
-    <div className="space-y-4">
-      <TransactionFilterBar
-        key={viewId}
-        filters={filters}
-        availableBankNames={availableBankNames}
-        availableAccountIds={availableAccountIds}
-        onSearchChange={onSearchChange}
-        onDateFilterChange={onDateFilterChange}
-        onBankNameFilterChange={onBankNameFilterChange}
-        onAccountIdFilterChange={onAccountIdFilterChange}
-        onTypeFilterChange={onTypeFilterChange}
-        onAmountFilterChange={onAmountFilterChange}
-        onClearAllFilters={onClearAllFilters}
-      />
-
-      <ViewTransactionTableContent
-        key={JSON.stringify([viewId, filters])}
-        transactions={transactions}
-        viewId={viewId}
-        filters={filters}
-        displayCurrency={displayCurrency}
-        exchangeRatesMap={exchangeRatesMap}
-        isExchangeRatesLoading={isExchangeRatesLoading}
-      />
-    </div>
-  );
-}
-
-function ViewTransactionTableContent({
-  transactions,
-  viewId,
-  filters,
-  displayCurrency,
-  exchangeRatesMap,
-  isExchangeRatesLoading,
-}: ViewTransactionTableContentProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
-  const [pageIndex, setPageIndex] = useState(0);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [selectAllMatching, setSelectAllMatching] = useState(false);
-  const [bulkAction, setBulkAction] = useState<BulkViewTransactionAction | null>(null);
-  const [bulkModalOpen, setBulkModalOpen] = useState(false);
-  const pageSize = 20;
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [rowRemovalId, setRowRemovalId] = useState<number | null>(null);
+  const canRemoveFromView = usePermission('views:write');
 
-  // Mutations for pin/unpin/exclude
-  const { mutate: pinTransaction, isPending: isPinning } = usePinTransaction();
-  const { mutate: unpinTransaction, isPending: isUnpinning } = useUnpinTransaction();
-  const { mutate: excludeTransaction, isPending: isExcluding } = useExcludeTransaction();
-
-  const isMutating = isPinning || isUnpinning || isExcluding;
-
-  const tableRows = useMemo<ViewTransactionTableRow[]>(
+  const rows = useMemo<ViewTransactionTableRow[]>(
     () =>
       transactions.map((transaction) => ({
         ...transaction,
-        amountInUsd: convertCurrency(
-          transaction.amount,
-          transaction.date,
-          transaction.currencyIsoCode,
-          'USD',
-          exchangeRatesMap,
-        ),
+        displayAmount: displayAmounts.get(transaction.id)!,
       })),
-    [exchangeRatesMap, transactions],
+    [displayAmounts, transactions],
   );
 
-  // Handle row click to navigate to transaction detail
   const handleRowClick = useCallback(
-    (transaction: ViewTransaction) => {
-      // Pass the view context so we can return to the view
+    (transaction: Transaction) => {
       const returnTo = `${location.pathname}${location.search}`;
-      const params = new URLSearchParams({
-        returnTo,
-        breadcrumbLabel: 'View',
-      });
+      const params = new URLSearchParams({ returnTo, breadcrumbLabel: 'View' });
       navigate(`/transactions/${transaction.id}?${params.toString()}`);
     },
     [location.pathname, location.search, navigate],
   );
 
-  // Handle pin action
-  const handlePin = useCallback(
-    (txnId: number, e: React.MouseEvent) => {
-      e.stopPropagation();
-      pinTransaction({ viewId, txnId });
-    },
-    [pinTransaction, viewId],
+  const selectedIds = useMemo(
+    () =>
+      Object.keys(rowSelection)
+        .filter((key) => rowSelection[key])
+        .map((key) => Number.parseInt(key, 10)),
+    [rowSelection],
   );
-
-  // Handle unpin action
-  const handleUnpin = useCallback(
-    (txnId: number, e: React.MouseEvent) => {
-      e.stopPropagation();
-      unpinTransaction({ viewId, txnId });
-    },
-    [unpinTransaction, viewId],
+  const allFilteredIds = useMemo(
+    () => transactions.map((transaction) => transaction.id),
+    [transactions],
   );
+  const bulkRemovalIds = selectAllMatching ? allFilteredIds : selectedIds;
+  const idsToRemove = rowRemovalId === null ? bulkRemovalIds : [rowRemovalId];
 
-  // Handle exclude action
-  const handleExclude = useCallback(
-    (txnId: number, e: React.MouseEvent) => {
-      e.stopPropagation();
-      excludeTransaction({ viewId, txnId });
-    },
-    [excludeTransaction, viewId],
-  );
+  const handleRowRemove = useCallback((transactionId: number) => {
+    setRowRemovalId(transactionId);
+    setRemoveDialogOpen(true);
+  }, []);
+  const handleBulkRemove = useCallback(() => {
+    setRowRemovalId(null);
+    setRemoveDialogOpen(true);
+  }, []);
+  const handleRemoveDialogOpenChange = useCallback((open: boolean) => {
+    setRemoveDialogOpen(open);
+    if (!open) setRowRemovalId(null);
+  }, []);
+  const handleRemoveSuccess = useCallback(() => {
+    setRowSelection({});
+    setSelectAllMatching(false);
+  }, []);
+  const handleClearSelection = useCallback(() => {
+    setRowSelection({});
+    setSelectAllMatching(false);
+  }, []);
+  const handleSelectAllMatching = useCallback(() => {
+    setSelectAllMatching(true);
+  }, []);
 
-  // Define columns for TanStack Table
   const columns = useMemo<ColumnDef<ViewTransactionTableRow>[]>(
     () => [
       {
-        id: 'select',
-        header: ({ table }) => (
-          <Checkbox
-            checked={
-              table.getIsAllPageRowsSelected()
-                ? true
-                : table.getIsSomePageRowsSelected()
-                  ? 'indeterminate'
-                  : false
-            }
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all rows on page"
-          />
-        ),
-        cell: ({ row }) => (
-          <div onClick={(e) => e.stopPropagation()}>
-            <Checkbox
-              checked={row.getIsSelected()}
-              onCheckedChange={(value) => row.toggleSelected(!!value)}
-              aria-label={`Select transaction ${row.original.id}`}
-            />
-          </div>
-        ),
-        size: 50,
-        minSize: 50,
-        maxSize: 50,
+        id: 'amountAvailability',
+        accessorFn: (row) => (row.displayAmount.available ? 0 : 1),
+        sortingFn: 'basic',
       },
-      {
-        id: 'pinned',
-        header: '',
-        cell: ({ row }) => {
-          if (row.original.membershipType === 'PINNED') {
-            return (
-              <div className="flex items-center justify-center">
-                <Pin className="h-4 w-4 text-primary" />
-              </div>
-            );
-          }
-          return null;
-        },
-        size: 40,
-        minSize: 40,
-        maxSize: 40,
-      },
+      ...(canRemoveFromView
+        ? [
+            {
+              id: 'select',
+              header: ({ table }) => <SelectPageRowsCheckbox table={table} />,
+              cell: ({ row }) => <ViewRowSelectionCheckbox row={row} />,
+              size: 50,
+              minSize: 50,
+              maxSize: 50,
+            } satisfies ColumnDef<ViewTransactionTableRow>,
+          ]
+        : []),
       {
         accessorKey: 'date',
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-              className="hover:bg-transparent"
-            >
-              Date
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          );
-        },
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="hover:bg-transparent"
+          >
+            Date
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
         cell: ({ row }) => formatLocalDate(row.original.date),
-        sortingFn: (rowA, rowB) => {
-          return compareLocalDates(
-            rowA.getValue('date') as string,
-            rowB.getValue('date') as string,
-          );
-        },
+        sortingFn: (rowA, rowB) => compareLocalDates(rowA.original.date, rowB.original.date),
         size: 120,
         minSize: 120,
         maxSize: 120,
@@ -328,216 +226,155 @@ function ViewTransactionTableContent({
       },
       {
         id: 'amount',
-        accessorFn: (row) => row.amountInUsd,
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-              className="w-full justify-end hover:bg-transparent"
-            >
-              Amount
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          );
-        },
-        sortingFn: 'basic',
-        cell: ({ row }) => {
-          if (isExchangeRatesLoading) {
-            return (
-              <div className="flex items-center justify-end gap-2">
-                <Skeleton className="h-5 w-24" />
-              </div>
-            );
+        accessorFn: (row) => (row.displayAmount.available ? row.displayAmount.value : 0),
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="w-full justify-end hover:bg-transparent"
+          >
+            Amount
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        sortingFn: (rowA, rowB) => {
+          const amountA = rowA.original.displayAmount;
+          const amountB = rowB.original.displayAmount;
+          if (amountA.available && amountB.available && amountA.value !== amountB.value) {
+            return amountA.value - amountB.value;
           }
-          return (
+
+          const dateComparison = compareLocalDates(rowA.original.date, rowB.original.date);
+          return dateComparison !== 0 ? dateComparison : rowA.original.id - rowB.original.id;
+        },
+        cell: ({ row }) =>
+          isDisplayAmountLoading ? (
+            <div className="flex items-center justify-end gap-2">
+              <Skeleton className="h-5 w-24" />
+            </div>
+          ) : (
             <TransactionAmountBadge
-              amount={row.original.amount}
-              date={row.original.date}
-              currencyCode={row.original.currencyIsoCode}
-              displayCurrency={displayCurrency}
-              exchangeRatesMap={exchangeRatesMap}
+              displayAmount={row.original.displayAmount}
               isCredit={row.original.type === 'CREDIT'}
             />
-          );
-        },
+          ),
         size: 150,
         minSize: 130,
         maxSize: 150,
       },
-      {
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => {
-          const isPinned = row.original.membershipType === 'PINNED';
-          return (
-            <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" disabled={isMutating}>
-                    <MoreHorizontal className="h-4 w-4" />
-                    <span className="sr-only">Actions</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  {isPinned ? (
-                    <DropdownMenuItem
-                      onClick={(e) =>
-                        handleUnpin(row.original.id, e as unknown as React.MouseEvent)
-                      }
-                    >
-                      <PinOff className="mr-2 h-4 w-4" />
-                      Unpin
-                    </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem
-                      onClick={(e) => handlePin(row.original.id, e as unknown as React.MouseEvent)}
-                    >
-                      <Pin className="mr-2 h-4 w-4" />
-                      Pin to View
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={(e) =>
-                      handleExclude(row.original.id, e as unknown as React.MouseEvent)
-                    }
-                    destructive
-                  >
-                    <EyeOff className="mr-2 h-4 w-4" />
-                    Exclude
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          );
-        },
-        size: 60,
-        minSize: 60,
-        maxSize: 60,
-      },
+      ...(canRemoveFromView
+        ? [
+            {
+              id: 'actions',
+              header: 'Actions',
+              cell: ({ row }) => (
+                <RemoveViewTransactionButton
+                  transactionId={row.original.id}
+                  onRemove={handleRowRemove}
+                />
+              ),
+              size: 170,
+              minSize: 170,
+              maxSize: 170,
+            } satisfies ColumnDef<ViewTransactionTableRow>,
+          ]
+        : []),
     ],
-    [
-      displayCurrency,
-      exchangeRatesMap,
-      isExchangeRatesLoading,
-      isMutating,
-      handlePin,
-      handleUnpin,
-      handleExclude,
-    ],
+    [canRemoveFromView, handleRowRemove, isDisplayAmountLoading],
   );
 
   const handleSortingChange = useCallback((updater: Updater<SortingState>) => {
-    setSorting((currentSorting) =>
-      typeof updater === 'function' ? updater(currentSorting) : updater,
-    );
-    setPageIndex(0);
+    setSorting((currentSorting) => {
+      const requestedSorting = typeof updater === 'function' ? updater(currentSorting) : updater;
+      const amountSorting = requestedSorting.find((sort) => sort.id === 'amount');
+      const visibleSorting = requestedSorting.filter(
+        (sort) => sort.id !== 'amount' && sort.id !== 'amountAvailability',
+      );
+
+      return amountSorting
+        ? [{ id: 'amountAvailability', desc: false }, amountSorting, ...visibleSorting]
+        : visibleSorting;
+    });
+    setPagination((current) => ({ ...current, pageIndex: 0 }));
   }, []);
 
   const table = useReactTable({
-    data: tableRows,
+    data: rows,
     columns,
     state: {
       sorting,
-      pagination: {
-        pageIndex,
-        pageSize,
-      },
+      pagination,
       rowSelection,
+      columnVisibility: { amountAvailability: false },
     },
-    enableRowSelection: true,
+    enableRowSelection: canRemoveFromView,
     onRowSelectionChange: (updater) => {
-      const newSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
-      setRowSelection(newSelection);
-      if (selectAllMatching) {
-        setSelectAllMatching(false);
-      }
+      const nextSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
+      setRowSelection(nextSelection);
+      if (selectAllMatching) setSelectAllMatching(false);
     },
     getRowId: (row) => row.id.toString(),
     onSortingChange: handleSortingChange,
-    onPaginationChange: (updater) => {
-      const currentPagination = { pageIndex, pageSize };
-      const newPagination = typeof updater === 'function' ? updater(currentPagination) : updater;
-      setPageIndex(newPagination.pageIndex);
-    },
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    manualPagination: false,
-    autoResetPageIndex: false,
   });
-
-  const selectedTransactions = selectAllMatching
-    ? transactions
-    : table.getSelectedRowModel().rows.map((row) => row.original);
-  const selectedIds = selectedTransactions.map((transaction) => transaction.id);
-  const idsToUpdate = selectedIds;
-  const idsToPin = selectedTransactions
-    .filter((transaction) => transaction.membershipType !== 'PINNED')
-    .map((transaction) => transaction.id);
-  const modalSelectedIds = bulkAction === 'pin' ? idsToPin : idsToUpdate;
-
-  const handleClearSelection = useCallback(() => {
-    setRowSelection({});
-    setSelectAllMatching(false);
-  }, []);
-
-  const handleSelectAllMatching = useCallback(() => {
-    setSelectAllMatching(true);
-  }, []);
-
-  const handleBulkPin = useCallback(() => {
-    if (idsToPin.length === 0) return;
-    setBulkAction('pin');
-    setBulkModalOpen(true);
-  }, [idsToPin.length]);
-
-  const handleBulkExclude = useCallback(() => {
-    setBulkAction('exclude');
-    setBulkModalOpen(true);
-  }, []);
-
-  const handleBulkModalOpenChange = useCallback((open: boolean) => {
-    setBulkModalOpen(open);
-    if (!open) {
-      setBulkAction(null);
-    }
-  }, []);
-
-  const handleBulkSuccess = useCallback(() => {
-    setRowSelection({});
-    setSelectAllMatching(false);
-  }, []);
 
   const emptyMessage = hasActiveTransactionFilters(filters)
     ? 'No transactions match these filters.'
     : 'No transactions in this view.';
 
   return (
-    <>
-      {table.getIsAllPageRowsSelected() && transactions.length > pageSize && !selectAllMatching && (
-        <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
-          <span>
-            All {Math.min(pageSize, transactions.length)} transactions on this page are selected.
-          </span>
-          <button
-            type="button"
-            onClick={handleSelectAllMatching}
-            className="font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            Select all {transactions.length} transactions in this view
-          </button>
+    <div className="space-y-4">
+      <TransactionFilterBar
+        key={viewId}
+        filters={filters}
+        availableBankNames={availableBankNames}
+        availableAccountIds={availableAccountIds}
+        onSearchChange={onSearchChange}
+        onDateFilterChange={onDateFilterChange}
+        onBankNameFilterChange={onBankNameFilterChange}
+        onAccountIdFilterChange={onAccountIdFilterChange}
+        onTypeFilterChange={onTypeFilterChange}
+        onAmountFilterChange={onAmountFilterChange}
+        onClearAllFilters={onClearAllFilters}
+      />
+
+      {unavailableAmountFilterCount > 0 && (
+        <div className="rounded-md bg-warning/15 px-4 py-3 text-sm text-warning" role="status">
+          {unavailableAmountFilterCount}{' '}
+          {unavailableAmountFilterCount === 1 ? 'transaction was' : 'transactions were'} excluded
+          because conversion to {displayCurrency} is unavailable.
         </div>
       )}
 
-      {selectAllMatching && (
+      {canRemoveFromView &&
+        table.getIsAllPageRowsSelected() &&
+        transactions.length > pagination.pageSize &&
+        !selectAllMatching && (
+          <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
+            <span>
+              All {Math.min(pagination.pageSize, transactions.length)} transactions on this page are
+              selected.
+            </span>
+            <button
+              type="button"
+              onClick={handleSelectAllMatching}
+              className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Select all {transactions.length} transactions matching this filter
+            </button>
+          </div>
+        )}
+
+      {canRemoveFromView && selectAllMatching && (
         <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
-          <span>All {idsToUpdate.length} transactions in this view are selected.</span>
+          <span>All {transactions.length} transactions matching this filter are selected.</span>
           <button
             type="button"
             onClick={handleClearSelection}
-            className="font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
           >
             Clear selection
           </button>
@@ -560,17 +397,18 @@ function ViewTransactionTableContent({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isAmountFilterLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  Loading filtered amounts...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows.length > 0 ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   onClick={() => handleRowClick(row.original)}
-                  className={cn(
-                    'cursor-pointer border-b transition-colors hover:bg-muted/50',
-                    row.getIsSelected() && 'bg-muted',
-                    row.original.membershipType === 'PINNED' &&
-                      'border-l-2 border-l-primary bg-primary/5',
-                  )}
+                  className="cursor-pointer border-b transition-colors hover:bg-muted/50"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className={columnWidthClass(cell.column.getSize())}>
@@ -590,16 +428,12 @@ function ViewTransactionTableContent({
         </Table>
       </div>
 
-      {table.getRowModel().rows.length > 0 && (
+      {!isAmountFilterLoading && table.getRowModel().rows.length > 0 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
-            Showing{' '}
-            {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
-            {Math.min(
-              (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-              transactions.length,
-            )}{' '}
-            of {transactions.length} transactions
+            Showing {pagination.pageIndex * pagination.pageSize + 1} to{' '}
+            {Math.min((pagination.pageIndex + 1) * pagination.pageSize, transactions.length)} of{' '}
+            {transactions.length} transactions
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -642,25 +476,92 @@ function ViewTransactionTableContent({
         </div>
       )}
 
-      <BulkViewTransactionBar
-        selectedCount={idsToUpdate.length}
-        isPinDisabled={idsToPin.length === 0}
-        isVisible={idsToUpdate.length > 0}
+      <RemoveViewTransactionsBar
+        selectedCount={bulkRemovalIds.length}
+        onRemove={handleBulkRemove}
         onClearSelection={handleClearSelection}
-        onPin={handleBulkPin}
-        onExclude={handleBulkExclude}
+        isVisible={
+          canRemoveFromView &&
+          rowRemovalId === null &&
+          (selectedIds.length > 0 || selectAllMatching)
+        }
       />
 
-      {bulkAction && (
-        <BulkViewTransactionModal
+      {canRemoveFromView && (
+        <RemoveViewTransactionsModal
           viewId={viewId}
-          selectedIds={modalSelectedIds}
-          action={bulkAction}
-          isOpen={bulkModalOpen}
-          onOpenChange={handleBulkModalOpenChange}
-          onSuccess={handleBulkSuccess}
+          transactionIds={idsToRemove}
+          open={removeDialogOpen}
+          onOpenChange={handleRemoveDialogOpenChange}
+          onSuccess={handleRemoveSuccess}
         />
       )}
-    </>
+    </div>
+  );
+}
+
+function SelectPageRowsCheckbox({ table }: { table: ReactTable<ViewTransactionTableRow> }) {
+  const handleCheckedChange = useCallback(
+    (checked: boolean | 'indeterminate') => {
+      table.toggleAllPageRowsSelected(checked === true);
+    },
+    [table],
+  );
+  const checked = table.getIsAllPageRowsSelected()
+    ? true
+    : table.getIsSomePageRowsSelected()
+      ? 'indeterminate'
+      : false;
+
+  return (
+    <Checkbox
+      checked={checked}
+      onCheckedChange={handleCheckedChange}
+      aria-label="Select all transactions on this page"
+    />
+  );
+}
+
+function ViewRowSelectionCheckbox({ row }: { row: Row<ViewTransactionTableRow> }) {
+  const handleCheckedChange = useCallback(
+    (checked: boolean | 'indeterminate') => {
+      row.toggleSelected(checked === true);
+    },
+    [row],
+  );
+  const handleClick = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+  }, []);
+
+  return (
+    <Checkbox
+      checked={row.getIsSelected()}
+      onCheckedChange={handleCheckedChange}
+      onClick={handleClick}
+      aria-label={`Select transaction ${row.original.id}`}
+    />
+  );
+}
+
+function RemoveViewTransactionButton({
+  transactionId,
+  onRemove,
+}: {
+  transactionId: number;
+  onRemove: (transactionId: number) => void;
+}) {
+  const handleClick = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      onRemove(transactionId);
+    },
+    [onRemove, transactionId],
+  );
+
+  return (
+    <Button variant="ghost" size="sm" onClick={handleClick}>
+      <X className="mr-2 h-4 w-4" />
+      Remove from view
+    </Button>
   );
 }

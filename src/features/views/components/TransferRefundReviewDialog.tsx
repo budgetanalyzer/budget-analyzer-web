@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { CheckedState } from '@radix-ui/react-checkbox';
+import { ErrorBanner } from '@/components/ErrorBanner';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
 import {
@@ -10,10 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/Dialog';
-import { ErrorBanner } from '@/components/ErrorBanner';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
 import type { TransferRefundCandidate } from '@/features/views/types/transferRefundReview';
-import { useBulkExcludeTransactions } from '@/hooks/useViews';
+import { createRemoveViewTransactionsRequest, useUpdateViewTransactions } from '@/hooks/useViews';
 import { toast } from '@/hooks/useToast';
 import type { Transaction } from '@/types/transaction';
 import { formatCurrency } from '@/utils/currency';
@@ -33,7 +33,7 @@ interface TransferRefundReviewDialogProps {
 
 type CandidateSide = 'debit' | 'credit';
 
-const EXCLUSION_FAILURE_MESSAGE = 'Failed to exclude transactions';
+const REMOVE_FAILURE_MESSAGE = 'Failed to remove transactions from this view';
 
 export function TransferRefundReviewDialog({
   viewId,
@@ -45,22 +45,13 @@ export function TransferRefundReviewDialog({
   onClose,
   onComplete,
 }: TransferRefundReviewDialogProps) {
-  const { mutate: bulkExclude, isPending } = useBulkExcludeTransactions();
+  const { mutate: updateViewTransactions, isPending } = useUpdateViewTransactions();
   const [deselectedIds, setDeselectedIds] = useState<Set<number>>(() => new Set());
-
-  const completionCandidates = useMemo(
-    () => candidates.filter((candidate) => candidate.explicitlyExcludedTransactionIds.length > 0),
-    [candidates],
-  );
-  const newCandidates = useMemo(
-    () => candidates.filter((candidate) => candidate.explicitlyExcludedTransactionIds.length === 0),
-    [candidates],
-  );
 
   const eligibleIds = useMemo(
     () =>
       Array.from(
-        new Set(candidates.flatMap((candidate) => candidate.eligibleExclusionTransactionIds)),
+        new Set(candidates.flatMap((candidate) => candidate.eligibleRemovalTransactionIds)),
       ),
     [candidates],
   );
@@ -74,28 +65,21 @@ export function TransferRefundReviewDialog({
   const handleSelectionChange = useCallback((transactionId: number, selected: boolean) => {
     setDeselectedIds((currentIds) => {
       const nextIds = new Set(currentIds);
-      if (selected) {
-        nextIds.delete(transactionId);
-      } else {
-        nextIds.add(transactionId);
-      }
+      if (selected) nextIds.delete(transactionId);
+      else nextIds.add(transactionId);
       return nextIds;
     });
   }, []);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      if (!nextOpen && !isPending) {
-        onClose();
-      }
+      if (!nextOpen && !isPending) onClose();
     },
     [isPending, onClose],
   );
 
   const handleCancel = useCallback(() => {
-    if (!isPending) {
-      onClose();
-    }
+    if (!isPending) onClose();
   }, [isPending, onClose]);
 
   const handleRetry = useCallback(() => {
@@ -103,36 +87,27 @@ export function TransferRefundReviewDialog({
   }, [onRetry]);
 
   const handleConfirm = useCallback(() => {
-    if (selectedIds.length === 0 || isPending || isLoading || error) return;
+    if (!canConfirm) return;
 
-    bulkExclude(
-      { viewId, ids: selectedIds },
+    updateViewTransactions(
       {
-        onSuccess: ({ updatedCount, notFoundIds }) => {
-          const totalCount = selectedIds.length;
-
-          if (updatedCount === 0) {
-            toast.error(EXCLUSION_FAILURE_MESSAGE);
-            return;
-          }
-
-          if (notFoundIds.length > 0) {
-            toast.warning(
-              `Excluded ${updatedCount} of ${totalCount}. ${notFoundIds.length} not found or unavailable.`,
-            );
-          } else {
-            toast.success(`Excluded ${updatedCount} transaction${updatedCount !== 1 ? 's' : ''}`);
-          }
-
+        viewId,
+        request: createRemoveViewTransactionsRequest(selectedIds),
+      },
+      {
+        onSuccess: () => {
+          toast.success(
+            `Removed ${selectedIds.length} transaction${selectedIds.length !== 1 ? 's' : ''} from this view`,
+          );
           onClose();
           onComplete();
         },
         onError: (mutationError) => {
-          toast.error(formatApiError(mutationError, EXCLUSION_FAILURE_MESSAGE));
+          toast.error(formatApiError(mutationError, REMOVE_FAILURE_MESSAGE));
         },
       },
     );
-  }, [bulkExclude, error, isLoading, isPending, onClose, onComplete, selectedIds, viewId]);
+  }, [canConfirm, onClose, onComplete, selectedIds, updateViewTransactions, viewId]);
 
   return (
     <Dialog open onOpenChange={handleOpenChange}>
@@ -140,8 +115,8 @@ export function TransferRefundReviewDialog({
         <DialogHeader>
           <DialogTitle>Review possible transfers and refunds</DialogTitle>
           <DialogDescription>
-            Review related transactions for &ldquo;{viewName}&rdquo; and choose which ones to
-            exclude from this view. Nothing is excluded until you confirm.
+            Review related transactions for &ldquo;{viewName}&rdquo; and choose which current
+            members to remove from this view. Nothing is removed until you confirm.
           </DialogDescription>
         </DialogHeader>
 
@@ -156,31 +131,16 @@ export function TransferRefundReviewDialog({
             <div className="rounded-md border border-dashed p-6 text-center">
               <p className="font-medium">No possible transfers or refunds were found.</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                You can still manually exclude transactions from this view in the transaction table.
+                You can still manually remove transactions from this view in the transaction table.
               </p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {completionCandidates.length > 0 && (
-                <CandidateGroup
-                  title="Complete previous exclusions"
-                  description="A possible related transaction remains in this view while another transaction is already excluded. Review whether to exclude the remaining transaction."
-                  candidates={completionCandidates}
-                  selectedIds={selectedIdSet}
-                  isPending={isPending}
-                  onSelectionChange={handleSelectionChange}
-                />
-              )}
-              {newCandidates.length > 0 && (
-                <CandidateGroup
-                  title="New possible transfers and refunds"
-                  candidates={newCandidates}
-                  selectedIds={selectedIdSet}
-                  isPending={isPending}
-                  onSelectionChange={handleSelectionChange}
-                />
-              )}
-            </div>
+            <CandidateGroup
+              candidates={candidates}
+              selectedIds={selectedIdSet}
+              isPending={isPending}
+              onSelectionChange={handleSelectionChange}
+            />
           )}
         </div>
 
@@ -189,7 +149,7 @@ export function TransferRefundReviewDialog({
             Cancel
           </Button>
           <Button type="button" onClick={handleConfirm} disabled={!canConfirm}>
-            {isPending ? 'Excluding...' : `Exclude ${selectedIds.length} from this view`}
+            {isPending ? 'Removing...' : `Remove ${selectedIds.length} from this view`}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -198,8 +158,6 @@ export function TransferRefundReviewDialog({
 }
 
 interface CandidateGroupProps {
-  title: string;
-  description?: string;
   candidates: TransferRefundCandidate[];
   selectedIds: ReadonlySet<number>;
   isPending: boolean;
@@ -207,21 +165,16 @@ interface CandidateGroupProps {
 }
 
 function CandidateGroup({
-  title,
-  description,
   candidates,
   selectedIds,
   isPending,
   onSelectionChange,
 }: CandidateGroupProps) {
-  const headingId = `candidate-group-${title.toLowerCase().replace(/ /g, '-')}`;
-
   return (
-    <section aria-labelledby={headingId}>
-      <h2 id={headingId} className="text-base font-semibold">
-        {title}
+    <section aria-labelledby="possible-transfer-refund-candidates">
+      <h2 id="possible-transfer-refund-candidates" className="text-base font-semibold">
+        Possible transfers and refunds
       </h2>
-      {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       <div className="mt-3 space-y-4">
         {candidates.map((candidate) => (
           <CandidateReview
@@ -272,10 +225,7 @@ function CandidateReview({
           candidateKey={candidate.key}
           side="debit"
           transaction={candidate.debit}
-          isEligible={candidate.eligibleExclusionTransactionIds.includes(candidate.debit.id)}
-          isExplicitlyExcluded={candidate.explicitlyExcludedTransactionIds.includes(
-            candidate.debit.id,
-          )}
+          isEligible={candidate.eligibleRemovalTransactionIds.includes(candidate.debit.id)}
           isSelected={selectedIds.has(candidate.debit.id)}
           isPending={isPending}
           onSelectionChange={onSelectionChange}
@@ -284,10 +234,7 @@ function CandidateReview({
           candidateKey={candidate.key}
           side="credit"
           transaction={candidate.credit}
-          isEligible={candidate.eligibleExclusionTransactionIds.includes(candidate.credit.id)}
-          isExplicitlyExcluded={candidate.explicitlyExcludedTransactionIds.includes(
-            candidate.credit.id,
-          )}
+          isEligible={candidate.eligibleRemovalTransactionIds.includes(candidate.credit.id)}
           isSelected={selectedIds.has(candidate.credit.id)}
           isPending={isPending}
           onSelectionChange={onSelectionChange}
@@ -302,7 +249,6 @@ interface CandidateTransactionRowProps {
   side: CandidateSide;
   transaction: Transaction;
   isEligible: boolean;
-  isExplicitlyExcluded: boolean;
   isSelected: boolean;
   isPending: boolean;
   onSelectionChange: (transactionId: number, selected: boolean) => void;
@@ -313,14 +259,13 @@ function CandidateTransactionRow({
   side,
   transaction,
   isEligible,
-  isExplicitlyExcluded,
   isSelected,
   isPending,
   onSelectionChange,
 }: CandidateTransactionRowProps) {
   const checkboxId = `review-${candidateKey}-${side}-${transaction.id}`;
   const sideLabel = side === 'debit' ? 'Debit' : 'Credit';
-  const checkboxLabel = `Exclude ${sideLabel.toLowerCase()} transaction ${transaction.id} from this view`;
+  const checkboxLabel = `Remove ${sideLabel.toLowerCase()} transaction ${transaction.id} from this view`;
 
   const handleCheckedChange = useCallback(
     (checked: CheckedState) => {
@@ -361,14 +306,12 @@ function CandidateTransactionRow({
             aria-label={checkboxLabel}
           />
           <label htmlFor={checkboxId} className="text-sm leading-none">
-            Exclude this {sideLabel.toLowerCase()} from the view
+            Remove this {sideLabel.toLowerCase()} from this view
           </label>
         </div>
       ) : (
         <p className="border-t pt-3 text-sm font-medium text-muted-foreground">
-          {isExplicitlyExcluded
-            ? 'Previously excluded from this view'
-            : 'Not currently in this view'}
+          Not currently in this view; shown as supporting evidence
         </p>
       )}
     </div>

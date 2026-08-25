@@ -9,6 +9,7 @@ import { UserProfileDropdown } from '@/features/auth/components/UserProfileDropd
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { isAdmin } from '@/features/auth/utils/role';
 import { cn } from '@/utils/cn';
+import { PermissionGuard } from '@/features/auth/components/PermissionGuard';
 
 export function Layout() {
   const location = useLocation();
@@ -53,7 +54,9 @@ export function Layout() {
               >
                 Analytics
               </Link>
-              <ViewSelector />
+              <PermissionGuard permission="views:read" fallback={null}>
+                <ViewSelector />
+              </PermissionGuard>
             </nav>
           </div>
           <div className="flex items-center gap-2">

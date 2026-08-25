@@ -12,6 +12,7 @@ const emptyFilters: TransactionFilterValues = {
   accountIdFilter: null,
   typeFilter: null,
   amountFilter: { min: null, max: null },
+  amountCurrency: null,
 };
 
 function createProps(

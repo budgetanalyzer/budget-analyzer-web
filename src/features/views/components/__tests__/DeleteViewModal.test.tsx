@@ -4,7 +4,7 @@ import { Route, Routes, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DeleteViewModal } from '@/features/views/components/DeleteViewModal';
 import { renderWithProviders } from '@/testing/test-utils';
-import type { SavedView } from '@/types/view';
+import type { SavedViewMetadata } from '@/types/view';
 
 const hookMocks = vi.hoisted(() => ({
   deleteMutate: vi.fn(),
@@ -23,13 +23,9 @@ vi.mock('@/hooks/useViews', async (importOriginal) => {
   };
 });
 
-const view: SavedView = {
+const view: SavedViewMetadata = {
   id: 'view-1',
   name: 'Groceries',
-  criteria: {},
-  openEnded: false,
-  pinnedCount: 2,
-  excludedCount: 1,
   transactionCount: 12,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-02T00:00:00Z',
@@ -73,8 +69,8 @@ describe('DeleteViewModal', () => {
 
     expect(screen.getByRole('heading', { name: 'Delete View' })).toBeInTheDocument();
     expect(screen.getByText(/delete .*Groceries/)).toBeInTheDocument();
-    expect(screen.getByText('2 pinned transaction(s)')).toBeInTheDocument();
-    expect(screen.getByText('1 excluded transaction(s)')).toBeInTheDocument();
+    expect(screen.getByText(/12 transaction memberships/)).toBeInTheDocument();
+    expect(screen.getByText(/transactions will not be deleted/)).toBeInTheDocument();
   });
 
   it('closes and navigates home after a successful delete', async () => {

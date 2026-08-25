@@ -32,7 +32,7 @@ export type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 const DEFAULT_PAGE_SIZE: PageSize = 50;
 const DEFAULT_SORT: string[] = ['date,DESC', 'id,DESC'];
 
-// Whitelist matched to backend (GET /v1/transactions/search in docs/api/budget-analyzer-api.yaml)
+// Whitelist kept in sync with GET /v1/transactions/search in the generated API specification.
 export const SORTABLE_FIELDS = [
   'id',
   'ownerId',
@@ -82,8 +82,12 @@ function parseNumberParam(searchParams: URLSearchParams, key: string): number | 
   const value = searchParams.get(key);
   if (value === null || value === '') return undefined;
   const parsed = Number(value);
-  if (Number.isNaN(parsed)) return undefined;
-  return parsed;
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeCurrencyIsoCode(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toUpperCase();
+  return normalized || undefined;
 }
 
 function parseTypeParam(searchParams: URLSearchParams): TransactionType | undefined {
@@ -123,7 +127,9 @@ export function parseAdminTxnQuery(searchParams: URLSearchParams): TransactionSe
     dateTo: parseStringParam(searchParams, ADMIN_TXN_PARAMS.DATE_TO),
     minAmount: parseNumberParam(searchParams, ADMIN_TXN_PARAMS.MIN_AMOUNT),
     maxAmount: parseNumberParam(searchParams, ADMIN_TXN_PARAMS.MAX_AMOUNT),
-    currencyIsoCode: parseStringParam(searchParams, ADMIN_TXN_PARAMS.CURRENCY),
+    currencyIsoCode: normalizeCurrencyIsoCode(
+      parseStringParam(searchParams, ADMIN_TXN_PARAMS.CURRENCY),
+    ),
   };
 }
 
@@ -148,7 +154,11 @@ export function buildAdminTxnSearchParams(query: TransactionSearchQuery): URLSea
   appendIfDefined(params, ADMIN_TXN_PARAMS.DATE_TO, query.dateTo);
   appendIfDefined(params, ADMIN_TXN_PARAMS.MIN_AMOUNT, query.minAmount);
   appendIfDefined(params, ADMIN_TXN_PARAMS.MAX_AMOUNT, query.maxAmount);
-  appendIfDefined(params, ADMIN_TXN_PARAMS.CURRENCY, query.currencyIsoCode);
+  appendIfDefined(
+    params,
+    ADMIN_TXN_PARAMS.CURRENCY,
+    normalizeCurrencyIsoCode(query.currencyIsoCode),
+  );
 
   if (query.page > 0) {
     params.set(ADMIN_TXN_PARAMS.PAGE, String(query.page));

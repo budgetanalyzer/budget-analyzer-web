@@ -109,7 +109,8 @@ describe('AdminTransactionsPage', () => {
     await user.click(screen.getByRole('button', { name: /More filters/i }));
     await user.type(screen.getByPlaceholderText(/bank name/i), 'Chase');
     await user.type(screen.getByPlaceholderText(/account ID/i), 'checking-0001');
-    await user.type(screen.getByPlaceholderText('Min'), '10.5');
+    await user.type(screen.getByLabelText('Currency ISO code'), ' eur ');
+    await user.type(screen.getByPlaceholderText('Min'), '-10.5');
     await user.type(screen.getByPlaceholderText('Max'), '99.25');
     await user.click(screen.getByRole('button', { name: /^Search$/ }));
 
@@ -122,7 +123,8 @@ describe('AdminTransactionsPage', () => {
       expect(params.get('dateTo')).toBe('2026-01-31');
       expect(params.get('bank')).toBe('Chase');
       expect(params.get('account')).toBe('checking-0001');
-      expect(params.get('minAmount')).toBe('10.5');
+      expect(params.get('currency')).toBe('EUR');
+      expect(params.get('minAmount')).toBe('-10.5');
       expect(params.get('maxAmount')).toBe('99.25');
     });
 
@@ -132,7 +134,8 @@ describe('AdminTransactionsPage', () => {
       expect(latestRequestUrl?.searchParams.get('dateTo')).toBe('2026-01-31');
       expect(latestRequestUrl?.searchParams.get('bankName')).toBe('Chase');
       expect(latestRequestUrl?.searchParams.get('accountId')).toBe('checking-0001');
-      expect(latestRequestUrl?.searchParams.get('minAmount')).toBe('10.5');
+      expect(latestRequestUrl?.searchParams.get('currencyIsoCode')).toBe('EUR');
+      expect(latestRequestUrl?.searchParams.get('minAmount')).toBe('-10.5');
       expect(latestRequestUrl?.searchParams.get('maxAmount')).toBe('99.25');
     });
   });
@@ -148,21 +151,73 @@ describe('AdminTransactionsPage', () => {
     );
 
     renderPage(
-      '/admin/transactions?q=rent&bank=Chase&type=credit&minAmount=15&page=-3&size=999&sort=notAllowed,DESC',
+      '/admin/transactions?q=rent&bank=Chase&type=credit&currency=%20gbp%20&minAmount=-15&page=-3&size=999&sort=notAllowed,DESC',
     );
 
     expect(await screen.findByDisplayValue('rent')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Chase')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('15')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('GBP')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('-15')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Amount bounds and amount sorting compare raw stored numbers/i),
+    ).toBeInTheDocument();
 
     await waitFor(() => {
       expect(requestUrl?.searchParams.get('description')).toBe('rent');
       expect(requestUrl?.searchParams.get('bankName')).toBe('Chase');
       expect(requestUrl?.searchParams.get('type')).toBe('CREDIT');
-      expect(requestUrl?.searchParams.get('minAmount')).toBe('15');
+      expect(requestUrl?.searchParams.get('currencyIsoCode')).toBe('GBP');
+      expect(requestUrl?.searchParams.get('minAmount')).toBe('-15');
       expect(requestUrl?.searchParams.get('page')).toBe('0');
       expect(requestUrl?.searchParams.get('size')).toBe('50');
       expect(requestUrl?.searchParams.getAll('sort')).toEqual(['date,DESC', 'id,DESC']);
+    });
+  });
+
+  it('changes currency without clearing amount bounds and canonicalizes the URL', async () => {
+    const user = userEvent.setup();
+    let latestRequestUrl: URL | null = null;
+
+    server.use(
+      http.get('/api/v1/transactions/search', ({ request }) => {
+        latestRequestUrl = new URL(request.url);
+        return HttpResponse.json(createPage([groceryTransaction]));
+      }),
+    );
+
+    renderPage('/admin/transactions?currency=usd&minAmount=-10&maxAmount=25');
+    await screen.findByText('Grocery shopping');
+
+    const currency = screen.getByLabelText('Currency ISO code');
+    await user.clear(currency);
+    await user.type(currency, 'eur');
+    await user.click(screen.getByRole('button', { name: /^Search$/ }));
+
+    await waitFor(() => {
+      const params = new URLSearchParams(
+        screen.getByTestId('location').textContent?.split('?')[1] ?? '',
+      );
+      expect(params.get('currency')).toBe('EUR');
+      expect(params.get('minAmount')).toBe('-10');
+      expect(params.get('maxAmount')).toBe('25');
+      expect(latestRequestUrl?.searchParams.get('currencyIsoCode')).toBe('EUR');
+      expect(latestRequestUrl?.searchParams.get('minAmount')).toBe('-10');
+      expect(latestRequestUrl?.searchParams.get('maxAmount')).toBe('25');
+    });
+  });
+
+  it('clears currency and amount filters from a deep link', async () => {
+    const user = userEvent.setup();
+
+    renderPage('/admin/transactions?currency=EUR&minAmount=-10');
+    await screen.findByText('Grocery shopping');
+
+    await user.click(screen.getByRole('button', { name: /Clear all/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent('/admin/transactions');
+      expect(screen.getByLabelText('Currency ISO code')).toHaveValue('');
+      expect(screen.getByLabelText('Minimum amount')).toHaveValue(null);
     });
   });
 

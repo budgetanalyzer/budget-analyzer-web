@@ -6,40 +6,25 @@ import { ExchangeRateInfo } from '@/features/transactions/components/ExchangeRat
 import { expandVariants, expandTransition } from '@/lib/animations';
 import { formatCurrency } from '@/utils/currency';
 import { ArrowRightLeft, Banknote } from 'lucide-react';
-import { TransactionType } from '@/types/transaction';
-
-type ConversionInfo =
-  | {
-      needsConversion: false;
-    }
-  | {
-      needsConversion: true;
-      convertedAmount: number;
-      rate?: number;
-      rateDate?: string;
-      usedFallbackRate: boolean;
-      sourceCurrency: string;
-      targetCurrency: string;
-    };
+import type { TransactionType } from '@/types/transaction';
+import type { DisplayAmount } from '@/types/displayAmount';
 
 interface CurrencyConversionCardProps {
-  conversionInfo: ConversionInfo | null;
-  originalAmount: number;
+  displayAmount: DisplayAmount;
   transactionType: TransactionType;
 }
 
 export function CurrencyConversionCard({
-  conversionInfo,
-  originalAmount,
+  displayAmount,
   transactionType,
 }: CurrencyConversionCardProps) {
-  const getAmountColorClass = (type: TransactionType) => {
-    return type === 'CREDIT' ? 'text-green-600 dark:text-green-400' : 'text-foreground';
-  };
+  const needsConversion = displayAmount.sourceCurrency !== displayAmount.targetCurrency;
+  const amountColorClass =
+    transactionType === 'CREDIT' ? 'text-green-600 dark:text-green-400' : 'text-foreground';
 
   return (
     <AnimatePresence initial={false}>
-      {conversionInfo?.needsConversion && (
+      {needsConversion && (
         <motion.div
           key="currency-conversion"
           layout
@@ -56,14 +41,14 @@ export function CurrencyConversionCard({
                 <CardTitle>Currency Conversion</CardTitle>
               </div>
               <CardDescription>
-                Converted to {conversionInfo.targetCurrency} using the FRED daily spot rate
+                Selected-currency amount in {displayAmount.targetCurrency}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <IconLabel
                 icon={Banknote}
-                label="Original Transaction"
-                value={formatCurrency(originalAmount, conversionInfo.sourceCurrency)}
+                label="Native Amount"
+                value={`${formatCurrency(displayAmount.sourceMagnitude, displayAmount.sourceCurrency)} ${displayAmount.sourceCurrency}`}
                 valueClassName="text-xl font-semibold"
               />
 
@@ -71,23 +56,27 @@ export function CurrencyConversionCard({
                 <ArrowRightLeft className="h-5 w-5 text-primary mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-muted-foreground">
-                    Converted Amount ({conversionInfo.targetCurrency})
+                    Selected Amount ({displayAmount.targetCurrency})
                   </p>
-                  <p className={`text-2xl font-bold ${getAmountColorClass(transactionType)}`}>
-                    {formatCurrency(conversionInfo.convertedAmount, conversionInfo.targetCurrency)}
-                  </p>
+                  {displayAmount.available ? (
+                    <p className={`text-2xl font-bold ${amountColorClass}`}>
+                      {formatCurrency(displayAmount.value, displayAmount.targetCurrency)}
+                    </p>
+                  ) : (
+                    <p className="text-base font-semibold text-warning">
+                      Conversion to {displayAmount.targetCurrency} unavailable
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {conversionInfo.rate && (
-                <ExchangeRateInfo
-                  rate={conversionInfo.rate}
-                  sourceCurrency={conversionInfo.sourceCurrency}
-                  targetCurrency={conversionInfo.targetCurrency}
-                  rateDate={conversionInfo.rateDate}
-                  usedFallbackRate={conversionInfo.usedFallbackRate}
-                />
-              )}
+              {displayAmount.available &&
+                displayAmount.rateLegs.map((rateLeg) => (
+                  <ExchangeRateInfo
+                    key={`${rateLeg.kind}-${rateLeg.exchangeRate.targetCurrency}`}
+                    rateLeg={rateLeg}
+                  />
+                ))}
             </CardContent>
           </Card>
         </motion.div>

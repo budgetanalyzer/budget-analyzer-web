@@ -5,6 +5,7 @@ const routeMounts = vi.hoisted(() => ({
   dataHook: vi.fn(),
   layout: vi.fn(),
   transactions: vi.fn(),
+  views: vi.fn(),
 }));
 
 vi.mock('@/features/auth/hooks/useAuth');
@@ -57,6 +58,18 @@ vi.mock('@/features/admin/transactions/pages/AdminTransactionsPage', () => ({
 vi.mock('@/features/statement-formats/pages/StatementFormatManagementPage', () => ({
   StatementFormatManagementPage: () => 'statement format management page',
 }));
+vi.mock('@/features/views/pages/ViewsPage', () => ({
+  ViewsPage: () => {
+    routeMounts.views();
+    return 'views page';
+  },
+}));
+vi.mock('@/features/views/pages/ViewPage', () => ({
+  ViewPage: () => {
+    routeMounts.views();
+    return 'view detail page';
+  },
+}));
 vi.mock('@/features/admin/components/UnauthorizedPage', () => ({
   UnauthorizedPage: () => 'unauthorized route',
 }));
@@ -105,6 +118,18 @@ function mockAdminAuth() {
   });
 }
 
+function mockRegularAuth() {
+  mockUseAuth.mockReturnValue({
+    user: regularUser,
+    error: null,
+    isLoading: false,
+    isAuthenticated: true,
+    login: vi.fn(),
+    logout: vi.fn(),
+    refetch: vi.fn(),
+  });
+}
+
 describe('App route authorization', () => {
   beforeEach(() => {
     mockUseAuth.mockReset();
@@ -113,6 +138,7 @@ describe('App route authorization', () => {
     routeMounts.dataHook.mockReset();
     routeMounts.layout.mockReset();
     routeMounts.transactions.mockReset();
+    routeMounts.views.mockReset();
     mockAdminAuth();
   });
 
@@ -153,21 +179,39 @@ describe('App route authorization', () => {
   });
 
   it('uses the read permission for the user statement format management route', async () => {
-    mockUseAuth.mockReturnValue({
-      user: regularUser,
-      error: null,
-      isLoading: false,
-      isAuthenticated: true,
-      login: vi.fn(),
-      logout: vi.fn(),
-      refetch: vi.fn(),
-    });
+    mockRegularAuth();
     mockUsePermission.mockImplementation((permission) => permission === 'statementformats:read');
 
     renderApp('/statement-formats');
 
     expect(await screen.findByText('statement format management page')).toBeInTheDocument();
     expect(mockUsePermission).toHaveBeenCalledWith('statementformats:read');
+  });
+
+  it.each(['/views', '/views/view-1'])(
+    'gates saved-view route %s with views:read',
+    async (path) => {
+      mockRegularAuth();
+      mockUsePermission.mockImplementation((permission) => permission === 'views:read');
+
+      renderApp(path);
+
+      expect(
+        await screen.findByText(path === '/views' ? 'views page' : 'view detail page'),
+      ).toBeInTheDocument();
+      expect(mockUsePermission).toHaveBeenCalledWith('views:read');
+      expect(routeMounts.views).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('does not mount a denied saved-view route', async () => {
+    mockRegularAuth();
+    mockUsePermission.mockReturnValue(false);
+
+    renderApp('/views/view-1');
+
+    expect(await screen.findByText('unauthorized route')).toBeInTheDocument();
+    expect(routeMounts.views).not.toHaveBeenCalled();
   });
 
   it('keeps non-admin authenticated users out of the admin route tree', async () => {

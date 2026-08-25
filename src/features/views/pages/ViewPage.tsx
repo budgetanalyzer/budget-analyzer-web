@@ -1,65 +1,83 @@
-// src/features/views/pages/ViewPage.tsx
-import { useMemo, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { motion, LayoutGroup, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Hash, Pin, Calendar, Eye, BarChart3, Search } from 'lucide-react';
-import { useView, useViewMembership, useViewTransactions } from '@/hooks/useViews';
-import { useTransactions } from '@/hooks/useTransactions';
-import { useExchangeRatesMap } from '@/hooks/useCurrencies';
-import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
-import { useAppSelector } from '@/store/hooks';
-import { useTransactionStats } from '@/features/transactions/hooks/useTransactionStats';
-import { PageHeader } from '@/components/PageHeader';
-import { Card, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
+import { ArrowLeft, BarChart3, Calendar, Hash, Plus, Search } from 'lucide-react';
+import { Link, useLocation, useParams } from 'react-router';
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { MessageBanner } from '@/components/MessageBanner';
 import { MissingExchangeRatesBanner } from '@/components/MissingExchangeRatesBanner';
-import { ViewCriteriaSummary } from '@/features/views/components/ViewCriteriaSummary';
-import { ViewTransactionTable } from '@/features/views/components/ViewTransactionTable';
-import { ViewSettingsMenu } from '@/features/views/components/ViewSettingsMenu';
-import { EditViewModal } from '@/features/views/components/EditViewModal';
-import { DeleteViewModal } from '@/features/views/components/DeleteViewModal';
-import { RestoreExcludedTransactionsModal } from '@/features/views/components/RestoreExcludedTransactionsModal';
-import { TransferRefundReviewDialog } from '@/features/views/components/TransferRefundReviewDialog';
-import { useTransactionFiltersSync } from '@/hooks/useTransactionFiltersSync';
+import { PageHeader } from '@/components/PageHeader';
+import { SaveAsViewButton } from '@/components/SaveAsViewButton';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
+import { buildAnalyticsReturnUrl } from '@/features/analytics/utils/urlState';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 import { TransactionStatsGrid } from '@/features/transactions/components/TransactionStatsGrid';
-import { StatCardConfig } from '@/features/transactions/components/TransactionStatsGrid';
+import type { StatCardConfig } from '@/features/transactions/components/TransactionStatsGrid';
+import { useTransactionStats } from '@/features/transactions/hooks/useTransactionStats';
+import { DeleteViewModal } from '@/features/views/components/DeleteViewModal';
+import { EditViewModal } from '@/features/views/components/EditViewModal';
+import { TransferRefundReviewDialog } from '@/features/views/components/TransferRefundReviewDialog';
+import { ViewSettingsMenu } from '@/features/views/components/ViewSettingsMenu';
+import { ViewTransactionTable } from '@/features/views/components/ViewTransactionTable';
+import { findTransferRefundCandidates } from '@/features/views/utils/findTransferRefundCandidates';
+import { useCurrencies, useExchangeRatesMap } from '@/hooks/useCurrencies';
+import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
+import { useTransactionFiltersSync } from '@/hooks/useTransactionFiltersSync';
+import { useView, useViewTransactions } from '@/hooks/useViews';
 import { fadeInVariants, layoutTransition } from '@/lib/animations';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { setDisplayCurrency } from '@/store/uiSlice';
 import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate, getDateRange } from '@/utils/dates';
-import { filterTransactions } from '@/utils/transactionFilters';
-import { buildAnalyticsReturnUrl } from '@/features/analytics/utils/urlState';
-import { findTransferRefundCandidates } from '@/features/views/utils/findTransferRefundCandidates';
+import { projectDisplayAmount } from '@/utils/displayAmount';
+import { filterTransactionsByDisplayAmount } from '@/utils/transactionFilters';
+import { buildAddTransactionsModeUrl } from '@/utils/addTransactionsMode';
+
+function describeViewAmountTotal(
+  baseDescription: string,
+  availableAmountCount: number,
+  unavailableAmountCount: number,
+): string {
+  if (availableAmountCount === 0 && unavailableAmountCount > 0) {
+    return `Conversion unavailable for all ${unavailableAmountCount} transactions`;
+  }
+  if (unavailableAmountCount > 0) {
+    return `${baseDescription} · Partial; ${unavailableAmountCount} unavailable`;
+  }
+  return baseDescription;
+}
 
 export function ViewPage() {
   const { id } = useParams<{ id: string }>();
-
   return <ViewPageContent key={id} id={id!} />;
 }
 
 function ViewPageContent({ id }: { id: string }) {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const dispatch = useAppDispatch();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
-
-  // Modal state
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const canClone = usePermission('views:write');
+  const canAddTransactions = usePermission('views:write');
+  const canRename = usePermission('views:write');
+  const canDelete = usePermission('views:delete');
+  const canReviewTransfersAndRefunds = usePermission('views:write');
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [isTransferRefundReviewOpen, setIsTransferRefundReviewOpen] = useState(false);
 
-  const handleEditClick = useCallback(() => setIsEditModalOpen(true), []);
+  const handleRenameClick = useCallback(() => setIsRenameModalOpen(true), []);
   const handleDeleteClick = useCallback(() => setIsDeleteModalOpen(true), []);
-  const handleRestoreClick = useCallback(() => setIsRestoreModalOpen(true), []);
-  const handleTransferRefundReviewOpen = useCallback(() => setIsTransferRefundReviewOpen(true), []);
-  const handleEditClose = useCallback(() => setIsEditModalOpen(false), []);
+  const handleRenameClose = useCallback(() => setIsRenameModalOpen(false), []);
   const handleDeleteClose = useCallback(() => setIsDeleteModalOpen(false), []);
-  const handleRestoreClose = useCallback(() => setIsRestoreModalOpen(false), []);
-  const handleTransferRefundReviewClose = useCallback(
-    () => setIsTransferRefundReviewOpen(false),
-    [],
-  );
+  const handleTransferRefundReviewOpen = useCallback(() => {
+    setIsTransferRefundReviewOpen(true);
+  }, []);
+  const handleTransferRefundReviewClose = useCallback(() => {
+    setIsTransferRefundReviewOpen(false);
+  }, []);
 
   const {
     filters,
@@ -70,139 +88,142 @@ function ViewPageContent({ id }: { id: string }) {
     handleTypeFilterChange,
     handleAmountFilterChange,
     clearAllFilters,
-  } = useTransactionFiltersSync();
+  } = useTransactionFiltersSync(displayCurrency);
+  const { amountFilter, amountCurrency } = filters;
 
-  const handleRefreshExchangeRates = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
-    queryClient.invalidateQueries({ queryKey: ['currencies'] });
-  }, [queryClient]);
-
-  // Fetch view metadata and transactions
   const {
     data: view,
     isLoading: isViewLoading,
     error: viewError,
     refetch: refetchView,
   } = useView(id);
-
   const {
     data: transactions,
+    allTransactions,
+    memberTransactionIds,
+    missingTransactionIds,
     isLoading: isTransactionsLoading,
     error: transactionsError,
     refetch: refetchTransactions,
   } = useViewTransactions(id);
-
-  const {
-    data: membership,
-    isLoading: isMembershipLoading,
-    error: membershipError,
-    refetch: refetchMembership,
-  } = useViewMembership(id);
-
-  const {
-    data: allTransactions,
-    isLoading: isAllTransactionsLoading,
-    error: allTransactionsError,
-    refetch: refetchAllTransactions,
-  } = useTransactions();
-
-  const handleRetry = useCallback(() => {
-    refetchView();
-    refetchTransactions();
-  }, [refetchTransactions, refetchView]);
-
-  // Fetch exchange rates for currency conversion
+  const { data: enabledCurrencies, isLoading: isCurrenciesLoading } = useCurrencies(true);
   const {
     exchangeRatesMap,
     pendingCurrencies,
     isLoading: isExchangeRatesLoading,
     error: exchangeRatesError,
-  } = useExchangeRatesMap({
-    displayCurrency,
-  });
+  } = useExchangeRatesMap({ displayCurrency });
 
-  const isTransferRefundDiscoveryLoading =
-    isAllTransactionsLoading || isExchangeRatesLoading || isMembershipLoading;
-  const transferRefundDiscoveryError =
-    allTransactionsError || exchangeRatesError || membershipError || null;
-
+  const transferRefundDiscoveryError = transactionsError || exchangeRatesError || null;
   const transferRefundCandidates = useMemo(() => {
     if (
       !isTransferRefundReviewOpen ||
-      isTransferRefundDiscoveryLoading ||
-      transferRefundDiscoveryError ||
-      !membership
+      isTransactionsLoading ||
+      isExchangeRatesLoading ||
+      transferRefundDiscoveryError
     ) {
       return [];
     }
 
     return findTransferRefundCandidates(
       allTransactions ?? [],
-      transactions ?? [],
+      new Set(memberTransactionIds),
       exchangeRatesMap,
-      membership.excluded,
     );
   }, [
     allTransactions,
     exchangeRatesMap,
-    isTransferRefundDiscoveryLoading,
+    isExchangeRatesLoading,
+    isTransactionsLoading,
     isTransferRefundReviewOpen,
-    membership,
-    transactions,
+    memberTransactionIds,
     transferRefundDiscoveryError,
   ]);
 
-  const handleTransferRefundDiscoveryRetry = useCallback(() => {
-    refetchAllTransactions();
-    refetchMembership();
-    queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
-  }, [queryClient, refetchAllTransactions, refetchMembership]);
+  const hasAmountFilter = amountFilter.min !== null || amountFilter.max !== null;
+  const enabledCurrencyCodes = useMemo(() => {
+    const codes = new Set(['USD']);
+    enabledCurrencies?.forEach((currency) => codes.add(currency.currencyCode));
+    return codes;
+  }, [enabledCurrencies]);
+  const isAmountCurrencyValidationPending = hasAmountFilter && isCurrenciesLoading;
+  const isAmountCurrencyInvalid =
+    hasAmountFilter &&
+    !isAmountCurrencyValidationPending &&
+    (!amountCurrency ||
+      !/^[A-Z]{3}$/.test(amountCurrency) ||
+      !enabledCurrencyCodes.has(amountCurrency));
+  const isAmountCurrencySyncing =
+    hasAmountFilter &&
+    !isAmountCurrencyValidationPending &&
+    !isAmountCurrencyInvalid &&
+    amountCurrency !== displayCurrency;
 
-  const disabledCurrencies = useMissingCurrencies();
+  useEffect(() => {
+    if (isAmountCurrencySyncing && amountCurrency) {
+      dispatch(setDisplayCurrency(amountCurrency));
+    }
+  }, [amountCurrency, dispatch, isAmountCurrencySyncing]);
 
-  const availableBankNames = useMemo(() => {
-    if (!transactions) return [];
-    return [...new Set(transactions.map((transaction) => transaction.bankName))].sort();
-  }, [transactions]);
+  const isAmountFilterLoading =
+    hasAmountFilter &&
+    !isAmountCurrencyInvalid &&
+    (isAmountCurrencyValidationPending || isAmountCurrencySyncing || isExchangeRatesLoading);
+  const isDisplayAmountLoading =
+    isExchangeRatesLoading || isAmountCurrencyValidationPending || isAmountCurrencySyncing;
 
-  const availableAccountIds = useMemo(() => {
-    if (!transactions) return [];
-    return [
-      ...new Set(
-        transactions.map((transaction) => transaction.accountId).filter(Boolean) as string[],
+  const displayAmounts = useMemo(
+    () =>
+      new Map(
+        (transactions ?? []).map((transaction) => [
+          transaction.id,
+          projectDisplayAmount(transaction, displayCurrency, exchangeRatesMap),
+        ]),
       ),
-    ].sort();
-  }, [transactions]);
-
-  const filteredTransactions = useMemo(
-    () => filterTransactions(transactions ?? [], filters),
-    [filters, transactions],
+    [displayCurrency, exchangeRatesMap, transactions],
   );
 
-  // Calculate stats with proper currency conversion
+  const filterResult = useMemo(() => {
+    const effectiveFilters =
+      isAmountCurrencyInvalid || isAmountFilterLoading
+        ? { ...filters, amountFilter: { min: null, max: null } }
+        : filters;
+
+    return filterTransactionsByDisplayAmount(transactions ?? [], effectiveFilters, displayAmounts);
+  }, [displayAmounts, filters, isAmountCurrencyInvalid, isAmountFilterLoading, transactions]);
+  const filteredTransactions = filterResult.transactions;
+  const visibleTransactionIds = useMemo(
+    () => filteredTransactions.map((transaction) => transaction.id),
+    [filteredTransactions],
+  );
+
+  const availableBankNames = useMemo(
+    () => [...new Set((transactions ?? []).map((transaction) => transaction.bankName))].sort(),
+    [transactions],
+  );
+  const availableAccountIds = useMemo(
+    () =>
+      [
+        ...new Set(
+          (transactions ?? [])
+            .map((transaction) => transaction.accountId)
+            .filter(Boolean) as string[],
+        ),
+      ].sort(),
+    [transactions],
+  );
+
   const { stats: transactionStats } = useTransactionStats({
     transactions: filteredTransactions,
-    displayCurrency,
-    exchangeRatesMap,
+    displayAmounts,
   });
-
   const stats = useMemo<StatCardConfig[]>(() => {
-    if (!transactions || !view) return [];
-
-    const pinnedTransactions = filteredTransactions.filter(
-      (t) => t.membershipType === 'PINNED',
-    ).length;
-
-    // Calculate date range
-    const dateRange = getDateRange(filteredTransactions.map((t) => t.date));
-    let dateRangeDescription = 'No transactions';
-    if (dateRange) {
-      if (dateRange.earliest === dateRange.latest) {
-        dateRangeDescription = formatLocalDate(dateRange.earliest);
-      } else {
-        dateRangeDescription = `${formatLocalDate(dateRange.earliest)} - ${formatLocalDate(dateRange.latest)}`;
-      }
-    }
+    const dateRange = getDateRange(filteredTransactions.map((transaction) => transaction.date));
+    const dateRangeDescription = dateRange
+      ? dateRange.earliest === dateRange.latest
+        ? formatLocalDate(dateRange.earliest)
+        : `${formatLocalDate(dateRange.earliest)} - ${formatLocalDate(dateRange.latest)}`
+      : 'No transactions';
 
     return [
       {
@@ -213,31 +234,55 @@ function ViewPageContent({ id }: { id: string }) {
         iconClassName: 'text-blue-500',
       },
       {
-        title: 'Pinned',
-        value: pinnedTransactions.toString(),
-        description: 'Manually pinned to view',
-        icon: Pin,
-        iconClassName: 'text-primary',
-      },
-      {
         title: 'Total Spend',
-        value: formatCurrency(transactionStats.totalDebits, displayCurrency),
-        description: 'Sum of debits',
+        value:
+          transactionStats.totalDebits === null
+            ? 'Unavailable'
+            : formatCurrency(transactionStats.totalDebits, displayCurrency),
+        description: describeViewAmountTotal(
+          'Sum of visible debits',
+          transactionStats.availableDebitAmountCount,
+          transactionStats.unavailableDebitAmountCount,
+        ),
         icon: Calendar,
         iconClassName: 'text-red-500',
         valueClassName: 'text-red-600 dark:text-red-400',
       },
       {
         title: 'Total Income',
-        value: formatCurrency(transactionStats.totalCredits, displayCurrency),
-        description: 'Sum of credits',
+        value:
+          transactionStats.totalCredits === null
+            ? 'Unavailable'
+            : formatCurrency(transactionStats.totalCredits, displayCurrency),
+        description: describeViewAmountTotal(
+          'Sum of visible credits',
+          transactionStats.availableCreditAmountCount,
+          transactionStats.unavailableCreditAmountCount,
+        ),
         icon: Calendar,
         iconClassName: 'text-green-500',
         valueClassName: 'text-green-600 dark:text-green-400',
       },
     ];
-  }, [transactions, view, filteredTransactions, displayCurrency, transactionStats]);
+  }, [displayCurrency, filteredTransactions, transactionStats]);
 
+  const handleRetry = useCallback(() => {
+    refetchView();
+    refetchTransactions();
+  }, [refetchTransactions, refetchView]);
+  const handleRefreshExchangeRates = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
+    queryClient.invalidateQueries({ queryKey: ['currencies'] });
+  }, [queryClient]);
+  const handleTransferRefundDiscoveryRetry = useCallback(() => {
+    refetchTransactions();
+    queryClient.invalidateQueries({ queryKey: ['exchangeRates'] });
+  }, [queryClient, refetchTransactions]);
+  const handleClearInvalidAmountFilter = useCallback(() => {
+    handleAmountFilterChange(null, null);
+  }, [handleAmountFilterChange]);
+
+  const disabledCurrencies = useMissingCurrencies();
   const isLoading = isViewLoading || isTransactionsLoading;
   const error = viewError || transactionsError;
 
@@ -250,14 +295,12 @@ function ViewPageContent({ id }: { id: string }) {
   }
 
   if (error) {
-    // Handle 404 specifically with a better message
-    const is404 = error.status === 404;
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
         <div className="w-full max-w-md">
           <ErrorBanner error={error} onRetry={handleRetry} />
         </div>
-        {is404 && (
+        {error.status === 404 && (
           <Link to="/">
             <Button variant="outline">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -269,9 +312,7 @@ function ViewPageContent({ id }: { id: string }) {
     );
   }
 
-  if (!view || !transactions) {
-    return null;
-  }
+  if (!view || !transactions) return null;
 
   const analyzeViewUrl = buildAnalyticsReturnUrl({
     scope: 'view',
@@ -279,18 +320,42 @@ function ViewPageContent({ id }: { id: string }) {
     viewMode: 'monthly',
     transactionType: 'debit',
   });
+  const returnTo = `${location.pathname}${location.search}${location.hash}`;
+  const addTransactionsUrl = buildAddTransactionsModeUrl({
+    viewId: view.id,
+    returnTo,
+    sourceSearchParams: new URLSearchParams(location.search),
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={view.name}
-        description={`${transactions.length} transactions`}
+        description={`${view.transactionCount} transactions`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={handleTransferRefundReviewOpen}>
-              <Search className="mr-2 h-4 w-4" />
-              Find Transfers &amp; Refunds
-            </Button>
+            {canAddTransactions && addTransactionsUrl && (
+              <Link
+                to={addTransactionsUrl}
+                className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add transactions
+              </Link>
+            )}
+            {canClone && (
+              <SaveAsViewButton
+                transactionIds={visibleTransactionIds}
+                isTransactionIdsReady={!isAmountFilterLoading}
+                label="Clone View"
+              />
+            )}
+            {canReviewTransfersAndRefunds && (
+              <Button variant="outline" onClick={handleTransferRefundReviewOpen}>
+                <Search className="mr-2 h-4 w-4" />
+                Find Transfers &amp; Refunds
+              </Button>
+            )}
             <Link
               to={analyzeViewUrl}
               className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -298,17 +363,7 @@ function ViewPageContent({ id }: { id: string }) {
               <BarChart3 className="mr-2 h-4 w-4" />
               Analyze View
             </Link>
-            {view.excludedCount > 0 && (
-              <Button variant="outline" onClick={handleRestoreClick}>
-                <Eye className="mr-2 h-4 w-4" />
-                Restore Excluded
-              </Button>
-            )}
-            <ViewSettingsMenu
-              view={view}
-              onEditClick={handleEditClick}
-              onDeleteClick={handleDeleteClick}
-            />
+            <ViewSettingsMenu onRenameClick={handleRenameClick} onDeleteClick={handleDeleteClick} />
           </div>
         }
       />
@@ -322,34 +377,28 @@ function ViewPageContent({ id }: { id: string }) {
             isRefreshing={isExchangeRatesLoading}
           />
         )}
+        {isAmountCurrencyInvalid && (
+          <MessageBanner
+            type="warning"
+            message="Amount filter ignored because its currency is invalid or disabled. Clear it and enter a new range."
+            onClose={handleClearInvalidAmountFilter}
+          />
+        )}
       </AnimatePresence>
 
-      {/* Criteria Summary */}
-      <motion.div
-        variants={fadeInVariants}
-        initial="initial"
-        animate="animate"
-        transition={layoutTransition}
-      >
-        <Card>
-          <CardContent className="py-4">
-            <ViewCriteriaSummary
-              criteria={view.criteria}
-              excludedCount={view.excludedCount}
-              openEnded={view.openEnded}
-              onRestoreExcludedClick={handleRestoreClick}
-            />
-          </CardContent>
-        </Card>
-      </motion.div>
+      {missingTransactionIds.length > 0 && (
+        <div className="rounded-md bg-warning/15 px-4 py-3 text-sm text-warning" role="status">
+          {missingTransactionIds.length}{' '}
+          {missingTransactionIds.length === 1 ? 'membership is' : 'memberships are'} not available
+          in the current transaction snapshot.
+        </div>
+      )}
 
       <LayoutGroup>
-        {/* Stats Grid */}
         <motion.div layout transition={layoutTransition}>
-          <TransactionStatsGrid stats={stats} isLoading={isExchangeRatesLoading} />
+          <TransactionStatsGrid stats={stats} isLoading={isDisplayAmountLoading} />
         </motion.div>
 
-        {/* Transactions Table */}
         <motion.div
           layout
           variants={fadeInVariants}
@@ -373,34 +422,32 @@ function ViewPageContent({ id }: { id: string }) {
                 onAmountFilterChange={handleAmountFilterChange}
                 onClearAllFilters={clearAllFilters}
                 displayCurrency={displayCurrency}
-                exchangeRatesMap={exchangeRatesMap}
-                isExchangeRatesLoading={isExchangeRatesLoading}
+                displayAmounts={displayAmounts}
+                isDisplayAmountLoading={isDisplayAmountLoading}
+                isAmountFilterLoading={isAmountFilterLoading}
+                unavailableAmountFilterCount={
+                  hasAmountFilter && !isAmountFilterLoading && !isAmountCurrencyInvalid
+                    ? filterResult.unavailableAmountCount
+                    : 0
+                }
               />
             </CardContent>
           </Card>
         </motion.div>
       </LayoutGroup>
 
-      {/* Edit View Modal */}
-      <EditViewModal open={isEditModalOpen} onClose={handleEditClose} view={view} />
-
-      {/* Delete View Modal */}
-      <DeleteViewModal open={isDeleteModalOpen} onClose={handleDeleteClose} view={view} />
-
-      {view.excludedCount > 0 && isRestoreModalOpen && (
-        <RestoreExcludedTransactionsModal
-          open={isRestoreModalOpen}
-          onClose={handleRestoreClose}
-          view={view}
-        />
+      {canRename && isRenameModalOpen && (
+        <EditViewModal open onClose={handleRenameClose} view={view} />
       )}
-
-      {isTransferRefundReviewOpen && (
+      {canDelete && isDeleteModalOpen && (
+        <DeleteViewModal open onClose={handleDeleteClose} view={view} />
+      )}
+      {canReviewTransfersAndRefunds && isTransferRefundReviewOpen && (
         <TransferRefundReviewDialog
           viewId={view.id}
           viewName={view.name}
           candidates={transferRefundCandidates}
-          isLoading={isTransferRefundDiscoveryLoading}
+          isLoading={isTransactionsLoading || isExchangeRatesLoading}
           error={transferRefundDiscoveryError}
           onRetry={handleTransferRefundDiscoveryRetry}
           onClose={handleTransferRefundReviewClose}

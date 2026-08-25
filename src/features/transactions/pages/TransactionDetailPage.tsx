@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate } from '@/utils/dates';
+import { projectDisplayAmount } from '@/utils/displayAmount';
 import {
   Calendar,
   Banknote,
@@ -31,7 +32,6 @@ import {
   X,
 } from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';
-import { convertCurrency, findNearestExchangeRate } from '@/utils/currency';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { toast } from '@/hooks/useToast';
 import { formatApiError } from '@/utils/errorMessages';
@@ -56,49 +56,9 @@ export function TransactionDetailPage() {
     displayCurrency,
   });
 
-  // Calculate conversion info
-  const conversionInfo = useMemo(() => {
+  const displayAmount = useMemo(() => {
     if (!transaction) return null;
-
-    const sourceCurrency = transaction.currencyIsoCode;
-    const needsConversion = sourceCurrency !== displayCurrency;
-
-    if (!needsConversion) {
-      return { needsConversion: false as const };
-    }
-
-    const convertedAmount = convertCurrency(
-      transaction.amount,
-      transaction.date,
-      sourceCurrency,
-      displayCurrency,
-      exchangeRatesMap,
-    );
-
-    // Determine which currency rate to display to the user
-    // For X->USD conversions, show the source currency rate
-    // For all other conversions (USD->X or X->Y), show the target currency rate
-    const currencyToLookup = displayCurrency === 'USD' ? sourceCurrency : displayCurrency;
-
-    // Get the full exchange rate response from the map (or nearest available)
-    const exchangeRateResponse = findNearestExchangeRate(
-      transaction.date,
-      currencyToLookup,
-      exchangeRatesMap,
-    );
-
-    // State 3: Missing rate - we had to use a rate from a completely different date
-    const usedFallbackRate = exchangeRateResponse?.date !== transaction.date;
-
-    return {
-      needsConversion: true as const,
-      convertedAmount,
-      rate: exchangeRateResponse?.rate,
-      rateDate: exchangeRateResponse?.date,
-      usedFallbackRate,
-      sourceCurrency,
-      targetCurrency: displayCurrency,
-    };
+    return projectDisplayAmount(transaction, displayCurrency, exchangeRatesMap);
   }, [transaction, displayCurrency, exchangeRatesMap]);
 
   const handleStartEdit = useCallback(() => {
@@ -267,7 +227,11 @@ export function TransactionDetailPage() {
                         : 'text-foreground'
                     }`}
                   >
-                    {formatCurrency(transaction.amount, transaction.currencyIsoCode)}
+                    {formatCurrency(
+                      displayAmount?.sourceMagnitude ?? Math.abs(transaction.amount),
+                      transaction.currencyIsoCode,
+                    )}{' '}
+                    {transaction.currencyIsoCode}
                   </p>
                 </div>
                 <Badge variant={transaction.type === 'CREDIT' ? 'success' : 'secondary'}>
@@ -355,13 +319,13 @@ export function TransactionDetailPage() {
         </motion.div>
       </div>
 
-      {/* Currency Conversion Card - Only show if conversion is needed */}
       <LayoutGroup>
-        <CurrencyConversionCard
-          conversionInfo={conversionInfo}
-          originalAmount={transaction.amount}
-          transactionType={transaction.type}
-        />
+        {displayAmount && (
+          <CurrencyConversionCard
+            displayAmount={displayAmount}
+            transactionType={transaction.type}
+          />
+        )}
 
         <motion.div
           layout
@@ -379,10 +343,9 @@ export function TransactionDetailPage() {
 
       <DeleteTransactionModal
         transaction={transaction}
+        displayAmount={displayAmount}
         isOpen={deleteDialogOpen}
         onOpenChange={handleDeleteDialogOpenChange}
-        displayCurrency={displayCurrency}
-        exchangeRatesMap={exchangeRatesMap}
         onDeleted={handleDeleted}
       />
     </motion.div>

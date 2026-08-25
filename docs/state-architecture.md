@@ -33,6 +33,11 @@ Examples include:
   saved-view metadata and canonical membership; and
 - admin query hooks for paginated user and cross-user transaction searches.
 
+Static membership and the complete active current-user transaction snapshot are
+separate server-state resources. Saved-view transaction objects are derived by
+intersecting the ordered membership IDs with the transaction-list cache; they
+are not copied into another cache or hydrated through per-ID detail requests.
+
 Hooks and mutations own query keys and invalidation. Components consume their
 results and derive presentation values locally. Transport and malformed-response
 contracts belong to [API integration](api-integration.md); endpoint schemas
@@ -51,7 +56,7 @@ route hook or feature utility, not scattered component effects.
 Transactions page and saved-view detail:
 
 ```text
-/?q=coffee&dateFrom=2026-01-01&dateTo=2026-01-31&bankName=Test%20Bank&accountId=checking&type=DEBIT&minAmount=10&maxAmount=250
+/?q=coffee&dateFrom=2026-01-01&dateTo=2026-01-31&bankName=Test%20Bank&accountId=checking&type=DEBIT&minAmount=10&maxAmount=250&amountCurrency=USD
 ```
 
 Supported canonical parameters are:
@@ -61,17 +66,34 @@ Supported canonical parameters are:
 - `bankName`
 - `accountId`
 - `type`
-- `minAmount` and `maxAmount`
+- `minAmount`, `maxAmount`, and `amountCurrency`
+
+`amountCurrency` records the enabled display currency in which an amount range
+was authored. A legacy URL with bounds but no currency uses the current display
+currency until the next amount edit canonicalizes the URL. A valid deep link
+synchronizes the persisted display preference before applying its range;
+malformed or disabled currencies leave the bounds unapplied and visible for the
+user to clear. Changing the display currency from the Transactions or saved-view
+detail page clears all three amount parameters before updating the preference.
 
 The parser still accepts legacy `bank` and `account` values, but setters replace
 them with the canonical names. On saved-view detail these parameters filter the
-currently visible membership only; they do not change saved criteria, pins, or
-exclusions.
+currently visible static membership only; they do not change collection
+membership. All ordinary transaction and saved-view filters operate locally on
+the complete snapshot or its member intersection. They are not backend query
+criteria.
 
 The applied search term lives in `q`. `TransactionFilterBar` keeps the user's
 unsubmitted search text and amount values in local draft state, committing
 search on Enter and amounts after their debounce. Clearing all filters removes
 the transaction parameters and the drilldown navigation context.
+
+Static-view addition is also URL-owned navigation context. `addToView` contains
+a validated saved-view UUID and `addToViewReturnTo` contains the matching
+internal `/views/{id}` source URL. Entering the mode copies ordinary transaction
+filters to `/`; filter edits preserve the mode, while cancel and successful
+addition return to the clean source URL. Malformed, external, mismatched, or
+recursive targets are removed before saved-view queries mount.
 
 ### Analytics controls and source
 
@@ -88,9 +110,13 @@ values fall back to all transactions, monthly view, debit transactions, and the
 latest available transaction year when `year` is absent.
 
 `scope=all` resolves data with `useTransactions()`. A valid `scope=view` and
-`viewId` resolve view metadata and canonical visible membership, which includes
-pinned transactions and omits excluded transactions. `useAnalyticsData`
-receives the resolved transaction list and stays independent of its API source.
+`viewId` resolve static view metadata and the ordered intersection of membership
+with the complete active transaction snapshot. `useAnalyticsData` receives the
+resolved transaction list and stays independent of its API source. Its monetary
+models are derived from per-transaction selected-currency projections: counts
+include every qualifying transaction, totals include only available quantized
+values, and unavailable counts distinguish partial or all-unavailable periods
+from real zero totals.
 
 ### Admin searches
 
@@ -102,7 +128,11 @@ also live in the URL. Their pure parser/builders are:
 
 These utilities validate supported values and omit defaults when building URLs.
 The resulting parsed query object is part of the TanStack Query key and API
-request. Do not move admin search or pagination state into Redux.
+request. This is the cross-user exception to the ordinary local-filter rule:
+the backend applies filters, sorting, and pagination, and amount bounds retain
+their stored signed numeric meaning. `currencyIsoCode` is independent from the
+amount bounds and from the Redux display-currency preference. Do not move admin
+search or pagination state into Redux.
 
 ## Redux Preferences
 
@@ -139,12 +169,19 @@ Use local state for values that matter only while the owning UI is mounted:
 Selection is owned by each table component. It is derived into action IDs only
 when a bulk action runs and is cleared according to that component's workflow.
 It is not reported upward as a second filtered-row state and is not persisted in
-Redux.
+Redux. Saved-view removal can promote the current page selection to all locally
+filtered members; that mode derives the complete filtered ID array and clears
+only after atomic membership removal succeeds or the user explicitly clears it.
+Add-to-view selection is a mutually exclusive table purpose that derives only
+nonmember IDs from the filtered complete snapshot. A stale addition retains the
+selection but blocks resubmission until the user changes it after refreshed
+transaction and membership data arrive.
 
 Use `useMemo` or plain calculations for filtered collections, statistics,
-membership maps, and option lists. Use effects only when synchronizing an
-external system, following the repository conventions summarized in
-[Architecture](architecture.md).
+membership maps, display-amount projections, and option lists. Sorting and
+presentation pagination also remain with the owning table. Use effects only
+when synchronizing an external system, following the repository conventions
+summarized in [Architecture](architecture.md).
 
 ## Navigation Context
 

@@ -1,21 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
+import { http, HttpResponse } from 'msw';
 
 const transactionHookMocks = vi.hoisted(() => ({
   deleteMutate: vi.fn(),
   updateMutate: vi.fn(),
 }));
 
-const viewHookState = vi.hoisted(() => ({
-  isLoading: false,
-  isPinning: false,
-  pinMutate: vi.fn(),
-  views: [] as unknown[],
-}));
-
 vi.mock('@/features/auth/hooks/usePermission');
+vi.mock('@/components/SaveAsViewButton', () => ({
+  SaveAsViewButton: ({ isTransactionIdsReady }: { isTransactionIdsReady: boolean }) => (
+    <button type="button" disabled={!isTransactionIdsReady}>
+      Save as View
+    </button>
+  ),
+}));
 vi.mock('@/hooks/useTransactions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/useTransactions')>();
   return {
@@ -24,25 +25,14 @@ vi.mock('@/hooks/useTransactions', async (importOriginal) => {
     useDeleteTransaction: () => ({ mutate: transactionHookMocks.deleteMutate, isPending: false }),
   };
 });
-vi.mock('@/hooks/useViews', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks/useViews')>();
-  return {
-    ...actual,
-    useViews: () => ({ data: viewHookState.views, isLoading: viewHookState.isLoading }),
-    usePinTransaction: () => ({
-      mutate: viewHookState.pinMutate,
-      isPending: viewHookState.isPinning,
-    }),
-  };
-});
-
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { TransactionTable } from '@/features/transactions/components/TransactionTable';
 import { Transaction } from '@/types/transaction';
 import type { ExchangeRateResponse } from '@/types/currency';
 import { renderWithProviders } from '@/testing/test-utils';
 import { buildExchangeRateMap } from '@/utils/currency';
-import type { SavedView } from '@/types/view';
+import { projectDisplayAmount } from '@/utils/displayAmount';
+import { server } from '@/testing/mocks/server';
 
 const mockUsePermission = vi.mocked(usePermission);
 const noop = vi.fn();
@@ -74,20 +64,6 @@ const transactions: Transaction[] = [
   },
 ];
 
-const savedViews: SavedView[] = [
-  {
-    id: 'monthly-view',
-    name: 'Monthly Review',
-    criteria: {},
-    openEnded: false,
-    pinnedCount: 0,
-    excludedCount: 0,
-    transactionCount: 3,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-  },
-];
-
 type ExchangeRatesMap = Map<string, Map<string, ExchangeRateResponse>>;
 
 function LocationProbe() {
@@ -95,7 +71,29 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function createTable(rows: Transaction[], exchangeRatesMap: ExchangeRatesMap) {
+function createTable(
+  rows: Transaction[],
+  exchangeRatesMap: ExchangeRatesMap,
+  displayCurrency = 'USD',
+  options: {
+    isAmountFilterLoading?: boolean;
+    unavailableAmountFilterCount?: number;
+    includeViewAction?: boolean;
+    amountMin?: number;
+    addMode?: {
+      memberTransactionIds: number[];
+      onCancel?: () => void;
+      onSuccess?: () => void;
+    };
+  } = {},
+) {
+  const displayAmounts = new Map(
+    rows.map((transaction) => [
+      transaction.id,
+      projectDisplayAmount(transaction, displayCurrency, exchangeRatesMap),
+    ]),
+  );
+
   return (
     <>
       <TransactionTable
@@ -106,7 +104,11 @@ function createTable(rows: Transaction[], exchangeRatesMap: ExchangeRatesMap) {
           bankNameFilter: null,
           accountIdFilter: null,
           typeFilter: null,
-          amountFilter: { min: null, max: null },
+          amountFilter: {
+            min: options.amountMin ?? null,
+            max: null,
+          },
+          amountCurrency: options.amountMin !== undefined ? displayCurrency : null,
         }}
         onDateFilterChange={noop}
         onSearchChange={noop}
@@ -115,11 +117,27 @@ function createTable(rows: Transaction[], exchangeRatesMap: ExchangeRatesMap) {
         onTypeFilterChange={noop}
         onAmountFilterChange={noop}
         onClearAllFilters={noop}
-        displayCurrency="USD"
-        exchangeRatesMap={exchangeRatesMap}
-        isExchangeRatesLoading={false}
+        displayCurrency={displayCurrency}
+        displayAmounts={displayAmounts}
+        isDisplayAmountLoading={false}
+        isAmountFilterLoading={options.isAmountFilterLoading ?? false}
+        unavailableAmountFilterCount={options.unavailableAmountFilterCount ?? 0}
         availableBankNames={['Test Bank']}
         availableAccountIds={['acct-1']}
+        viewTransactionIds={options.includeViewAction ? rows.map(({ id }) => id) : undefined}
+        isViewTransactionIdsReady={!options.isAmountFilterLoading}
+        selectionPurpose={
+          options.addMode
+            ? {
+                type: 'add-to-view',
+                viewId: '11111111-1111-4111-8111-111111111111',
+                viewName: 'Static collection',
+                memberTransactionIds: options.addMode.memberTransactionIds,
+                onCancel: options.addMode.onCancel ?? noop,
+                onSuccess: options.addMode.onSuccess ?? noop,
+              }
+            : { type: 'delete' }
+        }
       />
       <LocationProbe />
     </>
@@ -129,11 +147,15 @@ function createTable(rows: Transaction[], exchangeRatesMap: ExchangeRatesMap) {
 function renderTable({
   rows = transactions,
   exchangeRatesMap = new Map(),
+  displayCurrency = 'USD',
+  options,
 }: {
   rows?: Transaction[];
   exchangeRatesMap?: ExchangeRatesMap;
+  displayCurrency?: string;
+  options?: Parameters<typeof createTable>[3];
 } = {}) {
-  return renderWithProviders(createTable(rows, exchangeRatesMap), {
+  return renderWithProviders(createTable(rows, exchangeRatesMap, displayCurrency, options), {
     initialEntries: ['/transactions'],
   });
 }
@@ -156,10 +178,6 @@ beforeEach(() => {
   mockUsePermission.mockReset();
   transactionHookMocks.deleteMutate.mockReset();
   transactionHookMocks.updateMutate.mockReset();
-  viewHookState.isLoading = false;
-  viewHookState.isPinning = false;
-  viewHookState.pinMutate.mockReset();
-  viewHookState.views = [];
 });
 
 describe('TransactionTable permission gating', () => {
@@ -173,7 +191,7 @@ describe('TransactionTable permission gating', () => {
     await openFirstRowMenu();
     expect(screen.getByRole('menuitem', { name: /Edit/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Delete/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /Add to View/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Add to View/ })).not.toBeInTheDocument();
   });
 
   it('hides the select column and the Delete action when transactions:delete is missing', async () => {
@@ -185,7 +203,7 @@ describe('TransactionTable permission gating', () => {
     await openFirstRowMenu();
     expect(screen.getByRole('menuitem', { name: /Edit/ })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /Delete/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /Add to View/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Add to View/ })).not.toBeInTheDocument();
   });
 
   it('hides the Edit action but keeps the select column when transactions:write is missing', async () => {
@@ -197,10 +215,10 @@ describe('TransactionTable permission gating', () => {
     await openFirstRowMenu();
     expect(screen.queryByRole('menuitem', { name: /Edit/ })).not.toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Delete/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /Add to View/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Add to View/ })).not.toBeInTheDocument();
   });
 
-  it('leaves only the Add to View action and removes the select column when neither permission is granted', async () => {
+  it('removes saved-view and transaction actions when permissions are denied', async () => {
     mockUsePermission.mockReturnValue(false);
     renderTable();
 
@@ -209,7 +227,7 @@ describe('TransactionTable permission gating', () => {
     await openFirstRowMenu();
     expect(screen.queryByRole('menuitem', { name: /Edit/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /Delete/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /Add to View/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Add to View/ })).not.toBeInTheDocument();
   });
 
   it('renders the table headers without the select column when transactions:delete is missing', () => {
@@ -230,81 +248,6 @@ describe('TransactionTable permission gating', () => {
     const headerRow = within(table).getAllByRole('row')[0];
     // Select + Date, Description, Bank, Account, Type, Amount, Actions = 8 columns.
     expect(within(headerRow).getAllByRole('columnheader')).toHaveLength(8);
-  });
-});
-
-describe('TransactionTable Add to View submenu', () => {
-  it('pins from pointer interaction without triggering row, edit, or delete behavior', async () => {
-    mockUsePermission.mockReturnValue(true);
-    viewHookState.views = savedViews;
-    const user = userEvent.setup();
-    renderTable();
-
-    const row = screen.getByText('Salary').closest('tr');
-    expect(row).not.toBeNull();
-    const trigger = within(row as HTMLTableRowElement).getByRole('button', { name: 'Open menu' });
-    await user.click(trigger);
-    await user.hover(screen.getByRole('menuitem', { name: 'Add to View' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Monthly Review' }));
-
-    expect(viewHookState.pinMutate).toHaveBeenCalledOnce();
-    expect(viewHookState.pinMutate).toHaveBeenCalledWith(
-      { viewId: 'monthly-view', txnId: 2 },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
-    );
-    expect(screen.getByTestId('location')).toHaveTextContent('/transactions');
-    expect(screen.queryByRole('heading', { name: 'Delete Transaction' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
-    expect(transactionHookMocks.updateMutate).not.toHaveBeenCalled();
-    expect(transactionHookMocks.deleteMutate).not.toHaveBeenCalled();
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-  });
-
-  it('opens with ArrowRight and pins the selected view exactly once by keyboard', async () => {
-    mockUsePermission.mockReturnValue(false);
-    viewHookState.views = savedViews;
-    const user = userEvent.setup();
-    renderTable();
-
-    const trigger = screen.getAllByRole('button', { name: 'Open menu' })[0];
-    trigger.focus();
-    await user.keyboard('{Enter}');
-    const addToView = screen.getByRole('menuitem', { name: 'Add to View' });
-    expect(addToView).toHaveFocus();
-
-    await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('menuitem', { name: 'Monthly Review' })).toHaveFocus();
-    await user.keyboard('{Enter}');
-
-    expect(viewHookState.pinMutate).toHaveBeenCalledOnce();
-    expect(viewHookState.pinMutate).toHaveBeenCalledWith(
-      { viewId: 'monthly-view', txnId: 2 },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
-    );
-    expect(screen.getByTestId('location')).toHaveTextContent('/transactions');
-  });
-
-  it.each([
-    { label: 'views are loading', isLoading: true, isPinning: false },
-    { label: 'a pin is pending', isLoading: false, isPinning: true },
-  ])('does not activate the submenu when $label', async ({ isLoading, isPinning }) => {
-    mockUsePermission.mockReturnValue(false);
-    viewHookState.views = savedViews;
-    viewHookState.isLoading = isLoading;
-    viewHookState.isPinning = isPinning;
-    const user = userEvent.setup();
-    renderTable();
-
-    const trigger = screen.getAllByRole('button', { name: 'Open menu' })[0];
-    await user.click(trigger);
-    const addToView = screen.getByRole('menuitem', { name: 'Add to View' });
-    expect(addToView).toBeDisabled();
-    addToView.focus();
-    await user.keyboard('{ArrowRight}{Enter}');
-
-    expect(screen.queryByRole('menuitem', { name: 'Monthly Review' })).not.toBeInTheDocument();
-    expect(viewHookState.pinMutate).not.toHaveBeenCalled();
-    expect(screen.getByTestId('location')).toHaveTextContent('/transactions');
   });
 });
 
@@ -332,35 +275,106 @@ describe('TransactionTable sorting', () => {
       baseCurrency: 'USD',
       targetCurrency: 'JPY',
       date: transactions[0].date,
+      publishedDate: transactions[0].date,
       rate: 100,
     },
   ]);
 
-  it('sorts signed mixed-currency amounts by USD equivalents in both directions', async () => {
+  it('sorts signed mixed-currency amounts by selected-currency values in both directions', async () => {
     mockUsePermission.mockReturnValue(false);
     renderTable({ rows: mixedCurrencyTransactions, exchangeRatesMap });
 
     await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
-    expectDescriptionOrder(['USD debit', 'JPY debit']);
+    expectDescriptionOrder(['JPY debit', 'USD debit']);
 
     await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
-    expectDescriptionOrder(['JPY debit', 'USD debit']);
+    expectDescriptionOrder(['USD debit', 'JPY debit']);
   });
 
   it('recalculates an active Amount sort when exchange rates arrive', async () => {
     mockUsePermission.mockReturnValue(false);
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { rerender } = renderTable({ rows: mixedCurrencyTransactions });
+    const rows = mixedCurrencyTransactions;
+    const { rerender } = renderTable({ rows });
 
     await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
-    expectDescriptionOrder(['JPY debit', 'USD debit']);
+    expectDescriptionOrder(['USD debit', 'JPY debit']);
 
     await act(async () => {
-      rerender(createTable(mixedCurrencyTransactions, exchangeRatesMap));
+      rerender(createTable(rows, exchangeRatesMap));
     });
 
-    expectDescriptionOrder(['USD debit', 'JPY debit']);
-    warnSpy.mockRestore();
+    expectDescriptionOrder(['JPY debit', 'USD debit']);
+  });
+
+  it('reorders an active Amount sort when the selected currency changes by date', async () => {
+    mockUsePermission.mockReturnValue(false);
+    const rows = [
+      { ...transactions[0], id: 20, amount: 100, description: 'Older USD' },
+      { ...transactions[1], id: 21, amount: 150, description: 'Newer USD' },
+    ];
+    const datedRates = buildExchangeRateMap([
+      {
+        baseCurrency: 'USD',
+        targetCurrency: 'JPY',
+        date: rows[0].date,
+        publishedDate: rows[0].date,
+        rate: 2,
+      },
+      {
+        baseCurrency: 'USD',
+        targetCurrency: 'JPY',
+        date: rows[1].date,
+        publishedDate: rows[1].date,
+        rate: 0.5,
+      },
+    ]);
+    const { rerender } = renderTable({ rows, exchangeRatesMap: datedRates });
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+    expectDescriptionOrder(['Older USD', 'Newer USD']);
+
+    await act(async () => {
+      rerender(createTable(rows, datedRates, 'JPY'));
+    });
+    expectDescriptionOrder(['Newer USD', 'Older USD']);
+  });
+
+  it('uses LocalDate and ID tie-breakers for equal displayed values', async () => {
+    mockUsePermission.mockReturnValue(false);
+    const rows = [
+      { ...transactions[0], id: 31, date: '2026-01-16', amount: 10, description: 'Later high ID' },
+      { ...transactions[0], id: 29, date: '2026-01-15', amount: 10, description: 'Earlier' },
+      { ...transactions[0], id: 30, date: '2026-01-16', amount: 10, description: 'Later low ID' },
+    ];
+    renderTable({ rows });
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+    expectDescriptionOrder(['Earlier', 'Later low ID', 'Later high ID']);
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+    expectDescriptionOrder(['Later high ID', 'Later low ID', 'Earlier']);
+  });
+
+  it('keeps unavailable display amounts last in both directions', async () => {
+    mockUsePermission.mockReturnValue(false);
+    const rows = [
+      { ...transactions[0], id: 40, amount: 10, description: 'Available low' },
+      {
+        ...transactions[0],
+        id: 41,
+        amount: 500,
+        currencyIsoCode: 'GBP',
+        description: 'Unavailable',
+      },
+      { ...transactions[0], id: 42, amount: 20, description: 'Available high' },
+    ];
+    renderTable({ rows });
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+    expectDescriptionOrder(['Available low', 'Available high', 'Unavailable']);
+
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+    expectDescriptionOrder(['Available high', 'Available low', 'Unavailable']);
   });
 
   it('returns to the first page when the current sort direction changes', async () => {
@@ -379,5 +393,196 @@ describe('TransactionTable sorting', () => {
     await userEvent.click(screen.getByRole('button', { name: /Date/ }));
 
     expect(screen.getByText('Showing 1 to 10 of 11 transactions')).toBeInTheDocument();
+  });
+});
+
+describe('TransactionTable presentation pagination and amount readiness', () => {
+  it('paginates for presentation while select-all matching retains the complete row set', async () => {
+    mockUsePermission.mockReturnValue(true);
+    const rows = Array.from({ length: 11 }, (_, index) => ({
+      ...transactions[0],
+      id: index + 1,
+      description: `Transaction ${index + 1}`,
+    }));
+    const user = userEvent.setup();
+    renderTable({ rows });
+
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(11);
+    await user.click(screen.getAllByRole('checkbox')[0]);
+    await user.click(
+      screen.getByRole('button', { name: 'Select all 11 transactions matching this filter' }),
+    );
+
+    expect(screen.getByText('11 transactions selected')).toBeInTheDocument();
+  });
+
+  it('shows amount loading, unavailable exclusions, and disables saving while unresolved', () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
+    const rendered = renderTable({
+      options: { isAmountFilterLoading: true, includeViewAction: true, amountMin: 10 },
+    });
+
+    expect(screen.getByText('Loading filtered amounts...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save as View' })).toBeDisabled();
+
+    rendered.unmount();
+    renderTable({
+      options: {
+        unavailableAmountFilterCount: 2,
+        includeViewAction: true,
+        amountMin: 10,
+      },
+    });
+    expect(
+      screen.getByText('2 transactions were excluded because conversion to USD is unavailable.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save as View' })).toBeEnabled();
+  });
+});
+
+describe('TransactionTable add-to-view selection', () => {
+  it('uses views:write independently and disables existing members', () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
+    renderTable({ options: { addMode: { memberTransactionIds: [1] } } });
+
+    expect(
+      screen.getByRole('checkbox', { name: 'Transaction 1 is already in Static collection' }),
+    ).toBeDisabled();
+    expect(screen.getByText('Already in view')).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Select transaction 2 to add to Static collection',
+      }),
+    ).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+  });
+
+  it('keeps page and all-matching selection limited to interleaved nonmembers', async () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
+    const rows = Array.from({ length: 12 }, (_, index) => ({
+      ...transactions[0],
+      id: index + 1,
+      description: `Transaction ${index + 1}`,
+    }));
+    let requestBody: unknown;
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', async ({ request }) => {
+        requestBody = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const onSuccess = vi.fn();
+    const user = userEvent.setup();
+    renderTable({
+      rows,
+      options: { addMode: { memberTransactionIds: [2, 7], onSuccess } },
+    });
+
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select eligible transactions on this page' }),
+    );
+    expect(
+      screen.getByText('All 8 eligible transactions on this page are selected.'),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Select all 10 eligible transactions matching this filter',
+      }),
+    );
+    expect(screen.getByText('10 transactions selected to add')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add transactions' }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
+    expect(requestBody).toEqual({
+      addTransactionIds: [1, 3, 4, 5, 6, 8, 9, 10, 11, 12],
+      removeTransactionIds: [],
+    });
+  });
+
+  it('disables an empty or unresolved submission and supports cancel', async () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
+    const onCancel = vi.fn();
+    const user = userEvent.setup();
+    renderTable({
+      options: {
+        addMode: { memberTransactionIds: [], onCancel },
+        isAmountFilterLoading: true,
+      },
+    });
+
+    const submit = screen.getByRole('button', { name: 'Add transactions' });
+    expect(submit).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains selection after a stale addition and requires a selection review', async () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', () =>
+        HttpResponse.json(
+          {
+            type: 'APPLICATION_ERROR',
+            code: 'SAVED_VIEW_MEMBERSHIP_STALE',
+            message: 'Snapshot changed',
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderTable({ options: { addMode: { memberTransactionIds: [1] } } });
+
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Select transaction 2 to add to Static collection',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Add transactions' }));
+
+    expect(
+      await screen.findByText(/Membership and transactions were refreshed; review your selection/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('1 transaction selected to add')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add transactions' })).toBeDisabled();
+
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Select transaction 2 to add to Static collection',
+      }),
+    );
+    expect(screen.getByRole('button', { name: 'Add transactions' })).toBeDisabled();
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Select transaction 2 to add to Static collection',
+      }),
+    );
+    expect(screen.getByRole('button', { name: 'Add transactions' })).toBeEnabled();
+  });
+
+  it('surfaces another mutation error without dropping the selection', async () => {
+    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', () =>
+        HttpResponse.json(
+          { type: 'SERVICE_UNAVAILABLE', message: 'Try again later' },
+          { status: 503 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderTable({ options: { addMode: { memberTransactionIds: [1] } } });
+
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Select transaction 2 to add to Static collection',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Add transactions' }));
+
+    expect(await screen.findByText('Try again later')).toBeInTheDocument();
+    expect(screen.getByText('1 transaction selected to add')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add transactions' })).toBeEnabled();
   });
 });

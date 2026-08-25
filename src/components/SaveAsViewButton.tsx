@@ -1,16 +1,19 @@
-// src/components/SaveAsViewButton.tsx
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Bookmark } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 import { CreateViewModal } from '@/components/CreateViewModal';
-import { ViewCriteriaApi } from '@/types/view';
+import { Button } from '@/components/ui/Button';
 
 interface SaveAsViewButtonProps {
-  criteria: ViewCriteriaApi;
-  disabled?: boolean;
+  transactionIds: number[];
+  isTransactionIdsReady: boolean;
+  label?: string;
 }
 
-export function SaveAsViewButton({ criteria, disabled }: SaveAsViewButtonProps) {
+export function SaveAsViewButton({
+  transactionIds,
+  isTransactionIdsReady,
+  label = 'Save as View',
+}: SaveAsViewButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleOpenModal = useCallback(() => {
@@ -23,11 +26,22 @@ export function SaveAsViewButton({ criteria, disabled }: SaveAsViewButtonProps) 
 
   return (
     <>
-      <Button onClick={handleOpenModal} disabled={disabled} size="default" variant="outline">
+      <Button
+        onClick={handleOpenModal}
+        disabled={!isTransactionIdsReady}
+        size="default"
+        variant="outline"
+      >
         <Bookmark className="mr-2 h-4 w-4" />
-        Save as View
+        {label}
       </Button>
-      <CreateViewModal open={isModalOpen} onClose={handleCloseModal} criteria={criteria} />
+      <CreateViewModal
+        open={isModalOpen}
+        onClose={handleCloseModal}
+        transactionIds={transactionIds}
+        isTransactionIdsReady={isTransactionIdsReady}
+        title={label}
+      />
     </>
   );
 }

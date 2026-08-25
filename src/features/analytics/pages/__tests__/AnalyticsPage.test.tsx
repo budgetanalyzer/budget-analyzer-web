@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { Transaction } from '@/types/transaction';
-import { SavedView, ViewTransaction } from '@/types/view';
+import type { SavedViewMetadata } from '@/types/view';
 import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage';
 import { renderWithProviders } from '@/testing/test-utils';
 
@@ -19,6 +19,10 @@ const hookMocks = vi.hoisted(() => ({
   useViewTransactions: vi.fn(),
 }));
 
+const currencyHookState = vi.hoisted(() => ({
+  exchangeRatesMap: new Map(),
+}));
+
 vi.mock('@/hooks/useTransactions', () => ({
   useTransactions: hookMocks.useTransactions,
 }));
@@ -31,7 +35,7 @@ vi.mock('@/hooks/useViews', () => ({
 
 vi.mock('@/hooks/useCurrencies', () => ({
   useExchangeRatesMap: () => ({
-    exchangeRatesMap: new Map(),
+    exchangeRatesMap: currencyHookState.exchangeRatesMap,
     pendingCurrencies: [],
     isLoading: false,
   }),
@@ -41,13 +45,9 @@ vi.mock('@/hooks/useMissingCurrencies', () => ({
   useMissingCurrencies: () => [],
 }));
 
-const groceriesView: SavedView = {
+const groceriesView: SavedViewMetadata = {
   id: 'view-1',
   name: 'Groceries',
-  criteria: {},
-  openEnded: true,
-  pinnedCount: 1,
-  excludedCount: 1,
   transactionCount: 1,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -107,17 +107,13 @@ beforeEach(() => {
   hookMocks.useViews.mockReset();
   hookMocks.useView.mockReset();
   hookMocks.useViewTransactions.mockReset();
+  currencyHookState.exchangeRatesMap = new Map();
 
   hookMocks.useTransactions.mockReturnValue(queryResult([transaction({ amount: 100 })]));
   hookMocks.useViews.mockReturnValue(queryResult([groceriesView]));
   hookMocks.useView.mockReturnValue(queryResult(groceriesView));
   hookMocks.useViewTransactions.mockReturnValue(
-    queryResult<ViewTransaction[]>([
-      {
-        ...transaction({ id: 2, amount: 25, description: 'Pinned grocery' }),
-        membershipType: 'PINNED',
-      },
-    ]),
+    queryResult<Transaction[]>([transaction({ id: 2, amount: 25, description: 'Saved grocery' })]),
   );
 });
 
@@ -202,11 +198,8 @@ describe('AnalyticsPage source resolution', () => {
 
   it('routes a credit analytics drilldown to the credit-only view detail page', async () => {
     hookMocks.useViewTransactions.mockReturnValue(
-      queryResult<ViewTransaction[]>([
-        {
-          ...transaction({ id: 2, amount: 25, type: 'CREDIT', description: 'Refund' }),
-          membershipType: 'PINNED',
-        },
+      queryResult<Transaction[]>([
+        transaction({ id: 2, amount: 25, type: 'CREDIT', description: 'Refund' }),
       ]),
     );
 
@@ -297,5 +290,32 @@ describe('AnalyticsPage source resolution', () => {
 
     expect(screen.getByText('No yearly analytics for credit transactions.')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /2026/ })).not.toBeInTheDocument();
+  });
+
+  it('labels a mixed selected-currency total partial and counts every transaction', () => {
+    hookMocks.useTransactions.mockReturnValue(
+      queryResult([
+        transaction({ id: 1, amount: 100 }),
+        transaction({ id: 2, currencyIsoCode: 'GBP', amount: 80 }),
+      ]),
+    );
+
+    renderPage('/analytics?scope=all&viewMode=monthly&transactionType=debit&year=2026');
+
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+    expect(screen.getByText('Partial total · 1 unavailable')).toBeInTheDocument();
+    expect(screen.getByText('2 transactions')).toBeInTheDocument();
+  });
+
+  it('shows all-unavailable selected-currency totals as unavailable', () => {
+    hookMocks.useTransactions.mockReturnValue(
+      queryResult([transaction({ currencyIsoCode: 'GBP', amount: 80 })]),
+    );
+
+    renderPage('/analytics?scope=all&viewMode=yearly&transactionType=debit');
+
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    expect(screen.getByText('All 1 amount unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('$80.00')).not.toBeInTheDocument();
   });
 });

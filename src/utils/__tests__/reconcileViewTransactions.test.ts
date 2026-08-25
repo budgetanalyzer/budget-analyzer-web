@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { reconcileViewTransactions } from '@/utils/reconcileViewTransactions';
 import type { Transaction } from '@/types/transaction';
-import type { ViewMembershipResponse } from '@/types/view';
 
-function transaction(overrides: Partial<Transaction> & Pick<Transaction, 'id'>): Transaction {
-  const { id, ...rest } = overrides;
-
+function transaction(id: number): Transaction {
   return {
     id,
     accountId: 'checking',
@@ -17,108 +14,48 @@ function transaction(overrides: Partial<Transaction> & Pick<Transaction, 'id'>):
     description: `Transaction ${id}`,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
-    ...rest,
   };
 }
 
 describe('reconcileViewTransactions', () => {
-  it('marks cached matched and pinned transactions with their membership type', () => {
-    const membership: ViewMembershipResponse = {
-      matched: [1],
-      pinned: [2],
-      excluded: [],
-    };
-
-    const result = reconcileViewTransactions(membership, [
-      transaction({ id: 1 }),
-      transaction({ id: 2 }),
+  it('preserves deterministic membership order instead of transaction snapshot order', () => {
+    const result = reconcileViewTransactions({ transactionIds: [3, 1, 2] }, [
+      transaction(1),
+      transaction(2),
+      transaction(3),
     ]);
 
-    expect(result.viewTransactions).toEqual([
-      expect.objectContaining({ id: 1, membershipType: 'MATCHED' }),
-      expect.objectContaining({ id: 2, membershipType: 'PINNED' }),
-    ]);
-    expect(result.missingIds).toEqual([]);
+    expect(result.transactions.map(({ id }) => id)).toEqual([3, 1, 2]);
+    expect(result.missingTransactionIds).toEqual([]);
   });
 
-  it('omits excluded transactions from visible rows and missing IDs', () => {
-    const membership: ViewMembershipResponse = {
-      matched: [1, 2],
-      pinned: [3],
-      excluded: [2, 3],
-    };
-
-    const result = reconcileViewTransactions(membership, [
-      transaction({ id: 1 }),
-      transaction({ id: 2 }),
-      transaction({ id: 3 }),
+  it('skips missing active transactions and reports them diagnostically in membership order', () => {
+    const result = reconcileViewTransactions({ transactionIds: [4, 1, 5, 2] }, [
+      transaction(2),
+      transaction(1),
     ]);
 
-    expect(result.viewTransactions).toEqual([
-      expect.objectContaining({ id: 1, membershipType: 'MATCHED' }),
-    ]);
-    expect(result.missingIds).toEqual([]);
+    expect(result.transactions.map(({ id }) => id)).toEqual([1, 2]);
+    expect(result.missingTransactionIds).toEqual([4, 5]);
   });
 
-  it('includes restored transactions after they leave the excluded set', () => {
-    const membership: ViewMembershipResponse = {
-      matched: [1, 2],
-      pinned: [],
-      excluded: [],
-    };
-
-    const result = reconcileViewTransactions(membership, [
-      transaction({ id: 1 }),
-      transaction({ id: 2 }),
-    ]);
-
-    expect(result.viewTransactions.map((row) => row.id)).toEqual([1, 2]);
+  it('returns empty arrays for empty membership or an empty active snapshot', () => {
+    expect(reconcileViewTransactions({ transactionIds: [] }, [transaction(1)])).toEqual({
+      transactions: [],
+      missingTransactionIds: [],
+    });
+    expect(reconcileViewTransactions({ transactionIds: [2, 1] }, [])).toEqual({
+      transactions: [],
+      missingTransactionIds: [2, 1],
+    });
   });
 
-  it('deduplicates duplicate membership IDs and keeps pinned membership precedence', () => {
-    const membership: ViewMembershipResponse = {
-      matched: [1, 1, 2],
-      pinned: [2, 2],
-      excluded: [],
-    };
-
-    const result = reconcileViewTransactions(membership, [
-      transaction({ id: 1 }),
-      transaction({ id: 2 }),
+  it('emits repeated membership IDs exactly as supplied by the authoritative response', () => {
+    const result = reconcileViewTransactions({ transactionIds: [2, 2, 1] }, [
+      transaction(1),
+      transaction(2),
     ]);
 
-    expect(result.viewTransactions).toEqual([
-      expect.objectContaining({ id: 1, membershipType: 'MATCHED' }),
-      expect.objectContaining({ id: 2, membershipType: 'PINNED' }),
-    ]);
-    expect(result.missingIds).toEqual([]);
-  });
-
-  it('returns missing visible transaction IDs when cache entries are absent', () => {
-    const membership: ViewMembershipResponse = {
-      matched: [1, 2],
-      pinned: [3],
-      excluded: [4],
-    };
-
-    const result = reconcileViewTransactions(membership, [transaction({ id: 1 })]);
-
-    expect(result.viewTransactions).toEqual([
-      expect.objectContaining({ id: 1, membershipType: 'MATCHED' }),
-    ]);
-    expect(result.missingIds).toEqual([2, 3]);
-  });
-
-  it('treats every visible membership ID as missing when the transaction cache is unavailable', () => {
-    const membership: ViewMembershipResponse = {
-      matched: [1, 2],
-      pinned: [2, 3],
-      excluded: [1],
-    };
-
-    const result = reconcileViewTransactions(membership, undefined);
-
-    expect(result.viewTransactions).toEqual([]);
-    expect(result.missingIds).toEqual([2, 3]);
+    expect(result.transactions.map(({ id }) => id)).toEqual([2, 2, 1]);
   });
 });
