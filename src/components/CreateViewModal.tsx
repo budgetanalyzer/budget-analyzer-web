@@ -115,7 +115,7 @@ export function CreateViewModal({
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 pt-4">
             <div className="space-y-2">
               <label htmlFor="view-name" className="text-sm font-medium">
                 View Name

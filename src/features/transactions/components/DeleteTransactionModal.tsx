@@ -63,7 +63,7 @@ export function DeleteTransactionModal({
           </DialogDescription>
         </DialogHeader>
         {transaction && (
-          <div className="my-4 rounded-md bg-muted p-4">
+          <div className="mt-4 rounded-md bg-muted p-4">
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Date:</span>

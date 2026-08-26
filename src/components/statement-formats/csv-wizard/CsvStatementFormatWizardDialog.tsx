@@ -729,7 +729,7 @@ export function CsvStatementFormatWizardDialog({
           ) : null}
         </div>
 
-        <DialogFooter className="mt-6 gap-2">
+        <DialogFooter>
           {step === 'upload' ? (
             <>
               <Button type="button" variant="outline" onClick={handleCancel}>

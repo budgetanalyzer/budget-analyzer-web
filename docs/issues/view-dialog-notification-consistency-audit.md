@@ -62,7 +62,7 @@ applicable to a financial dashboard.
 
 ### 1. Compact confirmations have no content-to-footer spacing
 
-**Status:** Open
+**Status:** Resolved
 
 [`RemoveViewTransactionsModal`](../../src/features/views/components/RemoveViewTransactionsModal.tsx)
 places `DialogFooter` immediately after `DialogHeader` without margin, padding,
@@ -80,11 +80,17 @@ header and footer. Long review dialogs explicitly use `border-t pt-4`, while
 statement-format dialogs use `mt-6 gap-2`, demonstrating further local spacing
 conventions.
 
-- [ ] Choose one compact confirmation spacing convention.
-- [ ] Apply it to saved-view and transaction confirmations that have adjacent
+- [x] Choose one compact confirmation spacing convention.
+- [x] Apply it to saved-view and transaction confirmations that have adjacent
       headers and footers.
-- [ ] Verify desktop and mobile button spacing; the base footer reverses its
+- [x] Verify desktop and mobile button spacing; the base footer reverses its
       column on mobile but supplies no mobile gap.
+
+The shared `DialogFooter` now owns `mt-6` content separation and `gap-2` button
+spacing at every breakpoint. This applies the convention to compact
+confirmations throughout the application and makes it the default for future
+dialogs. Existing feature-local copies were removed, and content with trailing
+padding was normalized so it does not compound the shared footer margin.
 
 ### 2. Mutation success feedback has two different visual languages
 

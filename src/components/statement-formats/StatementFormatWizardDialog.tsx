@@ -150,7 +150,7 @@ export function StatementFormatWizardDialog({
           {fileError ? <p className="text-sm text-destructive">{fileError}</p> : null}
         </div>
 
-        <DialogFooter className="mt-6 gap-2">
+        <DialogFooter>
           <Button type="button" variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
