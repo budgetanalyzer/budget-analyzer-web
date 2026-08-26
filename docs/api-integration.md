@@ -78,10 +78,23 @@ HTTP 422 errors and otherwise uses the normalized server message. Keep the map
 synchronized with the generated unified specification when backend application
 codes change.
 
-Error banners and toasts are presentation choices at the feature boundary:
-query/load failures normally remain visible in an `ErrorBanner`, while mutation
-failures use the custom toast system when the initiating dialog or control stays
-mounted. Repository test conventions and MSW ownership are documented in the
+Feedback belongs at the narrowest feature boundary that contains the event. An
+obvious successful direct manipulation needs no detached confirmation: the
+updated value, closed dialog, removed row, changed status, or refreshed action
+state communicates success. Keep an explicit message when it conveys
+information the changed interface does not make clear, including non-obvious
+counts, partial outcomes, consequences, next steps, cross-route results,
+ongoing conditions, failures, and background or global events. The message
+should remain available in proportion to how consequential or actionable that
+information is.
+
+Query and load failures normally remain visible in an `ErrorBanner`. Some
+mutation failures still use the custom transient toast system, including while
+the initiating dialog or control stays mounted. That is existing behavior
+awaiting a separate presentation decision, not evidence that a
+no-toast-by-default contract is complete; do not infer that errors, recovery
+instructions, or other actionable information may safely disappear. Repository
+test conventions and MSW ownership are documented in the
 [Testing guide](testing-guide.md).
 
 ## TanStack Query Boundary

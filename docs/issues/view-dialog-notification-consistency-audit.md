@@ -103,11 +103,11 @@ a contextual feedback hierarchy: feedback belongs at the narrowest scope that
 contains the event, with persistence proportional to consequence and
 actionability.
 
-Both
+At the time of the audit, both
 [`RemoveViewTransactionsModal`](../../src/features/views/components/RemoveViewTransactionsModal.tsx)
 and
 [`TransferRefundReviewDialog`](../../src/features/views/components/TransferRefundReviewDialog.tsx)
-report success through `toast.success`. The custom
+reported success through `toast.success`. The custom
 [`Toast`](../../src/components/ui/Toast.tsx) is a solid-color floating card in a
 top-right viewport. [`Toaster`](../../src/components/ui/Toaster.tsx) dismisses
 it after five seconds, renders only description text, and uses a close control
@@ -125,9 +125,9 @@ wide rather than solely a regression in the view feature. The custom toast
 must remain CSP-safe; the repository specifically prohibits returning to
 Sonner or another runtime-style-injecting dependency.
 
-[`API integration`](../api-integration.md#user-facing-error-messages) defines a
-query/load-error versus mutation-error convention, but it does not define when
-successful mutations should use a toast instead of an inline banner.
+[`API integration`](../api-integration.md#user-facing-error-messages) now owns
+the first-pass success-feedback rule and records the retained transient
+mutation-error behavior as unresolved work.
 
 #### External guidance and toast consensus
 
@@ -177,16 +177,28 @@ guidance and with the product owner's stated preference:
 - Reserve a toast only for a background or out-of-context event that has no
   sensible stable surface, or choose not to support that exception.
 
-Adopting this policy would require updating the mutation-error presentation
-contract in API integration documentation, not only replacing individual toast
-calls.
+The first implementation pass removed eight `toast.success` branches and the
+redundant user-deactivation success banner. Inline and detail edits, single and
+fully successful bulk deletion, statement-format hide and restore, both
+saved-view membership-removal flows, and user deactivation now rely on their
+visible interface changes. Messages remain for failures, partial or zero-result
+outcomes, non-obvious counts and consequences, next steps, cross-route results,
+ongoing conditions, and background or global events.
 
-- [ ] Decide the product rule for transient mutation success versus persistent
+This does not resolve the finding. Mutation errors still use transient toasts,
+and the replacement surface, toast appearance and touch behavior, and status-
+message accessibility remain open decisions.
+
+- [x] Decide the product rule for transient mutation success versus persistent
       page-level status.
 - [ ] Decide whether toast styling should visually align more closely with
       `MessageBanner` while remaining a floating, transient surface.
 - [ ] Ensure close affordances remain discoverable on touch devices.
-- [ ] Record the durable notification rule in the appropriate owner document.
+- [x] Record the durable notification rule in the appropriate owner document.
+- [ ] Replace retained transient mutation-error toasts with an agreed
+      contextual, persistent surface.
+- [ ] Define and implement accessible status-message semantics for retained
+      explicit feedback.
 
 ### 3. The same removal operation changes semantic button treatment
 
