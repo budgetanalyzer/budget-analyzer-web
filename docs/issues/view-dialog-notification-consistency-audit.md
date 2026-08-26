@@ -185,9 +185,13 @@ visible interface changes. Messages remain for failures, partial or zero-result
 outcomes, non-obvious counts and consequences, next steps, cross-route results,
 ongoing conditions, and background or global events.
 
-This does not resolve the finding. Mutation errors still use transient toasts,
-and the replacement surface, toast appearance and touch behavior, and status-
-message accessibility remain open decisions.
+The first contextual-error migration moved the two saved-view membership-
+removal failures from transient toasts into persistent, normalized dialog
+alerts. The same shared banner now gives errors alert semantics and success or
+warning messages status semantics. This is partial progress only: mutation
+errors elsewhere still use transient toasts, while toast appearance, touch
+discoverability, and status-message coverage outside `MessageBanner` remain
+open.
 
 - [x] Decide the product rule for transient mutation success versus persistent
       page-level status.
@@ -217,22 +221,19 @@ state that the transactions are not deleted.
 
 ### 4. Rename and delete view failures have no user-facing feedback
 
-**Status:** Open
+**Status:** Resolved
 
-[`EditViewModal`](../../src/features/views/components/EditViewModal.tsx) supplies
-only an `onSuccess` callback. [`DeleteViewModal`](../../src/features/views/components/DeleteViewModal.tsx)
-also supplies only `onSuccess`. Their hooks invalidate data but do not provide
-global error presentation. A failed request therefore leaves the dialog open
-and re-enables its controls without explaining what happened.
+Rename and delete failures now render normalized API copy in persistent inline
+alerts at their initiating dialogs. Rename preserves the edited name; delete
+keeps its confirmation and current route. Dismissal clears only the message,
+and retry retains the existing successful close and delete-navigation behavior.
+MSW-backed failure and retry tests exercise both workflows through their real
+TanStack Query mutation hooks.
 
-Removal, transaction edit, and transaction deletion mutations all show an
-error toast, so the absence is inconsistent with both current documentation
-and nearby mutation behavior.
-
-- [ ] Add normalized, user-facing mutation failure feedback to rename and
+- [x] Add normalized, user-facing mutation failure feedback to rename and
       delete.
-- [ ] Keep the dialog and user input intact after failure.
-- [ ] Add behavior tests for the failure paths.
+- [x] Keep the dialog and user input intact after failure.
+- [x] Add behavior tests for the failure paths.
 
 ### 5. Pending dialogs expose inconsistent dismissal behavior
 

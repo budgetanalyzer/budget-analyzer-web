@@ -88,14 +88,20 @@ ongoing conditions, failures, and background or global events. The message
 should remain available in proportion to how consequential or actionable that
 information is.
 
+Actionable mutation failures stay at the initiating feature boundary. Present
+normalized `formatApiError` copy as a persistent alert, preserve the user's
+input or selection, and keep the relevant form, dialog, or control available
+for dismissal or retry. Shared `MessageBanner` errors expose `role="alert"`;
+its success and warning variants expose `role="status"`, and all variants make
+the complete message atomic for assistive technology.
+
 Query and load failures normally remain visible in an `ErrorBanner`. Some
-mutation failures still use the custom transient toast system, including while
-the initiating dialog or control stays mounted. That is existing behavior
-awaiting a separate presentation decision, not evidence that a
-no-toast-by-default contract is complete; do not infer that errors, recovery
-instructions, or other actionable information may safely disappear. Repository
-test conventions and MSW ownership are documented in the
-[Testing guide](testing-guide.md).
+mutation failures still use the custom transient toast system even while the
+initiating dialog or control stays mounted. Those sites are migration debt,
+not exceptions to the contextual-error contract and not evidence that errors,
+recovery instructions, or other actionable information may safely disappear.
+Repository test conventions and MSW ownership are documented in the [Testing
+guide](testing-guide.md).
 
 ## TanStack Query Boundary
 

@@ -15,17 +15,18 @@ than being one formally standardized pattern.
 
 I searched production source, excluding tests. I found:
 
-- 15 toast-emission branches;
-- 13 `MessageBanner` render sites;
+- 13 toast-emission branches;
+- 17 `MessageBanner` render sites;
 - 13 `ErrorBanner` render sites;
 - several specialized inline callouts; and
 - one session-warning modal.
 
 The first success-feedback pass removed eight toast branches and one
 `MessageBanner` site whose successful outcome was already obvious in the
-changed interface. The counts and tables below describe production source
-after that removal; retained messages carry information that is not safely
-inferred from the interface alone.
+changed interface. A later saved-view contextual-error pass moved two more
+toast branches and added four `MessageBanner` render sites. The counts and
+tables below describe current production source; retained messages carry
+information that is not safely inferred from the interface alone.
 
 ## 1. Global Transient Toasts
 
@@ -47,8 +48,6 @@ of severity, and have a close button visible only on hover or focus.
 | Saving a view otherwise fails | Error | Transient failure while the create dialog remains mounted with its input. [`CreateViewModal.tsx`](../../src/components/CreateViewModal.tsx#L78) |
 | Hiding a statement format fails | Error | Transient error for a row-level action. [`StatementFormatManagementPage.tsx`](../../src/features/statement-formats/pages/StatementFormatManagementPage.tsx#L52) |
 | Restoring a statement format fails | Error | Transient error for a row-level action. [`StatementFormatManagementPage.tsx`](../../src/features/statement-formats/pages/StatementFormatManagementPage.tsx#L67) |
-| Manual membership removal fails | Error | Transient error while the removal dialog remains mounted. [`RemoveViewTransactionsModal.tsx`](../../src/features/views/components/RemoveViewTransactionsModal.tsx#L62) |
-| Transfer/refund-assisted removal fails | Error | Transient error while the review dialog remains mounted. [`TransferRefundReviewDialog.tsx`](../../src/features/views/components/TransferRefundReviewDialog.tsx#L103) |
 
 ## 2. Contextual Dismissible Banners
 
@@ -70,6 +69,10 @@ or workflow, and equipped with an always-visible close button.
 | User deactivation fails | Error, persistent until dismissed or retried | Dialog closes and the error appears on the user detail page. [`UserDetailPage.tsx`](../../src/features/admin/users/pages/UserDetailPage.tsx#L131) |
 | CSV wizard step fails | Error, persistent and contextual | Appears inside the wizard; field-specific failures instead remain beside their fields. [`CsvStatementFormatWizardDialog.tsx`](../../src/components/statement-formats/csv-wizard/CsvStatementFormatWizardDialog.tsx#L435) |
 | PDF wizard step fails | Error, persistent and contextual | Same pattern inside the PDF wizard. [`PdfStatementFormatWizardDialog.tsx`](../../src/components/statement-formats/pdf-wizard/PdfStatementFormatWizardDialog.tsx#L1066) |
+| Manual saved-view membership removal fails | Error, persistent until dismissed, retried, or the dialog closes | Keeps the removal dialog and its transaction selection available. [`RemoveViewTransactionsModal.tsx`](../../src/features/views/components/RemoveViewTransactionsModal.tsx#L90) |
+| Transfer/refund-assisted removal fails | Error, persistent until dismissed, retried, or the dialog closes | Appears beside the mutation action without replacing the separate candidate-discovery error state. [`TransferRefundReviewDialog.tsx`](../../src/features/views/components/TransferRefundReviewDialog.tsx#L157) |
+| Saved-view rename fails | Error, persistent until dismissed, retried, or the dialog closes | Preserves the edited name and keeps the rename dialog available. [`EditViewModal.tsx`](../../src/features/views/components/EditViewModal.tsx#L94) |
+| Saved-view deletion fails | Error, persistent until dismissed, retried, or the dialog closes | Keeps the confirmation dialog open and leaves the user on the current view. [`DeleteViewModal.tsx`](../../src/features/views/components/DeleteViewModal.tsx#L78) |
 
 The router-carried cases have a conventional name: **flash messages**.
 
@@ -166,13 +169,17 @@ The app already contains a recognizable rule:
 - Obvious successful direct manipulation → update the interface without a
   detached success notification.
 
-The first pass removed the mutation-success messages that duplicated an obvious
-local result. The retained mutation-error toasts still violate that hierarchy:
-they use a global, automatically disappearing surface for errors that should
-remain beside the initiating surface.
+The first pass removed mutation-success messages that duplicated an obvious
+local result. The first contextual-error migration then moved both saved-view
+membership-removal failures out of toasts and added the previously missing
+rename and delete failures as persistent dialog alerts. Other retained
+mutation-error toasts still violate the hierarchy: they use a global,
+automatically disappearing surface for errors that should remain beside the
+initiating surface.
 
-One implementation detail also matters: `MessageBanner`, `ErrorBanner`, and
-`MissingExchangeRatesBanner` generally lack `role="status"`, `role="alert"`, or
-an `aria-live` region. Only a handful of bespoke callouts have those semantics.
-The app therefore has a visual contextual-feedback pattern, but it is not yet a
-consistently accessible status-message system.
+`MessageBanner` now exposes errors as atomic `role="alert"` messages and its
+success and warning variants as atomic `role="status"` messages. Other shared
+and bespoke feedback, including `ErrorBanner` and
+`MissingExchangeRatesBanner`, does not yet follow one consistent status-message
+contract. The application therefore has an accessible shared contextual banner
+without a complete application-wide status-message migration.

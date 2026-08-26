@@ -20,6 +20,7 @@ export function MessageBanner({ type, message, onClose }: MessageBannerProps) {
     warning: 'bg-warning/15 text-warning',
     error: 'bg-destructive/15 text-destructive',
   };
+  const messageRole = type === 'error' ? 'alert' : 'status';
 
   return (
     <motion.div
@@ -31,16 +32,23 @@ export function MessageBanner({ type, message, onClose }: MessageBannerProps) {
       transition={fadeTransition}
       className={`flex items-center justify-between rounded-lg px-4 py-3 ${colorClasses[type]}`}
     >
-      <div className="flex items-center gap-2">
+      <div role={messageRole} aria-atomic="true" className="flex items-center gap-2">
         {type === 'success' ? (
-          <CheckCircle className="h-5 w-5 flex-shrink-0" />
+          <CheckCircle aria-hidden="true" className="h-5 w-5 flex-shrink-0" />
         ) : (
-          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <AlertCircle aria-hidden="true" className="h-5 w-5 flex-shrink-0" />
         )}
         <span className="font-medium whitespace-pre-line">{message}</span>
       </div>
-      <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-        <X className="h-4 w-4" />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={onClose}
+        className="h-8 w-8"
+        aria-label="Dismiss message"
+      >
+        <X aria-hidden="true" className="h-4 w-4" />
       </Button>
     </motion.div>
   );

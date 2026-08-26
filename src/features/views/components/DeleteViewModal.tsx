@@ -1,6 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { AlertTriangle } from 'lucide-react';
+import { MessageBanner } from '@/components/MessageBanner';
 import { Button } from '@/components/ui/Button';
 import {
   Dialog,
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/Dialog';
 import { useDeleteView } from '@/hooks/useViews';
 import type { SavedViewMetadata } from '@/types/view';
+import { formatApiError } from '@/utils/errorMessages';
 
 interface DeleteViewModalProps {
   open: boolean;
@@ -19,24 +21,40 @@ interface DeleteViewModalProps {
   view: SavedViewMetadata;
 }
 
+const DELETE_FAILURE_MESSAGE = 'Failed to delete this view';
+
 export function DeleteViewModal({ open, onClose, view }: DeleteViewModalProps) {
   const navigate = useNavigate();
+  const [mutationErrorMessage, setMutationErrorMessage] = useState<string | null>(null);
   const { mutate: deleteView, isPending } = useDeleteView();
 
+  const handleDismissMutationError = useCallback(() => {
+    setMutationErrorMessage(null);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setMutationErrorMessage(null);
+    onClose();
+  }, [onClose]);
+
   const handleDelete = useCallback(() => {
+    setMutationErrorMessage(null);
     deleteView(view.id, {
       onSuccess: () => {
-        onClose();
+        handleClose();
         navigate('/');
       },
+      onError: (error) => {
+        setMutationErrorMessage(formatApiError(error, DELETE_FAILURE_MESSAGE));
+      },
     });
-  }, [deleteView, navigate, onClose, view.id]);
+  }, [deleteView, handleClose, navigate, view.id]);
 
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
-      if (!isOpen) onClose();
+      if (!isOpen) handleClose();
     },
-    [onClose],
+    [handleClose],
   );
 
   return (
@@ -55,8 +73,18 @@ export function DeleteViewModal({ open, onClose, view }: DeleteViewModalProps) {
           </DialogDescription>
         </DialogHeader>
 
+        {mutationErrorMessage && (
+          <div className="mt-4">
+            <MessageBanner
+              type="error"
+              message={mutationErrorMessage}
+              onClose={handleDismissMutationError}
+            />
+          </div>
+        )}
+
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+          <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
             Cancel
           </Button>
           <Button type="button" variant="destructive" onClick={handleDelete} disabled={isPending}>

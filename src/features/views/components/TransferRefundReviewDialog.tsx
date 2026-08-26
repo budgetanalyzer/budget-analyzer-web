@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { CheckedState } from '@radix-ui/react-checkbox';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { MessageBanner } from '@/components/MessageBanner';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
 import {
@@ -14,7 +15,6 @@ import {
 } from '@/components/ui/Dialog';
 import type { TransferRefundCandidate } from '@/features/views/types/transferRefundReview';
 import { createRemoveViewTransactionsRequest, useUpdateViewTransactions } from '@/hooks/useViews';
-import { toast } from '@/hooks/useToast';
 import type { Transaction } from '@/types/transaction';
 import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate } from '@/utils/dates';
@@ -47,6 +47,7 @@ export function TransferRefundReviewDialog({
 }: TransferRefundReviewDialogProps) {
   const { mutate: updateViewTransactions, isPending } = useUpdateViewTransactions();
   const [deselectedIds, setDeselectedIds] = useState<Set<number>>(() => new Set());
+  const [mutationErrorMessage, setMutationErrorMessage] = useState<string | null>(null);
 
   const eligibleIds = useMemo(
     () =>
@@ -71,16 +72,25 @@ export function TransferRefundReviewDialog({
     });
   }, []);
 
+  const handleDismissMutationError = useCallback(() => {
+    setMutationErrorMessage(null);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setMutationErrorMessage(null);
+    onClose();
+  }, [onClose]);
+
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      if (!nextOpen && !isPending) onClose();
+      if (!nextOpen && !isPending) handleClose();
     },
-    [isPending, onClose],
+    [handleClose, isPending],
   );
 
   const handleCancel = useCallback(() => {
-    if (!isPending) onClose();
-  }, [isPending, onClose]);
+    if (!isPending) handleClose();
+  }, [handleClose, isPending]);
 
   const handleRetry = useCallback(() => {
     onRetry();
@@ -89,6 +99,7 @@ export function TransferRefundReviewDialog({
   const handleConfirm = useCallback(() => {
     if (!canConfirm) return;
 
+    setMutationErrorMessage(null);
     updateViewTransactions(
       {
         viewId,
@@ -96,15 +107,15 @@ export function TransferRefundReviewDialog({
       },
       {
         onSuccess: () => {
-          onClose();
+          handleClose();
           onComplete();
         },
         onError: (mutationError) => {
-          toast.error(formatApiError(mutationError, REMOVE_FAILURE_MESSAGE));
+          setMutationErrorMessage(formatApiError(mutationError, REMOVE_FAILURE_MESSAGE));
         },
       },
     );
-  }, [canConfirm, onClose, onComplete, selectedIds, updateViewTransactions, viewId]);
+  }, [canConfirm, handleClose, onComplete, selectedIds, updateViewTransactions, viewId]);
 
   return (
     <Dialog open onOpenChange={handleOpenChange}>
@@ -140,6 +151,16 @@ export function TransferRefundReviewDialog({
             />
           )}
         </div>
+
+        {mutationErrorMessage && (
+          <div className="mt-4">
+            <MessageBanner
+              type="error"
+              message={mutationErrorMessage}
+              onClose={handleDismissMutationError}
+            />
+          </div>
+        )}
 
         <DialogFooter className="border-t pt-4">
           <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>

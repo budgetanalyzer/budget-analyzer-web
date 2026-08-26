@@ -1,27 +1,12 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { Route, Routes, useLocation } from 'react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DeleteViewModal } from '@/features/views/components/DeleteViewModal';
+import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
 import type { SavedViewMetadata } from '@/types/view';
-
-const hookMocks = vi.hoisted(() => ({
-  deleteMutate: vi.fn(),
-  isPending: false,
-}));
-
-vi.mock('@/hooks/useViews', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks/useViews')>();
-
-  return {
-    ...actual,
-    useDeleteView: () => ({
-      mutate: hookMocks.deleteMutate,
-      isPending: hookMocks.isPending,
-    }),
-  };
-});
 
 const view: SavedViewMetadata = {
   id: 'view-1',
@@ -30,6 +15,15 @@ const view: SavedViewMetadata = {
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-02T00:00:00Z',
 };
+
+function createDeferredPromise() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
 
 function LocationProbe() {
   const location = useLocation();
@@ -58,11 +52,6 @@ function renderDeleteViewModal(onClose = vi.fn()) {
   return { onClose, ...result };
 }
 
-beforeEach(() => {
-  hookMocks.deleteMutate.mockReset();
-  hookMocks.isPending = false;
-});
-
 describe('DeleteViewModal', () => {
   it('shows the view delete impact before confirmation', () => {
     renderDeleteViewModal();
@@ -74,36 +63,74 @@ describe('DeleteViewModal', () => {
   });
 
   it('closes and navigates home after a successful delete', async () => {
-    hookMocks.deleteMutate.mockImplementation((_id, options) => {
-      options.onSuccess();
-    });
+    const user = userEvent.setup();
+    const requestedIds: string[] = [];
+    server.use(
+      http.delete('/api/v1/views/:id', ({ params }) => {
+        requestedIds.push(String(params.id));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
     const { onClose } = renderDeleteViewModal();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete View' }));
+    await user.click(screen.getByRole('button', { name: 'Delete View' }));
 
-    expect(hookMocks.deleteMutate).toHaveBeenCalledWith(
-      'view-1',
-      expect.objectContaining({ onSuccess: expect.any(Function) }),
-    );
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(screen.getByTestId('location')).toHaveTextContent('/');
+    await waitFor(() => expect(requestedIds).toEqual(['view-1']));
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('does not close or navigate when delete does not succeed', async () => {
+  it('stays on the current view after failure and clears a dismissible alert on retry', async () => {
+    const user = userEvent.setup();
+    const retryResponse = createDeferredPromise();
+    const requestedIds: string[] = [];
+    server.use(
+      http.delete('/api/v1/views/:id', async ({ params }) => {
+        requestedIds.push(String(params.id));
+        if (requestedIds.length < 3) {
+          return HttpResponse.json(
+            { type: 'INTERNAL_ERROR', message: 'Delete request failed' },
+            { status: 500 },
+          );
+        }
+
+        await retryResponse.promise;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
     const { onClose } = renderDeleteViewModal();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete View' }));
+    await user.click(screen.getByRole('button', { name: 'Delete View' }));
 
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete request failed');
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1');
-  });
+    expect(screen.getByRole('heading', { name: 'Delete View' })).toBeInTheDocument();
+    expect(screen.getByText(/12 transaction memberships/)).toBeInTheDocument();
 
-  it('disables delete actions while deletion is pending', () => {
-    hookMocks.isPending = true;
+    await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
 
-    renderDeleteViewModal();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1');
 
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete View' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete View' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete request failed');
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete View' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete View' }));
+
+    expect(await screen.findByRole('button', { name: 'Deleting...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Deleting...' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1');
+
+    retryResponse.resolve();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(requestedIds).toEqual(['view-1', 'view-1', 'view-1']);
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
