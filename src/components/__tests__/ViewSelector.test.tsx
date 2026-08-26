@@ -7,20 +7,16 @@ import { ViewSelector } from '@/components/ViewSelector';
 import { useViews } from '@/hooks/useViews';
 import { renderWithProviders } from '@/testing/test-utils';
 import type { ApiError } from '@/types/apiError';
-import type { SavedView } from '@/types/view';
+import type { SavedViewMetadata } from '@/types/view';
 
 vi.mock('@/hooks/useViews');
 
 const mockUseViews = vi.mocked(useViews);
 
-const views: SavedView[] = [
+const views: SavedViewMetadata[] = [
   {
     id: 'current-view',
     name: 'Current View',
-    criteria: {},
-    openEnded: false,
-    pinnedCount: 0,
-    excludedCount: 0,
     transactionCount: 4,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
@@ -28,10 +24,6 @@ const views: SavedView[] = [
   {
     id: 'monthly-view',
     name: 'Monthly Review',
-    criteria: {},
-    openEnded: true,
-    pinnedCount: 1,
-    excludedCount: 0,
     transactionCount: 12,
     createdAt: '2026-01-02T00:00:00Z',
     updatedAt: '2026-01-02T00:00:00Z',
@@ -43,12 +35,12 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function mockViews(data: SavedView[]) {
+function mockViews(data: SavedViewMetadata[]) {
   mockUseViews.mockReturnValue({
     data,
     isLoading: false,
     error: null,
-  } as unknown as UseQueryResult<SavedView[], ApiError>);
+  } as unknown as UseQueryResult<SavedViewMetadata[], ApiError>);
 }
 
 function renderSelector(initialEntry = '/views/current-view') {

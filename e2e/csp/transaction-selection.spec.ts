@@ -11,13 +11,18 @@ test.use({
 
 test('authenticated transaction selection has no CSP violations or prohibited stylesheets', async ({
   page,
+  authenticatedSession,
   browserMocks,
   cspMonitor,
 }) => {
+  await page.clock.setFixedTime((authenticatedSession.expiresAt - 60 * 60) * 1000);
   registerTransactionPageResponses(browserMocks);
 
   await page.goto('./');
   await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Session Expiring', exact: true }),
+  ).not.toBeVisible();
 
   const transactionRow = page.getByRole('row', {
     name: /Deterministic browser fixture transaction/,

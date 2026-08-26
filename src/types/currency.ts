@@ -42,7 +42,8 @@ export interface CurrencySeriesUpdateRequest {
 export interface ExchangeRateResponse {
   baseCurrency: string;
   targetCurrency: string;
-  date: string; // LocalDate format (YYYY-MM-DD)
+  date: string; // Effective requested LocalDate (YYYY-MM-DD)
+  publishedDate: string; // Source observation LocalDate (YYYY-MM-DD)
   rate: number;
 }
 

@@ -6,7 +6,7 @@ import {
   useTransactions,
   useUpdateTransaction,
 } from '@/hooks/useTransactions';
-import { viewKeys } from '@/hooks/useViews';
+import { viewKeys } from '@/queryKeys';
 import { createTestQueryClient } from '@/testing/test-utils';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -77,7 +77,7 @@ describe('transaction mutations', () => {
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: viewKeys.all });
   });
 
-  it('invalidates saved views after updating a transaction', async () => {
+  it('does not invalidate static membership after updating a transaction', async () => {
     const queryClient = createTestQueryClient();
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
@@ -106,6 +106,6 @@ describe('transaction mutations', () => {
 
     await result.current.mutateAsync({ id: 1, data: { description: 'Updated transaction' } });
 
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: viewKeys.all });
+    expect(invalidateQueries).not.toHaveBeenCalledWith({ queryKey: viewKeys.all });
   });
 });

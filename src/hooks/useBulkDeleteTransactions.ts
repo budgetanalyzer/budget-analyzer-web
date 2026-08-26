@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Transaction } from '@/types/transaction';
 import { transactionApi } from '@/api/transactionApi';
 import { ApiError } from '@/types/apiError';
-import { viewKeys } from '@/hooks/useViews';
+import { transactionKeys, viewKeys } from '@/queryKeys';
 
 export interface BulkDeleteResult {
   deletedCount: number;
@@ -19,12 +19,12 @@ export const useBulkDeleteTransactions = () => {
       // Optimistically update cache by removing successfully deleted transactions
       const successfullyDeletedIds = deletedIds.filter((id) => !result.notFoundIds.includes(id));
 
-      queryClient.setQueryData<Transaction[]>(['transactions'], (oldData) => {
+      queryClient.setQueryData<Transaction[]>(transactionKeys.list(), (oldData) => {
         if (!oldData) return oldData;
         return oldData.filter((transaction) => !successfullyDeletedIds.includes(transaction.id));
       });
 
-      queryClient.invalidateQueries({ queryKey: ['transactionCount'] });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.count() });
       queryClient.invalidateQueries({ queryKey: viewKeys.all });
     },
   });

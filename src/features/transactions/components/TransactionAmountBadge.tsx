@@ -1,34 +1,21 @@
 // src/features/transactions/components/TransactionAmountBadge.tsx
-import { useMemo } from 'react';
-import { ExchangeRateResponse } from '@/types/currency';
-import { convertCurrency, formatCurrency } from '@/utils/currency';
+import { formatCurrency } from '@/utils/currency';
+import type { DisplayAmount } from '@/types/displayAmount';
 import { Badge } from '@/components/ui/Badge';
 import { motion } from 'motion/react';
 import { fadeInVariants, fadeTransition } from '@/lib/animations';
 
 interface TransactionAmountBadgeProps {
-  amount: number;
-  date: string;
-  currencyCode: string;
-  displayCurrency: string;
-  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
+  displayAmount: DisplayAmount;
   isCredit: boolean;
 }
 
-export function TransactionAmountBadge({
-  amount,
-  date,
-  currencyCode,
-  displayCurrency,
-  exchangeRatesMap,
-  isCredit,
-}: TransactionAmountBadgeProps) {
-  const convertedAmount = useMemo(
-    () => convertCurrency(amount, date, currencyCode, displayCurrency, exchangeRatesMap),
-    [amount, date, currencyCode, displayCurrency, exchangeRatesMap],
-  );
-
-  const needsConversion = currencyCode !== displayCurrency;
+export function TransactionAmountBadge({ displayAmount, isCredit }: TransactionAmountBadgeProps) {
+  const formattedAmount = displayAmount.available
+    ? formatCurrency(displayAmount.value, displayAmount.targetCurrency)
+    : formatCurrency(displayAmount.sourceMagnitude, displayAmount.sourceCurrency);
+  const needsConversion =
+    displayAmount.available && displayAmount.sourceCurrency !== displayAmount.targetCurrency;
 
   return (
     <motion.div
@@ -43,11 +30,16 @@ export function TransactionAmountBadge({
           isCredit ? 'text-green-600 dark:text-green-400' : 'text-foreground'
         }`}
       >
-        {formatCurrency(convertedAmount, displayCurrency)}
+        {formattedAmount}
+        {!displayAmount.available && (
+          <div className="text-xs font-normal text-warning">
+            Conversion to {displayAmount.targetCurrency} unavailable
+          </div>
+        )}
       </div>
       {needsConversion && (
         <Badge variant="outline" className="text-xs">
-          {currencyCode}
+          {displayAmount.sourceCurrency}
         </Badge>
       )}
     </motion.div>

@@ -1,8 +1,8 @@
 // src/features/transactions/components/DeleteTransactionModal.tsx
 import { useCallback } from 'react';
 import { Transaction } from '@/types/transaction';
-import { ExchangeRateResponse } from '@/types/currency';
-import { convertCurrency, formatCurrency } from '@/utils/currency';
+import type { DisplayAmount } from '@/types/displayAmount';
+import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate } from '@/utils/dates';
 import {
   Dialog,
@@ -18,33 +18,20 @@ import { toast } from '@/hooks/useToast';
 
 interface DeleteTransactionModalProps {
   transaction: Transaction | null;
+  displayAmount: DisplayAmount | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  displayCurrency: string;
-  exchangeRatesMap: Map<string, Map<string, ExchangeRateResponse>>;
   onDeleted?: () => void;
 }
 
 export function DeleteTransactionModal({
   transaction,
+  displayAmount,
   isOpen,
   onOpenChange,
-  displayCurrency,
-  exchangeRatesMap,
   onDeleted,
 }: DeleteTransactionModalProps) {
   const { mutate: deleteTransaction, isPending: isDeleting } = useDeleteTransaction();
-
-  const convertedAmount = transaction
-    ? convertCurrency(
-        transaction.amount,
-        transaction.date,
-        transaction.currencyIsoCode,
-        displayCurrency,
-        exchangeRatesMap,
-      )
-    : null;
-  const needsOriginalCurrency = transaction?.currencyIsoCode !== displayCurrency;
 
   const handleCancel = useCallback(() => {
     onOpenChange(false);
@@ -87,17 +74,30 @@ export function DeleteTransactionModal({
                 <span className="font-medium">{transaction.description}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Amount:</span>
+                <span className="text-muted-foreground">Native amount:</span>
                 <span className="font-medium">
-                  {formatCurrency(convertedAmount ?? transaction.amount, displayCurrency)}
-                  {needsOriginalCurrency && (
-                    <span className="text-muted-foreground">
-                      {' '}
-                      ({formatCurrency(transaction.amount, transaction.currencyIsoCode)})
-                    </span>
-                  )}
+                  {formatCurrency(
+                    displayAmount?.sourceMagnitude ?? Math.abs(transaction.amount),
+                    transaction.currencyIsoCode,
+                  )}{' '}
+                  {transaction.currencyIsoCode}
                 </span>
               </div>
+              {displayAmount && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Selected amount:</span>
+                  {displayAmount.available ? (
+                    <span className="font-medium">
+                      {formatCurrency(displayAmount.value, displayAmount.targetCurrency)}{' '}
+                      {displayAmount.targetCurrency}
+                    </span>
+                  ) : (
+                    <span className="font-medium text-warning">
+                      Conversion to {displayAmount.targetCurrency} unavailable
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

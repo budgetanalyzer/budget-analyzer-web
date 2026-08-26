@@ -7,6 +7,8 @@ import { useCurrencies } from '@/hooks/useCurrencies';
 import { renderWithProviders } from '@/testing/test-utils';
 import type { ApiError } from '@/types/apiError';
 import type { CurrencySeriesResponse } from '@/types/currency';
+import { useLocation } from 'react-router';
+import { toast } from '@/hooks/useToast';
 
 vi.mock('@/hooks/useCurrencies');
 
@@ -39,22 +41,55 @@ function mockCurrencies(data: CurrencySeriesResponse[] | undefined, isLoading = 
   } as unknown as UseQueryResult<CurrencySeriesResponse[], ApiError>);
 }
 
-function renderSelector(displayCurrency = 'EUR') {
-  return renderWithProviders(<CurrencySelector />, {
-    preloadedState: {
-      ui: {
-        theme: 'light',
-        displayCurrency,
-        adminSidebarOpen: true,
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+}
+
+function renderSelector(displayCurrency = 'EUR', initialEntry = '/') {
+  return renderWithProviders(
+    <>
+      <CurrencySelector />
+      <LocationProbe />
+    </>,
+    {
+      initialEntries: [initialEntry],
+      preloadedState: {
+        ui: {
+          theme: 'light',
+          displayCurrency,
+          adminSidebarOpen: true,
+        },
       },
     },
-  });
+  );
 }
 
 describe('CurrencySelector', () => {
   beforeEach(() => {
     mockUseCurrencies.mockReset();
+    vi.restoreAllMocks();
   });
+
+  it.each(['/transactions', '/views/view-1'])(
+    'clears URL amount semantics before changing currency on %s',
+    async (pathname) => {
+      mockCurrencies(currencies);
+      const infoSpy = vi.spyOn(toast, 'info');
+      const user = userEvent.setup();
+      const { store } = renderSelector(
+        'EUR',
+        `${pathname}?q=coffee&minAmount=10&maxAmount=20&amountCurrency=EUR`,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'EUR' }));
+      await user.click(screen.getByRole('menuitem', { name: 'GBP' }));
+
+      expect(screen.getByTestId('location')).toHaveTextContent(`${pathname}?q=coffee`);
+      expect(store.getState().ui.displayCurrency).toBe('GBP');
+      expect(infoSpy).toHaveBeenCalledWith('Amount filters were cleared for the new currency.');
+    },
+  );
 
   it('selects an enabled currency, updates Redux, and closes', async () => {
     mockCurrencies(currencies);
@@ -79,8 +114,8 @@ describe('CurrencySelector', () => {
   it('renders no selector while enabled currencies are loading', () => {
     mockCurrencies(undefined, true);
 
-    const { container } = renderSelector();
+    renderSelector();
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

@@ -43,6 +43,7 @@ export function YearlySpendingGrid({
           yearLabel={year.yearLabel}
           totalSpending={year.totalSpending}
           transactionCount={year.transactionCount}
+          unavailableAmountCount={year.unavailableAmountCount}
           currency={currency}
           viewMode={viewMode}
           transactionType={transactionType}

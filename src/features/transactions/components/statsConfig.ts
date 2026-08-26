@@ -33,6 +33,24 @@ function formatDateRange(earliest: string | null, latest: string | null): string
   return `${formatLocalDate(earliest)} - ${formatLocalDate(latest)}`;
 }
 
+function formatMonetaryValue(value: number | null, displayCurrency: string): string {
+  return value === null ? 'Unavailable' : formatCurrency(value, displayCurrency);
+}
+
+function monetaryDescription(
+  baseDescription: string,
+  availableAmountCount: number,
+  unavailableAmountCount: number,
+): string {
+  if (availableAmountCount === 0 && unavailableAmountCount > 0) {
+    return `Conversion unavailable for all ${unavailableAmountCount} transactions`;
+  }
+  if (unavailableAmountCount > 0) {
+    return `${baseDescription} · Partial; ${unavailableAmountCount} unavailable`;
+  }
+  return baseDescription;
+}
+
 export function buildMainStatsConfig(
   stats: TransactionStats,
   displayCurrency: string,
@@ -46,26 +64,38 @@ export function buildMainStatsConfig(
     },
     {
       title: 'Total Credits',
-      value: formatCurrency(stats.totalCredits, displayCurrency),
-      description: 'Income received',
+      value: formatMonetaryValue(stats.totalCredits, displayCurrency),
+      description: monetaryDescription(
+        'Income received',
+        stats.availableCreditAmountCount,
+        stats.unavailableCreditAmountCount,
+      ),
       icon: TrendingUp,
       iconClassName: 'text-green-600',
       valueClassName: 'text-green-600 dark:text-green-400',
     },
     {
       title: 'Total Debits',
-      value: formatCurrency(stats.totalDebits, displayCurrency),
-      description: 'Expenses paid',
+      value: formatMonetaryValue(stats.totalDebits, displayCurrency),
+      description: monetaryDescription(
+        'Expenses paid',
+        stats.availableDebitAmountCount,
+        stats.unavailableDebitAmountCount,
+      ),
       icon: TrendingDown,
       iconClassName: 'text-red-600',
     },
     {
       title: 'Net Balance',
-      value: formatCurrency(stats.netBalance, displayCurrency),
-      description: 'Current period',
+      value: formatMonetaryValue(stats.netBalance, displayCurrency),
+      description: monetaryDescription(
+        'Current period',
+        stats.availableAmountCount,
+        stats.unavailableAmountCount,
+      ),
       icon: Scale,
       valueClassName:
-        stats.netBalance >= 0
+        stats.netBalance !== null && stats.netBalance >= 0
           ? 'text-green-600 dark:text-green-400'
           : 'text-red-600 dark:text-red-400',
     },
@@ -92,26 +122,38 @@ export function buildMonthlyStatsConfig(
     },
     {
       title: 'Avg Credits/Month',
-      value: formatCurrency(monthlyAverages.avgCreditsPerMonth, displayCurrency),
-      description: 'Average monthly income',
+      value: formatMonetaryValue(monthlyAverages.avgCreditsPerMonth, displayCurrency),
+      description: monetaryDescription(
+        'Average monthly income',
+        monthlyAverages.availableCreditAmountCount,
+        monthlyAverages.unavailableCreditAmountCount,
+      ),
       icon: TrendingUp,
       iconClassName: 'text-green-600',
       valueClassName: 'text-green-600 dark:text-green-400',
     },
     {
       title: 'Avg Debits/Month',
-      value: formatCurrency(monthlyAverages.avgDebitsPerMonth, displayCurrency),
-      description: 'Average monthly expenses',
+      value: formatMonetaryValue(monthlyAverages.avgDebitsPerMonth, displayCurrency),
+      description: monetaryDescription(
+        'Average monthly expenses',
+        monthlyAverages.availableDebitAmountCount,
+        monthlyAverages.unavailableDebitAmountCount,
+      ),
       icon: TrendingDown,
       iconClassName: 'text-red-600',
     },
     {
       title: 'Avg Net Balance/Month',
-      value: formatCurrency(monthlyAverages.avgNetBalancePerMonth, displayCurrency),
-      description: 'Average monthly balance',
+      value: formatMonetaryValue(monthlyAverages.avgNetBalancePerMonth, displayCurrency),
+      description: monetaryDescription(
+        'Average monthly balance',
+        monthlyAverages.availableAmountCount,
+        monthlyAverages.unavailableAmountCount,
+      ),
       icon: Scale,
       valueClassName:
-        monthlyAverages.avgNetBalancePerMonth >= 0
+        monthlyAverages.avgNetBalancePerMonth !== null && monthlyAverages.avgNetBalancePerMonth >= 0
           ? 'text-green-600 dark:text-green-400'
           : 'text-red-600 dark:text-red-400',
     },

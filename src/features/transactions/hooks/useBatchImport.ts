@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, UseMutationResult } from '@tanstack/react-
 import { BatchImportRequest, BatchImportResponse } from '@/types/transaction';
 import { transactionApi } from '@/api/transactionApi';
 import { ApiError } from '@/types/apiError';
-import { viewKeys } from '@/hooks/useViews';
+import { transactionKeys } from '@/queryKeys';
 
 export const useBatchImport = (): UseMutationResult<
   BatchImportResponse,
@@ -16,9 +16,8 @@ export const useBatchImport = (): UseMutationResult<
     mutationFn: (request: BatchImportRequest) => transactionApi.batchImportTransactions(request),
     onSuccess: () => {
       // Invalidate transactions query to refetch the updated list
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['transactionCount'] });
-      queryClient.invalidateQueries({ queryKey: viewKeys.all });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.list() });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.count() });
     },
   });
 };

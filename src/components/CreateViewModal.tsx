@@ -1,31 +1,36 @@
-// src/components/CreateViewModal.tsx
-import { useState, useCallback, FormEvent } from 'react';
+import { useCallback, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Checkbox } from '@/components/ui/Checkbox';
+import { toast } from '@/hooks/useToast';
 import { useCreateView } from '@/hooks/useViews';
-import { ViewCriteriaApi } from '@/types/view';
-import { formatLocalDate } from '@/utils/dates';
+import { formatApiError } from '@/utils/errorMessages';
 
 interface CreateViewModalProps {
   open: boolean;
   onClose: () => void;
-  criteria: ViewCriteriaApi;
+  transactionIds: number[];
+  isTransactionIdsReady: boolean;
+  title?: string;
 }
 
-export function CreateViewModal({ open, onClose, criteria }: CreateViewModalProps) {
+export function CreateViewModal({
+  open,
+  onClose,
+  transactionIds,
+  isTransactionIdsReady,
+  title = 'Save as View',
+}: CreateViewModalProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [name, setName] = useState('');
-  const [openEnded, setOpenEnded] = useState(false);
   const { mutate: createView, isPending } = useCreateView();
 
   const clearTransactionFilterParams = useCallback(() => {
@@ -40,77 +45,74 @@ export function CreateViewModal({ open, onClose, criteria }: CreateViewModalProp
     params.delete('type');
     params.delete('minAmount');
     params.delete('maxAmount');
+    params.delete('amountCurrency');
     params.delete('returnTo');
     params.delete('breadcrumbLabel');
     setSearchParams(params, { replace: true });
   }, [searchParams, setSearchParams]);
 
   const handleSubmit = useCallback(
-    (e: FormEvent) => {
-      e.preventDefault();
+    (event: FormEvent) => {
+      event.preventDefault();
 
-      if (!name.trim()) return;
+      const trimmedName = name.trim();
+      if (!trimmedName || !isTransactionIdsReady) return;
 
       createView(
-        {
-          name: name.trim(),
-          criteria,
-          openEnded,
-        },
+        { name: trimmedName, transactionIds },
         {
           onSuccess: (newView) => {
             clearTransactionFilterParams();
             onClose();
             setName('');
-            setOpenEnded(false);
             navigate(`/views/${newView.id}`);
+          },
+          onError: (error) => {
+            if (error.response.code === 'SAVED_VIEW_MEMBERSHIP_STALE') {
+              toast.error(
+                'The visible transaction set changed. The transaction snapshot was refreshed; review the current set and save again.',
+              );
+              return;
+            }
+
+            toast.error(formatApiError(error, 'Failed to save view'));
           },
         },
       );
     },
-    [name, criteria, openEnded, createView, clearTransactionFilterParams, onClose, navigate],
+    [
+      clearTransactionFilterParams,
+      createView,
+      isTransactionIdsReady,
+      name,
+      navigate,
+      onClose,
+      transactionIds,
+    ],
   );
 
   const handleCancel = useCallback(() => {
     setName('');
-    setOpenEnded(false);
     onClose();
   }, [onClose]);
 
-  const handleOpenEndedChange = useCallback((checked: boolean | 'indeterminate') => {
-    setOpenEnded(checked === true);
+  const handleOpenChange = useCallback(
+    (isOpen: boolean) => {
+      if (!isOpen) handleCancel();
+    },
+    [handleCancel],
+  );
+
+  const handleNameChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setName(event.target.value);
   }, []);
 
-  // Build criteria summary lines
-  const criteriaLines: string[] = [];
-  if (criteria.dateFrom || criteria.dateTo) {
-    const start = criteria.dateFrom ? formatLocalDate(criteria.dateFrom) : 'Any';
-    const end = criteria.dateTo ? formatLocalDate(criteria.dateTo) : 'Ongoing';
-    criteriaLines.push(`Date range: ${start} - ${end}`);
-  }
-  if (criteria.searchText) {
-    criteriaLines.push(`Search: "${criteria.searchText}"`);
-  }
-  if (criteria.type) {
-    criteriaLines.push(`Type: ${criteria.type === 'DEBIT' ? 'Debit' : 'Credit'}`);
-  }
-  if (criteria.minAmount !== undefined || criteria.maxAmount !== undefined) {
-    const min = criteria.minAmount !== undefined ? `$${criteria.minAmount}` : '$0';
-    const max = criteria.maxAmount !== undefined ? `$${criteria.maxAmount}` : 'Any';
-    criteriaLines.push(`Amount: ${min} - ${max}`);
-  }
-  if (criteria.accountIds && criteria.accountIds.length > 0) {
-    criteriaLines.push(`Accounts: ${criteria.accountIds.join(', ')}`);
-  }
-
-  const hasCriteria = criteriaLines.length > 0;
-
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleCancel()}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Save as View</DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -121,47 +123,26 @@ export function CreateViewModal({ open, onClose, criteria }: CreateViewModalProp
               <Input
                 id="view-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={handleNameChange}
                 placeholder="e.g., SF Trip December 2024"
                 required
-                maxLength={100}
+                maxLength={255}
                 autoFocus
               />
             </div>
 
-            {hasCriteria && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Filters to Save:</p>
-                <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
-                  {criteriaLines.map((line, index) => (
-                    <li key={index}>{line}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="open-ended"
-                checked={openEnded}
-                onCheckedChange={handleOpenEndedChange}
-              />
-              <div className="space-y-1">
-                <label htmlFor="open-ended" className="cursor-pointer text-sm font-medium">
-                  Keep view open-ended
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  Include future transactions matching these criteria
-                </p>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              {transactionIds.length === 1
+                ? '1 currently visible transaction will be saved.'
+                : `${transactionIds.length} currently visible transactions will be saved.`}
+            </p>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending || !name.trim()}>
+            <Button type="submit" disabled={isPending || !name.trim() || !isTransactionIdsReady}>
               {isPending ? 'Saving...' : 'Save View'}
             </Button>
           </DialogFooter>

@@ -35,6 +35,7 @@ export function dismiss(id: string) {
 }
 
 export const toast = {
+  info: (message: string) => addToast(message, 'default'),
   success: (message: string) => addToast(message, 'success'),
   error: (message: string) => addToast(message, 'destructive'),
   warning: (message: string) => addToast(message, 'warning'),

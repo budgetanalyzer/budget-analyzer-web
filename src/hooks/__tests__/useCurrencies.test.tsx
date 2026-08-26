@@ -7,11 +7,13 @@ import {
   useCreateCurrency,
   useCurrencies,
   useExchangeRates,
+  useExchangeRatesMap,
   useUpdateCurrency,
 } from '@/hooks/useCurrencies';
 import { server } from '@/testing/mocks/server';
 import { createTestQueryClient } from '@/testing/test-utils';
 import type { CurrencySeriesResponse } from '@/types/currency';
+import type { Transaction } from '@/types/transaction';
 
 const usdCurrency: CurrencySeriesResponse = {
   id: 1,
@@ -21,6 +23,29 @@ const usdCurrency: CurrencySeriesResponse = {
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-02T00:00:00Z',
 };
+
+function currency(currencyCode: string, id: number): CurrencySeriesResponse {
+  return {
+    ...usdCurrency,
+    id,
+    currencyCode,
+  };
+}
+
+function transaction(id: number, currencyIsoCode: string, date: string): Transaction {
+  return {
+    id,
+    accountId: `account-${id}`,
+    bankName: 'Test Bank',
+    date,
+    currencyIsoCode,
+    amount: 10,
+    type: 'DEBIT',
+    description: `Transaction ${id}`,
+    createdAt: `${date}T00:00:00Z`,
+    updatedAt: `${date}T00:00:00Z`,
+  };
+}
 
 function createWrapper(queryClient = createTestQueryClient()) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -93,6 +118,151 @@ describe('useExchangeRates', () => {
 
     expect(result.current.isPending).toBe(true);
     expect(requestCount).toBe(0);
+  });
+});
+
+describe('useExchangeRatesMap', () => {
+  it('requests only needed currencies with inclusive complete-snapshot bounds', async () => {
+    const queryClient = createTestQueryClient();
+    const capturedUrls: URL[] = [];
+
+    server.use(
+      http.get('/api/v1/transactions', () =>
+        HttpResponse.json([
+          transaction(1, 'EUR', '2026-01-15'),
+          transaction(2, 'USD', '2026-01-01'),
+          transaction(3, 'JPY', '2026-01-31'),
+        ]),
+      ),
+      http.get('/api/v1/currencies', () =>
+        HttpResponse.json([currency('EUR', 2), currency('JPY', 3)]),
+      ),
+      http.get('/api/v1/exchange-rates', ({ request }) => {
+        const url = new URL(request.url);
+        const targetCurrency = url.searchParams.get('targetCurrency') ?? '';
+        capturedUrls.push(url);
+        return HttpResponse.json([
+          {
+            baseCurrency: 'USD',
+            targetCurrency,
+            date: '2026-01-15',
+            publishedDate: '2026-01-15',
+            rate: targetCurrency === 'EUR' ? 0.8 : 150,
+          },
+        ]);
+      }),
+    );
+
+    const { result } = renderHook(() => useExchangeRatesMap({ displayCurrency: 'JPY' }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.exchangeRatesData).toHaveLength(2));
+
+    expect(capturedUrls.map((url) => url.searchParams.get('targetCurrency')).sort()).toEqual([
+      'EUR',
+      'JPY',
+    ]);
+    capturedUrls.forEach((url) => {
+      expect(url.searchParams.get('startDate')).toBe('2026-01-01');
+      expect(url.searchParams.get('endDate')).toBe('2026-01-31');
+    });
+    expect(
+      queryClient.getQueryData(['exchangeRates', 'EUR', '2026-01-01', '2026-01-31']),
+    ).toBeDefined();
+    expect(result.current.pendingCurrencies).toEqual([]);
+    expect(result.current.failedCurrencies).toEqual([]);
+  });
+
+  it('retains successful series and identifies a partially failed currency', async () => {
+    server.use(
+      http.get('/api/v1/transactions', () =>
+        HttpResponse.json([
+          transaction(1, 'EUR', '2026-02-01'),
+          transaction(2, 'JPY', '2026-02-02'),
+        ]),
+      ),
+      http.get('/api/v1/currencies', () =>
+        HttpResponse.json([currency('EUR', 2), currency('JPY', 3)]),
+      ),
+      http.get('/api/v1/exchange-rates', ({ request }) => {
+        const targetCurrency = new URL(request.url).searchParams.get('targetCurrency');
+        if (targetCurrency === 'JPY') {
+          return HttpResponse.json(
+            { type: 'SERVICE_UNAVAILABLE', message: 'JPY rates unavailable' },
+            { status: 503 },
+          );
+        }
+        return HttpResponse.json([
+          {
+            baseCurrency: 'USD',
+            targetCurrency: 'EUR',
+            date: '2026-02-01',
+            publishedDate: '2026-01-30',
+            rate: 0.8,
+          },
+        ]);
+      }),
+    );
+
+    const { result } = renderHook(() => useExchangeRatesMap({ displayCurrency: 'USD' }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.failedCurrencies).toEqual(['JPY']), {
+      timeout: 4000,
+    });
+
+    expect(result.current.exchangeRatesMap.get('2026-02-01')?.get('EUR')?.rate).toBe(0.8);
+    expect(result.current.exchangeRatesData).toHaveLength(1);
+    expect(result.current.pendingCurrencies).toEqual([]);
+    expect(result.current.error).toMatchObject({ status: 503 });
+  });
+
+  it('reports an enabled currency with an empty successful series as pending', async () => {
+    server.use(
+      http.get('/api/v1/transactions', () =>
+        HttpResponse.json([transaction(1, 'USD', '2026-03-01')]),
+      ),
+      http.get('/api/v1/currencies', () => HttpResponse.json([currency('EUR', 2)])),
+      http.get('/api/v1/exchange-rates', () => HttpResponse.json([])),
+    );
+
+    const { result } = renderHook(() => useExchangeRatesMap({ displayCurrency: 'EUR' }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.pendingCurrencies).toEqual(['EUR']));
+
+    expect(result.current.failedCurrencies).toEqual([]);
+    expect(result.current.error).toBeUndefined();
+  });
+
+  it('does not issue exchange-rate history queries for an empty snapshot', async () => {
+    const queryClient = createTestQueryClient();
+    let exchangeRateRequestCount = 0;
+
+    server.use(
+      http.get('/api/v1/transactions', () => HttpResponse.json([])),
+      http.get('/api/v1/currencies', () => HttpResponse.json([])),
+      http.get('/api/v1/exchange-rates', () => {
+        exchangeRateRequestCount += 1;
+        return HttpResponse.json([]);
+      }),
+    );
+
+    const { result } = renderHook(() => useExchangeRatesMap({ displayCurrency: 'EUR' }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() =>
+      expect(queryClient.getQueryState(['transactions'])?.status).toBe('success'),
+    );
+
+    expect(exchangeRateRequestCount).toBe(0);
+    expect(result.current.exchangeRatesData).toEqual([]);
+    expect(result.current.pendingCurrencies).toEqual([]);
+    expect(result.current.failedCurrencies).toEqual([]);
   });
 });
 

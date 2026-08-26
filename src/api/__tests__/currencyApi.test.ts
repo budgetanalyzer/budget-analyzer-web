@@ -122,6 +122,7 @@ describe('currencyApi', () => {
             baseCurrency: 'USD',
             targetCurrency: 'EUR',
             date: '2026-01-01',
+            publishedDate: '2025-12-31',
             rate: 0.92,
           },
         ]);
@@ -139,6 +140,7 @@ describe('currencyApi', () => {
     expect(capturedUrl?.searchParams.get('startDate')).toBe('2026-01-01');
     expect(capturedUrl?.searchParams.get('endDate')).toBe('2026-01-31');
     expect(response[0].rate).toBe(0.92);
+    expect(response[0].publishedDate).toBe('2025-12-31');
   });
 
   it('rejects a string exchange-rate response', async () => {

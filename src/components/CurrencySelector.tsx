@@ -1,6 +1,7 @@
 // src/components/CurrencySelector.tsx
 import { useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useLocation, useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import {
   DropdownMenu,
@@ -11,9 +12,12 @@ import {
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setDisplayCurrency } from '@/store/uiSlice';
 import { useCurrencies } from '@/hooks/useCurrencies';
+import { toast } from '@/hooks/useToast';
 
 export function CurrencySelector() {
   const dispatch = useAppDispatch();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const { data: currencies, isLoading } = useCurrencies(true); // Only show enabled currencies
 
@@ -26,7 +30,29 @@ export function CurrencySelector() {
   }, [enabledCodes, displayCurrency, dispatch]);
 
   const handleCurrencyChange = (currency: string) => {
+    if (currency === displayCurrency) return;
+
+    const isTransactionsRoute = location.pathname === '/' || location.pathname === '/transactions';
+    const isSavedViewDetailRoute = /^\/views\/[^/]+\/?$/.test(location.pathname);
+    const shouldClearAmountFilter =
+      (isTransactionsRoute || isSavedViewDetailRoute) &&
+      (searchParams.has('minAmount') ||
+        searchParams.has('maxAmount') ||
+        searchParams.has('amountCurrency'));
+
+    if (shouldClearAmountFilter) {
+      const params = new URLSearchParams(searchParams);
+      params.delete('minAmount');
+      params.delete('maxAmount');
+      params.delete('amountCurrency');
+      setSearchParams(params, { replace: true });
+    }
+
     dispatch(setDisplayCurrency(currency));
+
+    if (shouldClearAmountFilter) {
+      toast.info('Amount filters were cleared for the new currency.');
+    }
   };
 
   if (isLoading) {

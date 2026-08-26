@@ -1,16 +1,15 @@
 import type { ExchangeRateResponse } from '@/types/currency';
 import type { Transaction } from '@/types/transaction';
-import type { ViewTransaction } from '@/types/view';
 import type {
   TransferRefundCandidate,
   TransferRefundCandidateKind,
 } from '@/features/views/types/transferRefundReview';
-import { findNearestExchangeRate } from '@/utils/currency';
 import { compareLocalDates, getDaysBetween } from '@/utils/dates';
+import { projectDisplayAmount } from '@/utils/displayAmount';
 
 type ExchangeRateMap = Map<string, Map<string, ExchangeRateResponse>>;
 type AccountRelationship = 'SAME' | 'DIFFERENT' | 'AMBIGUOUS';
-type CandidateEdgeMembership = 'ALL_VISIBLE' | 'USES_NON_VISIBLE';
+type CandidateEdgeMembership = 'ALL_MEMBERS' | 'USES_NONMEMBER';
 
 interface PreparedTransaction {
   transaction: Transaction;
@@ -44,8 +43,6 @@ const REFUND_FIXED_TOLERANCE_CENTS = 100;
 const TRANSFER_MAX_DAYS = 7;
 const TRANSFER_PERCENT_TOLERANCE = 0.05;
 
-// These describe statement mechanics rather than a merchant or employer. Transfer terms are
-// intentionally retained because they can help explain a transfer candidate without gating it.
 const DESCRIPTION_BOILERPLATE_TOKENS = new Set([
   'card',
   'credit',
@@ -71,21 +68,13 @@ function getAccountRelationship(debit: Transaction, credit: Transaction): Accoun
   const debitBank = normalizeIdentity(debit.bankName);
   const creditBank = normalizeIdentity(credit.bankName);
 
-  if (!debitBank || !creditBank) {
-    return 'AMBIGUOUS';
-  }
-
-  if (debitBank !== creditBank) {
-    return 'DIFFERENT';
-  }
+  if (!debitBank || !creditBank) return 'AMBIGUOUS';
+  if (debitBank !== creditBank) return 'DIFFERENT';
 
   const debitAccount = normalizeIdentity(debit.accountId);
   const creditAccount = normalizeIdentity(credit.accountId);
 
-  if (!debitAccount || !creditAccount) {
-    return 'AMBIGUOUS';
-  }
-
+  if (!debitAccount || !creditAccount) return 'AMBIGUOUS';
   return debitAccount === creditAccount ? 'SAME' : 'DIFFERENT';
 }
 
@@ -111,29 +100,13 @@ function convertAmountToUsdCents(
   preparedTransaction: PreparedTransaction,
   exchangeRates: ExchangeRateMap,
 ): number | null {
-  const { transaction, currencyCode, absoluteAmount } = preparedTransaction;
-  let amountUsd = absoluteAmount;
+  const normalizedTransaction = {
+    ...preparedTransaction.transaction,
+    currencyIsoCode: preparedTransaction.currencyCode,
+  };
+  const displayAmount = projectDisplayAmount(normalizedTransaction, 'USD', exchangeRates);
 
-  if (currencyCode !== 'USD') {
-    const exchangeRate = findNearestExchangeRate(transaction.date, currencyCode, exchangeRates);
-    if (
-      !exchangeRate ||
-      normalizeCurrencyCode(exchangeRate.baseCurrency) !== 'USD' ||
-      normalizeCurrencyCode(exchangeRate.targetCurrency) !== currencyCode ||
-      !Number.isFinite(exchangeRate.rate) ||
-      exchangeRate.rate <= 0
-    ) {
-      return null;
-    }
-
-    amountUsd = absoluteAmount / exchangeRate.rate;
-  }
-
-  if (!Number.isFinite(amountUsd)) {
-    return null;
-  }
-
-  return roundPositiveAmountToCents(amountUsd);
+  return displayAmount.available ? roundPositiveAmountToCents(displayAmount.value) : null;
 }
 
 function prepareTransactions(transactions: Transaction[]): PreparedTransaction[] {
@@ -141,9 +114,7 @@ function prepareTransactions(transactions: Transaction[]): PreparedTransaction[]
     const currencyCode = normalizeCurrencyCode(transaction.currencyIsoCode);
     const absoluteAmount = Math.abs(transaction.amount);
 
-    if (!currencyCode || !Number.isFinite(absoluteAmount) || absoluteAmount === 0) {
-      return [];
-    }
+    if (!currencyCode || !Number.isFinite(absoluteAmount) || absoluteAmount === 0) return [];
 
     return [
       {
@@ -184,9 +155,7 @@ function getComparisonAmounts(
     ? roundPositiveAmountToCents(credit.absoluteAmount)
     : getUsdAmountCents(credit, exchangeRates, usdAmountCache);
 
-  if (debitAmountCents === null || creditAmountCents === null) {
-    return null;
-  }
+  if (debitAmountCents === null || creditAmountCents === null) return null;
 
   return {
     debitAmountCents,
@@ -221,16 +190,12 @@ function buildCandidateEdge(
   membership: CandidateEdgeMembership,
 ): CandidateEdge | null {
   const accountRelationship = getAccountRelationship(debit.transaction, credit.transaction);
-  if (accountRelationship === 'AMBIGUOUS') {
-    return null;
-  }
+  if (accountRelationship === 'AMBIGUOUS') return null;
 
   const signedDayDistance = getDaysBetween(debit.transaction.date, credit.transaction.date);
   const absoluteDayDistance = Math.abs(signedDayDistance);
   const comparisonAmounts = getComparisonAmounts(debit, credit, exchangeRates, usdAmountCache);
-  if (!comparisonAmounts) {
-    return null;
-  }
+  if (!comparisonAmounts) return null;
 
   const { debitAmountCents, amountDifferenceCents } = comparisonAmounts;
   const amountDifferenceBasisPoints = getAmountDifferenceBasisPoints(
@@ -287,12 +252,12 @@ function buildCandidateEdge(
 function getCandidateEdgeMembership(
   debit: PreparedTransaction,
   credit: PreparedTransaction,
-  visibleTransactionIds: Set<number>,
+  memberTransactionIds: Set<number>,
 ): CandidateEdgeMembership {
-  return visibleTransactionIds.has(debit.transaction.id) &&
-    visibleTransactionIds.has(credit.transaction.id)
-    ? 'ALL_VISIBLE'
-    : 'USES_NON_VISIBLE';
+  return memberTransactionIds.has(debit.transaction.id) &&
+    memberTransactionIds.has(credit.transaction.id)
+    ? 'ALL_MEMBERS'
+    : 'USES_NONMEMBER';
 }
 
 function compareCandidateEdges(left: CandidateEdge, right: CandidateEdge): number {
@@ -300,8 +265,7 @@ function compareCandidateEdges(left: CandidateEdge, right: CandidateEdge): numbe
     left.amountDifferenceBasisPoints - right.amountDifferenceBasisPoints ||
     left.absoluteDayDistance - right.absoluteDayDistance ||
     right.sharedDescriptionTokens.length - left.sharedDescriptionTokens.length ||
-    Number(left.membership === 'USES_NON_VISIBLE') -
-      Number(right.membership === 'USES_NON_VISIBLE') ||
+    Number(left.membership === 'USES_NONMEMBER') - Number(right.membership === 'USES_NONMEMBER') ||
     left.debit.transaction.id - right.debit.transaction.id ||
     left.credit.transaction.id - right.credit.transaction.id
   );
@@ -309,8 +273,7 @@ function compareCandidateEdges(left: CandidateEdge, right: CandidateEdge): numbe
 
 function toCandidate(
   edge: CandidateEdge,
-  visibleTransactionIds: Set<number>,
-  explicitlyExcludedTransactionIds: Set<number>,
+  memberTransactionIds: Set<number>,
 ): TransferRefundCandidate {
   const debit = edge.debit.transaction;
   const credit = edge.credit.transaction;
@@ -323,31 +286,22 @@ function toCandidate(
     absoluteDayDistance: edge.absoluteDayDistance,
     amountDifferenceBasisPoints: edge.amountDifferenceBasisPoints,
     sharedDescriptionTokens: edge.sharedDescriptionTokens,
-    explicitlyExcludedTransactionIds: [debit.id, credit.id].filter((transactionId) =>
-      explicitlyExcludedTransactionIds.has(transactionId),
-    ),
-    eligibleExclusionTransactionIds: [debit.id, credit.id].filter(
-      (transactionId) =>
-        visibleTransactionIds.has(transactionId) &&
-        !explicitlyExcludedTransactionIds.has(transactionId),
+    eligibleRemovalTransactionIds: [debit.id, credit.id].filter((transactionId) =>
+      memberTransactionIds.has(transactionId),
     ),
   };
 }
 
 /**
- * Finds possible one-to-one refunds and internal transfers using only the supplied transactions,
- * visible and explicitly excluded saved-view membership, and exchange-rate snapshots.
+ * Find one-to-one refunds and internal transfers. Nonmembers may be evidence, but every retained
+ * candidate includes at least one current saved-view member and only member IDs are removable.
  */
 export function findTransferRefundCandidates(
   transactions: Transaction[],
-  visibleViewTransactions: ViewTransaction[],
+  memberIds: ReadonlySet<number>,
   exchangeRates: ExchangeRateMap,
-  explicitlyExcludedIds: number[] = [],
 ): TransferRefundCandidate[] {
-  const visibleTransactionIds = new Set(
-    visibleViewTransactions.map((transaction) => transaction.id),
-  );
-  const explicitlyExcludedTransactionIds = new Set(explicitlyExcludedIds);
+  const memberTransactionIds = new Set(memberIds);
   const preparedTransactions = prepareTransactions(transactions);
   const debits = preparedTransactions.filter(({ transaction }) => transaction.type === 'DEBIT');
   const credits = preparedTransactions.filter(({ transaction }) => transaction.type === 'CREDIT');
@@ -357,17 +311,15 @@ export function findTransferRefundCandidates(
   for (const credit of credits) {
     for (const debit of debits) {
       if (
-        !visibleTransactionIds.has(debit.transaction.id) &&
-        !visibleTransactionIds.has(credit.transaction.id)
+        !memberTransactionIds.has(debit.transaction.id) &&
+        !memberTransactionIds.has(credit.transaction.id)
       ) {
         continue;
       }
 
-      const membership = getCandidateEdgeMembership(debit, credit, visibleTransactionIds);
+      const membership = getCandidateEdgeMembership(debit, credit, memberTransactionIds);
       const edge = buildCandidateEdge(debit, credit, exchangeRates, usdAmountCache, membership);
-      if (edge) {
-        edges.push(edge);
-      }
+      if (edge) edges.push(edge);
     }
   }
 
@@ -379,13 +331,11 @@ export function findTransferRefundCandidates(
   for (const edge of edges) {
     const debitId = edge.debit.transaction.id;
     const creditId = edge.credit.transaction.id;
-    if (retainedTransactionIds.has(debitId) || retainedTransactionIds.has(creditId)) {
-      continue;
-    }
+    if (retainedTransactionIds.has(debitId) || retainedTransactionIds.has(creditId)) continue;
 
     retainedTransactionIds.add(debitId);
     retainedTransactionIds.add(creditId);
-    candidates.push(toCandidate(edge, visibleTransactionIds, explicitlyExcludedTransactionIds));
+    candidates.push(toCandidate(edge, memberTransactionIds));
   }
 
   return candidates.sort(

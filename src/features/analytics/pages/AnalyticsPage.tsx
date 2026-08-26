@@ -1,74 +1,62 @@
 // src/features/analytics/pages/AnalyticsPage.tsx
-import { motion, AnimatePresence } from 'motion/react';
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTransactions } from '@/hooks/useTransactions';
-import { useView, useViews, useViewTransactions } from '@/hooks/useViews';
-import { useExchangeRatesMap } from '@/hooks/useCurrencies';
-import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
+import { motion, AnimatePresence } from 'motion/react';
+import { Navigate, useSearchParams } from 'react-router';
+import { AnalyticsSourceSelector } from '@/features/analytics/components/AnalyticsSourceSelector';
+import { MonthlySpendingGrid } from '@/features/analytics/components/MonthlySpendingGrid';
+import { TransactionTypeSelector } from '@/features/analytics/components/TransactionTypeSelector';
+import { ViewModeSelector } from '@/features/analytics/components/ViewModeSelector';
+import { YearlySpendingGrid } from '@/features/analytics/components/YearlySpendingGrid';
+import { YearSelector } from '@/features/analytics/components/YearSelector';
 import { useAnalyticsData } from '@/features/analytics/hooks/useAnalyticsData';
-import { fadeInVariants, layoutTransition, fadeVariants, fadeTransition } from '@/lib/animations';
+import {
+  ANALYTICS_PARAMS,
+  type AnalyticsScope,
+  type AnalyticsUrlState,
+  type TransactionTypeParam,
+  type ViewMode,
+  parseAnalyticsSearchParams,
+} from '@/features/analytics/utils/urlState';
+import { PermissionGuard } from '@/features/auth/components/PermissionGuard';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { MissingExchangeRatesBanner } from '@/components/MissingExchangeRatesBanner';
 import { PageHeader } from '@/components/PageHeader';
-import { MonthlySpendingGrid } from '@/features/analytics/components/MonthlySpendingGrid';
-import { YearlySpendingGrid } from '@/features/analytics/components/YearlySpendingGrid';
-import { YearSelector } from '@/features/analytics/components/YearSelector';
-import { ViewModeSelector } from '@/features/analytics/components/ViewModeSelector';
-import { TransactionTypeSelector } from '@/features/analytics/components/TransactionTypeSelector';
-import { AnalyticsSourceSelector } from '@/features/analytics/components/AnalyticsSourceSelector';
+import { useExchangeRatesMap } from '@/hooks/useCurrencies';
+import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
+import { useTransactions } from '@/hooks/useTransactions';
+import { useView, useViews, useViewTransactions } from '@/hooks/useViews';
+import { fadeInVariants, layoutTransition, fadeVariants, fadeTransition } from '@/lib/animations';
 import { useAppSelector } from '@/store/hooks';
-import { useSearchParams } from 'react-router';
-import { useCallback, useEffect, useMemo } from 'react';
+import type { ApiError } from '@/types/apiError';
+import type { Transaction } from '@/types/transaction';
 import { getCurrentYear } from '@/utils/dates';
-import {
-  ANALYTICS_PARAMS,
-  ViewMode,
-  TransactionTypeParam,
-  AnalyticsScope,
-  parseAnalyticsSearchParams,
-} from '@/features/analytics/utils/urlState';
 
-export function AnalyticsPage() {
+interface AnalyticsContentProps {
+  analyticsUrlState: AnalyticsUrlState;
+  resolvedTransactions: Transaction[] | undefined;
+  isSourceLoading: boolean;
+  sourceError: ApiError | null;
+  onRetrySource: () => void;
+  sourceSelector?: ReactNode;
+  activeViewName?: string;
+}
+
+function AnalyticsContent({
+  analyticsUrlState,
+  resolvedTransactions,
+  isSourceLoading,
+  sourceError,
+  onRetrySource,
+  sourceSelector,
+  activeViewName,
+}: AnalyticsContentProps) {
   const queryClient = useQueryClient();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const [searchParams, setSearchParams] = useSearchParams();
-
-  const analyticsUrlState = useMemo(() => parseAnalyticsSearchParams(searchParams), [searchParams]);
-
   const { scope: analyticsScope, viewId, viewMode, transactionType } = analyticsUrlState;
-  const activeViewId = analyticsScope === 'view' ? (viewId ?? '') : '';
 
-  const {
-    data: transactions,
-    isLoading: isTransactionsLoading,
-    error: transactionsError,
-    refetch: refetchTransactions,
-  } = useTransactions({ enabled: analyticsScope === 'all' });
-
-  const { data: views, isLoading: isViewsLoading, error: viewsError } = useViews();
-
-  const {
-    data: activeView,
-    isLoading: isViewLoading,
-    error: viewError,
-    refetch: refetchView,
-  } = useView(activeViewId);
-
-  const {
-    data: viewTransactions,
-    isLoading: isViewTransactionsLoading,
-    error: viewTransactionsError,
-    refetch: refetchViewTransactions,
-  } = useViewTransactions(activeViewId);
-
-  const resolvedTransactions = analyticsScope === 'view' ? viewTransactions : transactions;
-  const isSourceLoading =
-    analyticsScope === 'view' ? isViewLoading || isViewTransactionsLoading : isTransactionsLoading;
-  const sourceError =
-    analyticsScope === 'view' ? viewError || viewTransactionsError : transactionsError;
-
-  // Fetch exchange rates for currency conversion
   const {
     exchangeRatesMap,
     pendingCurrencies,
@@ -84,22 +72,10 @@ export function AnalyticsPage() {
     queryClient.invalidateQueries({ queryKey: ['currencies'] });
   }, [queryClient]);
 
-  const handleRetrySource = useCallback(() => {
-    if (analyticsScope === 'view') {
-      refetchView();
-      refetchViewTransactions();
-      return;
-    }
-
-    refetchTransactions();
-  }, [analyticsScope, refetchTransactions, refetchView, refetchViewTransactions]);
-
-  // Get selected year from URL or default to current year (will be updated to latestYear with data)
   const currentYear = useMemo(() => getCurrentYear(), []);
   const yearParam = searchParams.get(ANALYTICS_PARAMS.YEAR);
   const selectedYear = analyticsUrlState.year ?? currentYear;
 
-  // Process analytics data with memoization
   const { monthlySpending, yearlySpending, earliestYear, latestYear, yearsWithTransactions } =
     useAnalyticsData(
       resolvedTransactions,
@@ -109,14 +85,11 @@ export function AnalyticsPage() {
       transactionType,
     );
 
-  // Initialize to latest year with transactions if no year param exists
-  // Or redirect if selected year is out of valid range
   useEffect(() => {
     if (isSourceLoading || !resolvedTransactions) {
       return;
     }
 
-    // If no year parameter, default to the latest year with actual transactions
     if (!yearParam || analyticsUrlState.year === undefined) {
       const params = new URLSearchParams(searchParams);
       params.set(ANALYTICS_PARAMS.YEAR, latestYear.toString());
@@ -124,7 +97,6 @@ export function AnalyticsPage() {
       return;
     }
 
-    // If year parameter exists but is out of valid range, redirect to nearest valid year
     if (!isNaN(selectedYear)) {
       let redirectYear: number | null = null;
 
@@ -153,23 +125,6 @@ export function AnalyticsPage() {
     analyticsUrlState.year,
   ]);
 
-  const handleSourceChange = useCallback(
-    ({ scope, viewId: nextViewId }: { scope: AnalyticsScope; viewId?: string }) => {
-      const params = new URLSearchParams(searchParams);
-      params.set(ANALYTICS_PARAMS.SCOPE, scope);
-
-      if (scope === 'view' && nextViewId) {
-        params.set(ANALYTICS_PARAMS.VIEW_ID, nextViewId);
-      } else {
-        params.delete(ANALYTICS_PARAMS.VIEW_ID);
-      }
-
-      setSearchParams(params);
-    },
-    [searchParams, setSearchParams],
-  );
-
-  // Handle year change
   const handleYearChange = useCallback(
     (year: number) => {
       const params = new URLSearchParams(searchParams);
@@ -179,7 +134,6 @@ export function AnalyticsPage() {
     [searchParams, setSearchParams],
   );
 
-  // Handle view mode change
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
       const params = new URLSearchParams(searchParams);
@@ -189,7 +143,6 @@ export function AnalyticsPage() {
     [searchParams, setSearchParams],
   );
 
-  // Handle transaction type change
   const handleTransactionTypeChange = useCallback(
     (type: TransactionTypeParam) => {
       const params = new URLSearchParams(searchParams);
@@ -200,12 +153,12 @@ export function AnalyticsPage() {
   );
 
   const pageDescription = useMemo(() => {
-    const sourceSuffix = analyticsScope === 'view' && activeView ? ` in ${activeView.name}` : '';
+    const sourceSuffix = analyticsScope === 'view' && activeViewName ? ` in ${activeViewName}` : '';
 
     return viewMode === 'monthly'
       ? `Monthly spending breakdown for ${selectedYear}${sourceSuffix}`
       : `Yearly spending overview${sourceSuffix}`;
-  }, [activeView, analyticsScope, selectedYear, viewMode]);
+  }, [activeViewName, analyticsScope, selectedYear, viewMode]);
 
   if (isSourceLoading) {
     return (
@@ -219,11 +172,15 @@ export function AnalyticsPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="w-full max-w-md">
-          <ErrorBanner error={sourceError} onRetry={handleRetrySource} />
+          <ErrorBanner error={sourceError} onRetry={onRetrySource} />
         </div>
       </div>
     );
   }
+
+  const controlsGridClassName = sourceSelector
+    ? 'grid gap-4 md:grid-cols-[minmax(12rem,1fr)_auto_auto_minmax(12rem,1fr)] md:items-end'
+    : 'grid gap-4 md:grid-cols-[auto_auto_minmax(12rem,1fr)] md:items-end';
 
   return (
     <div className="space-y-6">
@@ -245,19 +202,9 @@ export function AnalyticsPage() {
         initial="initial"
         animate="animate"
         transition={layoutTransition}
-        className="grid gap-4 md:grid-cols-[minmax(12rem,1fr)_auto_auto_minmax(12rem,1fr)] md:items-end"
+        className={controlsGridClassName}
       >
-        <div className="flex justify-start">
-          <AnalyticsSourceSelector
-            scope={analyticsScope}
-            viewId={viewId}
-            selectedViewName={activeView?.name}
-            views={views ?? []}
-            isLoadingViews={isViewsLoading}
-            hasViewsError={!!viewsError}
-            onChange={handleSourceChange}
-          />
-        </div>
+        {sourceSelector && <div className="flex justify-start">{sourceSelector}</div>}
         <div className="flex justify-start md:justify-center">
           <ViewModeSelector selectedMode={viewMode} onChange={handleViewModeChange} />
         </div>
@@ -315,5 +262,126 @@ export function AnalyticsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function SavedViewAnalyticsSource() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const analyticsUrlState = useMemo(() => parseAnalyticsSearchParams(searchParams), [searchParams]);
+  const { scope: analyticsScope, viewId } = analyticsUrlState;
+  const activeViewId = analyticsScope === 'view' ? (viewId ?? '') : '';
+
+  const {
+    data: transactions,
+    isLoading: isTransactionsLoading,
+    error: transactionsError,
+    refetch: refetchTransactions,
+  } = useTransactions({ enabled: analyticsScope === 'all' });
+  const { data: views, isLoading: isViewsLoading, error: viewsError } = useViews();
+  const {
+    data: activeView,
+    isLoading: isViewLoading,
+    error: viewError,
+    refetch: refetchView,
+  } = useView(activeViewId);
+  const {
+    data: viewTransactions,
+    isLoading: isViewTransactionsLoading,
+    error: viewTransactionsError,
+    refetch: refetchViewTransactions,
+  } = useViewTransactions(activeViewId);
+
+  const handleRetrySource = useCallback(() => {
+    if (analyticsScope === 'view') {
+      refetchView();
+      refetchViewTransactions();
+      return;
+    }
+
+    refetchTransactions();
+  }, [analyticsScope, refetchTransactions, refetchView, refetchViewTransactions]);
+
+  const handleSourceChange = useCallback(
+    ({ scope, viewId: nextViewId }: { scope: AnalyticsScope; viewId?: string }) => {
+      const params = new URLSearchParams(searchParams);
+      params.set(ANALYTICS_PARAMS.SCOPE, scope);
+
+      if (scope === 'view' && nextViewId) {
+        params.set(ANALYTICS_PARAMS.VIEW_ID, nextViewId);
+      } else {
+        params.delete(ANALYTICS_PARAMS.VIEW_ID);
+      }
+
+      setSearchParams(params);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const resolvedTransactions = analyticsScope === 'view' ? viewTransactions : transactions;
+  const isSourceLoading =
+    analyticsScope === 'view' ? isViewLoading || isViewTransactionsLoading : isTransactionsLoading;
+  const sourceError =
+    analyticsScope === 'view' ? viewError || viewTransactionsError : transactionsError;
+
+  const sourceSelector = (
+    <AnalyticsSourceSelector
+      scope={analyticsScope}
+      viewId={viewId}
+      selectedViewName={activeView?.name}
+      views={views ?? []}
+      isLoadingViews={isViewsLoading}
+      hasViewsError={!!viewsError}
+      onChange={handleSourceChange}
+    />
+  );
+
+  return (
+    <AnalyticsContent
+      analyticsUrlState={analyticsUrlState}
+      resolvedTransactions={resolvedTransactions}
+      isSourceLoading={isSourceLoading}
+      sourceError={sourceError}
+      onRetrySource={handleRetrySource}
+      sourceSelector={sourceSelector}
+      activeViewName={activeView?.name}
+    />
+  );
+}
+
+function AllTransactionsAnalyticsSource() {
+  const [searchParams] = useSearchParams();
+  const analyticsUrlState = useMemo(() => parseAnalyticsSearchParams(searchParams), [searchParams]);
+  const { data: transactions, isLoading, error, refetch } = useTransactions({ enabled: true });
+
+  return (
+    <AnalyticsContent
+      analyticsUrlState={analyticsUrlState}
+      resolvedTransactions={transactions}
+      isSourceLoading={isLoading}
+      sourceError={error}
+      onRetrySource={refetch}
+    />
+  );
+}
+
+function DeniedSavedViewAnalyticsSource() {
+  const [searchParams] = useSearchParams();
+
+  if (searchParams.get(ANALYTICS_PARAMS.SCOPE) === 'view') {
+    const canonicalParams = new URLSearchParams(searchParams);
+    canonicalParams.set(ANALYTICS_PARAMS.SCOPE, 'all');
+    canonicalParams.delete(ANALYTICS_PARAMS.VIEW_ID);
+
+    return <Navigate to={{ search: `?${canonicalParams.toString()}` }} replace />;
+  }
+
+  return <AllTransactionsAnalyticsSource />;
+}
+
+export function AnalyticsPage() {
+  return (
+    <PermissionGuard permission="views:read" fallback={<DeniedSavedViewAnalyticsSource />}>
+      <SavedViewAnalyticsSource />
+    </PermissionGuard>
   );
 }

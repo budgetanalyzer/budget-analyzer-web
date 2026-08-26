@@ -2,7 +2,7 @@
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTransactions } from '@/hooks/useTransactions';
-import { useExchangeRatesMap } from '@/hooks/useCurrencies';
+import { useCurrencies, useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
 import { useTransactionStats } from '@/features/transactions/hooks/useTransactionStats';
 import { useTransactionFiltersSync } from '@/hooks/useTransactionFiltersSync';
@@ -17,20 +17,100 @@ import { MessageBanner } from '@/components/MessageBanner';
 import { MissingExchangeRatesBanner } from '@/components/MissingExchangeRatesBanner';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import {
   buildMainStatsConfig,
   buildMonthlyStatsConfig,
 } from '@/features/transactions/components/statsConfig';
-import { useAppSelector } from '@/store/hooks';
-import { filterTransactions } from '@/utils/transactionFilters';
-import { ViewCriteriaApi } from '@/types/view';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { setDisplayCurrency } from '@/store/uiSlice';
+import { filterTransactionsByDisplayAmount } from '@/utils/transactionFilters';
+import { projectDisplayAmount } from '@/utils/displayAmount';
 import { usePermission } from '@/features/auth/hooks/usePermission';
+import { PermissionGuard } from '@/features/auth/components/PermissionGuard';
+import { Navigate, useNavigate, useSearchParams } from 'react-router';
+import { useView, useViewMembership } from '@/hooks/useViews';
+import {
+  hasAddTransactionsModeParams,
+  parseAddTransactionsMode,
+  removeAddTransactionsModeParams,
+  type AddTransactionsMode,
+} from '@/utils/addTransactionsMode';
 
 export function TransactionsPage() {
+  const [searchParams] = useSearchParams();
+  const addMode = parseAddTransactionsMode(searchParams);
+
+  if (hasAddTransactionsModeParams(searchParams) && !addMode) {
+    const cleanedParams = removeAddTransactionsModeParams(searchParams);
+    const cleanedSearch = cleanedParams.toString();
+    return <Navigate to={`/${cleanedSearch ? `?${cleanedSearch}` : ''}`} replace />;
+  }
+
+  if (addMode) {
+    return (
+      <PermissionGuard permission="views:write">
+        <AddTransactionsPage mode={addMode} />
+      </PermissionGuard>
+    );
+  }
+
+  return <TransactionsPageContent />;
+}
+
+function AddTransactionsPage({ mode }: { mode: AddTransactionsMode }) {
+  const viewQuery = useView(mode.viewId);
+  const membershipQuery = useViewMembership(mode.viewId);
+
+  const handleRetry = useCallback(() => {
+    viewQuery.refetch();
+    membershipQuery.refetch();
+  }, [membershipQuery, viewQuery]);
+
+  if (viewQuery.isLoading || membershipQuery.isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <LoadingSpinner size="lg" text="Loading saved view..." />
+      </div>
+    );
+  }
+
+  const targetError = viewQuery.error || membershipQuery.error;
+  if (targetError) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="w-full max-w-md">
+          <ErrorBanner error={targetError} onRetry={handleRetry} />
+        </div>
+      </div>
+    );
+  }
+
+  if (!viewQuery.data || !membershipQuery.data) return null;
+
+  return (
+    <TransactionsPageContent
+      addMode={{
+        ...mode,
+        viewName: viewQuery.data.name,
+        memberTransactionIds: membershipQuery.data.transactionIds,
+      }}
+    />
+  );
+}
+
+interface ActiveAddMode extends AddTransactionsMode {
+  viewName: string;
+  memberTransactionIds: number[];
+}
+
+function TransactionsPageContent({ addMode }: { addMode?: ActiveAddMode }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
+  const { data: enabledCurrencies, isLoading: isCurrenciesLoading } = useCurrencies(true);
 
   const canImportTransactions = usePermission('transactions:write');
 
@@ -44,9 +124,8 @@ export function TransactionsPage() {
     handleAmountFilterChange,
     hasActiveFilters,
     clearAllFilters,
-  } = useTransactionFiltersSync();
-  const { globalFilter, dateFilter, bankNameFilter, accountIdFilter, typeFilter, amountFilter } =
-    filters;
+  } = useTransactionFiltersSync(displayCurrency);
+  const { amountFilter, amountCurrency } = filters;
 
   // Fetch exchange rates and build map for currency conversion
   const {
@@ -56,6 +135,49 @@ export function TransactionsPage() {
   } = useExchangeRatesMap({
     displayCurrency,
   });
+
+  const hasAmountFilter = amountFilter.min !== null || amountFilter.max !== null;
+  const enabledCurrencyCodes = useMemo(() => {
+    const codes = new Set(['USD']);
+    enabledCurrencies?.forEach((currency) => codes.add(currency.currencyCode));
+    return codes;
+  }, [enabledCurrencies]);
+  const isAmountCurrencyValidationPending = hasAmountFilter && isCurrenciesLoading;
+  const isAmountCurrencyInvalid =
+    hasAmountFilter &&
+    !isAmountCurrencyValidationPending &&
+    (!amountCurrency ||
+      !/^[A-Z]{3}$/.test(amountCurrency) ||
+      !enabledCurrencyCodes.has(amountCurrency));
+  const isAmountCurrencySyncing =
+    hasAmountFilter &&
+    !isAmountCurrencyValidationPending &&
+    !isAmountCurrencyInvalid &&
+    amountCurrency !== displayCurrency;
+
+  useEffect(() => {
+    if (isAmountCurrencySyncing && amountCurrency) {
+      dispatch(setDisplayCurrency(amountCurrency));
+    }
+  }, [amountCurrency, dispatch, isAmountCurrencySyncing]);
+
+  const isAmountFilterLoading =
+    hasAmountFilter &&
+    !isAmountCurrencyInvalid &&
+    (isAmountCurrencyValidationPending || isAmountCurrencySyncing || isExchangeRatesLoading);
+  const isDisplayAmountLoading =
+    isExchangeRatesLoading || isAmountCurrencyValidationPending || isAmountCurrencySyncing;
+
+  const displayAmounts = useMemo(
+    () =>
+      new Map(
+        (transactions ?? []).map((transaction) => [
+          transaction.id,
+          projectDisplayAmount(transaction, displayCurrency, exchangeRatesMap),
+        ]),
+      ),
+    [displayCurrency, exchangeRatesMap, transactions],
+  );
 
   const disabledCurrencies = useMissingCurrencies();
 
@@ -76,11 +198,19 @@ export function TransactionsPage() {
   }, [transactions]);
 
   // Apply filters to transactions
-  const filteredTransactions = useMemo(() => {
-    if (!transactions) return [];
+  const filterResult = useMemo(() => {
+    const effectiveFilters =
+      isAmountCurrencyInvalid || isAmountFilterLoading
+        ? { ...filters, amountFilter: { min: null, max: null } }
+        : filters;
 
-    return filterTransactions(transactions, filters);
-  }, [transactions, filters]);
+    return filterTransactionsByDisplayAmount(transactions ?? [], effectiveFilters, displayAmounts);
+  }, [displayAmounts, filters, isAmountCurrencyInvalid, isAmountFilterLoading, transactions]);
+  const filteredTransactions = filterResult.transactions;
+  const visibleTransactionIds = useMemo(
+    () => filteredTransactions.map((transaction) => transaction.id),
+    [filteredTransactions],
+  );
 
   // Handle import success/error messages with auto-dismiss
   const { importMessage, handleImportSuccess, handleImportError, clearImportMessage } =
@@ -91,8 +221,7 @@ export function TransactionsPage() {
   // Calculate stats from FILTERED transactions
   const { stats, monthlyAverages } = useTransactionStats({
     transactions: filteredTransactions,
-    displayCurrency,
-    exchangeRatesMap,
+    displayAmounts,
   });
 
   // Build stat card configurations using utility functions
@@ -106,35 +235,14 @@ export function TransactionsPage() {
     [monthlyAverages, displayCurrency],
   );
 
-  // Build criteria from current filters for SaveAsViewButton
-  const viewCriteria = useMemo((): ViewCriteriaApi => {
-    const criteria: ViewCriteriaApi = {};
-    if (dateFilter?.from) {
-      criteria.dateFrom = dateFilter.from;
+  const handleClearInvalidAmountFilter = useCallback(() => {
+    handleAmountFilterChange(null, null);
+  }, [handleAmountFilterChange]);
+  const handleLeaveAddMode = useCallback(() => {
+    if (addMode) {
+      navigate(addMode.returnTo, { replace: true });
     }
-    if (dateFilter?.to) {
-      criteria.dateTo = dateFilter.to;
-    }
-    if (globalFilter) {
-      criteria.searchText = globalFilter;
-    }
-    if (bankNameFilter) {
-      criteria.bankNames = [bankNameFilter];
-    }
-    if (accountIdFilter) {
-      criteria.accountIds = [accountIdFilter];
-    }
-    if (typeFilter) {
-      criteria.type = typeFilter;
-    }
-    if (amountFilter.min !== null) {
-      criteria.minAmount = amountFilter.min;
-    }
-    if (amountFilter.max !== null) {
-      criteria.maxAmount = amountFilter.max;
-    }
-    return criteria;
-  }, [dateFilter, globalFilter, bankNameFilter, accountIdFilter, typeFilter, amountFilter]);
+  }, [addMode, navigate]);
 
   if (isLoading) {
     return (
@@ -157,10 +265,14 @@ export function TransactionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Transactions"
-        description="View and manage transactions"
+        title={addMode ? `Add transactions to ${addMode.viewName}` : 'Transactions'}
+        description={
+          addMode
+            ? 'Select transactions from the complete active snapshot.'
+            : 'View and manage transactions'
+        }
         action={
-          canImportTransactions ? (
+          !addMode && canImportTransactions ? (
             <ImportButton onSuccess={handleImportSuccess} onError={handleImportError} />
           ) : undefined
         }
@@ -183,14 +295,21 @@ export function TransactionsPage() {
               onClose={clearImportMessage}
             />
           )}
+          {isAmountCurrencyInvalid && (
+            <MessageBanner
+              type="warning"
+              message="Amount filter ignored because its currency is invalid or disabled. Clear it and enter a new range."
+              onClose={handleClearInvalidAmountFilter}
+            />
+          )}
         </AnimatePresence>
 
         <motion.div layout transition={layoutTransition}>
-          <TransactionStatsGrid stats={mainStats} isLoading={isExchangeRatesLoading} />
+          <TransactionStatsGrid stats={mainStats} isLoading={isDisplayAmountLoading} />
         </motion.div>
 
         <motion.div layout transition={layoutTransition}>
-          <TransactionStatsGrid stats={monthlyStats} isLoading={isExchangeRatesLoading} />
+          <TransactionStatsGrid stats={monthlyStats} isLoading={isDisplayAmountLoading} />
         </motion.div>
 
         <motion.div
@@ -214,11 +333,30 @@ export function TransactionsPage() {
                   onAmountFilterChange={handleAmountFilterChange}
                   onClearAllFilters={clearAllFilters}
                   displayCurrency={displayCurrency}
-                  exchangeRatesMap={exchangeRatesMap}
-                  isExchangeRatesLoading={isExchangeRatesLoading}
+                  displayAmounts={displayAmounts}
+                  isDisplayAmountLoading={isDisplayAmountLoading}
+                  isAmountFilterLoading={isAmountFilterLoading}
+                  unavailableAmountFilterCount={
+                    hasAmountFilter && !isAmountFilterLoading && !isAmountCurrencyInvalid
+                      ? filterResult.unavailableAmountCount
+                      : 0
+                  }
                   availableBankNames={availableBankNames}
                   availableAccountIds={availableAccountIds}
-                  viewCriteria={viewCriteria}
+                  viewTransactionIds={visibleTransactionIds}
+                  isViewTransactionIdsReady={!isAmountFilterLoading}
+                  selectionPurpose={
+                    addMode
+                      ? {
+                          type: 'add-to-view',
+                          viewId: addMode.viewId,
+                          viewName: addMode.viewName,
+                          memberTransactionIds: addMode.memberTransactionIds,
+                          onCancel: handleLeaveAddMode,
+                          onSuccess: handleLeaveAddMode,
+                        }
+                      : { type: 'delete' }
+                  }
                 />
               )}
             </CardContent>

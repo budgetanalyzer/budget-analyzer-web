@@ -15,6 +15,10 @@ describe('error message utilities', () => {
       'This preview has expired or is no longer valid. Please preview the file again.',
     ],
     ['PREVIEW_IMPORT_TOKEN_EXPIRED', 'This preview has expired. Please preview the file again.'],
+    [
+      'SAVED_VIEW_MEMBERSHIP_STALE',
+      'The transaction snapshot changed and must be refreshed before updating this saved view.',
+    ],
     ['CURRENCY_NOT_ENABLED', 'This currency is not enabled for exchange rate data'],
   ])('maps %s to the user-facing message', (code, message) => {
     expect(getErrorMessage(code)).toBe(message);

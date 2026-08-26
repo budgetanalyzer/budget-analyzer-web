@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { useTransactionFiltersSync } from '@/hooks/useTransactionFiltersSync';
 import { renderWithProviders } from '@/testing/test-utils';
 
-function FilterHarness() {
+function FilterHarness({ displayCurrency = 'EUR' }: { displayCurrency?: string }) {
   const location = useLocation();
   const {
     filters,
@@ -17,7 +17,7 @@ function FilterHarness() {
     handleTypeFilterChange,
     handleAmountFilterChange,
     clearAllFilters,
-  } = useTransactionFiltersSync();
+  } = useTransactionFiltersSync(displayCurrency);
 
   return (
     <div>
@@ -30,6 +30,7 @@ function FilterHarness() {
       <div data-testid="type">{filters.typeFilter ?? ''}</div>
       <div data-testid="min">{filters.amountFilter.min ?? ''}</div>
       <div data-testid="max">{filters.amountFilter.max ?? ''}</div>
+      <div data-testid="amount-currency">{filters.amountCurrency ?? ''}</div>
       <div data-testid="active">{hasActiveFilters() ? 'active' : 'inactive'}</div>
       <button type="button" onClick={() => handleSearchChange('market')}>
         Set Search
@@ -52,6 +53,9 @@ function FilterHarness() {
       <button type="button" onClick={() => handleAmountFilterChange(10, 250)}>
         Set Amounts
       </button>
+      <button type="button" onClick={() => handleAmountFilterChange(null, null)}>
+        Clear Amounts
+      </button>
       <button type="button" onClick={clearAllFilters}>
         Clear All
       </button>
@@ -71,7 +75,7 @@ function renderHarness(initialEntry: string) {
 describe('useTransactionFiltersSync', () => {
   it('parses every canonical transaction filter parameter', () => {
     renderHarness(
-      '/views/view-1?q=coffee&dateFrom=2026-01-01&dateTo=2026-01-31&bankName=Alpha%20Bank&accountId=checking&type=CREDIT&minAmount=10.5&maxAmount=250',
+      '/views/view-1?q=coffee&dateFrom=2026-01-01&dateTo=2026-01-31&bankName=Alpha%20Bank&accountId=checking&type=CREDIT&minAmount=10.5&maxAmount=250&amountCurrency=GBP',
     );
 
     expect(screen.getByTestId('search')).toHaveTextContent('coffee');
@@ -82,7 +86,15 @@ describe('useTransactionFiltersSync', () => {
     expect(screen.getByTestId('type')).toHaveTextContent('CREDIT');
     expect(screen.getByTestId('min')).toHaveTextContent('10.5');
     expect(screen.getByTestId('max')).toHaveTextContent('250');
+    expect(screen.getByTestId('amount-currency')).toHaveTextContent('GBP');
     expect(screen.getByTestId('active')).toHaveTextContent('active');
+  });
+
+  it('binds a legacy amount range to the current display currency without rewriting the URL', () => {
+    renderHarness('/?minAmount=10');
+
+    expect(screen.getByTestId('amount-currency')).toHaveTextContent('EUR');
+    expect(screen.getByTestId('location')).toHaveTextContent('/?minAmount=10');
   });
 
   it('accepts legacy bank and account aliases', () => {
@@ -134,6 +146,21 @@ describe('useTransactionFiltersSync', () => {
       expect(params.get('type')).toBe('CREDIT');
       expect(params.get('minAmount')).toBe('10');
       expect(params.get('maxAmount')).toBe('250');
+      expect(params.get('amountCurrency')).toBe('EUR');
+    });
+  });
+
+  it('removes the amount currency when both bounds are cleared', async () => {
+    renderHarness('/?minAmount=10&amountCurrency=GBP&keep=yes');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clear Amounts' }));
+
+    await waitFor(() => {
+      const params = new URLSearchParams(screen.getByTestId('location').textContent?.split('?')[1]);
+      expect(params.get('minAmount')).toBeNull();
+      expect(params.get('maxAmount')).toBeNull();
+      expect(params.get('amountCurrency')).toBeNull();
+      expect(params.get('keep')).toBe('yes');
     });
   });
 
@@ -156,7 +183,7 @@ describe('useTransactionFiltersSync', () => {
 
   it('clears canonical filters, aliases, and analytics context while preserving unrelated params', async () => {
     renderHarness(
-      '/views/view-1?keep=yes&q=coffee&dateFrom=2026-01-01&dateTo=2026-01-31&bankName=Alpha&bank=Legacy&accountId=checking&account=old&type=DEBIT&minAmount=10&maxAmount=50&returnTo=%2Fanalytics&breadcrumbLabel=January',
+      '/views/view-1?keep=yes&q=coffee&dateFrom=2026-01-01&dateTo=2026-01-31&bankName=Alpha&bank=Legacy&accountId=checking&account=old&type=DEBIT&minAmount=10&maxAmount=50&amountCurrency=USD&returnTo=%2Fanalytics&breadcrumbLabel=January',
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Clear All' }));

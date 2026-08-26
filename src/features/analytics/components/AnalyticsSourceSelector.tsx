@@ -6,7 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select';
-import { SavedView } from '@/types/view';
+import type { SavedViewMetadata } from '@/types/view';
 import { AnalyticsScope } from '@/features/analytics/utils/urlState';
 import { cn } from '@/utils/cn';
 
@@ -14,7 +14,7 @@ interface AnalyticsSourceSelectorProps {
   scope: AnalyticsScope;
   viewId?: string;
   selectedViewName?: string;
-  views: SavedView[];
+  views: SavedViewMetadata[];
   isLoadingViews: boolean;
   hasViewsError: boolean;
   onChange: (source: { scope: AnalyticsScope; viewId?: string }) => void;

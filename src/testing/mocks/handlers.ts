@@ -76,6 +76,9 @@ export const handlers = [
         'statementformats:write',
         'users:read',
         'users:write',
+        'views:read',
+        'views:write',
+        'views:delete',
       ],
     });
   }),
@@ -93,6 +96,32 @@ export const handlers = [
     ]);
   }),
   http.delete('/api/v1/transactions/:id', () => {
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.get('/api/v1/views', () => {
+    return HttpResponse.json([
+      {
+        id: '11111111-1111-1111-1111-111111111111',
+        name: 'Example collection',
+        transactionCount: 1,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ]);
+  }),
+  http.get('/api/v1/views/:id', ({ params }) => {
+    return HttpResponse.json({
+      id: String(params.id),
+      name: 'Example collection',
+      transactionCount: 1,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+  }),
+  http.get('/api/v1/views/:id/transactions', () => {
+    return HttpResponse.json({ transactionIds: [1] });
+  }),
+  http.patch('/api/v1/views/:id/transactions', () => {
     return new HttpResponse(null, { status: 204 });
   }),
   http.get('/api/v1/transactions/search', () => {

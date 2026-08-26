@@ -16,6 +16,7 @@ import {
 import { currencyApi } from '@/api/currencyApi';
 import { ApiError } from '@/types/apiError';
 import { buildExchangeRateMap } from '@/utils/currency';
+import { getDateRange } from '@/utils/dates';
 import { useTransactions } from '@/hooks/useTransactions';
 
 /**
@@ -72,7 +73,7 @@ export const useExchangeRates = (params: {
  * This hook intelligently fetches only the rates needed based on:
  * - Currencies present in the full transaction list
  * - The selected display currency
- * - Always fetches the full date range (2000-01-01 onwards) to avoid refetching on filter changes
+ * - The inclusive LocalDate range of the full transaction list
  *
  * Uses React Query's useQueries to fetch rates for all needed currencies in parallel.
  * TODO: Future optimization - create a batch fetch API endpoint
@@ -96,40 +97,47 @@ export const useExchangeRatesMap = (params: { displayCurrency: string }) => {
     return codes;
   }, [enabledCurrencies]);
 
-  // Extract unique non-USD currencies from transactions + display currency
+  const dateRange = useMemo(() => {
+    if (!transactions?.length) return null;
+    return getDateRange(transactions.map((transaction) => transaction.date));
+  }, [transactions]);
+
+  // Extract only the non-USD source and target legs needed for this snapshot.
   const currenciesNeeded = useMemo(() => {
+    if (!transactions?.length) return [];
+
     const currencies = new Set<string>();
+    let needsTargetRate = false;
 
-    // Add currencies from transactions (excluding USD since it's the base)
-    if (transactions) {
-      transactions.forEach((t) => {
-        if (t.currencyIsoCode !== 'USD') {
-          currencies.add(t.currencyIsoCode);
-        }
-      });
-    }
+    transactions.forEach((transaction) => {
+      if (transaction.currencyIsoCode === displayCurrency) return;
 
-    // Always include display currency if it's not USD
-    if (displayCurrency !== 'USD') {
+      needsTargetRate = true;
+      if (transaction.currencyIsoCode !== 'USD') {
+        currencies.add(transaction.currencyIsoCode);
+      }
+    });
+
+    if (needsTargetRate && displayCurrency !== 'USD') {
       currencies.add(displayCurrency);
     }
 
-    return Array.from(currencies);
+    return Array.from(currencies).sort();
   }, [transactions, displayCurrency]);
 
-  // Always fetch the full date range (2000-01-01 onwards)
-  // This prevents refetching when transactions are filtered, deleted, or when viewing single transactions
-  const startDate = transactions?.length ? '2000-01-01' : undefined;
+  const startDate = dateRange?.earliest;
+  const endDate = dateRange?.latest;
 
   // Fetch exchange rates for needed currencies in parallel using useQueries
   // Use the combine option to efficiently merge results and avoid unnecessary re-renders
   const combinedResult = useQueries({
     queries: currenciesNeeded.map((targetCurrency: string) => ({
-      queryKey: ['exchangeRates', targetCurrency, startDate],
+      queryKey: ['exchangeRates', targetCurrency, startDate, endDate],
       queryFn: () =>
         currencyApi.getExchangeRates({
           targetCurrency,
           startDate,
+          endDate,
         }),
       staleTime: Infinity,
       gcTime: Infinity,
@@ -140,26 +148,38 @@ export const useExchangeRatesMap = (params: { displayCurrency: string }) => {
       // Combine all exchange rate data from all queries
       const allRates: ExchangeRateResponse[] = [];
       const currenciesWithNoRates: string[] = [];
+      const failedCurrencies: string[] = [];
 
       results.forEach((result, index) => {
         if (result.data && result.data.length > 0) {
           allRates.push(...result.data);
-        } else if (!result.isLoading && !result.error) {
+        } else if (result.isSuccess) {
           // Currency fetch completed but no rates returned
           currenciesWithNoRates.push(currenciesNeeded[index]);
+        }
+
+        if (result.isError) {
+          failedCurrencies.push(currenciesNeeded[index]);
         }
       });
 
       return {
         data: allRates,
         currenciesWithNoRates,
+        failedCurrencies,
         isLoading: results.some((result) => result.isLoading),
-        error: results.find((result) => result.error)?.error as ApiError | undefined,
+        error: results.find((result) => result.isError)?.error as ApiError | undefined,
       };
     },
   });
 
-  const { data: allExchangeRatesData, currenciesWithNoRates, isLoading, error } = combinedResult;
+  const {
+    data: allExchangeRatesData,
+    currenciesWithNoRates,
+    failedCurrencies,
+    isLoading,
+    error,
+  } = combinedResult;
 
   const pendingCurrencies = useMemo(
     () => currenciesWithNoRates.filter((c) => enabledCurrencyCodes.has(c)),
@@ -174,25 +194,11 @@ export const useExchangeRatesMap = (params: { displayCurrency: string }) => {
     return buildExchangeRateMap(allExchangeRatesData);
   }, [allExchangeRatesData]);
 
-  // Memoized sorted array of all exchange rate dates (ascending order)
-  const sortedExchangeRateDates = useMemo(() => {
-    if (allExchangeRatesData.length === 0) return [];
-    // Get unique dates across all currencies
-    const uniqueDates = new Set(allExchangeRatesData.map((rate) => rate.date));
-    return Array.from(uniqueDates).sort();
-  }, [allExchangeRatesData]);
-
-  // Memoized earliest exchange rate date across all currencies
-  const earliestExchangeRateDate = useMemo(() => {
-    return sortedExchangeRateDates[0] || null;
-  }, [sortedExchangeRateDates]);
-
   return {
     exchangeRatesMap,
     exchangeRatesData: allExchangeRatesData,
-    sortedExchangeRateDates,
-    earliestExchangeRateDate,
     pendingCurrencies,
+    failedCurrencies,
     isLoading,
     error,
   };

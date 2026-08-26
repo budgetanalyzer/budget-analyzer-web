@@ -12,6 +12,7 @@ const emptyFilters: TransactionFilterValues = {
   accountIdFilter: null,
   typeFilter: null,
   amountFilter: { min: null, max: null },
+  amountCurrency: null,
 };
 
 function createProps(
@@ -258,7 +259,7 @@ describe('TransactionFilterBar', () => {
     expect(onAmountFilterChange).toHaveBeenCalledWith(12.5, 45);
   });
 
-  it('shows Clear and the contextual action only while a filter is active', async () => {
+  it('keeps the contextual action visible while Clear follows active filters', async () => {
     const user = userEvent.setup();
     const onClearAllFilters = vi.fn();
     const props = createProps({
@@ -268,14 +269,14 @@ describe('TransactionFilterBar', () => {
     const { rerender } = render(<TransactionFilterBar {...props} />);
 
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save current filters' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save current filters' })).toBeInTheDocument();
 
     rerender(
       <TransactionFilterBar {...props} filters={{ ...emptyFilters, bankNameFilter: 'Bank A' }} />,
     );
 
+    expect(screen.getByRole('button', { name: 'Save current filters' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Clear' }));
     expect(onClearAllFilters).toHaveBeenCalledOnce();
-    expect(screen.getByRole('button', { name: 'Save current filters' })).toBeInTheDocument();
   });
 });

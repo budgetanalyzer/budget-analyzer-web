@@ -1,20 +1,18 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router-dom';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreateViewModal } from '@/components/CreateViewModal';
 import { renderWithProviders } from '@/testing/test-utils';
-import type { ViewCriteriaApi } from '@/types/view';
+import { ApiError } from '@/types/apiError';
 
-const mockMutate = vi.fn();
+const mocks = vi.hoisted(() => ({ mutate: vi.fn(), toastError: vi.fn() }));
 
 vi.mock('@/hooks/useViews', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/useViews')>();
-  return {
-    ...actual,
-    useCreateView: () => ({ mutate: mockMutate, isPending: false }),
-  };
+  return { ...actual, useCreateView: () => ({ mutate: mocks.mutate, isPending: false }) };
 });
+vi.mock('@/hooks/useToast', () => ({ toast: { error: mocks.toastError } }));
 
 beforeAll(() => {
   if (!window.ResizeObserver) {
@@ -26,34 +24,32 @@ beforeAll(() => {
   }
 });
 
-function renderModal(criteria: ViewCriteriaApi) {
-  return renderWithProviders(<CreateViewModal open onClose={vi.fn()} criteria={criteria} />, {
-    initialEntries: ['/views'],
-    router: 'dom',
-  });
-}
-
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderModalInRoutes({
-  criteria,
+function renderModal({
+  transactionIds = [8, 2],
+  isReady = true,
   onClose = vi.fn(),
-  initialEntry = '/transactions?dateFrom=2026-01-01&q=coffee&returnTo=%2Fanalytics',
 }: {
-  criteria: ViewCriteriaApi;
+  transactionIds?: number[];
+  isReady?: boolean;
   onClose?: () => void;
-  initialEntry?: string;
-}) {
+} = {}) {
   const result = renderWithProviders(
     <Routes>
       <Route
         path="/transactions"
         element={
           <>
-            <CreateViewModal open onClose={onClose} criteria={criteria} />
+            <CreateViewModal
+              open
+              onClose={onClose}
+              transactionIds={transactionIds}
+              isTransactionIdsReady={isReady}
+            />
             <LocationProbe />
           </>
         }
@@ -61,91 +57,98 @@ function renderModalInRoutes({
       <Route path="/views/:id" element={<LocationProbe />} />
     </Routes>,
     {
-      initialEntries: [initialEntry],
+      initialEntries: ['/transactions?q=coffee&minAmount=10&amountCurrency=USD'],
       router: 'dom',
     },
   );
-
   return { onClose, ...result };
 }
 
 beforeEach(() => {
-  mockMutate.mockReset();
+  mocks.mutate.mockReset();
+  mocks.toastError.mockReset();
 });
 
 describe('CreateViewModal', () => {
-  it('submits saved-view criteria with dateFrom, dateTo, and transaction type', async () => {
-    const criteria: ViewCriteriaApi = {
-      dateFrom: '2026-01-01',
-      dateTo: '2026-01-31',
-      type: 'DEBIT',
-      searchText: 'coffee',
-    };
+  it('submits only the name and exact visible transaction ids', async () => {
+    renderModal({ transactionIds: [8, 2] });
+    const nameInput = screen.getByLabelText('View Name');
 
-    renderModal(criteria);
+    expect(nameInput).toHaveAttribute('maxlength', '255');
+    await userEvent.type(nameInput, 'Coffee collection');
+    await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
 
-    await userEvent.type(screen.getByLabelText(/View Name/i), 'January Debits');
-    await userEvent.click(screen.getByRole('button', { name: /Save View/i }));
-
-    expect(mockMutate).toHaveBeenCalledWith(
-      {
-        name: 'January Debits',
-        criteria,
-        openEnded: false,
-      },
+    expect(mocks.mutate).toHaveBeenCalledWith(
+      { name: 'Coffee collection', transactionIds: [8, 2] },
       expect.any(Object),
     );
   });
 
-  it('renders transaction type in the criteria summary', () => {
-    renderModal({ type: 'CREDIT' });
+  it('permits an empty collection', async () => {
+    renderModal({ transactionIds: [] });
+    await userEvent.type(screen.getByLabelText('View Name'), 'Empty collection');
+    await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
 
-    expect(screen.getByText('Type: Credit')).toBeInTheDocument();
+    expect(mocks.mutate).toHaveBeenCalledWith(
+      { name: 'Empty collection', transactionIds: [] },
+      expect.any(Object),
+    );
   });
 
-  it('navigates to the created view after a successful save', async () => {
-    mockMutate.mockImplementation((_request, options) => {
-      options.onSuccess({
-        id: 'view-created',
-        name: 'January Debits',
-        criteria: {},
-        openEnded: false,
-        pinnedCount: 0,
-        excludedCount: 0,
-        transactionCount: 0,
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
-    });
+  it('disables submission while the visible set is unresolved', async () => {
+    renderModal({ isReady: false });
+    await userEvent.type(screen.getByLabelText('View Name'), 'Pending');
+    expect(screen.getByRole('button', { name: 'Save View' })).toBeDisabled();
+  });
 
-    const { onClose } = renderModalInRoutes({
-      criteria: {
-        dateFrom: '2026-01-01',
-        searchText: 'coffee',
-      },
+  it('clears filters and navigates only after success', async () => {
+    mocks.mutate.mockImplementation((_request, options) => {
+      options.onSuccess({ id: 'created-view' });
     });
-
-    await userEvent.type(screen.getByLabelText(/View Name/i), 'January Debits');
-    await userEvent.click(screen.getByRole('button', { name: /Save View/i }));
+    const { onClose } = renderModal();
+    await userEvent.type(screen.getByLabelText('View Name'), 'Coffee collection');
+    await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
 
     expect(onClose).toHaveBeenCalledOnce();
-    expect(screen.getByTestId('location')).toHaveTextContent('/views/view-created');
+    expect(screen.getByTestId('location')).toHaveTextContent('/views/created-view');
+    expect(screen.getByTestId('location')).not.toHaveTextContent('q=coffee');
   });
 
-  it('keeps the modal state in place when save does not succeed', async () => {
-    const { onClose } = renderModalInRoutes({
-      criteria: {
-        dateFrom: '2026-01-01',
-        searchText: 'coffee',
-      },
+  it('keeps the modal and name in place on failure', async () => {
+    mocks.mutate.mockImplementation((_request, options) => {
+      options.onError(
+        new ApiError(500, { type: 'INTERNAL_ERROR', message: 'Could not create collection' }),
+      );
     });
-
-    await userEvent.type(screen.getByLabelText(/View Name/i), 'January Debits');
-    await userEvent.click(screen.getByRole('button', { name: /Save View/i }));
+    const { onClose } = renderModal();
+    const nameInput = screen.getByLabelText('View Name');
+    await userEvent.type(nameInput, 'Coffee collection');
+    await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
 
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByTestId('location')).toHaveTextContent(
-      '/transactions?dateFrom=2026-01-01&q=coffee&returnTo=%2Fanalytics',
+    expect(nameInput).toHaveValue('Coffee collection');
+    expect(screen.getByTestId('location')).toHaveTextContent('q=coffee');
+    expect(mocks.toastError).toHaveBeenCalledWith('Could not create collection');
+  });
+
+  it('explains stale membership while retaining the name', async () => {
+    mocks.mutate.mockImplementation((_request, options) => {
+      options.onError(
+        new ApiError(422, {
+          type: 'APPLICATION_ERROR',
+          message: 'Stale',
+          code: 'SAVED_VIEW_MEMBERSHIP_STALE',
+        }),
+      );
+    });
+    renderModal();
+    const nameInput = screen.getByLabelText('View Name');
+    await userEvent.type(nameInput, 'Coffee collection');
+    await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
+
+    expect(nameInput).toHaveValue('Coffee collection');
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      expect.stringMatching(/visible transaction set changed/i),
     );
   });
 });

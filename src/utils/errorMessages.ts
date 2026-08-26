@@ -22,6 +22,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   TRANSACTION_DATE_TOO_OLD: 'Transaction dates before the year 2000 are not supported',
   TRANSACTION_DATE_TOO_FAR_IN_FUTURE: 'Transaction dates in the future are not supported',
 
+  // Saved-view errors
+  SAVED_VIEW_MEMBERSHIP_STALE:
+    'The transaction snapshot changed and must be refreshed before updating this saved view.',
+
   // Currency errors
   INVALID_PROVIDER_SERIES_ID: 'The requested currency series id is invalid',
   DUPLICATE_CURRENCY_CODE: 'The currency code or series id is already taken',

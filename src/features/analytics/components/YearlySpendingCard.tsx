@@ -17,8 +17,9 @@ import {
 interface YearlySpendingCardProps {
   year: number;
   yearLabel: string;
-  totalSpending: number;
+  totalSpending: number | null;
   transactionCount: number;
+  unavailableAmountCount: number;
   currency: string;
   viewMode: ViewMode;
   transactionType: TransactionTypeParam;
@@ -31,6 +32,7 @@ export function YearlySpendingCard({
   yearLabel,
   totalSpending,
   transactionCount,
+  unavailableAmountCount,
   currency,
   viewMode,
   transactionType,
@@ -44,6 +46,11 @@ export function YearlySpendingCard({
   const Icon = isCredit ? TrendingUp : TrendingDown;
   const iconColorClass = isCredit ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground';
   const amountColorClass = isCredit ? 'text-green-600 dark:text-green-400' : 'text-foreground';
+  const isPartial = unavailableAmountCount > 0 && unavailableAmountCount < transactionCount;
+  const unavailableDescription =
+    unavailableAmountCount === transactionCount
+      ? `All ${unavailableAmountCount} ${unavailableAmountCount === 1 ? 'amount' : 'amounts'} unavailable`
+      : `Partial total · ${unavailableAmountCount} unavailable`;
 
   // Build return URL with preserved state
   const returnTo = buildAnalyticsReturnUrl({
@@ -84,8 +91,13 @@ export function YearlySpendingCard({
               {/* Total Spending */}
               <div className="space-y-1">
                 <p className={`text-2xl font-bold ${amountColorClass}`}>
-                  {formatCurrency(totalSpending, currency)}
+                  {totalSpending === null ? 'Unavailable' : formatCurrency(totalSpending, currency)}
                 </p>
+                {unavailableAmountCount > 0 && (
+                  <p className={`text-xs ${isPartial ? 'text-warning' : 'text-muted-foreground'}`}>
+                    {unavailableDescription}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">
                   {transactionCount} {transactionCount === 1 ? 'transaction' : 'transactions'}
                 </p>

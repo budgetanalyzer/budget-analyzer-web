@@ -28,6 +28,7 @@ interface DraftFilters {
   description: string;
   bankName: string;
   accountId: string;
+  currencyIsoCode: string;
   minAmount: string;
   maxAmount: string;
   dateFrom: string;
@@ -40,6 +41,7 @@ function draftFromQuery(query: TransactionSearchQuery): DraftFilters {
     description: query.description ?? '',
     bankName: query.bankName ?? '',
     accountId: query.accountId ?? '',
+    currencyIsoCode: query.currencyIsoCode ?? '',
     minAmount: query.minAmount !== undefined ? String(query.minAmount) : '',
     maxAmount: query.maxAmount !== undefined ? String(query.maxAmount) : '',
     dateFrom: query.dateFrom ?? '',
@@ -52,7 +54,7 @@ function parseAmount(value: string): number | undefined {
   const trimmed = value.trim();
   if (trimmed === '') return undefined;
   const parsed = Number(trimmed);
-  return Number.isNaN(parsed) ? undefined : parsed;
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function draftToQueryPatch(draft: DraftFilters): Partial<TransactionSearchQuery> {
@@ -60,6 +62,7 @@ function draftToQueryPatch(draft: DraftFilters): Partial<TransactionSearchQuery>
     description: draft.description.trim() || undefined,
     bankName: draft.bankName.trim() || undefined,
     accountId: draft.accountId.trim() || undefined,
+    currencyIsoCode: draft.currencyIsoCode.trim().toUpperCase() || undefined,
     minAmount: parseAmount(draft.minAmount),
     maxAmount: parseAmount(draft.maxAmount),
     dateFrom: draft.dateFrom || undefined,
@@ -76,6 +79,7 @@ function draftToQueryPatch(draft: DraftFilters): Partial<TransactionSearchQuery>
 function countAdvancedFilters(query: TransactionSearchQuery): number {
   let count = 0;
   if (query.type !== undefined) count += 1;
+  if (query.currencyIsoCode !== undefined && query.currencyIsoCode !== '') count += 1;
   if (query.minAmount !== undefined) count += 1;
   if (query.maxAmount !== undefined) count += 1;
   if (query.bankName !== undefined && query.bankName !== '') count += 1;
@@ -119,6 +123,10 @@ export function TransactionSearchFiltersPanel({
 
   const handleTypeChange = useCallback((value: string) => {
     setDraft((d) => ({ ...d, type: value as DraftType }));
+  }, []);
+
+  const handleCurrencyChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setDraft((d) => ({ ...d, currencyIsoCode: e.target.value }));
   }, []);
 
   const filtersActive = hasActiveFilters(query);
@@ -181,27 +189,59 @@ export function TransactionSearchFiltersPanel({
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-1">
-            <Input
-              type="number"
-              placeholder="Min"
-              value={draft.minAmount}
-              onChange={(e) => setDraft((d) => ({ ...d, minAmount: e.target.value }))}
-              className="w-[90px]"
-              min="0"
-              step="0.01"
-            />
-            <span className="text-muted-foreground">-</span>
-            <Input
-              type="number"
-              placeholder="Max"
-              value={draft.maxAmount}
-              onChange={(e) => setDraft((d) => ({ ...d, maxAmount: e.target.value }))}
-              className="w-[90px]"
-              min="0"
-              step="0.01"
-            />
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label htmlFor="admin-txn-currency" className="text-xs font-medium">
+                Currency ISO code
+              </label>
+              <Input
+                id="admin-txn-currency"
+                value={draft.currencyIsoCode}
+                onChange={handleCurrencyChange}
+                placeholder="USD"
+                autoCapitalize="characters"
+                spellCheck={false}
+                aria-describedby="admin-txn-amount-contract"
+                className="w-[110px] uppercase"
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="admin-txn-min-amount" className="text-xs font-medium">
+                Minimum amount
+              </label>
+              <Input
+                id="admin-txn-min-amount"
+                type="number"
+                placeholder="Min"
+                value={draft.minAmount}
+                onChange={(e) => setDraft((d) => ({ ...d, minAmount: e.target.value }))}
+                aria-describedby="admin-txn-amount-contract"
+                className="w-[110px]"
+                step="any"
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="admin-txn-max-amount" className="text-xs font-medium">
+                Maximum amount
+              </label>
+              <Input
+                id="admin-txn-max-amount"
+                type="number"
+                placeholder="Max"
+                value={draft.maxAmount}
+                onChange={(e) => setDraft((d) => ({ ...d, maxAmount: e.target.value }))}
+                aria-describedby="admin-txn-amount-contract"
+                className="w-[110px]"
+                step="any"
+              />
+            </div>
           </div>
+
+          <p id="admin-txn-amount-contract" className="w-full text-xs text-muted-foreground">
+            Amount bounds and amount sorting compare raw stored numbers without FX normalization. An
+            amount-only search can span currencies; combine a currency with bounds to make the
+            comparison currency-specific.
+          </p>
 
           <Input
             value={draft.bankName}

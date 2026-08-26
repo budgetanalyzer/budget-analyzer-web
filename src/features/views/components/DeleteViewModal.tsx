@@ -1,23 +1,22 @@
-// src/features/views/components/DeleteViewModal.tsx
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/Dialog';
-import { Button } from '@/components/ui/Button';
 import { useDeleteView } from '@/hooks/useViews';
-import { SavedView } from '@/types/view';
+import type { SavedViewMetadata } from '@/types/view';
 
 interface DeleteViewModalProps {
   open: boolean;
   onClose: () => void;
-  view: SavedView;
+  view: SavedViewMetadata;
 }
 
 export function DeleteViewModal({ open, onClose, view }: DeleteViewModalProps) {
@@ -31,10 +30,17 @@ export function DeleteViewModal({ open, onClose, view }: DeleteViewModalProps) {
         navigate('/');
       },
     });
-  }, [deleteView, view.id, onClose, navigate]);
+  }, [deleteView, navigate, onClose, view.id]);
+
+  const handleOpenChange = useCallback(
+    (isOpen: boolean) => {
+      if (!isOpen) onClose();
+    },
+    [onClose],
+  );
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -44,24 +50,10 @@ export function DeleteViewModal({ open, onClose, view }: DeleteViewModalProps) {
             <DialogTitle>Delete View</DialogTitle>
           </div>
           <DialogDescription className="pt-2">
-            Are you sure you want to delete &ldquo;{view.name}&rdquo;? This action cannot be undone.
+            Are you sure you want to delete &ldquo;{view.name}&rdquo; and its{' '}
+            {view.transactionCount} transaction memberships? Your transactions will not be deleted.
           </DialogDescription>
         </DialogHeader>
-
-        <div className="py-4">
-          <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3">
-            <p className="text-sm text-muted-foreground">
-              This will permanently delete the view and all its settings, including:
-            </p>
-            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-muted-foreground">
-              <li>{view.pinnedCount} pinned transaction(s)</li>
-              <li>{view.excludedCount} excluded transaction(s)</li>
-            </ul>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Your transactions will not be affected.
-            </p>
-          </div>
-        </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>

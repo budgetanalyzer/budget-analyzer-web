@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '@/testing/mocks/server';
-import { viewKeys } from '@/hooks/useViews';
+import { transactionKeys } from '@/queryKeys';
 import { toast } from '@/hooks/useToast';
 import { renderWithProviders } from '@/testing/test-utils';
 import { TransactionPreviewModal } from '@/features/transactions/components/TransactionPreviewModal';
@@ -779,10 +779,9 @@ describe('TransactionPreviewModal', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Import 1 Transaction' }));
 
     await waitFor(() => {
-      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['transactions'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: transactionKeys.list() });
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['transactionCount'] });
-      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: viewKeys.all });
-      expect(invalidateQueries).toHaveBeenCalledTimes(3);
+      expect(invalidateQueries).toHaveBeenCalledTimes(2);
     });
   });
 

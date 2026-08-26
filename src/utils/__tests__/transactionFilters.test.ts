@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { TransactionFilterValues } from '@/types/transactionFilters';
-import type { ViewTransaction } from '@/types/view';
-import { filterTransactions, hasActiveTransactionFilters } from '@/utils/transactionFilters';
+import type { Transaction } from '@/types/transaction';
+import type { DisplayAmount } from '@/types/displayAmount';
+import {
+  filterTransactions,
+  filterTransactionsByDisplayAmount,
+  hasActiveTransactionFilters,
+} from '@/utils/transactionFilters';
 
-const transactions: ViewTransaction[] = [
+const transactions: Transaction[] = [
   {
     id: 1,
     accountId: 'checking',
@@ -15,7 +20,6 @@ const transactions: ViewTransaction[] = [
     description: 'Coffee shop',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
-    membershipType: 'MATCHED',
   },
   {
     id: 2,
@@ -28,7 +32,6 @@ const transactions: ViewTransaction[] = [
     description: 'Salary',
     createdAt: '2026-01-15T00:00:00Z',
     updatedAt: '2026-01-15T00:00:00Z',
-    membershipType: 'PINNED',
   },
   {
     id: 3,
@@ -41,7 +44,6 @@ const transactions: ViewTransaction[] = [
     description: 'Rent',
     createdAt: '2026-02-01T00:00:00Z',
     updatedAt: '2026-02-01T00:00:00Z',
-    membershipType: 'MATCHED',
   },
   {
     id: 4,
@@ -54,7 +56,6 @@ const transactions: ViewTransaction[] = [
     description: 'COFFEE refund',
     createdAt: '2026-02-15T00:00:00Z',
     updatedAt: '2026-02-15T00:00:00Z',
-    membershipType: 'PINNED',
   },
 ];
 
@@ -65,6 +66,7 @@ const emptyFilters: TransactionFilterValues = {
   accountIdFilter: null,
   typeFilter: null,
   amountFilter: { min: null, max: null },
+  amountCurrency: null,
 };
 
 function ids(filters: TransactionFilterValues): number[] {
@@ -72,16 +74,11 @@ function ids(filters: TransactionFilterValues): number[] {
 }
 
 describe('filterTransactions', () => {
-  it('preserves input order and a transaction subtype', () => {
-    const result: ViewTransaction[] = filterTransactions(transactions, emptyFilters);
+  it('preserves input order and identity without filters', () => {
+    const result: Transaction[] = filterTransactions(transactions, emptyFilters);
 
     expect(result).toBe(transactions);
-    expect(result.map((transaction) => transaction.membershipType)).toEqual([
-      'MATCHED',
-      'PINNED',
-      'MATCHED',
-      'PINNED',
-    ]);
+    expect(result.map((transaction) => transaction.id)).toEqual([1, 2, 3, 4]);
   });
 
   it('uses the case-insensitive description-only table search', () => {
@@ -126,6 +123,7 @@ describe('filterTransactions', () => {
         accountIdFilter: 'checking',
         typeFilter: 'CREDIT',
         amountFilter: { min: 20, max: 50 },
+        amountCurrency: 'USD',
       }),
     ).toEqual([4]);
   });
@@ -140,5 +138,53 @@ describe('hasActiveTransactionFilters', () => {
         amountFilter: { min: 0, max: null },
       }),
     ).toBe(true);
+  });
+});
+
+describe('filterTransactionsByDisplayAmount', () => {
+  const available = (value: number): DisplayAmount => ({
+    available: true,
+    sourceMagnitude: value,
+    sourceCurrency: 'USD',
+    targetCurrency: 'USD',
+    minorUnitCount: 2,
+    value,
+    rateLegs: [],
+  });
+  const unavailable: DisplayAmount = {
+    available: false,
+    sourceMagnitude: 30,
+    sourceCurrency: 'GBP',
+    targetCurrency: 'USD',
+    reason: 'MISSING_SOURCE_RATE',
+  };
+  const displayAmounts = new Map<number, DisplayAmount>([
+    [1, available(10)],
+    [2, available(9.99)],
+    [3, available(10.01)],
+    [4, unavailable],
+  ]);
+
+  it('compares inclusive quantized display values after non-amount filters', () => {
+    const result = filterTransactionsByDisplayAmount(
+      transactions,
+      {
+        ...emptyFilters,
+        globalFilter: 'coffee',
+        amountFilter: { min: 10, max: 10 },
+        amountCurrency: 'USD',
+      },
+      displayAmounts,
+    );
+
+    expect(result.transactions.map((transaction) => transaction.id)).toEqual([1]);
+    expect(result.unavailableAmountCount).toBe(1);
+  });
+
+  it('retains unavailable conversions when no amount range is active', () => {
+    const result = filterTransactionsByDisplayAmount(transactions, emptyFilters, displayAmounts);
+
+    expect(result.transactions).toBe(transactions);
+    expect(result.unavailableAmountCount).toBe(0);
   });
 });

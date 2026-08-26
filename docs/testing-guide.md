@@ -49,12 +49,12 @@ tested; it does not emulate browser layout or anchor positioning.
 
 Shared infrastructure:
 
-| Path | Responsibility |
-| --- | --- |
-| `src/testing/setup.ts` | Global matchers, browser shims, and MSW lifecycle |
-| `src/testing/mocks/handlers.ts` | Default auth/API responses and resettable mock state |
-| `src/testing/mocks/server.ts` | Shared Node MSW server |
-| `src/testing/test-utils.tsx` | Fresh Query Client, Redux store, and provider-aware render helper |
+| Path                            | Responsibility                                                    |
+| ------------------------------- | ----------------------------------------------------------------- |
+| `src/testing/setup.ts`          | Global matchers, browser shims, and MSW lifecycle                 |
+| `src/testing/mocks/handlers.ts` | Default auth/API responses and resettable mock state              |
+| `src/testing/mocks/server.ts`   | Shared Node MSW server                                            |
+| `src/testing/test-utils.tsx`    | Fresh Query Client, Redux store, and provider-aware render helper |
 
 `createTestQueryClient()` disables query and mutation retries and disables
 refetch-on-window-focus by default. `createTestStore()` creates an isolated
@@ -132,11 +132,14 @@ Choose the test boundary according to the contract:
   and surfaced errors.
 - API module tests: paths, methods, query parameters, and request payloads.
 - Utility tests: LocalDate/timezone behavior, search semantics, currency
-  conversion fallbacks, reconciliation rules, and API error mappings.
+  projection availability and provenance, reconciliation rules, and API error
+  mappings.
 
 Keep repository-specific semantics visible. For example, saved-view membership
-tests cover excluded IDs, visible duplicate IDs, restored IDs, and missing
-visible IDs. Do not replace such product rules with generic render assertions.
+tests cover deterministic response ordering, membership IDs missing from the
+complete transaction cache, atomic add/remove deltas, stale additions, and zero
+per-ID member fetches. Do not replace such product rules with generic render
+assertions.
 
 ## MSW (Mock Service Worker)
 
@@ -183,12 +186,12 @@ npm run test:coverage
 Vitest prints the text report and writes HTML plus JSON summary artifacts under
 `coverage/`. Global thresholds in `vitest.config.ts` are:
 
-| Metric | Minimum |
-| --- | ---: |
-| Statements | 80% |
-| Branches | 80% |
-| Functions | 75% |
-| Lines | 80% |
+| Metric     | Minimum |
+| ---------- | ------: |
+| Statements |     80% |
+| Branches   |     80% |
+| Functions  |     75% |
+| Lines      |     80% |
 
 The command exits nonzero when any threshold is missed. `npm run build` uses
 this gate before type-checking and bundling, and `.github/workflows/build.yml`

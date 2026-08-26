@@ -15,11 +15,15 @@ function parseAmount(value: string | null): number | null {
  * Reads and updates the shared URL-backed transaction filters.
  * The URL is the source of truth so filters stay refreshable and shareable.
  */
-export function useTransactionFiltersSync() {
+export function useTransactionFiltersSync(displayCurrency: string) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const filters = useMemo<TransactionFilterValues>(() => {
     const type = searchParams.get('type');
+
+    const minAmount = parseAmount(searchParams.get('minAmount'));
+    const maxAmount = parseAmount(searchParams.get('maxAmount'));
+    const hasAmountFilter = minAmount !== null || maxAmount !== null;
 
     return {
       globalFilter: searchParams.get('q') ?? '',
@@ -31,11 +35,14 @@ export function useTransactionFiltersSync() {
       accountIdFilter: searchParams.get('accountId') ?? searchParams.get('account'),
       typeFilter: type === 'DEBIT' || type === 'CREDIT' ? type : null,
       amountFilter: {
-        min: parseAmount(searchParams.get('minAmount')),
-        max: parseAmount(searchParams.get('maxAmount')),
+        min: minAmount,
+        max: maxAmount,
       },
+      amountCurrency: hasAmountFilter
+        ? (searchParams.get('amountCurrency') ?? displayCurrency)
+        : null,
     };
-  }, [searchParams]);
+  }, [displayCurrency, searchParams]);
 
   const handleDateFilterChange = useCallback(
     (from: string | null, to: string | null) => {
@@ -123,9 +130,14 @@ export function useTransactionFiltersSync() {
       } else {
         params.delete('maxAmount');
       }
+      if ((min !== null && Number.isFinite(min)) || (max !== null && Number.isFinite(max))) {
+        params.set('amountCurrency', displayCurrency);
+      } else {
+        params.delete('amountCurrency');
+      }
       setSearchParams(params, { replace: true });
     },
-    [searchParams, setSearchParams],
+    [displayCurrency, searchParams, setSearchParams],
   );
 
   const hasActiveFilters = useCallback(() => hasActiveTransactionFilters(filters), [filters]);
@@ -142,6 +154,7 @@ export function useTransactionFiltersSync() {
     params.delete('type');
     params.delete('minAmount');
     params.delete('maxAmount');
+    params.delete('amountCurrency');
     params.delete('returnTo');
     params.delete('breadcrumbLabel');
     setSearchParams(params, { replace: true });

@@ -1,6 +1,6 @@
-// src/features/views/components/ViewSettingsMenu.tsx
 import { useCallback, useState } from 'react';
-import { MoreHorizontal, Pencil, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,69 +8,52 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
-import { Button } from '@/components/ui/Button';
-import { SavedView } from '@/types/view';
-import { useUpdateView } from '@/hooks/useViews';
+import { usePermission } from '@/features/auth/hooks/usePermission';
 
 interface ViewSettingsMenuProps {
-  view: SavedView;
-  onEditClick: () => void;
+  onRenameClick: () => void;
   onDeleteClick: () => void;
 }
 
-export function ViewSettingsMenu({ view, onEditClick, onDeleteClick }: ViewSettingsMenuProps) {
+export function ViewSettingsMenu({ onRenameClick, onDeleteClick }: ViewSettingsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { mutate: updateView, isPending } = useUpdateView();
+  const canRename = usePermission('views:write');
+  const canDelete = usePermission('views:delete');
 
-  const handleToggleOpenEnded = useCallback(() => {
-    updateView({
-      id: view.id,
-      request: { openEnded: !view.openEnded },
-    });
+  const handleRenameClick = useCallback(() => {
     setIsOpen(false);
-  }, [updateView, view.id, view.openEnded]);
-
-  const handleEditClick = useCallback(() => {
-    setIsOpen(false);
-    onEditClick();
-  }, [onEditClick]);
+    onRenameClick();
+  }, [onRenameClick]);
 
   const handleDeleteClick = useCallback(() => {
     setIsOpen(false);
     onDeleteClick();
   }, [onDeleteClick]);
 
+  if (!canRename && !canDelete) return null;
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={isPending}>
+        <Button variant="outline" size="sm">
           <MoreHorizontal className="h-4 w-4" />
           <span className="sr-only">View settings</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem onClick={handleEditClick}>
-          <Pencil className="mr-2 h-4 w-4" />
-          Edit View
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleToggleOpenEnded} disabled={isPending}>
-          {view.openEnded ? (
-            <>
-              <ToggleRight className="mr-2 h-4 w-4" />
-              Disable Open-Ended
-            </>
-          ) : (
-            <>
-              <ToggleLeft className="mr-2 h-4 w-4" />
-              Enable Open-Ended
-            </>
-          )}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleDeleteClick} destructive>
-          <Trash2 className="mr-2 h-4 w-4" />
-          Delete View
-        </DropdownMenuItem>
+        {canRename && (
+          <DropdownMenuItem onClick={handleRenameClick}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Rename View
+          </DropdownMenuItem>
+        )}
+        {canRename && canDelete && <DropdownMenuSeparator />}
+        {canDelete && (
+          <DropdownMenuItem onClick={handleDeleteClick} destructive>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete View
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

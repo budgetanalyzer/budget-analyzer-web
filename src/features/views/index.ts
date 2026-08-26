@@ -6,6 +6,7 @@ export { ViewsPage } from './pages/ViewsPage';
 
 // Components
 export { ViewCard } from './components/ViewCard';
-export { ViewCriteriaSummary } from './components/ViewCriteriaSummary';
+export { RemoveViewTransactionsBar } from './components/RemoveViewTransactionsBar';
+export { RemoveViewTransactionsModal } from './components/RemoveViewTransactionsModal';
+export { TransferRefundReviewDialog } from './components/TransferRefundReviewDialog';
 export { ViewTransactionTable } from './components/ViewTransactionTable';
-export { RestoreExcludedTransactionsModal } from './components/RestoreExcludedTransactionsModal';
