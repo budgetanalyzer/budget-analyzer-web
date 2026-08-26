@@ -165,7 +165,7 @@ describe('TransferRefundReviewDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Remove 1 from this view' }));
     mutationOptions().onSuccess();
 
-    expect(toastMocks.success).toHaveBeenCalledWith('Removed 1 transaction from this view');
+    expect(toastMocks.success).not.toHaveBeenCalled();
     expect(props.onClose).toHaveBeenCalledOnce();
     expect(props.onComplete).toHaveBeenCalledOnce();
   });

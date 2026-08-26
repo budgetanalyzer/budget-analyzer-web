@@ -96,9 +96,6 @@ export function TransferRefundReviewDialog({
       },
       {
         onSuccess: () => {
-          toast.success(
-            `Removed ${selectedIds.length} transaction${selectedIds.length !== 1 ? 's' : ''} from this view`,
-          );
           onClose();
           onComplete();
         },

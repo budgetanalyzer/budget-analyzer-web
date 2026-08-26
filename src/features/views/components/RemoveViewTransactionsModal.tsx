@@ -55,9 +55,6 @@ export function RemoveViewTransactionsModal({
       { viewId, request },
       {
         onSuccess: () => {
-          toast.success(
-            `Removed ${removeCount} transaction${removeCount !== 1 ? 's' : ''} from this view`,
-          );
           onOpenChange(false);
           onSuccess();
         },

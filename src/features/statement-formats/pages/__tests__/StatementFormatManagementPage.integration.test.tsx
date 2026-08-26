@@ -12,12 +12,11 @@ import type { StatementFormat } from '@/types/statementFormat';
 
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/features/transactions/hooks/usePreviewTransactions');
-vi.mock('@/hooks/useToast', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
+const toastMocks = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
 }));
+vi.mock('@/hooks/useToast', () => ({ toast: toastMocks }));
 vi.mock('@/components/statement-formats/StatementFormatWizardDialog', () => ({
   StatementFormatWizardDialog: () => null,
 }));
@@ -96,6 +95,8 @@ function customFormat(overrides: Partial<StatementFormat> = {}): StatementFormat
 }
 
 beforeEach(() => {
+  toastMocks.success.mockReset();
+  toastMocks.error.mockReset();
   mockUsePermission.mockReset();
   mockUsePermission.mockReturnValue(true);
   mockUsePreviewTransactions.mockReset();
@@ -125,6 +126,7 @@ describe('StatementFormatManagementPage API behavior', () => {
       expect(handlers.hideRequests).toEqual([101]);
       expect(getFormatRow('System Checking CSV').getByText('Hidden')).toBeInTheDocument();
     });
+    expect(toastMocks.success).not.toHaveBeenCalled();
   });
 
   it('hides a custom format and updates its visibility state after refetch', async () => {
@@ -168,6 +170,7 @@ describe('StatementFormatManagementPage API behavior', () => {
       expect(handlers.unhideRequests).toEqual([303]);
       expect(getFormatRow('Hidden System CSV').getByText('Visible')).toBeInTheDocument();
     });
+    expect(toastMocks.success).not.toHaveBeenCalled();
   });
 
   it('omits hidden formats from import selection while keeping them visible on the management page', async () => {

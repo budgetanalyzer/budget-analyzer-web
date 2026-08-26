@@ -1,10 +1,17 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RemoveViewTransactionsModal } from '@/features/views/components/RemoveViewTransactionsModal';
 import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
+
+const toastMocks = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock('@/hooks/useToast', () => ({ toast: toastMocks }));
 
 function renderModal(transactionIds = [3, 3, 8]) {
   const onOpenChange = vi.fn();
@@ -23,6 +30,11 @@ function renderModal(transactionIds = [3, 3, 8]) {
 }
 
 describe('RemoveViewTransactionsModal', () => {
+  beforeEach(() => {
+    toastMocks.success.mockReset();
+    toastMocks.error.mockReset();
+  });
+
   it('confirms the unique count and treats a bodyless 204 as complete success', async () => {
     let requestBody: unknown;
     server.use(
@@ -44,6 +56,7 @@ describe('RemoveViewTransactionsModal', () => {
     );
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
     expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(toastMocks.success).not.toHaveBeenCalled();
   });
 
   it('cancels without issuing a membership delta', async () => {
@@ -81,6 +94,7 @@ describe('RemoveViewTransactionsModal', () => {
 
     expect(onOpenChange).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
+    expect(toastMocks.error).toHaveBeenCalledWith('Membership update failed');
     expect(screen.getByRole('heading', { name: 'Remove from view' })).toBeInTheDocument();
     expect(screen.getByText(/Remove 1 transaction from this view/)).toBeInTheDocument();
   });

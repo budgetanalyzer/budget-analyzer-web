@@ -79,7 +79,7 @@ describe('UserDetailPage', () => {
     expect(screen.getByText('Not available')).toBeInTheDocument();
   });
 
-  it('deactivates an active user from the detail page and shows inline success feedback', async () => {
+  it('deactivates an active user and reflects the result in the detail page', async () => {
     renderPage('/admin/users/usr_abc123');
 
     await userEvent.click(await screen.findByRole('button', { name: 'Deactivate User' }));
@@ -87,10 +87,11 @@ describe('UserDetailPage', () => {
     expect(screen.getByRole('heading', { name: 'Deactivate Admin User?' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Deactivate Account' }));
 
-    expect(
-      await screen.findByText('User usr_abc123 deactivated successfully.'),
-    ).toBeInTheDocument();
     expect(await screen.findByText('Deactivation')).toBeInTheDocument();
+    expect(screen.getAllByText('DEACTIVATED')).toHaveLength(2);
+    expect(screen.getByText('Deactivated At')).toBeInTheDocument();
+    expect(screen.getByText('Deactivated By')).toBeInTheDocument();
+    expect(screen.queryByText('User usr_abc123 deactivated successfully.')).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Deactivate User' })).not.toBeInTheDocument();

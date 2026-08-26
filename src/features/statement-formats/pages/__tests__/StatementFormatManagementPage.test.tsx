@@ -21,7 +21,7 @@ import {
 import { toast } from '@/hooks/useToast';
 import { StatementFormatManagementPage } from '@/features/statement-formats/pages/StatementFormatManagementPage';
 import { renderWithProviders } from '@/testing/test-utils';
-import type { ApiError } from '@/types/apiError';
+import { ApiError } from '@/types/apiError';
 import type { StatementFormat } from '@/types/statementFormat';
 
 const mockUsePermission = vi.mocked(usePermission);
@@ -142,7 +142,7 @@ describe('StatementFormatManagementPage', () => {
     expect(screen.queryByRole('button', { name: /restore to import/i })).not.toBeInTheDocument();
   });
 
-  it('hides and restores formats with mutation callbacks', async () => {
+  it('hides and restores formats without success notifications', async () => {
     mockUsePermission.mockReturnValue(true);
     mockQuerySuccess(formats);
     hideMutate.mockImplementation((_id, options) => {
@@ -162,8 +162,41 @@ describe('StatementFormatManagementPage', () => {
 
     expect(hideMutate).toHaveBeenCalledWith(3, expect.any(Object));
     expect(unhideMutate).toHaveBeenCalledWith(1, expect.any(Object));
-    expect(mockToast.success).toHaveBeenCalledWith('Visible Alpha is hidden from import lists.');
-    expect(mockToast.success).toHaveBeenCalledWith('Hidden Beta is available for imports again.');
+    expect(hideMutate.mock.calls[0][1]).not.toHaveProperty('onSuccess');
+    expect(unhideMutate.mock.calls[0][1]).not.toHaveProperty('onSuccess');
+    expect(mockToast.success).not.toHaveBeenCalled();
+  });
+
+  it('retains hide and restore error notifications', async () => {
+    mockUsePermission.mockReturnValue(true);
+    mockQuerySuccess(formats);
+    hideMutate.mockImplementation((_id, options) => {
+      options?.onError?.(
+        new ApiError(409, {
+          type: 'APPLICATION_ERROR',
+          message: 'Cannot hide this format',
+        }),
+      );
+      options?.onSettled?.();
+    });
+    unhideMutate.mockImplementation((_id, options) => {
+      options?.onError?.(
+        new ApiError(403, {
+          type: 'FORBIDDEN',
+          message: 'Missing statement format write permission',
+        }),
+      );
+      options?.onSettled?.();
+    });
+    const user = userEvent.setup();
+
+    renderPage();
+
+    await user.click(screen.getAllByRole('button', { name: /hide from import/i })[0]);
+    await user.click(screen.getByRole('button', { name: /restore to import/i }));
+
+    expect(mockToast.error).toHaveBeenCalledWith('Cannot hide this format');
+    expect(mockToast.error).toHaveBeenCalledWith('Missing statement format write permission');
   });
 
   it('renders API load errors', () => {

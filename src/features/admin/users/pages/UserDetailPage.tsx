@@ -36,19 +36,13 @@ export function UserDetailPage() {
   const canDeactivateUsers = usePermission('users:write');
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const clearErrorMessage = useCallback(() => {
     setErrorMessage(null);
   }, []);
 
-  const clearSuccessMessage = useCallback(() => {
-    setSuccessMessage(null);
-  }, []);
-
   const handleOpenConfirmDialog = useCallback(() => {
     setErrorMessage(null);
-    setSuccessMessage(null);
     setIsConfirmDialogOpen(true);
   }, []);
 
@@ -65,12 +59,10 @@ export function UserDetailPage() {
     }
 
     setErrorMessage(null);
-    setSuccessMessage(null);
 
     deactivateUser(user.id, {
-      onSuccess: (data) => {
+      onSuccess: () => {
         setIsConfirmDialogOpen(false);
-        setSuccessMessage(`User ${data.userId} deactivated successfully.`);
       },
       onError: (mutationError: Error) => {
         setIsConfirmDialogOpen(false);
@@ -137,11 +129,6 @@ export function UserDetailPage() {
         <AnimatePresence mode="wait">
           {errorMessage && (
             <MessageBanner type="error" message={errorMessage} onClose={clearErrorMessage} />
-          )}
-        </AnimatePresence>
-        <AnimatePresence mode="wait">
-          {successMessage && (
-            <MessageBanner type="success" message={successMessage} onClose={clearSuccessMessage} />
           )}
         </AnimatePresence>
 

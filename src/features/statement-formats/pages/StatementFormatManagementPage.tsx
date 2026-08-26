@@ -48,9 +48,6 @@ export function StatementFormatManagementPage() {
     (format: StatementFormat) => {
       setPendingFormatId(format.id);
       hideFormat(format.id, {
-        onSuccess: () => {
-          toast.success(`${format.displayName} is hidden from import lists.`);
-        },
         onError: (hideError) => {
           toast.error(formatApiError(hideError, 'Failed to hide statement format'));
         },
@@ -66,9 +63,6 @@ export function StatementFormatManagementPage() {
     (format: StatementFormat) => {
       setPendingFormatId(format.id);
       unhideFormat(format.id, {
-        onSuccess: () => {
-          toast.success(`${format.displayName} is available for imports again.`);
-        },
         onError: (unhideError) => {
           toast.error(formatApiError(unhideError, 'Failed to restore statement format'));
         },
