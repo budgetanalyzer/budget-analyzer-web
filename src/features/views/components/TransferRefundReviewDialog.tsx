@@ -120,7 +120,7 @@ export function TransferRefundReviewDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="-mx-6 flex-1 overflow-y-auto px-6 py-4">
+        <div className="-mx-6 flex-1 overflow-y-auto px-6 pt-4">
           {isLoading ? (
             <div className="flex min-h-48 items-center justify-center">
               <LoadingSpinner text="Finding possible transfers and refunds..." />

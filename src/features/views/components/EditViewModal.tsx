@@ -52,7 +52,7 @@ export function EditViewModal({ open, onClose, view }: EditViewModalProps) {
             <DialogTitle>Rename View</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-2 py-4">
+          <div className="space-y-2 pt-4">
             <label htmlFor="view-name" className="text-sm font-medium">
               View Name
             </label>

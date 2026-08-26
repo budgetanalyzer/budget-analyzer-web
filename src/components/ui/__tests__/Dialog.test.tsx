@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/Dialog';
+import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/Dialog';
 
 const BODY_SCROLL_LOCK_CLASS = 'overflow-hidden';
 
@@ -49,6 +49,21 @@ function OverlappingDialogs() {
 afterEach(() => {
   cleanup();
   document.body.classList.remove(BODY_SCROLL_LOCK_CLASS);
+});
+
+describe('Dialog layout', () => {
+  it('provides shared content separation and button gaps at every breakpoint', () => {
+    render(
+      <DialogFooter>
+        <button type="button">Cancel</button>
+        <button type="button">Confirm</button>
+      </DialogFooter>,
+    );
+
+    const footer = screen.getByRole('button', { name: 'Cancel' }).parentElement;
+
+    expect(footer).toHaveClass('mt-6', 'gap-2', 'flex-col-reverse', 'sm:flex-row');
+  });
 });
 
 describe('Dialog body scroll lock', () => {

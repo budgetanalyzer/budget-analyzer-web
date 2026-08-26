@@ -39,6 +39,13 @@ application-owned source, styled with Tailwind, and may selectively build on
 headless libraries whose runtime behavior is compatible with the repository's
 CSP rules.
 
+Shared dialog footers own the application-wide action layout: they separate
+actions from preceding content with `mt-6` and use `gap-2` for both stacked
+mobile buttons and desktop rows. Feature dialogs should use the default
+`DialogFooter` spacing instead of repeating local margin or button-gap classes;
+specialized separators such as a top border may be added without replacing the
+shared spacing.
+
 ## State Boundary
 
 The application separates state by lifetime and authority:
