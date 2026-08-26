@@ -96,6 +96,13 @@ padding was normalized so it does not compound the shared footer margin.
 
 **Status:** Open
 
+The [application notification inventory](../research/notification-inventory.md)
+enumerates the current production notification surfaces and classifies their
+scope, semantic type, lifetime, and use. It identifies the existing pattern as
+a contextual feedback hierarchy: feedback belongs at the narrowest scope that
+contains the event, with persistence proportional to consequence and
+actionability.
+
 Both
 [`RemoveViewTransactionsModal`](../../src/features/views/components/RemoveViewTransactionsModal.tsx)
 and

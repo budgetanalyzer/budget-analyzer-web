@@ -32,19 +32,16 @@ export function BulkDeleteModal({
         const { deletedCount, notFoundIds } = result;
         const totalCount = selectedIds.length;
 
-        if (notFoundIds.length === 0) {
-          // All deleted successfully
-          toast.success(
-            `Successfully deleted ${deletedCount} transaction${deletedCount !== 1 ? 's' : ''}`,
-          );
-        } else if (deletedCount > 0) {
-          // Partial success
-          toast.warning(
-            `Deleted ${deletedCount} of ${totalCount}. ${notFoundIds.length} not found or already deleted.`,
-          );
-        } else {
-          // All failed
-          toast.error('Failed to delete transactions');
+        if (notFoundIds.length > 0) {
+          if (deletedCount > 0) {
+            // Partial success
+            toast.warning(
+              `Deleted ${deletedCount} of ${totalCount}. ${notFoundIds.length} not found or already deleted.`,
+            );
+          } else {
+            // All failed
+            toast.error('Failed to delete transactions');
+          }
         }
 
         onOpenChange(false);

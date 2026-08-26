@@ -42,7 +42,6 @@ export function DeleteTransactionModal({
 
     deleteTransaction(transaction.id, {
       onSuccess: () => {
-        toast.success('Transaction deleted successfully');
         onOpenChange(false);
         onDeleted?.();
       },

@@ -140,9 +140,6 @@ export function TransactionTable({
       updateTransaction(
         { id, data },
         {
-          onSuccess: () => {
-            toast.success('Transaction updated');
-          },
           onError: (error) => {
             toast.error(formatApiError(error, 'Failed to update transaction'));
           },

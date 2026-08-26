@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
@@ -40,6 +40,7 @@ import { buildExchangeRateMap } from '@/utils/currency';
 import { projectDisplayAmount } from '@/utils/displayAmount';
 import { server } from '@/testing/mocks/server';
 import { transactionKeys, viewKeys } from '@/queryKeys';
+import { toast } from '@/hooks/useToast';
 
 const mockUsePermission = vi.mocked(usePermission);
 const noop = vi.fn();
@@ -197,6 +198,10 @@ beforeEach(() => {
   saveAsViewButtonProps.current = undefined;
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('TransactionTable permission gating', () => {
   it('shows the select column and Edit + Delete row actions when all permissions are granted', async () => {
     mockUsePermission.mockReturnValue(true);
@@ -266,6 +271,61 @@ describe('TransactionTable permission gating', () => {
     const headerRow = within(table).getAllByRole('row')[0];
     // Select + Date, Description, Bank, Account, Type, Amount, Actions = 8 columns.
     expect(within(headerRow).getAllByRole('columnheader')).toHaveLength(8);
+  });
+});
+
+describe('TransactionTable inline editing', () => {
+  it('shows the updated row without emitting a redundant success notification', async () => {
+    const successToast = vi.spyOn(toast, 'success');
+    const user = userEvent.setup();
+    mockUsePermission.mockReturnValue(true);
+    const { rerender } = renderTable();
+
+    await openFirstRowMenu();
+    await user.click(screen.getByRole('menuitem', { name: /Edit/ }));
+    const descriptionInput = screen.getByDisplayValue('Salary');
+    await user.clear(descriptionInput);
+    await user.type(descriptionInput, 'Salary bonus');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(transactionHookMocks.updateMutate).toHaveBeenCalledWith(
+      { id: 2, data: { description: 'Salary bonus' } },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+    expect(transactionHookMocks.updateMutate.mock.calls[0][1]).not.toHaveProperty('onSuccess');
+
+    await act(async () => {
+      rerender(
+        createTable(
+          [transactions[0], { ...transactions[1], description: 'Salary bonus' }],
+          new Map(),
+        ),
+      );
+    });
+
+    expect(screen.getByText('Salary bonus')).toBeInTheDocument();
+    expect(successToast).not.toHaveBeenCalled();
+  });
+
+  it('retains failure feedback when an inline update fails', async () => {
+    const errorToast = vi.spyOn(toast, 'error');
+    const user = userEvent.setup();
+    mockUsePermission.mockReturnValue(true);
+    renderTable();
+
+    await openFirstRowMenu();
+    await user.click(screen.getByRole('menuitem', { name: /Edit/ }));
+    const descriptionInput = screen.getByDisplayValue('Salary');
+    await user.clear(descriptionInput);
+    await user.type(descriptionInput, 'Rejected update');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const mutationOptions = transactionHookMocks.updateMutate.mock.calls[0][1] as {
+      onError: (error: Error) => void;
+    };
+    mutationOptions.onError(new Error('Update failed'));
+
+    expect(errorToast).toHaveBeenCalledWith('Update failed');
   });
 });
 

@@ -121,7 +121,7 @@ describe('TransactionDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
 
-  it('updates editable detail fields and surfaces success feedback', async () => {
+  it('updates editable detail fields without a redundant success notification', async () => {
     const user = userEvent.setup();
     const successToast = vi.spyOn(toast, 'success');
     let requestBody: unknown;
@@ -154,10 +154,11 @@ describe('TransactionDetailPage', () => {
         description: 'Coffee and bagel',
         accountId: 'savings-987',
       });
-      expect(successToast).toHaveBeenCalledWith('Transaction updated');
     });
     expect(await screen.findByText('Coffee and bagel')).toBeInTheDocument();
     expect(screen.getByText('savings-987')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Details' })).toBeInTheDocument();
+    expect(successToast).not.toHaveBeenCalled();
   });
 
   it('keeps edit mode open and surfaces failure feedback when update fails', async () => {
@@ -188,7 +189,7 @@ describe('TransactionDetailPage', () => {
     expect(screen.getByLabelText('Description')).toHaveValue('Rejected description');
   });
 
-  it('deletes the transaction, shows success feedback, and returns to the list', async () => {
+  it('deletes the transaction and returns to the list without a redundant success notification', async () => {
     const user = userEvent.setup();
     const successToast = vi.spyOn(toast, 'success');
 
@@ -206,11 +207,9 @@ describe('TransactionDetailPage', () => {
     const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
     await user.click(deleteButtons[deleteButtons.length - 1]);
 
-    await waitFor(() => {
-      expect(successToast).toHaveBeenCalledWith('Transaction deleted successfully');
-    });
-    expect(queryClient.getQueryState(['transaction', transaction.id])?.isInvalidated).toBe(true);
     expect(await screen.findByRole('heading', { name: 'Transaction List' })).toBeInTheDocument();
+    expect(queryClient.getQueryState(['transaction', transaction.id])?.isInvalidated).toBe(true);
+    expect(successToast).not.toHaveBeenCalled();
   });
 
   it('keeps the delete dialog open and surfaces failure feedback when delete fails', async () => {

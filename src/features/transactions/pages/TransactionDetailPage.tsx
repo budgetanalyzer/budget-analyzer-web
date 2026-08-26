@@ -104,7 +104,6 @@ export function TransactionDetailPage() {
       },
       {
         onSuccess: () => {
-          toast.success('Transaction updated');
           handleCancelEdit();
         },
         onError: (updateError) => {
