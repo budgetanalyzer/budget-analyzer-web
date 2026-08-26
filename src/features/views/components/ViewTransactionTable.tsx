@@ -559,7 +559,12 @@ function RemoveViewTransactionButton({
   );
 
   return (
-    <Button variant="ghost" size="sm" onClick={handleClick}>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleClick}
+      className="border border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+    >
       <X className="mr-2 h-4 w-4" />
       Remove from view
     </Button>
