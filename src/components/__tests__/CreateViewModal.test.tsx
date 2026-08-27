@@ -1,18 +1,11 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { Route, Routes, useLocation } from 'react-router-dom';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { CreateViewModal } from '@/components/CreateViewModal';
+import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
-import { ApiError } from '@/types/apiError';
-
-const mocks = vi.hoisted(() => ({ mutate: vi.fn(), toastError: vi.fn() }));
-
-vi.mock('@/hooks/useViews', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks/useViews')>();
-  return { ...actual, useCreateView: () => ({ mutate: mocks.mutate, isPending: false }) };
-});
-vi.mock('@/hooks/useToast', () => ({ toast: { error: mocks.toastError } }));
 
 beforeAll(() => {
   if (!window.ResizeObserver) {
@@ -23,6 +16,25 @@ beforeAll(() => {
     }));
   }
 });
+
+function createDeferredPromise() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
+
+function createdView(name: string, transactionCount: number) {
+  return {
+    id: 'created-view',
+    name,
+    transactionCount,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  };
+}
 
 function LocationProbe() {
   const location = useLocation();
@@ -64,13 +76,15 @@ function renderModal({
   return { onClose, ...result };
 }
 
-beforeEach(() => {
-  mocks.mutate.mockReset();
-  mocks.toastError.mockReset();
-});
-
 describe('CreateViewModal', () => {
   it('submits only the name and exact visible transaction ids', async () => {
+    let requestBody: unknown;
+    server.use(
+      http.post('/api/v1/views', async ({ request }) => {
+        requestBody = await request.json();
+        return HttpResponse.json(createdView('Coffee collection', 2), { status: 201 });
+      }),
+    );
     renderModal({ transactionIds: [8, 2] });
     const nameInput = screen.getByLabelText('View Name');
 
@@ -78,20 +92,25 @@ describe('CreateViewModal', () => {
     await userEvent.type(nameInput, 'Coffee collection');
     await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
 
-    expect(mocks.mutate).toHaveBeenCalledWith(
-      { name: 'Coffee collection', transactionIds: [8, 2] },
-      expect.any(Object),
+    await waitFor(() =>
+      expect(requestBody).toEqual({ name: 'Coffee collection', transactionIds: [8, 2] }),
     );
   });
 
   it('permits an empty collection', async () => {
+    let requestBody: unknown;
+    server.use(
+      http.post('/api/v1/views', async ({ request }) => {
+        requestBody = await request.json();
+        return HttpResponse.json(createdView('Empty collection', 0), { status: 201 });
+      }),
+    );
     renderModal({ transactionIds: [] });
     await userEvent.type(screen.getByLabelText('View Name'), 'Empty collection');
     await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
 
-    expect(mocks.mutate).toHaveBeenCalledWith(
-      { name: 'Empty collection', transactionIds: [] },
-      expect.any(Object),
+    await waitFor(() =>
+      expect(requestBody).toEqual({ name: 'Empty collection', transactionIds: [] }),
     );
   });
 
@@ -102,53 +121,102 @@ describe('CreateViewModal', () => {
   });
 
   it('clears filters and navigates only after success', async () => {
-    mocks.mutate.mockImplementation((_request, options) => {
-      options.onSuccess({ id: 'created-view' });
-    });
+    server.use(
+      http.post('/api/v1/views', () =>
+        HttpResponse.json(createdView('Coffee collection', 2), { status: 201 }),
+      ),
+    );
     const { onClose } = renderModal();
     await userEvent.type(screen.getByLabelText('View Name'), 'Coffee collection');
     await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
 
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(screen.getByTestId('location')).toHaveTextContent('/views/created-view');
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/views/created-view'),
+    );
     expect(screen.getByTestId('location')).not.toHaveTextContent('q=coffee');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('keeps the modal and name in place on failure', async () => {
-    mocks.mutate.mockImplementation((_request, options) => {
-      options.onError(
-        new ApiError(500, { type: 'INTERNAL_ERROR', message: 'Could not create collection' }),
-      );
-    });
+  it('preserves the name and clears a dismissible failure alert on successful retry', async () => {
+    const user = userEvent.setup();
+    const retryResponse = createDeferredPromise();
+    const requestBodies: unknown[] = [];
+    server.use(
+      http.post('/api/v1/views', async ({ request }) => {
+        requestBodies.push(await request.json());
+        if (requestBodies.length < 3) {
+          return HttpResponse.json(
+            { type: 'INTERNAL_ERROR', message: 'Could not create collection' },
+            { status: 500 },
+          );
+        }
+
+        await retryResponse.promise;
+        return HttpResponse.json(createdView('Coffee collection', 2), { status: 201 });
+      }),
+    );
     const { onClose } = renderModal();
     const nameInput = screen.getByLabelText('View Name');
-    await userEvent.type(nameInput, 'Coffee collection');
-    await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
+    await user.type(nameInput, 'Coffee collection');
+    await user.click(screen.getByRole('button', { name: 'Save View' }));
 
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create collection');
     expect(onClose).not.toHaveBeenCalled();
     expect(nameInput).toHaveValue('Coffee collection');
     expect(screen.getByTestId('location')).toHaveTextContent('q=coffee');
-    expect(mocks.toastError).toHaveBeenCalledWith('Could not create collection');
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(nameInput).toHaveValue('Coffee collection');
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save View' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Save View' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create collection');
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save View' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Save View' }));
+
+    expect(await screen.findByRole('button', { name: 'Saving...' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(nameInput).toHaveValue('Coffee collection');
+    expect(screen.getByTestId('location')).toHaveTextContent('q=coffee');
+
+    retryResponse.resolve();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(requestBodies).toEqual([
+      { name: 'Coffee collection', transactionIds: [8, 2] },
+      { name: 'Coffee collection', transactionIds: [8, 2] },
+      { name: 'Coffee collection', transactionIds: [8, 2] },
+    ]);
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/views/created-view'),
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('explains stale membership while retaining the name', async () => {
-    mocks.mutate.mockImplementation((_request, options) => {
-      options.onError(
-        new ApiError(422, {
-          type: 'APPLICATION_ERROR',
-          message: 'Stale',
-          code: 'SAVED_VIEW_MEMBERSHIP_STALE',
-        }),
-      );
-    });
+    server.use(
+      http.post('/api/v1/views', () =>
+        HttpResponse.json(
+          {
+            type: 'APPLICATION_ERROR',
+            message: 'Stale',
+            code: 'SAVED_VIEW_MEMBERSHIP_STALE',
+          },
+          { status: 422 },
+        ),
+      ),
+    );
     renderModal();
     const nameInput = screen.getByLabelText('View Name');
     await userEvent.type(nameInput, 'Coffee collection');
     await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
 
+    expect(await screen.findByRole('alert')).toHaveTextContent(/visible transaction set changed/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/snapshot was refreshed/i);
     expect(nameInput).toHaveValue('Coffee collection');
-    expect(mocks.toastError).toHaveBeenCalledWith(
-      expect.stringMatching(/visible transaction set changed/i),
-    );
   });
 });

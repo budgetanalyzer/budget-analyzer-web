@@ -111,7 +111,15 @@ Frontend behavior is:
   `BroadcastChannel`, allowing other tabs to dismiss and reschedule their
   warnings.
 - Retry a network failure or HTTP 502 once immediately. If that retry fails,
-  show a warning toast. A 401 navigates to `/logout`.
+  show a persistent, dismissible application-level status warning. A later
+  successful local or cross-tab heartbeat clears that warning. Dismissing it
+  hides only the current failure; a later independently failed heartbeat may
+  show it again. A 401 navigates to `/logout`.
+
+The connectivity warning is rendered by the long-lived
+`SessionHeartbeatProvider` before the protected route tree, so it remains a
+stable global surface without covering or replacing route content. It is
+separate from the non-dismissable inactivity countdown modal.
 
 The default interval is two minutes and the warning begins two minutes before
 expiry. `VITE_HEARTBEAT_INTERVAL_MS` and

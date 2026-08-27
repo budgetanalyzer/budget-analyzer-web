@@ -1,12 +1,20 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BulkDeleteModal } from '@/features/transactions/components/BulkDeleteModal';
-import { toast } from '@/hooks/useToast';
 import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
+
+function createDeferredPromise() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
 
 function ModalHarness({
   selectedIds = [1, 2],
@@ -16,31 +24,49 @@ function ModalHarness({
   onSuccess: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(true);
+  const handleOpen = useCallback(() => {
+    setIsOpen(true);
+  }, []);
 
   return (
-    <BulkDeleteModal
-      selectedIds={selectedIds}
-      isOpen={isOpen}
-      onOpenChange={setIsOpen}
-      onSuccess={onSuccess}
-    />
+    <>
+      <BulkDeleteModal
+        selectedIds={selectedIds}
+        isOpen={isOpen}
+        onOpenChange={setIsOpen}
+        onSuccess={onSuccess}
+      />
+      {!isOpen && (
+        <button type="button" onClick={handleOpen}>
+          Open bulk delete
+        </button>
+      )}
+    </>
   );
 }
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
 describe('BulkDeleteModal', () => {
-  it('closes and runs success cleanup without a redundant notification when all deletions succeed', async () => {
-    const successToast = vi.spyOn(toast, 'success');
+  it.each([
+    {
+      resultName: 'full deletion',
+      response: { deletedCount: 2, notFoundIds: [] },
+    },
+    {
+      resultName: 'partial deletion',
+      response: { deletedCount: 1, notFoundIds: [2] },
+    },
+    {
+      resultName: 'all transactions already absent',
+      response: { deletedCount: 0, notFoundIds: [1, 2] },
+    },
+  ])('silently closes and runs success cleanup after $resultName', async ({ response }) => {
     const onSuccess = vi.fn();
     const user = userEvent.setup();
     let requestBody: unknown;
     server.use(
       http.post('/api/v1/transactions/bulk-delete', async ({ request }) => {
         requestBody = await request.json();
-        return HttpResponse.json({ deletedCount: 2, notFoundIds: [] });
+        return HttpResponse.json(response);
       }),
     );
 
@@ -55,60 +81,74 @@ describe('BulkDeleteModal', () => {
     });
     expect(requestBody).toEqual({ ids: [1, 2] });
     expect(onSuccess).toHaveBeenCalledTimes(1);
-    expect(successToast).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('retains the partial-result warning before closing and running success cleanup', async () => {
-    const warningToast = vi.spyOn(toast, 'warning');
+  it('preserves the selected IDs and clears a dismissible request failure before retry', async () => {
     const onSuccess = vi.fn();
     const user = userEvent.setup();
+    const retryResponse = createDeferredPromise();
+    let requestCount = 0;
     server.use(
-      http.post('/api/v1/transactions/bulk-delete', () =>
-        HttpResponse.json({ deletedCount: 1, notFoundIds: [2] }),
-      ),
+      http.post('/api/v1/transactions/bulk-delete', async () => {
+        requestCount += 1;
+        if (requestCount < 3) {
+          return HttpResponse.json(
+            { type: 'SERVICE_UNAVAILABLE', message: 'Bulk deletion unavailable' },
+            { status: 503 },
+          );
+        }
+
+        await retryResponse.promise;
+        return HttpResponse.json({ deletedCount: 2, notFoundIds: [] });
+      }),
     );
 
     renderWithProviders(<ModalHarness onSuccess={onSuccess} />);
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
-    await waitFor(() => {
-      expect(warningToast).toHaveBeenCalledWith('Deleted 1 of 2. 1 not found or already deleted.');
-    });
-    expect(onSuccess).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('heading', { name: 'Delete Transactions' })).not.toBeInTheDocument();
-  });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Bulk deletion unavailable');
+    expect(screen.getByText(/delete 2 transactions/i)).toBeInTheDocument();
+    expect(onSuccess).not.toHaveBeenCalled();
 
-  it('retains the zero-deletion error before closing and running success cleanup', async () => {
-    const errorToast = vi.spyOn(toast, 'error');
-    const onSuccess = vi.fn();
-    const user = userEvent.setup();
-    server.use(
-      http.post('/api/v1/transactions/bulk-delete', () =>
-        HttpResponse.json({ deletedCount: 0, notFoundIds: [1, 2] }),
-      ),
-    );
+    await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText(/delete 2 transactions/i)).toBeInTheDocument();
 
-    renderWithProviders(<ModalHarness onSuccess={onSuccess} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Bulk deletion unavailable');
+    expect(onSuccess).not.toHaveBeenCalled();
 
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
+    expect(await screen.findByRole('button', { name: 'Deleting...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText(/delete 2 transactions/i)).toBeInTheDocument();
+
+    retryResponse.resolve();
+
     await waitFor(() => {
-      expect(errorToast).toHaveBeenCalledWith('Failed to delete transactions');
+      expect(
+        screen.queryByRole('heading', { name: 'Delete Transactions' }),
+      ).not.toBeInTheDocument();
     });
+    expect(requestCount).toBe(3);
     expect(onSuccess).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('heading', { name: 'Delete Transactions' })).not.toBeInTheDocument();
   });
 
-  it('keeps the dialog open and surfaces request failure feedback', async () => {
-    const errorToast = vi.spyOn(toast, 'error');
+  it('discards request failure feedback when the dialog closes', async () => {
     const onSuccess = vi.fn();
     const user = userEvent.setup();
     server.use(
       http.post('/api/v1/transactions/bulk-delete', () =>
         HttpResponse.json(
-          { type: 'SERVICE_UNAVAILABLE', message: 'Bulk deletion unavailable' },
-          { status: 503 },
+          { type: 'INTERNAL_ERROR', message: 'Delete request failed' },
+          { status: 500 },
         ),
       ),
     );
@@ -116,9 +156,14 @@ describe('BulkDeleteModal', () => {
     renderWithProviders(<ModalHarness onSuccess={onSuccess} />);
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete request failed');
 
-    await waitFor(() => expect(errorToast).toHaveBeenCalledWith('Bulk deletion unavailable'));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Open bulk delete' }));
+
     expect(screen.getByRole('heading', { name: 'Delete Transactions' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText(/delete 2 transactions/i)).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
   });
 });

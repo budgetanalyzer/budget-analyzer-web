@@ -12,11 +12,6 @@ import type { StatementFormat } from '@/types/statementFormat';
 
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/features/transactions/hooks/usePreviewTransactions');
-const toastMocks = vi.hoisted(() => ({
-  success: vi.fn(),
-  error: vi.fn(),
-}));
-vi.mock('@/hooks/useToast', () => ({ toast: toastMocks }));
 vi.mock('@/components/statement-formats/StatementFormatWizardDialog', () => ({
   StatementFormatWizardDialog: () => null,
 }));
@@ -28,6 +23,8 @@ function installStatementFormatHandlers(initialFormats: StatementFormat[]) {
   let formats = initialFormats;
   const hideRequests: number[] = [];
   const unhideRequests: number[] = [];
+  let nextHideFailure: { id: number; message: string } | null = null;
+  let nextUnhideFailure: { id: number; message: string } | null = null;
 
   server.use(
     http.get('/api/v1/statement-formats', ({ request }) => {
@@ -41,6 +38,13 @@ function installStatementFormatHandlers(initialFormats: StatementFormat[]) {
     http.post('/api/v1/statement-formats/:id/hide', ({ params }) => {
       const id = Number(params.id);
       hideRequests.push(id);
+
+      if (nextHideFailure?.id === id) {
+        const message = nextHideFailure.message;
+        nextHideFailure = null;
+        return HttpResponse.json({ type: 'SERVICE_UNAVAILABLE', message }, { status: 503 });
+      }
+
       formats = formats.map((format) => (format.id === id ? { ...format, hidden: true } : format));
 
       return new HttpResponse(null, { status: 204 });
@@ -48,6 +52,13 @@ function installStatementFormatHandlers(initialFormats: StatementFormat[]) {
     http.post('/api/v1/statement-formats/:id/unhide', ({ params }) => {
       const id = Number(params.id);
       unhideRequests.push(id);
+
+      if (nextUnhideFailure?.id === id) {
+        const message = nextUnhideFailure.message;
+        nextUnhideFailure = null;
+        return HttpResponse.json({ type: 'SERVICE_UNAVAILABLE', message }, { status: 503 });
+      }
+
       formats = formats.map((format) => (format.id === id ? { ...format, hidden: false } : format));
 
       return new HttpResponse(null, { status: 204 });
@@ -55,17 +66,30 @@ function installStatementFormatHandlers(initialFormats: StatementFormat[]) {
     http.get('/api/v1/currencies', () => HttpResponse.json([])),
   );
 
-  return { hideRequests, unhideRequests };
+  return {
+    hideRequests,
+    unhideRequests,
+    failNextHide(id: number, message: string) {
+      nextHideFailure = { id, message };
+    },
+    failNextUnhide(id: number, message: string) {
+      nextUnhideFailure = { id, message };
+    },
+  };
 }
 
-function getFormatRow(formatName: string) {
+function getFormatRowElement(formatName: string) {
   const row = screen.getByText(formatName).closest('tr');
 
   if (!row) {
     throw new Error(`Could not find row for ${formatName}`);
   }
 
-  return within(row);
+  return row;
+}
+
+function getFormatRow(formatName: string) {
+  return within(getFormatRowElement(formatName));
 }
 
 function systemFormat(overrides: Partial<StatementFormat> = {}): StatementFormat {
@@ -95,8 +119,6 @@ function customFormat(overrides: Partial<StatementFormat> = {}): StatementFormat
 }
 
 beforeEach(() => {
-  toastMocks.success.mockReset();
-  toastMocks.error.mockReset();
   mockUsePermission.mockReset();
   mockUsePermission.mockReturnValue(true);
   mockUsePreviewTransactions.mockReset();
@@ -126,7 +148,6 @@ describe('StatementFormatManagementPage API behavior', () => {
       expect(handlers.hideRequests).toEqual([101]);
       expect(getFormatRow('System Checking CSV').getByText('Hidden')).toBeInTheDocument();
     });
-    expect(toastMocks.success).not.toHaveBeenCalled();
   });
 
   it('hides a custom format and updates its visibility state after refetch', async () => {
@@ -170,7 +191,84 @@ describe('StatementFormatManagementPage API behavior', () => {
       expect(handlers.unhideRequests).toEqual([303]);
       expect(getFormatRow('Hidden System CSV').getByText('Visible')).toBeInTheDocument();
     });
-    expect(toastMocks.success).not.toHaveBeenCalled();
+  });
+
+  it('keeps a hide failure beneath its format row and succeeds after dismissal and retry', async () => {
+    const user = userEvent.setup();
+    const handlers = installStatementFormatHandlers([
+      systemFormat(),
+      customFormat({ displayName: 'Unaffected Custom CSV' }),
+    ]);
+    handlers.failNextHide(101, 'Statement format service is temporarily unavailable');
+
+    renderWithProviders(<StatementFormatManagementPage />, {
+      initialEntries: ['/statement-formats'],
+      router: 'dom',
+    });
+
+    expect(await screen.findByText('System Checking CSV')).toBeInTheDocument();
+
+    await user.click(
+      getFormatRow('System Checking CSV').getByRole('button', { name: /hide from import/i }),
+    );
+
+    const alert = await screen.findByRole('alert');
+    const alertRow = alert.closest('tr');
+    expect(alert).toHaveTextContent('Statement format service is temporarily unavailable');
+    expect(getFormatRowElement('System Checking CSV').nextElementSibling).toBe(alertRow);
+    expect(getFormatRowElement('Unaffected Custom CSV').nextElementSibling).not.toBe(alertRow);
+    expect(
+      getFormatRow('System Checking CSV').getByRole('button', { name: /hide from import/i }),
+    ).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: /dismiss message/i }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    await user.click(
+      getFormatRow('System Checking CSV').getByRole('button', { name: /hide from import/i }),
+    );
+
+    await waitFor(() => {
+      expect(handlers.hideRequests).toEqual([101, 101]);
+      expect(getFormatRow('System Checking CSV').getByText('Hidden')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps a restore failure retryable in place and clears it after later success', async () => {
+    const user = userEvent.setup();
+    const handlers = installStatementFormatHandlers([
+      systemFormat({ id: 303, displayName: 'Hidden System CSV', hidden: true }),
+    ]);
+    handlers.failNextUnhide(303, 'The hidden format could not be restored');
+
+    renderWithProviders(<StatementFormatManagementPage />, {
+      initialEntries: ['/statement-formats'],
+      router: 'dom',
+    });
+
+    expect(await screen.findByText('Hidden System CSV')).toBeInTheDocument();
+
+    await user.click(
+      getFormatRow('Hidden System CSV').getByRole('button', { name: /restore to import/i }),
+    );
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('The hidden format could not be restored');
+    expect(getFormatRowElement('Hidden System CSV').nextElementSibling).toBe(alert.closest('tr'));
+    expect(
+      getFormatRow('Hidden System CSV').getByRole('button', { name: /restore to import/i }),
+    ).toBeEnabled();
+
+    await user.click(
+      getFormatRow('Hidden System CSV').getByRole('button', { name: /restore to import/i }),
+    );
+
+    await waitFor(() => {
+      expect(handlers.unhideRequests).toEqual([303, 303]);
+      expect(getFormatRow('Hidden System CSV').getByText('Visible')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('omits hidden formats from import selection while keeping them visible on the management page', async () => {

@@ -17,7 +17,7 @@ The review compared:
 - saved-view removal and transfer/refund review dialogs;
 - create, rename, and delete view dialogs;
 - single and bulk transaction deletion dialogs;
-- the custom toast system and inline transaction message banners; and
+- the former custom toast system and inline transaction message banners; and
 - the shared dialog primitive used by both older and newer features.
 
 No live-browser audit was performed. Visual findings below follow directly from
@@ -94,7 +94,7 @@ padding was normalized so it does not compound the shared footer margin.
 
 ### 2. Mutation success feedback has two different visual languages
 
-**Status:** Open
+**Status:** Resolved
 
 The [application notification inventory](../research/notification-inventory.md)
 enumerates the current production notification surfaces and classifies their
@@ -107,11 +107,9 @@ At the time of the audit, both
 [`RemoveViewTransactionsModal`](../../src/features/views/components/RemoveViewTransactionsModal.tsx)
 and
 [`TransferRefundReviewDialog`](../../src/features/views/components/TransferRefundReviewDialog.tsx)
-reported success through `toast.success`. The custom
-[`Toast`](../../src/components/ui/Toast.tsx) is a solid-color floating card in a
-top-right viewport. [`Toaster`](../../src/components/ui/Toaster.tsx) dismisses
-it after five seconds, renders only description text, and uses a close control
-that is visually hidden until hover or focus.
+reported success through a custom toast. That surface was a solid-color card in
+a top-right viewport, disappeared after five seconds, and hid its close control
+until hover or focus.
 
 By contrast, transaction imports and page conditions use
 [`MessageBanner`](../../src/components/MessageBanner.tsx): an inline,
@@ -119,15 +117,9 @@ lightly-tinted surface with a status icon, medium-weight text, motion, and an
 always-visible close button. This is the banner presentation users may perceive
 as the application's normal messaging.
 
-The removal flows are consistent with older transaction edit and delete
-mutations, which also use toasts. The inconsistency is therefore application
-wide rather than solely a regression in the view feature. The custom toast
-must remain CSP-safe; the repository specifically prohibits returning to
-Sonner or another runtime-style-injecting dependency.
-
-[`API integration`](../api-integration.md#user-facing-error-messages) now owns
-the first-pass success-feedback rule and records the retained transient
-mutation-error behavior as unresolved work.
+The inconsistency was application-wide rather than solely a regression in the
+view feature: older transaction edit, delete, import, statement-format, saved-
+view, currency, and session paths also emitted detached transient messages.
 
 #### External guidance and toast consensus
 
@@ -160,10 +152,9 @@ required action, recovery instructions, or information the user may need to
 reference. Avoiding toasts entirely is a reasonable product choice when every
 event has a stable contextual surface.
 
-#### Candidate Budget Analyzer rule
+#### Adopted Budget Analyzer rule
 
-The following no-toast-by-default policy would be consistent with that
-guidance and with the product owner's stated preference:
+The application adopts this no-toast policy:
 
 - Let the changed interface provide success feedback when the result is already
   obvious, such as a removed row disappearing and totals updating.
@@ -174,35 +165,48 @@ guidance and with the product owner's stated preference:
   retries, resolves, or dismisses them. Preserve selections and form input.
 - Use a page-level banner for page-wide or cross-cutting state, and keep
   important or actionable messages persistent.
-- Reserve a toast only for a background or out-of-context event that has no
-  sensible stable surface, or choose not to support that exception.
+- Use a stable application-level banner for a background or global condition
+  that has no narrower feature boundary.
 
-The first implementation pass removed eight `toast.success` branches and the
-redundant user-deactivation success banner. Inline and detail edits, single and
-fully successful bulk deletion, statement-format hide and restore, both
-saved-view membership-removal flows, and user deactivation now rely on their
-visible interface changes. Messages remain for failures, partial or zero-result
-outcomes, non-obvious counts and consequences, next steps, cross-route results,
-ongoing conditions, and background or global events.
+Implementation removed redundant success messages for inline and detail edits,
+single and bulk deletion, statement-format hide and restore, both saved-view
+membership-removal flows, and user deactivation. Full, partial, and zero-
+deletion successful bulk responses now converge silently on the refreshed
+table. The currency-change notice was also removed because the selected
+currency, cleared filters, and URL show the result.
 
-The first contextual-error migration moved the two saved-view membership-
-removal failures from transient toasts into persistent, normalized dialog
-alerts. The same shared banner now gives errors alert semantics and success or
-warning messages status semantics. This is partial progress only: mutation
-errors elsewhere still use transient toasts, while toast appearance, touch
-discoverability, and status-message coverage outside `MessageBanner` remain
-open.
+Actionable failures now remain at their initiating surface: create-view,
+single- and bulk-delete, reviewed-import, and saved-view failures stay in their
+dialogs; inline edits and statement-format visibility failures stay under the
+affected row; detail edits stay beside their controls. Each preserves the
+relevant draft, selection, or context for retry. The heartbeat connectivity
+warning moved to a persistent application-level banner. The informative import
+result remains because its counts and filter consequences are not otherwise
+visible.
+
+The toast provider, primitives, emission API, and dependency were deleted.
+Toast styling and touch-close behavior are therefore not applicable rather than
+deferred design work. The durable behavior contract is owned by
+[`API integration`](../api-integration.md#user-facing-error-messages).
 
 - [x] Decide the product rule for transient mutation success versus persistent
       page-level status.
-- [ ] Decide whether toast styling should visually align more closely with
-      `MessageBanner` while remaining a floating, transient surface.
-- [ ] Ensure close affordances remain discoverable on touch devices.
+- [x] Mark toast styling as not applicable because the transient surface was
+      removed rather than restyled.
+- [x] Mark toast touch-close affordances as not applicable because the
+      transient surface was removed; retained `MessageBanner` close controls
+      remain visible.
 - [x] Record the durable notification rule in the appropriate owner document.
-- [ ] Replace retained transient mutation-error toasts with an agreed
+- [x] Replace retained transient mutation-error toasts with an agreed
       contextual, persistent surface.
-- [ ] Define and implement accessible status-message semantics for retained
-      explicit feedback.
+- [x] Define accessible semantics for retained explicit feedback rendered by
+      `MessageBanner`: errors are atomic `role="alert"` messages, while
+      success and warning messages are atomic `role="status"` messages.
+
+The last checklist item is intentionally scoped to `MessageBanner`. This
+resolution does not claim that `ErrorBanner`, query/load callouts, condition
+banners, or other bespoke status-like surfaces were changed or now share the
+same accessibility contract.
 
 ### 3. The same removal operation changes semantic button treatment
 

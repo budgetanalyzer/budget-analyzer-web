@@ -140,8 +140,10 @@ contains the complete taxonomy and gating guidance.
   `date-fns`. LocalDate values have no timezone; ISO 8601 values do.
 - Add dynamic table width mappings to `src/utils/columnWidth.ts`; never use a
   React `style` prop.
-- Use `src/hooks/useToast.ts` and `src/components/ui/Toast.tsx` for toasts,
-  never `sonner`.
+- Do not add transient toasts or a toast dependency. Keep actionable feedback
+  persistent and contextual; informative cross-route results may use the
+  existing flash-banner pattern. Follow the contract in
+  [API integration](docs/api-integration.md#user-facing-error-messages).
 - Shared `src/components/ui/Table.tsx` owns horizontal overflow. Feature tables
   must not hide its native scrollbar.
 - Do not add tooltips; information must remain available on mobile.

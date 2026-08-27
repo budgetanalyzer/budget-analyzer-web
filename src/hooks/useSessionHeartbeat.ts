@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { getSessionStatus } from '@/api/auth';
-import { toast } from '@/hooks/useToast';
 import { useActivityTracking } from '@/hooks/useActivityTracking';
 
 const LOGOUT_PATH = '/logout';
+const CONNECTION_WARNING = 'Unable to reach the server. Your session may expire.';
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS =
   Number(import.meta.env.VITE_HEARTBEAT_INTERVAL_MS) || 2 * 60 * 1000;
@@ -37,10 +37,15 @@ export function useSessionHeartbeat({
   const [showWarning, setShowWarning] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [connectionWarning, setConnectionWarning] = useState<string | null>(null);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const channelRef = useRef<BroadcastChannel>(undefined);
   const { wasActiveSinceLastCheck } = useActivityTracking();
+
+  const dismissConnectionWarning = useCallback(() => {
+    setConnectionWarning(null);
+  }, []);
 
   const scheduleWarning = useCallback(
     (serverExpiresAt: number) => {
@@ -64,6 +69,7 @@ export function useSessionHeartbeat({
     setIsSending(true);
     try {
       const status = await getSessionStatus();
+      setConnectionWarning(null);
       setShowWarning(false);
       scheduleWarning(status.expiresAt);
       channelRef.current?.postMessage({ expiresAt: status.expiresAt });
@@ -75,6 +81,7 @@ export function useSessionHeartbeat({
       if (isNetworkError(error) || isTransientError(error)) {
         try {
           const status = await getSessionStatus();
+          setConnectionWarning(null);
           setShowWarning(false);
           scheduleWarning(status.expiresAt);
           channelRef.current?.postMessage({ expiresAt: status.expiresAt });
@@ -83,7 +90,9 @@ export function useSessionHeartbeat({
             window.location.href = LOGOUT_PATH;
             return;
           }
-          toast.warning('Unable to reach the server. Your session may expire.');
+          if (isNetworkError(retryError) || isTransientError(retryError)) {
+            setConnectionWarning(CONNECTION_WARNING);
+          }
         }
       }
     } finally {
@@ -98,6 +107,7 @@ export function useSessionHeartbeat({
     channelRef.current = channel;
 
     channel.onmessage = (event: MessageEvent<{ expiresAt: number }>) => {
+      setConnectionWarning(null);
       setShowWarning(false);
       scheduleWarning(event.data.expiresAt);
     };
@@ -117,5 +127,12 @@ export function useSessionHeartbeat({
     };
   }, [enabled, heartbeatIntervalMs, performHeartbeat, scheduleWarning, wasActiveSinceLastCheck]);
 
-  return { showWarning, isSending, sendHeartbeat: performHeartbeat, expiresAt };
+  return {
+    showWarning,
+    isSending,
+    sendHeartbeat: performHeartbeat,
+    expiresAt,
+    connectionWarning,
+    dismissConnectionWarning,
+  };
 }

@@ -156,8 +156,9 @@ The repository imposes stricter application conventions:
 - Dialogs and mobile overlays acquire reference-counted body locks through
   `acquireBodyScrollLock()` in `src/utils/bodyScrollLock.ts`, which toggles the
   statically emitted `overflow-hidden` class.
-- Toasts use `src/components/ui/Toast.tsx` and `src/hooks/useToast.ts`. `sonner`
-  is prohibited because it unconditionally injects a runtime stylesheet.
+- Transient toasts and toast dependencies are not part of the application
+  contract. Feedback uses stable contextual surfaces. `sonner` remains
+  prohibited because it unconditionally injects a runtime stylesheet.
 - Shared dropdowns use `src/components/ui/DropdownMenu.tsx`, native popovers,
   and statically emitted anchor-positioning utilities. They do not use portals,
   measured coordinates, or runtime CSS.

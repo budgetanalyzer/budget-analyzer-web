@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { DeleteTransactionModal } from '@/features/transactions/components/DeleteTransactionModal';
-import { toast } from '@/hooks/useToast';
 import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
 import type { DisplayAmount } from '@/types/displayAmount';
@@ -32,6 +31,15 @@ const displayAmount: DisplayAmount = {
   value: 100,
   rateLegs: [],
 };
+
+function createDeferredPromise() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
 
 function renderModal(displayAmount: DisplayAmount) {
   return renderWithProviders(
@@ -82,7 +90,6 @@ describe('DeleteTransactionModal', () => {
   });
 
   it('closes and runs the deletion callback without a redundant success notification', async () => {
-    const successToast = vi.spyOn(toast, 'success');
     const onDeleted = vi.fn();
     const user = userEvent.setup();
     server.use(
@@ -97,25 +104,63 @@ describe('DeleteTransactionModal', () => {
       expect(screen.queryByRole('heading', { name: 'Delete Transaction' })).not.toBeInTheDocument();
     });
     expect(onDeleted).toHaveBeenCalledTimes(1);
-    expect(successToast).not.toHaveBeenCalled();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('keeps the dialog open and surfaces failure feedback when deletion fails', async () => {
-    const errorToast = vi.spyOn(toast, 'error');
+  it('preserves transaction context and clears a dismissible failure alert on successful retry', async () => {
     const onDeleted = vi.fn();
     const user = userEvent.setup();
+    const retryResponse = createDeferredPromise();
+    const requestedIds: string[] = [];
     server.use(
-      http.delete('/api/v1/transactions/:id', () =>
-        HttpResponse.json({ type: 'APPLICATION_ERROR', message: 'Delete failed' }, { status: 500 }),
-      ),
+      http.delete('/api/v1/transactions/:id', async ({ params }) => {
+        requestedIds.push(String(params.id));
+        if (requestedIds.length < 3) {
+          return HttpResponse.json(
+            { type: 'INTERNAL_ERROR', message: 'Delete request failed' },
+            { status: 500 },
+          );
+        }
+
+        await retryResponse.promise;
+        return new HttpResponse(null, { status: 204 });
+      }),
     );
 
     renderWithProviders(<InteractiveModal onDeleted={onDeleted} />);
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
-    await waitFor(() => expect(errorToast).toHaveBeenCalledWith('Delete failed'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete request failed');
     expect(screen.getByRole('heading', { name: 'Delete Transaction' })).toBeInTheDocument();
+    expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
+    expect(screen.getByText('€80.00 EUR')).toBeInTheDocument();
     expect(onDeleted).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete request failed');
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByRole('button', { name: 'Deleting...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
+
+    retryResponse.resolve();
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Delete Transaction' })).not.toBeInTheDocument();
+    });
+    expect(requestedIds).toEqual(['7', '7', '7']);
+    expect(onDeleted).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });

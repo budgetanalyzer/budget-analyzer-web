@@ -12,7 +12,6 @@ import {
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setDisplayCurrency } from '@/store/uiSlice';
 import { useCurrencies } from '@/hooks/useCurrencies';
-import { toast } from '@/hooks/useToast';
 
 export function CurrencySelector() {
   const dispatch = useAppDispatch();
@@ -49,10 +48,6 @@ export function CurrencySelector() {
     }
 
     dispatch(setDisplayCurrency(currency));
-
-    if (shouldClearAmountFilter) {
-      toast.info('Amount filters were cleared for the new currency.');
-    }
   };
 
   if (isLoading) {

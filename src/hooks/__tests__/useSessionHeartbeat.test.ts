@@ -3,7 +3,6 @@ import { renderHook, act } from '@testing-library/react';
 import { useSessionHeartbeat } from '@/hooks/useSessionHeartbeat';
 import * as authApi from '@/api/auth';
 import * as activityTracking from '@/hooks/useActivityTracking';
-import * as toastModule from '@/hooks/useToast';
 import type { SessionStatus } from '@/types/session';
 import { AxiosError, AxiosHeaders } from 'axios';
 
@@ -70,6 +69,16 @@ function make502Error(): AxiosError {
   return new AxiosError('Bad Gateway', 'ERR_BAD_RESPONSE', undefined, undefined, {
     status: 502,
     statusText: 'Bad Gateway',
+    data: {},
+    headers: {},
+    config: { headers: new AxiosHeaders() },
+  });
+}
+
+function make500Error(): AxiosError {
+  return new AxiosError('Internal Server Error', 'ERR_BAD_RESPONSE', undefined, undefined, {
+    status: 500,
+    statusText: 'Internal Server Error',
     data: {},
     headers: {},
     config: { headers: new AxiosHeaders() },
@@ -179,22 +188,65 @@ describe('useSessionHeartbeat', () => {
       configurable: true,
     });
 
-    renderHook(() => useSessionHeartbeat({ enabled: true }));
+    const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
     await advanceTimers(0);
     expect(hrefSetter).toHaveBeenCalledWith('/logout');
+    expect(result.current.connectionWarning).toBeNull();
   });
 
-  it('retries once on network error then shows toast warning', async () => {
-    const toastSpy = vi.spyOn(toastModule.toast, 'warning');
+  it('retries once on network error then exposes a connection warning', async () => {
     mockGetSessionStatus
       .mockRejectedValueOnce(makeNetworkError())
       .mockRejectedValueOnce(makeNetworkError());
 
-    renderHook(() => useSessionHeartbeat({ enabled: true }));
+    const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
     await advanceTimers(0);
 
     expect(mockGetSessionStatus).toHaveBeenCalledTimes(2); // initial + retry
-    expect(toastSpy).toHaveBeenCalledWith('Unable to reach the server. Your session may expire.');
+    expect(result.current.connectionWarning).toBe(
+      'Unable to reach the server. Your session may expire.',
+    );
+  });
+
+  it('dismisses a connection warning and shows it again after a later failed heartbeat', async () => {
+    mockGetSessionStatus
+      .mockRejectedValueOnce(makeNetworkError())
+      .mockRejectedValueOnce(makeNetworkError())
+      .mockRejectedValueOnce(make502Error())
+      .mockRejectedValueOnce(make502Error());
+
+    const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
+    await advanceTimers(0);
+
+    act(() => {
+      result.current.dismissConnectionWarning();
+    });
+    expect(result.current.connectionWarning).toBeNull();
+
+    await act(async () => {
+      await result.current.sendHeartbeat();
+    });
+
+    expect(result.current.connectionWarning).toBe(
+      'Unable to reach the server. Your session may expire.',
+    );
+  });
+
+  it('clears a connection warning after a successful heartbeat', async () => {
+    mockGetSessionStatus
+      .mockRejectedValueOnce(makeNetworkError())
+      .mockRejectedValueOnce(makeNetworkError())
+      .mockResolvedValueOnce(makeSessionStatus());
+
+    const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
+    await advanceTimers(0);
+    expect(result.current.connectionWarning).not.toBeNull();
+
+    await act(async () => {
+      await result.current.sendHeartbeat();
+    });
+
+    expect(result.current.connectionWarning).toBeNull();
   });
 
   it('sendHeartbeat hides warning on success', async () => {
@@ -233,21 +285,21 @@ describe('useSessionHeartbeat', () => {
     expect(clearTimeoutSpy).toHaveBeenCalled();
   });
 
-  it('retries once on 502 transient error then shows toast warning', async () => {
-    const toastSpy = vi.spyOn(toastModule.toast, 'warning');
+  it('retries once on 502 transient error then exposes a connection warning', async () => {
     mockGetSessionStatus
       .mockRejectedValueOnce(make502Error())
       .mockRejectedValueOnce(make502Error());
 
-    renderHook(() => useSessionHeartbeat({ enabled: true }));
+    const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
     await advanceTimers(0);
 
     expect(mockGetSessionStatus).toHaveBeenCalledTimes(2);
-    expect(toastSpy).toHaveBeenCalledWith('Unable to reach the server. Your session may expire.');
+    expect(result.current.connectionWarning).toBe(
+      'Unable to reach the server. Your session may expire.',
+    );
   });
 
   it('retries once on 502 and succeeds on retry', async () => {
-    const toastSpy = vi.spyOn(toastModule.toast, 'warning');
     mockGetSessionStatus
       .mockRejectedValueOnce(make502Error())
       .mockResolvedValueOnce(makeSessionStatus());
@@ -256,8 +308,20 @@ describe('useSessionHeartbeat', () => {
     await advanceTimers(0);
 
     expect(mockGetSessionStatus).toHaveBeenCalledTimes(2);
-    expect(toastSpy).not.toHaveBeenCalled();
+    expect(result.current.connectionWarning).toBeNull();
     expect(result.current.showWarning).toBe(false);
+  });
+
+  it('does not show a connection warning when the retry fails with another status', async () => {
+    mockGetSessionStatus
+      .mockRejectedValueOnce(makeNetworkError())
+      .mockRejectedValueOnce(make500Error());
+
+    const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
+    await advanceTimers(0);
+
+    expect(mockGetSessionStatus).toHaveBeenCalledTimes(2);
+    expect(result.current.connectionWarning).toBeNull();
   });
 
   it('broadcasts expiresAt to other tabs on successful heartbeat', async () => {
@@ -282,23 +346,26 @@ describe('useSessionHeartbeat', () => {
     receiver.close();
   });
 
-  it('receiving broadcast from another tab reschedules warning and hides modal', async () => {
+  it('receiving a successful heartbeat from another tab clears the connection warning', async () => {
     const now = Math.floor(Date.now() / 1000);
-    mockGetSessionStatus.mockResolvedValue(makeSessionStatus({ expiresAt: now + 60 }));
+    mockGetSessionStatus
+      .mockRejectedValueOnce(makeNetworkError())
+      .mockRejectedValueOnce(makeNetworkError());
 
     const { result } = renderHook(() =>
       useSessionHeartbeat({ enabled: true, warningBeforeExpirySec: 300 }),
     );
     await advanceTimers(0);
-    expect(result.current.showWarning).toBe(true);
+    expect(result.current.connectionWarning).not.toBeNull();
 
-    // Simulate another tab broadcasting a fresh expiresAt
     const sender = new MockBroadcastChannel('session-heartbeat');
     act(() => {
       sender.postMessage({ expiresAt: now + 1800 });
     });
 
+    expect(result.current.connectionWarning).toBeNull();
     expect(result.current.showWarning).toBe(false);
+    expect(result.current.expiresAt).toBe(now + 1800);
     sender.close();
   });
 
@@ -314,11 +381,15 @@ describe('useSessionHeartbeat', () => {
   });
 
   it('closes BroadcastChannel on unmount', async () => {
-    renderHook(() => useSessionHeartbeat({ enabled: true }));
+    const { unmount } = renderHook(() => useSessionHeartbeat({ enabled: true }));
     await advanceTimers(0);
 
     const channel = MockBroadcastChannel.instances.find((i) => i.name === 'session-heartbeat');
     expect(channel).toBeDefined();
     expect(channel!.closed).toBe(false);
+
+    unmount();
+
+    expect(channel!.closed).toBe(true);
   });
 });

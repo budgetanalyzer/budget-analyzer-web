@@ -24,7 +24,10 @@ import {
 } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { DeleteTransactionModal } from '@/features/transactions/components/DeleteTransactionModal';
-import { EditableTransactionRow } from '@/features/transactions/components/EditableTransactionRow';
+import {
+  EditableTransactionRow,
+  type EditableTransactionSaveHandler,
+} from '@/features/transactions/components/EditableTransactionRow';
 import { BulkDeleteBar } from '@/features/transactions/components/BulkDeleteBar';
 import { BulkDeleteModal } from '@/features/transactions/components/BulkDeleteModal';
 import { SaveAsViewButton } from '@/components/SaveAsViewButton';
@@ -34,7 +37,6 @@ import { ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } f
 import { useNavigate } from 'react-router';
 import { useUpdateTransaction } from '@/hooks/useTransactions';
 import { formatApiError } from '@/utils/errorMessages';
-import { toast } from '@/hooks/useToast';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { columnWidthClass } from '@/utils/columnWidth';
 import { TransactionFilterBar } from '@/components/TransactionFilterBar';
@@ -135,13 +137,14 @@ export function TransactionTable({
   );
 
   // Handle save from row component
-  const handleSaveTransaction = useCallback(
-    (id: number, data: { description?: string; accountId?: string }) => {
+  const handleSaveTransaction = useCallback<EditableTransactionSaveHandler>(
+    (id, data, callbacks) => {
       updateTransaction(
         { id, data },
         {
+          onSuccess: callbacks.onSuccess,
           onError: (error) => {
-            toast.error(formatApiError(error, 'Failed to update transaction'));
+            callbacks.onError(formatApiError(error, 'Failed to update transaction'));
           },
         },
       );
@@ -405,6 +408,7 @@ export function TransactionTable({
     manualPagination: false,
     autoResetPageIndex: true,
   });
+  const visibleColumnCount = table.getVisibleLeafColumns().length;
 
   return (
     <div className="space-y-4">
@@ -512,6 +516,7 @@ export function TransactionTable({
                     columnWidths={Object.fromEntries(
                       table.getAllColumns().map((col) => [col.id, columnWidthClass(col.getSize())]),
                     )}
+                    visibleColumnCount={visibleColumnCount}
                     canSelect={selectionEnabled}
                     canEdit={canEditTransactions}
                     canDelete={canBulkDelete}

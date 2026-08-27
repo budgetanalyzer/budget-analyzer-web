@@ -8,7 +8,6 @@ import { renderWithProviders } from '@/testing/test-utils';
 import type { ApiError } from '@/types/apiError';
 import type { CurrencySeriesResponse } from '@/types/currency';
 import { useLocation } from 'react-router';
-import { toast } from '@/hooks/useToast';
 
 vi.mock('@/hooks/useCurrencies');
 
@@ -68,26 +67,26 @@ function renderSelector(displayCurrency = 'EUR', initialEntry = '/') {
 describe('CurrencySelector', () => {
   beforeEach(() => {
     mockUseCurrencies.mockReset();
-    vi.restoreAllMocks();
   });
 
   it.each(['/transactions', '/views/view-1'])(
     'clears URL amount semantics before changing currency on %s',
     async (pathname) => {
       mockCurrencies(currencies);
-      const infoSpy = vi.spyOn(toast, 'info');
       const user = userEvent.setup();
       const { store } = renderSelector(
         'EUR',
-        `${pathname}?q=coffee&minAmount=10&maxAmount=20&amountCurrency=EUR`,
+        `${pathname}?q=coffee&dateFrom=2026-01-01&type=DEBIT&minAmount=10&maxAmount=20&amountCurrency=EUR`,
       );
 
       await user.click(screen.getByRole('button', { name: 'EUR' }));
       await user.click(screen.getByRole('menuitem', { name: 'GBP' }));
 
-      expect(screen.getByTestId('location')).toHaveTextContent(`${pathname}?q=coffee`);
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        `${pathname}?q=coffee&dateFrom=2026-01-01&type=DEBIT`,
+      );
+      expect(screen.getByRole('button', { name: 'GBP' })).toBeInTheDocument();
       expect(store.getState().ui.displayCurrency).toBe('GBP');
-      expect(infoSpy).toHaveBeenCalledWith('Amount filters were cleared for the new currency.');
     },
   );
 

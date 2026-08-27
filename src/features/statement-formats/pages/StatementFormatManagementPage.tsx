@@ -7,10 +7,14 @@ import {
   useStatementFormats,
   useUnhideStatementFormat,
 } from '@/hooks/useStatementFormats';
-import { toast } from '@/hooks/useToast';
 import { formatApiError } from '@/utils/errorMessages';
 import type { StatementFormat } from '@/types/statementFormat';
 import { StatementFormatVisibilityTable } from '@/features/statement-formats/components/StatementFormatVisibilityTable';
+
+interface VisibilityMutationError {
+  formatId: number;
+  message: string;
+}
 
 function compareBooleanPriority(first: boolean, second: boolean) {
   if (first === second) return 0;
@@ -37,6 +41,8 @@ export function StatementFormatManagementPage() {
   const { mutate: hideFormat } = useHideStatementFormat();
   const { mutate: unhideFormat } = useUnhideStatementFormat();
   const [pendingFormatId, setPendingFormatId] = useState<number | null>(null);
+  const [visibilityMutationError, setVisibilityMutationError] =
+    useState<VisibilityMutationError | null>(null);
 
   const sortedFormats = useMemo(() => sortStatementFormats(formats ?? []), [formats]);
 
@@ -44,12 +50,20 @@ export function StatementFormatManagementPage() {
     void refetch();
   }, [refetch]);
 
+  const handleDismissVisibilityError = useCallback(() => {
+    setVisibilityMutationError(null);
+  }, []);
+
   const handleHide = useCallback(
     (format: StatementFormat) => {
+      setVisibilityMutationError(null);
       setPendingFormatId(format.id);
       hideFormat(format.id, {
         onError: (hideError) => {
-          toast.error(formatApiError(hideError, 'Failed to hide statement format'));
+          setVisibilityMutationError({
+            formatId: format.id,
+            message: formatApiError(hideError, `Failed to hide ${format.displayName} from import.`),
+          });
         },
         onSettled: () => {
           setPendingFormatId(null);
@@ -61,10 +75,17 @@ export function StatementFormatManagementPage() {
 
   const handleUnhide = useCallback(
     (format: StatementFormat) => {
+      setVisibilityMutationError(null);
       setPendingFormatId(format.id);
       unhideFormat(format.id, {
         onError: (unhideError) => {
-          toast.error(formatApiError(unhideError, 'Failed to restore statement format'));
+          setVisibilityMutationError({
+            formatId: format.id,
+            message: formatApiError(
+              unhideError,
+              `Failed to restore ${format.displayName} to import.`,
+            ),
+          });
         },
         onSettled: () => {
           setPendingFormatId(null);
@@ -105,8 +126,10 @@ export function StatementFormatManagementPage() {
         <StatementFormatVisibilityTable
           formats={sortedFormats}
           pendingFormatId={pendingFormatId}
+          visibilityMutationError={visibilityMutationError}
           onHide={handleHide}
           onUnhide={handleUnhide}
+          onDismissVisibilityError={handleDismissVisibilityError}
         />
       )}
     </div>

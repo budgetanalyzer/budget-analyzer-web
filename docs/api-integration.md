@@ -96,12 +96,40 @@ its success and warning variants expose `role="status"`, and all variants make
 the complete message atomic for assistive technology.
 
 Query and load failures normally remain visible in an `ErrorBanner`. Some
-mutation failures still use the custom transient toast system even while the
-initiating dialog or control stays mounted. Those sites are migration debt,
-not exceptions to the contextual-error contract and not evidence that errors,
-recovery instructions, or other actionable information may safely disappear.
-Repository test conventions and MSW ownership are documented in the [Testing
-guide](testing-guide.md).
+older page and workflow error states use specialized persistent callouts rather
+than `MessageBanner`; those surfaces are not covered by its status-message
+semantics. Repository test conventions and MSW ownership are documented in the
+[Testing guide](testing-guide.md).
+
+Current contextual mutation boundaries are:
+
+- Saved-view creation failures remain in the create dialog, including the
+  stale-snapshot instruction. Rename, deletion, and both membership-removal
+  workflows keep persistent errors beside their dialog actions. Add-to-view
+  failures remain beside the page selection controls.
+- Inline transaction edit failures render below the affected row. Detail-page
+  edit failures remain beside the edit controls. Single- and bulk-deletion
+  request failures remain inside their confirmation dialogs, preserving the
+  transaction context or selection for retry.
+- Import-preview request failures remain at the import surface. Reviewed batch-
+  import failures remain inside the review dialog and preserve edited rows.
+  Successful imports retain the page-level result banner because created,
+  skipped, and intentionally imported duplicate counts—and whether active
+  filters may hide new rows—cannot be inferred reliably from the refreshed
+  table.
+- Statement-format hide and restore failures render directly below the
+  affected management row. Currency and statement-format form failures remain
+  above their forms; their cross-route create/update results use destination
+  flash banners.
+- User deactivation failures remain on the user detail page, and statement-
+  format wizard failures remain inside the active wizard.
+
+A successful bulk-delete response is converged state even when some or all
+requested IDs were already absent. Full, partial, and zero-deletion responses
+therefore close the dialog, clear selection, and refresh the table without a
+detached result message. A display-currency change similarly clears incompatible
+amount-filter URL state without a message because the cleared controls and URL
+are the visible result.
 
 ## TanStack Query Boundary
 
@@ -280,7 +308,10 @@ The import error codes `MISSING_ORIGINAL_FILENAME`,
 `BATCH_IMPORT_NO_TRANSACTIONS_CREATED`, `BATCH_IMPORT_SOURCE_MISMATCH`,
 `PREVIEW_IMPORT_TOKEN_INVALID`, and `PREVIEW_IMPORT_TOKEN_EXPIRED` have stable
 copy in `src/utils/errorMessages.ts`. Preview failures appear at the import
-surface; batch failures leave the review open and use a toast.
+surface; batch failures appear inside the review dialog and leave its edited
+rows available for dismissal or retry. Successful batch results continue to
+use the transactions-page banner because their counts and possible filter
+consequences are informative rather than redundant.
 
 For application structure and client/backend boundaries, see
 [Architecture](architecture.md). For request and feature tests, see the

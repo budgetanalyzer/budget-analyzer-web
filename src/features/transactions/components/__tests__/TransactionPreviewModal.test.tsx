@@ -4,7 +4,6 @@ import { delay, http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '@/testing/mocks/server';
 import { transactionKeys } from '@/queryKeys';
-import { toast } from '@/hooks/useToast';
 import { renderWithProviders } from '@/testing/test-utils';
 import { TransactionPreviewModal } from '@/features/transactions/components/TransactionPreviewModal';
 import type {
@@ -15,6 +14,15 @@ import type {
 } from '@/types/transaction';
 import type { StatementFormat } from '@/types/statementFormat';
 import { formatTimestamp } from '@/utils/dates';
+
+function createDeferredPromise() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+}
 
 const basePreviewTransaction: PreviewTransaction = {
   date: '2026-05-01',
@@ -785,34 +793,113 @@ describe('TransactionPreviewModal', () => {
     });
   });
 
-  it('keeps the modal open and shows mapped toast feedback when the atomic import fails', async () => {
-    const toastError = vi.spyOn(toast, 'error').mockImplementation(() => 'test-toast');
+  it('retains edited rows through dismissible failures and clears the alert on successful retry', async () => {
+    const user = userEvent.setup();
+    const retryResponse = createDeferredPromise();
+    const requestBodies: unknown[] = [];
+    const { onOpenChange, onImportComplete } = renderModal();
+
+    server.use(
+      http.post('/api/v1/transactions/batch', async ({ request }) => {
+        requestBodies.push(await request.json());
+        if (requestBodies.length < 3) {
+          return HttpResponse.json(
+            {
+              type: 'APPLICATION_ERROR',
+              message: 'Preview import token sources do not match.',
+              code: 'BATCH_IMPORT_SOURCE_MISMATCH',
+            },
+            { status: 422 },
+          );
+        }
+
+        await retryResponse.promise;
+        return HttpResponse.json({
+          created: 7,
+          duplicatesSkipped: 3,
+          duplicatesImported: 2,
+          files: [],
+        });
+      }),
+    );
+
+    const descriptionInput = screen.getByDisplayValue('Coffee');
+    await user.clear(descriptionInput);
+    await user.type(descriptionInput, 'Coffee reviewed');
+    await user.click(screen.getByRole('button', { name: 'Import 1 Transaction' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'These files cannot be imported together. Please preview the files together again.',
+    );
+    expect(screen.getByRole('heading', { name: 'Preview Import' })).toBeInTheDocument();
+    expect(descriptionInput).toHaveValue('Coffee reviewed');
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(onImportComplete).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(descriptionInput).toHaveValue('Coffee reviewed');
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Import 1 Transaction' })).toBeEnabled(),
+    );
+    await user.click(screen.getByRole('button', { name: 'Import 1 Transaction' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'These files cannot be imported together. Please preview the files together again.',
+    );
+    expect(descriptionInput).toHaveValue('Coffee reviewed');
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Import 1 Transaction' })).toBeEnabled(),
+    );
+    await user.click(screen.getByRole('button', { name: 'Import 1 Transaction' }));
+
+    expect(await screen.findByRole('button', { name: 'Importing...' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(descriptionInput).toHaveValue('Coffee reviewed');
+
+    retryResponse.resolve();
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(onImportComplete).toHaveBeenCalledWith(7, 3, 2);
+    expect(requestBodies).toHaveLength(3);
+    requestBodies.forEach((requestBody) => {
+      expect(requestBody).toEqual({
+        files: [
+          {
+            previewImportToken: 'preview-token-123',
+            transactions: [expect.objectContaining({ description: 'Coffee reviewed' })],
+          },
+        ],
+      });
+    });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('clears failed import feedback when the review dialog closes', async () => {
+    const user = userEvent.setup();
     const { onOpenChange, onImportComplete } = renderModal();
 
     server.use(
       http.post('/api/v1/transactions/batch', () =>
         HttpResponse.json(
-          {
-            type: 'APPLICATION_ERROR',
-            message: 'Preview import token sources do not match.',
-            code: 'BATCH_IMPORT_SOURCE_MISMATCH',
-          },
-          { status: 422 },
+          { type: 'INTERNAL_ERROR', message: 'Import service unavailable' },
+          { status: 500 },
         ),
       ),
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Import 1 Transaction' }));
+    await user.click(screen.getByRole('button', { name: 'Import 1 Transaction' }));
 
-    await waitFor(() => {
-      expect(toastError).toHaveBeenCalledWith(
-        'These files cannot be imported together. Please preview the files together again.',
-      );
-    });
-    expect(screen.getByRole('heading', { name: 'Preview Import' })).toBeInTheDocument();
-    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Import service unavailable');
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onImportComplete).not.toHaveBeenCalled();
-    toastError.mockRestore();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('closes on cancel without importing', async () => {
