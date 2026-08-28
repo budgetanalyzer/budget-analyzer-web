@@ -45,17 +45,15 @@ export function RemoveViewTransactionsModal({
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      if (isPending) return;
-
       if (nextOpen) onOpenChange(true);
       else handleClose();
     },
-    [handleClose, isPending, onOpenChange],
+    [handleClose, onOpenChange],
   );
 
   const handleCancel = useCallback(() => {
-    if (!isPending) handleClose();
-  }, [handleClose, isPending]);
+    handleClose();
+  }, [handleClose]);
 
   const handleConfirm = useCallback(() => {
     if (removeCount === 0 || isPending) return;
@@ -77,7 +75,7 @@ export function RemoveViewTransactionsModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent dismissible={!isPending}>
         <DialogHeader>
           <DialogTitle>Remove from view</DialogTitle>
           <DialogDescription>
@@ -98,11 +96,7 @@ export function RemoveViewTransactionsModal({
           <Button variant="outline" onClick={handleCancel} disabled={isPending}>
             Cancel
           </Button>
-          <Button
-            variant="destructive"
-            onClick={handleConfirm}
-            disabled={isPending || removeCount === 0}
-          >
+          <Button onClick={handleConfirm} disabled={isPending || removeCount === 0}>
             {isPending ? 'Removing...' : 'Remove from view'}
           </Button>
         </DialogFooter>

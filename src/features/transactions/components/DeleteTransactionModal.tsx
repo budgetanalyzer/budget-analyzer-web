@@ -75,7 +75,7 @@ export function DeleteTransactionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent dismissible={!isDeleting}>
         <DialogHeader>
           <DialogTitle>Delete Transaction</DialogTitle>
           <DialogDescription>

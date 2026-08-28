@@ -42,17 +42,15 @@ export function BulkDeleteModal({
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (isDeleting) return;
-
       if (open) onOpenChange(true);
       else handleClose();
     },
-    [handleClose, isDeleting, onOpenChange],
+    [handleClose, onOpenChange],
   );
 
   const handleCancel = useCallback(() => {
-    if (!isDeleting) handleClose();
-  }, [handleClose, isDeleting]);
+    handleClose();
+  }, [handleClose]);
 
   const handleDelete = useCallback(() => {
     if (isDeleting || selectedIds.length === 0) return;
@@ -71,7 +69,7 @@ export function BulkDeleteModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent dismissible={!isDeleting}>
         <DialogHeader>
           <DialogTitle>Delete Transactions</DialogTitle>
           <DialogDescription>

@@ -24,6 +24,12 @@ function createDeferredPromise() {
   return { promise, resolve };
 }
 
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
+}
+
 function renderEditViewModal(onClose = vi.fn()) {
   const result = renderWithProviders(<EditViewModal open onClose={onClose} view={view} />);
 
@@ -96,7 +102,16 @@ describe('EditViewModal', () => {
     await user.click(screen.getByRole('button', { name: 'Save Changes' }));
 
     expect(await screen.findByRole('button', { name: 'Saving...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(input).toHaveValue('Retained draft');
+
+    await user.click(getDialogBackdrop());
+    await user.keyboard('{Escape}');
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Rename View' })).toBeInTheDocument();
     expect(input).toHaveValue('Retained draft');
 
     retryResponse.resolve();

@@ -1,4 +1,4 @@
-import type { BrowserMockController } from './browserMocks';
+import type { BrowserMockController, DeferredApiMockController } from './browserMocks';
 import { buildTransaction } from './data';
 
 export function registerTransactionPageResponses(browserMocks: BrowserMockController): void {
@@ -21,5 +21,15 @@ export function registerTransactionPageResponses(browserMocks: BrowserMockContro
     method: 'GET',
     url: '/api/v1/views',
     json: [],
+  });
+}
+
+export function registerDeferredBulkDeleteResponse(
+  browserMocks: BrowserMockController,
+): DeferredApiMockController {
+  return browserMocks.mockDeferredApi({
+    method: 'POST',
+    url: '/api/v1/transactions/bulk-delete',
+    json: { deletedCount: 1, notFoundIds: [] },
   });
 }

@@ -18,8 +18,25 @@ export interface UnexpectedProtectedRequest {
 
 export interface BrowserMockController {
   mockApi: (response: ApiMockResponse) => void;
+  mockDeferredApi: (response: ApiMockResponse) => DeferredApiMockController;
+  releasePendingResponses: () => void;
   unexpectedRequests: () => readonly UnexpectedProtectedRequest[];
   assertNoUnexpectedRequests: () => void;
+}
+
+export interface DeferredApiMockController {
+  waitForRequest: () => Promise<void>;
+  release: () => void;
+}
+
+interface RegisteredApiMockResponse {
+  response: ApiMockResponse;
+  deferred?: {
+    requestReceived: Promise<void>;
+    markRequestReceived: () => void;
+    responseReleased: Promise<void>;
+    releaseResponse: () => void;
+  };
 }
 
 function canonicalUrl(url: URL): string {
@@ -55,8 +72,30 @@ export async function installBrowserMocks(
   user: User,
   session: SessionStatus,
 ): Promise<BrowserMockController> {
-  const apiResponses = new Map<string, ApiMockResponse>();
+  const apiResponses = new Map<string, RegisteredApiMockResponse>();
+  const deferredResponses = new Set<RegisteredApiMockResponse>();
   const unexpected: UnexpectedProtectedRequest[] = [];
+
+  const registerApiResponse = (
+    response: ApiMockResponse,
+    deferred?: RegisteredApiMockResponse['deferred'],
+  ): RegisteredApiMockResponse => {
+    const absoluteUrl = new URL(response.url, 'https://e2e.invalid');
+    if (!absoluteUrl.pathname.startsWith('/api/')) {
+      throw new Error(
+        `Browser mock configuration failure: API mock URL must start with /api/; received ${response.url}.`,
+      );
+    }
+    const key = requestKey(response.method, absoluteUrl);
+    if (apiResponses.has(key)) {
+      throw new Error(`Browser mock configuration failure: duplicate response for ${key}.`);
+    }
+
+    const registeredResponse = { response, deferred };
+    apiResponses.set(key, registeredResponse);
+    if (deferred) deferredResponses.add(registeredResponse);
+    return registeredResponse;
+  };
 
   const recordAndBlock = async (route: Route): Promise<void> => {
     const request = route.request();
@@ -87,10 +126,19 @@ export async function installBrowserMocks(
   });
   await page.route('**/api/**', async (route) => {
     const request = route.request();
-    const response = apiResponses.get(requestKey(request.method(), new URL(request.url())));
-    if (!response) {
+    const registeredResponse = apiResponses.get(
+      requestKey(request.method(), new URL(request.url())),
+    );
+    if (!registeredResponse) {
       await recordAndBlock(route);
       return;
+    }
+
+    const { response, deferred } = registeredResponse;
+    if (deferred) {
+      deferred.markRequestReceived();
+      await deferred.responseReleased;
+      deferredResponses.delete(registeredResponse);
     }
 
     await route.fulfill({
@@ -102,17 +150,32 @@ export async function installBrowserMocks(
 
   return {
     mockApi: (response) => {
-      const absoluteUrl = new URL(response.url, 'https://e2e.invalid');
-      if (!absoluteUrl.pathname.startsWith('/api/')) {
-        throw new Error(
-          `Browser mock configuration failure: API mock URL must start with /api/; received ${response.url}.`,
-        );
-      }
-      const key = requestKey(response.method, absoluteUrl);
-      if (apiResponses.has(key)) {
-        throw new Error(`Browser mock configuration failure: duplicate response for ${key}.`);
-      }
-      apiResponses.set(key, response);
+      registerApiResponse(response);
+    },
+    mockDeferredApi: (response) => {
+      let markRequestReceived!: () => void;
+      let releaseResponse!: () => void;
+      const requestReceived = new Promise<void>((resolve) => {
+        markRequestReceived = resolve;
+      });
+      const responseReleased = new Promise<void>((resolve) => {
+        releaseResponse = resolve;
+      });
+      const registeredResponse = registerApiResponse(response, {
+        requestReceived,
+        markRequestReceived,
+        responseReleased,
+        releaseResponse,
+      });
+
+      return {
+        waitForRequest: () => registeredResponse.deferred!.requestReceived,
+        release: () => registeredResponse.deferred!.releaseResponse(),
+      };
+    },
+    releasePendingResponses: () => {
+      deferredResponses.forEach((response) => response.deferred?.releaseResponse());
+      deferredResponses.clear();
     },
     unexpectedRequests: () => [...unexpected],
     assertNoUnexpectedRequests: () => {

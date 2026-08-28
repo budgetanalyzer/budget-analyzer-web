@@ -47,11 +47,8 @@ export function UserDetailPage() {
   }, []);
 
   const handleCloseConfirmDialog = useCallback(() => {
-    if (isPending) {
-      return;
-    }
     setIsConfirmDialogOpen(false);
-  }, [isPending]);
+  }, []);
 
   const handleConfirmDeactivation = useCallback(() => {
     if (!user?.id) {

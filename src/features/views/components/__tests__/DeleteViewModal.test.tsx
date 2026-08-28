@@ -25,6 +25,12 @@ function createDeferredPromise() {
   return { promise, resolve };
 }
 
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
+}
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
@@ -123,7 +129,15 @@ describe('DeleteViewModal', () => {
 
     expect(await screen.findByRole('button', { name: 'Deleting...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1');
+
+    await user.click(getDialogBackdrop());
+    await user.keyboard('{Escape}');
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Delete View' })).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1');
 
     retryResponse.resolve();

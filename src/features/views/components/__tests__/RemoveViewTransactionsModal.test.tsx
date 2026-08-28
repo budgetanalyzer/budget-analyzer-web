@@ -15,6 +15,12 @@ function createDeferredPromise() {
   return { promise, resolve };
 }
 
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
+}
+
 function renderModal(transactionIds = [3, 3, 8]) {
   const onOpenChange = vi.fn();
   const onSuccess = vi.fn();
@@ -43,7 +49,11 @@ describe('RemoveViewTransactionsModal', () => {
     const { onOpenChange, onSuccess } = renderModal();
 
     expect(screen.getByText(/Remove 2 transactions from this view/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Remove from view' }));
+    const confirmButton = screen.getByRole('button', { name: 'Remove from view' });
+    expect(confirmButton).toHaveClass('bg-primary', 'text-primary-foreground');
+    expect(confirmButton).not.toHaveClass('bg-destructive', 'text-destructive-foreground');
+
+    await userEvent.click(confirmButton);
 
     await waitFor(() =>
       expect(requestBody).toEqual({
@@ -131,7 +141,16 @@ describe('RemoveViewTransactionsModal', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove from view' }));
     expect(await screen.findByRole('button', { name: 'Removing...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText(/Remove 1 transaction from this view/)).toBeInTheDocument();
+
+    await userEvent.click(getDialogBackdrop());
+    await userEvent.keyboard('{Escape}');
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Remove from view' })).toBeInTheDocument();
     expect(screen.getByText(/Remove 1 transaction from this view/)).toBeInTheDocument();
 
     retryResponse.resolve();

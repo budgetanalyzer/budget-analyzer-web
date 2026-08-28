@@ -46,6 +46,26 @@ mobile buttons and desktop rows. Feature dialogs should use the default
 specialized separators such as a top border may be added without replacing the
 shared spacing.
 
+Shared dialogs follow the
+[WAI-ARIA modal dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
+`DialogContent` supplies modal dialog semantics and associates its
+`DialogTitle` and optional `DialogDescription` through stable generated
+identifiers. When a dialog opens, it honors an intentional autofocus target,
+otherwise focuses the first focusable element or the dialog container. Focus
+remains contained while the dialog is open and returns to the previously
+focused connected element when it closes.
+
+`DialogContent` is dismissible by default. Its single `dismissible` input owns
+all shared dismissal mechanisms: when false, the close control is absent and
+backdrop clicks and Escape do not request closure. This does not prevent the
+controlling feature from closing a controlled dialog after successful work.
+Feature-owned Cancel controls must reflect the same state when dismissal is
+disabled. A dialog that owns an in-flight mutation passes `dismissible={false}`
+and disables Cancel until the request settles because closing the dialog does
+not cancel the request. Successful mutation callbacks may still close it
+programmatically. Dialogs continue to use the reference-counted body scroll
+lock described in the CSP contract below.
+
 ## State Boundary
 
 The application separates state by lifetime and authority:

@@ -17,8 +17,12 @@ export const test = base.extend<BrowserFixtures>({
   authenticatedSession: [buildSessionStatus(), { option: true }],
   browserMocks: async ({ page, authenticatedUser, authenticatedSession }, provide) => {
     const browserMocks = await installBrowserMocks(page, authenticatedUser, authenticatedSession);
-    await provide(browserMocks);
-    browserMocks.assertNoUnexpectedRequests();
+    try {
+      await provide(browserMocks);
+    } finally {
+      browserMocks.releasePendingResponses();
+      browserMocks.assertNoUnexpectedRequests();
+    }
   },
   cspMonitor: async ({ page }, provide) => {
     await provide(await createCspObserverController(page));

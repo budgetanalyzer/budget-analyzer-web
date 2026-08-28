@@ -127,13 +127,27 @@ describe('ViewTransactionTable', () => {
     );
   });
 
-  it('shows row and selection removal actions with views:write', () => {
+  it('shows non-destructive row and selection removal actions with views:write', async () => {
     renderTable();
 
     expect(
       screen.getByRole('checkbox', { name: 'Select all transactions on this page' }),
     ).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Remove from view' })).toHaveLength(2);
+    const rowRemovalButtons = screen.getAllByRole('button', { name: 'Remove from view' });
+    expect(rowRemovalButtons).toHaveLength(2);
+    for (const button of rowRemovalButtons) {
+      expect(button).toHaveClass('border', 'border-input', 'bg-background');
+      expect(button).not.toHaveClass('bg-destructive', 'text-destructive');
+    }
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select transaction 1' }));
+    const removalBar = screen.getByText('1 transaction selected').parentElement;
+    expect(removalBar).not.toBeNull();
+    const bulkRemovalButton = within(removalBar!).getByRole('button', {
+      name: 'Remove from view',
+    });
+    expect(bulkRemovalButton).toHaveClass('border', 'border-input', 'bg-background');
+    expect(bulkRemovalButton).not.toHaveClass('bg-destructive', 'text-destructive');
   });
 
   it('removes all filtered members rather than only the visible page', async () => {

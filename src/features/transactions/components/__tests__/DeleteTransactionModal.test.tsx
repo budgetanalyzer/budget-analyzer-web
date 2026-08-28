@@ -41,6 +41,12 @@ function createDeferredPromise() {
   return { promise, resolve };
 }
 
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
+}
+
 function renderModal(displayAmount: DisplayAmount) {
   return renderWithProviders(
     <DeleteTransactionModal
@@ -151,8 +157,16 @@ describe('DeleteTransactionModal', () => {
 
     expect(await screen.findByRole('button', { name: 'Deleting...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
+
+    await user.click(getDialogBackdrop());
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('dialog', { name: 'Delete Transaction' })).toBeInTheDocument();
+    expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
+    expect(onDeleted).not.toHaveBeenCalled();
 
     retryResponse.resolve();
 

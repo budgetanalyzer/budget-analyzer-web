@@ -2,18 +2,18 @@
 
 ## Status and Goal
 
-**Overall status:** In progress. Three of seven findings are resolved; four
-remain open.
+**Overall status:** In progress. Six of seven findings are resolved; one remains
+open.
 
 | Finding | Status | Current result or remaining decision |
 | --- | --- | --- |
 | 1. Compact confirmation spacing | Resolved | The shared footer owns content and button spacing. |
 | 2. Mutation feedback | Resolved | The application adopted contextual feedback and removed the toast system. |
-| 3. Removal button treatment | Open | Choose and apply one saved-view membership-removal taxonomy. |
+| 3. Removal button treatment | Resolved | Membership-removal initiators are non-destructive and confirmations are primary. |
 | 4. Rename and delete failures | Resolved | Both dialogs preserve context and show persistent normalized errors. |
-| 5. Pending dismissal | Open | Choose one policy and represent it through every dismissal mechanism. |
+| 5. Pending dismissal | Resolved | Desktop Chromium verifies the integrated pending policy. |
 | 6. Dialog hierarchy and copy | Open | Establish title, icon, and transaction-context conventions. |
-| 7. Dialog semantics and focus | Open | Upgrade the shared primitive and verify real-browser behavior. |
+| 7. Dialog semantics and focus | Resolved | Desktop Chromium verifies the shared semantic and focus contract. |
 
 The implementation did not follow the original suggested order. Finding 1 was
 completed first. Findings 2 and 4 were then completed together: removing the
@@ -40,9 +40,12 @@ The review compared:
 - the former custom toast system and inline transaction message banners; and
 - the shared dialog primitive used by both older and newer features.
 
-No live-browser audit was performed. Visual findings below follow directly from
-the rendered component structure and Tailwind classes; interaction and
-accessibility findings follow from the shared primitive and dialog callbacks.
+The initial audit used the rendered component structure, Tailwind classes,
+shared primitive, and dialog callbacks. The finding 5 and 7 resolutions add a
+fail-closed desktop Chromium workflow against the strict production-smoke
+application. That browser evidence is intentionally limited to the integrated
+bulk-transaction deletion dialog and does not establish mobile or cross-browser
+behavior.
 
 ## Candidate UX Reference Set
 
@@ -230,22 +233,30 @@ same accessibility contract.
 
 ### 3. The same removal operation changes semantic button treatment
 
-**Status:** Open
+**Status:** Resolved
 
-Manual removal uses a red `destructive` confirmation button in
+At the time of the audit, manual removal used a red `destructive` confirmation
+button in
 [`RemoveViewTransactionsModal`](../../src/features/views/components/RemoveViewTransactionsModal.tsx),
 while transfer/refund review uses the default primary button in
 [`TransferRefundReviewDialog`](../../src/features/views/components/TransferRefundReviewDialog.tsx).
-Both submit the same saved-view membership-removal request and both explicitly
-state that the transactions are not deleted. The manual selection bar and
-single-row removal control also use destructive coloring, so the decision must
-cover the initiating affordances as well as the two confirmation buttons.
+Both submitted the same saved-view membership-removal request and both explicitly
+stated that the transactions are not deleted. The manual selection bar and
+single-row removal control also used destructive coloring, so the decision had
+to cover the initiating affordances as well as the two confirmation buttons.
 
-- [ ] Decide whether removing membership is destructive within this product's
+- [x] Decide whether removing membership is destructive within this product's
       button taxonomy.
-- [ ] Use the same variant for manual and assisted removal.
-- [ ] Keep the initiating manual-removal controls consistent with the adopted
+- [x] Use the same variant for manual and assisted removal.
+- [x] Keep the initiating manual-removal controls consistent with the adopted
       taxonomy.
+
+Saved-view membership removal is non-destructive: it retains the transaction
+and can be reversed by adding the transaction to the view again. Row and bulk
+initiators therefore use the non-destructive outline treatment, while both the
+compact and transfer/refund confirmations use the default primary treatment.
+Red destructive treatment remains reserved for consequential operations such
+as deleting data, deactivating a user, or disabling a currency.
 
 ### 4. Rename and delete view failures have no user-facing feedback
 
@@ -263,22 +274,37 @@ TanStack Query mutation hooks.
 - [x] Keep the dialog and user input intact after failure.
 - [x] Add behavior tests for the failure paths.
 
-### 5. Pending dialogs expose inconsistent dismissal behavior
+### 5. Pending dialogs exposed inconsistent dismissal behavior
 
-**Status:** Open
+**Status:** Resolved
 
-The transfer/refund review hides its close icon and rejects dismissal while its
-mutation is pending. Compact removal and bulk transaction deletion reject the
-dismissal callback but leave the close icon visible, making it appear clickable
-even though it is inert. Create-view, rename, delete-view, and single-transaction
-deletion allow close-icon, backdrop, or Escape dismissal while their mutation
-is pending even though their Cancel buttons are disabled.
+At the time of the audit, the transfer/refund review hid its close icon and
+rejected dismissal while its mutation was pending. Compact removal and bulk
+transaction deletion rejected the dismissal callback but left the close icon
+visible, making it appear clickable even though it was inert. Create-view,
+rename, delete-view, and single-transaction deletion allowed close-icon,
+backdrop, or Escape dismissal while their mutation was pending even though
+their Cancel buttons were disabled.
 
-- [ ] Choose whether pending mutations may be dismissed.
-- [ ] When dismissal is blocked, make every dismissal affordance accurately
+- [x] Choose whether pending mutations may be dismissed.
+- [x] When dismissal is blocked, make every dismissal affordance accurately
       reflect that state.
-- [ ] Apply the rule consistently to close icon, backdrop click, Escape, and
+- [x] Apply the rule consistently to close icon, backdrop click, Escape, and
       Cancel.
+- [x] Verify the integrated pending behavior in the real-browser CSP harness.
+
+The adopted rule blocks every dialog-dismissal mechanism while a mutation is
+pending because closing does not cancel the request. The audited saved-view and
+transaction deletion dialogs now derive shared dismissibility from their
+mutation state, disable Cancel, and retain successful programmatic closure.
+The current reviewed-import, statement-format wizard, and user-deactivation
+dialogs follow the same rule. Currency-disable confirmation intentionally
+closes before its mutation starts, and the inactivity warning is non-mutation
+session behavior that is always non-dismissible. Focused component tests cover
+the pending and successful-close workflows. The fail-closed production-smoke
+workflow additionally defers a bulk-deletion response and proves in desktop
+Chromium that Cancel is disabled, the close control is absent, backdrop and
+Escape do not dismiss, and successful completion still closes the dialog.
 
 ### 6. Dialog hierarchy and copy conventions drift across view actions
 
@@ -301,58 +327,45 @@ most recently.
 - [ ] Decide what transaction context is required for single-item membership
       removal versus bulk removal.
 
-### 7. The shared dialog primitive lacks standard dialog semantics and focus management
+### 7. The shared dialog primitive lacked standard dialog semantics and focus management
 
-**Status:** Open
+**Status:** Resolved
 
-The shared [`Dialog`](../../src/components/ui/Dialog.tsx) renders the modal
-content as a plain `div`. It does not provide `role="dialog"`, `aria-modal`,
-title/description associations, initial focus placement, focus containment, or
-focus restoration. It installs Escape and backdrop dismissal and a body scroll
-lock, but those behaviors do not supply the missing semantics or keyboard focus
-lifecycle.
+At the time of the audit, the shared
+[`Dialog`](../../src/components/ui/Dialog.tsx) rendered modal content as a plain
+`div`. It did not provide `role="dialog"`, `aria-modal`, title/description
+associations, initial focus placement, focus containment, or focus restoration.
+It installed Escape and backdrop dismissal and a body scroll lock, but those
+behaviors did not supply the missing semantics or keyboard focus lifecycle.
 
-This affects both older transaction dialogs and current saved-view dialogs; it
-is shared-component debt, not a view-only inconsistency.
+This affected both older transaction dialogs and current saved-view dialogs; it
+was shared-component debt, not a view-only inconsistency.
 
-- [ ] Define the required accessible dialog contract without adding a
+- [x] Define the required accessible dialog contract without adding a
       runtime-style-injecting dependency.
-- [ ] Implement semantics and focus behavior in the shared primitive rather
+- [x] Implement semantics and focus behavior in the shared primitive rather
       than independently in feature dialogs.
-- [ ] Add focused shared-component tests and browser verification where DOM
-      emulation cannot establish real focus behavior.
+- [x] Add focused shared-component tests.
+- [x] Add browser verification where DOM emulation cannot establish real focus
+      behavior.
+
+The shared primitive now provides modal semantics, generated title and optional
+description associations, deterministic initial focus, focus containment and
+restoration, and one coherent dismissal contract under focused component tests.
+The fail-closed production-smoke workflow verifies the accessible name and
+description, initial focus, forward and reverse focus wrapping, normal Escape
+dismissal, and restoration to the connected initiator in desktop Chromium. The
+same workflow observed zero CSP violations, runtime-added stylesheets, or final
+`<style>` elements. This is integrated desktop Chromium evidence, not mobile or
+cross-browser proof.
 
 ## Remaining Resolution Order
 
 The original suggested order is superseded by the completed work above. The
-recommended sequence for the four remaining findings is:
-
-1. Resolve finding 3 as a small, isolated product-taxonomy change. The current
-   application otherwise reserves destructive actions for deleting data,
-   deactivating a user, or disabling a currency. Because membership removal
-   retains the transaction and can be reversed, the recommended rule is to use
-   the default primary treatment for confirmation and non-destructive styling
-   for its initiating controls.
-2. Decide the finding 5 policy before changing individual dialogs. The
-   recommended rule is to block dismissal while a mutation is pending because
-   closing the dialog does not cancel the request and can falsely imply that
-   the operation was cancelled. Disabled Cancel, hidden close control, ignored
-   Escape, and ignored backdrop click must all express that same state.
-3. Implement finding 7 as a dedicated shared-primitive change. Give the
-   primitive one dismissal contract that can express the finding 5 pending
-   rule, then add dialog semantics, title and description associations,
-   initial focus, focus containment, and focus restoration. Migrate the
-   affected dialogs to that contract and close finding 5 in the same pass so
-   feature components do not reproduce dismissal logic.
-4. Resolve finding 6 after the behavioral foundation is stable. Use sentence
-   case for dialog titles, reserve warning iconography for the agreed class of
-   consequential destructive actions, and add identifying transaction context
-   when a confirmation affects exactly one transaction.
-
-Finding 7 remains the highest-risk change because it affects every dialog. It
-requires focused shared-component tests plus the external browser verification
-described by the testing documentation; the user-managed application
-environment must not be started by an agent.
+remaining work is to resolve finding 6 now that the behavioral foundation is
+verified. Use sentence case for dialog titles, reserve warning iconography for
+the agreed class of consequential destructive actions, and add identifying
+transaction context when a confirmation affects exactly one transaction.
 
 ## Completion Criteria
 
