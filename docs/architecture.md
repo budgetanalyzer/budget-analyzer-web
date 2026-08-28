@@ -53,7 +53,10 @@ Shared dialogs follow the
 identifiers. When a dialog opens, it honors an intentional autofocus target,
 otherwise focuses the first focusable element or the dialog container. Focus
 remains contained while the dialog is open and returns to the previously
-focused connected element when it closes.
+focused connected element when it closes. Overlapping dialogs share opening
+order for visual stacking and keyboard ownership, so the most recently opened
+dialog is both visible above and receives modal keyboard interaction before
+earlier dialogs.
 
 `DialogContent` is dismissible by default. Its single `dismissible` input owns
 all shared dismissal mechanisms: when false, the close control is absent and

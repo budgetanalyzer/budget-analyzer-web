@@ -70,6 +70,33 @@ function RestorableDialog() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogTitle>Restorable dialog</DialogTitle>
+          <input aria-label="Dialog name" autoFocus />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function OpeningOrderDialogs() {
+  const [warningOpen, setWarningOpen] = useState(false);
+  const handleOpenWarning = useCallback(() => setWarningOpen(true), []);
+
+  return (
+    <>
+      <Dialog open={warningOpen} onOpenChange={setWarningOpen}>
+        <DialogContent dismissible={false}>
+          <DialogTitle>Inactivity warning</DialogTitle>
+          <button type="button">Continue session</button>
+          <button type="button">Sign out</button>
+        </DialogContent>
+      </Dialog>
+      <Dialog open>
+        <DialogContent dismissible={false}>
+          <DialogTitle>Application dialog</DialogTitle>
+          <button type="button" onClick={handleOpenWarning}>
+            Show warning
+          </button>
+          <button type="button">Application action</button>
         </DialogContent>
       </Dialog>
     </>
@@ -273,6 +300,25 @@ describe('Dialog dismissal', () => {
     expect(onSecondOpenChange).toHaveBeenCalledWith(false);
     expect(screen.getByRole('dialog', { name: 'First dialog' })).toBeInTheDocument();
   });
+
+  it('keeps opening-order rendering aligned with keyboard ownership', async () => {
+    const user = userEvent.setup();
+    render(<OpeningOrderDialogs />);
+
+    await user.click(screen.getByRole('button', { name: 'Show warning' }));
+
+    const applicationDialog = screen.getByRole('dialog', { name: 'Application dialog' });
+    const warningDialog = screen.getByRole('dialog', { name: 'Inactivity warning' });
+
+    expect(
+      applicationDialog.compareDocumentPosition(warningDialog) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    screen.getByRole('button', { name: 'Sign out' }).focus();
+    await user.tab();
+
+    expect(screen.getByRole('button', { name: 'Continue session' })).toHaveFocus();
+  });
 });
 
 describe('Dialog focus lifecycle', () => {
@@ -353,13 +399,13 @@ describe('Dialog focus lifecycle', () => {
     expect(screen.getByRole('button', { name: 'Last action' })).toHaveFocus();
   });
 
-  it('restores focus to the previously focused connected element on close', async () => {
+  it('restores focus captured before a descendant autofocuses', async () => {
     const user = userEvent.setup();
     render(<RestorableDialog />);
 
     const trigger = screen.getByRole('button', { name: 'Open dialog' });
     await user.click(trigger);
-    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
+    expect(screen.getByRole('textbox', { name: 'Dialog name' })).toHaveFocus();
 
     await user.click(screen.getByRole('button', { name: 'Close' }));
 

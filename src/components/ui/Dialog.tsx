@@ -1,5 +1,6 @@
 // src/components/ui/Dialog.tsx
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/utils/cn';
 import { X } from 'lucide-react';
 import { acquireBodyScrollLock } from '@/utils/bodyScrollLock';
@@ -130,9 +131,44 @@ interface DialogContentProps {
   dismissible?: boolean;
 }
 
+interface DialogMountBoundaryProps {
+  children: React.ReactNode;
+  onOpening: (previouslyFocusedElement: HTMLElement | null) => void;
+  open: boolean;
+}
+
+class DialogMountBoundary extends React.Component<
+  DialogMountBoundaryProps,
+  Record<string, never>,
+  HTMLElement | null
+> {
+  getSnapshotBeforeUpdate(previousProps: DialogMountBoundaryProps): HTMLElement | null {
+    if (!previousProps.open && this.props.open) {
+      return document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
+
+    return null;
+  }
+
+  componentDidUpdate(
+    previousProps: DialogMountBoundaryProps,
+    _previousState: Record<string, never>,
+    previouslyFocusedElement: HTMLElement | null,
+  ) {
+    if (!previousProps.open && this.props.open) {
+      this.props.onOpening(previouslyFocusedElement);
+    }
+  }
+
+  render() {
+    return this.props.children;
+  }
+}
+
 export function DialogContent({ children, className, dismissible = true }: DialogContentProps) {
   const { open, setOpen } = useDialog();
   const contentRef = React.useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = React.useRef<HTMLElement | null>(null);
   const titleId = React.useId();
   const descriptionId = React.useId();
   const [titleElement, setTitleElement] = React.useState<HTMLHeadingElement | null>(null);
@@ -152,6 +188,10 @@ export function DialogContent({ children, className, dismissible = true }: Dialo
     requestDismiss();
   }, [requestDismiss]);
 
+  const handleOpening = React.useCallback((previouslyFocusedElement: HTMLElement | null) => {
+    previouslyFocusedElementRef.current = previouslyFocusedElement;
+  }, []);
+
   const contentContextValue = React.useMemo(
     () => ({ titleId, descriptionId, setTitleElement, setDescriptionElement }),
     [descriptionId, titleId],
@@ -163,8 +203,6 @@ export function DialogContent({ children, className, dismissible = true }: Dialo
     const content = contentRef.current;
     if (!content) return;
 
-    const previouslyFocusedElement =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     openDialogStack.push(content);
     const focusableElements = getFocusableElements(content);
     const autofocusElement = content.querySelector<HTMLElement>('[autofocus]');
@@ -180,8 +218,8 @@ export function DialogContent({ children, className, dismissible = true }: Dialo
     return () => {
       const wasTopmost = removeOpenDialog(content);
 
-      if (wasTopmost && previouslyFocusedElement?.isConnected) {
-        previouslyFocusedElement.focus();
+      if (wasTopmost && previouslyFocusedElementRef.current?.isConnected) {
+        previouslyFocusedElementRef.current.focus();
       }
     };
   }, [open]);
@@ -230,46 +268,51 @@ export function DialogContent({ children, className, dismissible = true }: Dialo
     return () => document.removeEventListener('keydown', handleEscape);
   }, [open, requestDismiss]);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={handleBackdropClick}
-        aria-hidden="true"
-      />
+    <DialogMountBoundary open={open} onOpening={handleOpening}>
+      {open
+        ? createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+                onClick={handleBackdropClick}
+                aria-hidden="true"
+              />
 
-      {/* Content */}
-      <div
-        ref={contentRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleElement ? titleId : undefined}
-        aria-describedby={descriptionElement ? descriptionId : undefined}
-        tabIndex={-1}
-        className={cn(
-          'relative z-50 w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg',
-          'animate-in fade-in-0 zoom-in-95',
-          className,
-        )}
-      >
-        <DialogContentContext.Provider value={contentContextValue}>
-          {dismissible && (
-            <button
-              onClick={handleCloseClick}
-              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              type="button"
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </button>
-          )}
-          {children}
-        </DialogContentContext.Provider>
-      </div>
-    </div>
+              {/* Content */}
+              <div
+                ref={contentRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleElement ? titleId : undefined}
+                aria-describedby={descriptionElement ? descriptionId : undefined}
+                tabIndex={-1}
+                className={cn(
+                  'relative z-50 w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg',
+                  'animate-in fade-in-0 zoom-in-95',
+                  className,
+                )}
+              >
+                <DialogContentContext.Provider value={contentContextValue}>
+                  {dismissible && (
+                    <button
+                      onClick={handleCloseClick}
+                      className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      type="button"
+                    >
+                      <X className="h-4 w-4" />
+                      <span className="sr-only">Close</span>
+                    </button>
+                  )}
+                  {children}
+                </DialogContentContext.Provider>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </DialogMountBoundary>
   );
 }
 
