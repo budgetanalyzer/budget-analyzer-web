@@ -202,10 +202,18 @@ describe('ViewTransactionTable', () => {
   it('opens row removal without navigating away', async () => {
     renderTable();
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Remove from view' })[0]);
+    const coffeeRow = screen.getByText('Coffee').closest('tr');
+    expect(coffeeRow).not.toBeNull();
+    await userEvent.click(
+      within(coffeeRow as HTMLElement).getByRole('button', { name: 'Remove from view' }),
+    );
 
     expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1?q=coffee');
-    expect(screen.getByText(/Remove 1 transaction from this view/)).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Remove from view' });
+    expect(within(dialog).getByText(/Remove 1 transaction from this view/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Jan 15, 2026')).toBeInTheDocument();
+    expect(within(dialog).getByText('Coffee')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('$10.00 USD')).toHaveLength(2);
   });
 
   it('retains bulk selection after cancellation and mutation failure', async () => {

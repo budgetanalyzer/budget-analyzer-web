@@ -42,7 +42,7 @@ test('transaction dialog contains focus and blocks dismissal during deletion wit
   browserMocks.assertNoUnexpectedRequests();
 
   await dialogInitiator.click();
-  const dialog = page.getByRole('dialog', { name: 'Delete Transactions', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Delete transactions', exact: true });
   const closeButton = dialog.getByRole('button', { name: 'Close', exact: true });
   const deleteButton = dialog.getByRole('button', { name: 'Delete', exact: true });
 

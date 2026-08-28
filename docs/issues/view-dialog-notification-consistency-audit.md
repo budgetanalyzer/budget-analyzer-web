@@ -2,8 +2,7 @@
 
 ## Status and Goal
 
-**Overall status:** In progress. Six of seven findings are resolved; one remains
-open.
+**Overall status:** Resolved. All seven findings are complete.
 
 | Finding | Status | Current result or remaining decision |
 | --- | --- | --- |
@@ -12,7 +11,7 @@ open.
 | 3. Removal button treatment | Resolved | Membership-removal initiators are non-destructive and confirmations are primary. |
 | 4. Rename and delete failures | Resolved | Both dialogs preserve context and show persistent normalized errors. |
 | 5. Pending dismissal | Resolved | Desktop Chromium verifies the integrated pending policy. |
-| 6. Dialog hierarchy and copy | Open | Establish title, icon, and transaction-context conventions. |
+| 6. Dialog hierarchy and copy | Resolved | Audited titles, warning iconography, and single-transaction context follow the documented conventions. |
 | 7. Dialog semantics and focus | Resolved | Desktop Chromium verifies the shared semantic and focus contract. |
 
 The implementation did not follow the original suggested order. Finding 1 was
@@ -21,9 +20,6 @@ toast system required mutation failures to move to persistent contextual
 surfaces, so fixing the missing rename and delete feedback belonged in the
 same application-wide pass. This was a coherent dependency-driven reorder,
 not an incomplete toast restyling effort.
-
-Keep the audit open. Close each remaining checklist item only after its
-intended product behavior and applicable tests are in place.
 
 Make saved-view dialogs and mutation feedback feel like one interface while
 preserving the repository's strict CSP requirements. This audit records source
@@ -308,7 +304,7 @@ Escape do not dismiss, and successful completion still closes the dialog.
 
 ### 6. Dialog hierarchy and copy conventions drift across view actions
 
-**Status:** Open
+**Status:** Resolved
 
 Saved-view titles mix sentence case (`Remove from view`, `Review possible
 transfers and refunds`) with title case (`Rename View`, `Delete View`). Delete
@@ -322,10 +318,31 @@ have different consequences. They still need an explicit convention so visual
 hierarchy and confirmation context do not depend on which component was built
 most recently.
 
-- [ ] Standardize dialog title casing.
-- [ ] Define when destructive confirmations receive warning iconography.
-- [ ] Decide what transaction context is required for single-item membership
+- [x] Standardize dialog title casing.
+- [x] Define when destructive confirmations receive warning iconography.
+- [x] Decide what transaction context is required for single-item membership
       removal versus bulk removal.
+
+Audited dialog titles now use sentence case, including the input-derived save
+and clone titles. Consequential destructive confirmations use a decorative
+warning triangle for view deletion and single- or bulk-transaction deletion.
+Reversible saved-view membership removal, including transfer/refund review,
+does not use warning iconography.
+
+Manual membership removal identifies an affected transaction when the unique
+removal set contains exactly one item. The confirmation shows its LocalDate,
+description, positive native amount, and selected-currency projection or an
+explicit unavailable-conversion message. Multi-transaction removal remains
+concise and count-based. The transaction table passes the existing transaction
+and display-amount projection into the confirmation; no calculation or API
+contract changed.
+
+Focused component coverage and the strict production-smoke browser workflow
+verify the resulting hierarchy. The desktop Chromium workflow exercises the
+sentence-case `Delete transactions` dialog against the current bundle and
+reports zero CSP violations, zero runtime-added stylesheets, and zero final
+`<style>` elements. This evidence does not claim mobile or cross-browser
+coverage.
 
 ### 7. The shared dialog primitive lacked standard dialog semantics and focus management
 
@@ -362,19 +379,18 @@ cross-browser proof.
 ## Remaining Resolution Order
 
 The original suggested order is superseded by the completed work above. The
-remaining work is to resolve finding 6 now that the behavioral foundation is
-verified. Use sentence case for dialog titles, reserve warning iconography for
-the agreed class of consequential destructive actions, and add identifying
-transaction context when a confirmation affects exactly one transaction.
+behavioral foundation was verified before finding 6 normalized titles, warning
+iconography, and single-transaction context. The current production-smoke
+bundle then passed the browser CSP harness, completing the audit.
 
 ## Completion Criteria
 
-- Each checklist above is completed or intentionally rejected with rationale.
-- Equivalent membership-removal actions use equivalent visual and interaction
+- [x] Each checklist above is completed or intentionally rejected with rationale.
+- [x] Equivalent membership-removal actions use equivalent visual and interaction
   treatment.
-- Compact dialogs have deliberate desktop and mobile spacing.
-- Every view mutation provides success visibility through the changed UI or a
+- [x] Compact dialogs have deliberate desktop and mobile spacing.
+- [x] Every view mutation provides success visibility through the changed UI or a
   documented notification surface and provides explicit failure feedback.
-- Pending dismissal behavior is consistent across all dismissal mechanisms.
-- The shared dialog contract meets the agreed semantic and focus requirements.
-- Applicable unit and browser behavior tests cover the resulting contracts.
+- [x] Pending dismissal behavior is consistent across all dismissal mechanisms.
+- [x] The shared dialog contract meets the agreed semantic and focus requirements.
+- [x] Applicable unit and browser behavior tests cover the resulting contracts.

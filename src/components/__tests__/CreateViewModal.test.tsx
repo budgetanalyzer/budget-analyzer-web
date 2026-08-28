@@ -92,6 +92,7 @@ describe('CreateViewModal', () => {
       }),
     );
     renderModal({ transactionIds: [8, 2] });
+    expect(screen.getByRole('dialog', { name: 'Save as view' })).toBeInTheDocument();
     const nameInput = screen.getByLabelText('View Name');
 
     expect(nameInput).toHaveAttribute('maxlength', '255');
@@ -195,7 +196,7 @@ describe('CreateViewModal', () => {
     await user.keyboard('{Escape}');
 
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog', { name: 'Save as View' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Save as view' })).toBeInTheDocument();
     expect(nameInput).toHaveValue('Coffee collection');
 
     retryResponse.resolve();

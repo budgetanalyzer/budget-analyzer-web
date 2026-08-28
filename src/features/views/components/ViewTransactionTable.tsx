@@ -127,6 +127,8 @@ export function ViewTransactionTable({
   );
   const bulkRemovalIds = selectAllMatching ? allFilteredIds : selectedIds;
   const idsToRemove = rowRemovalId === null ? bulkRemovalIds : [rowRemovalId];
+  const singleRemovalRow =
+    idsToRemove.length === 1 ? (rows.find((row) => row.id === idsToRemove[0]) ?? null) : null;
 
   const handleRowRemove = useCallback((transactionId: number) => {
     setRowRemovalId(transactionId);
@@ -491,6 +493,8 @@ export function ViewTransactionTable({
         <RemoveViewTransactionsModal
           viewId={viewId}
           transactionIds={idsToRemove}
+          transaction={singleRemovalRow}
+          displayAmount={singleRemovalRow?.displayAmount ?? null}
           open={removeDialogOpen}
           onOpenChange={handleRemoveDialogOpenChange}
           onSuccess={handleRemoveSuccess}

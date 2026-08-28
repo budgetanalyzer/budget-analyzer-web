@@ -72,7 +72,7 @@ export function EditViewModal({ open, onClose, view }: EditViewModalProps) {
       <DialogContent className="sm:max-w-[425px]" dismissible={!isPending}>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Rename View</DialogTitle>
+            <DialogTitle>Rename view</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-2 pt-4">

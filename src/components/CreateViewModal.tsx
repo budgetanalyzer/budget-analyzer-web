@@ -30,7 +30,7 @@ export function CreateViewModal({
   onClose,
   transactionIds,
   isTransactionIdsReady,
-  title = 'Save as View',
+  title = 'Save as view',
 }: CreateViewModalProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

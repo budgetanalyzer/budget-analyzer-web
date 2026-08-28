@@ -66,6 +66,13 @@ not cancel the request. Successful mutation callbacks may still close it
 programmatically. Dialogs continue to use the reference-counted body scroll
 lock described in the CSP contract below.
 
+New and changed visible dialog titles use sentence case, including titles
+supplied through component inputs. Consequential destructive confirmations,
+such as deleting data that cannot be restored through the interface, include a
+warning icon; the icon is decorative when the title and description already
+communicate the warning. Reversible actions such as removing transaction
+membership from a saved view do not use warning iconography.
+
 ## State Boundary
 
 The application separates state by lifetime and authority:

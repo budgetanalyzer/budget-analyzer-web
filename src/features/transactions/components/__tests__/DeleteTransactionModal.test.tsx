@@ -76,6 +76,8 @@ describe('DeleteTransactionModal', () => {
   it('always discloses a positive native amount and shows an available selected amount', () => {
     renderModal(displayAmount);
 
+    const dialog = screen.getByRole('dialog', { name: 'Delete transaction' });
+    expect(dialog.querySelector('.lucide-triangle-alert')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByText('€80.00 EUR')).toBeInTheDocument();
     expect(screen.queryByText(/-€80\.00/)).not.toBeInTheDocument();
     expect(screen.getByText('$100.00 USD')).toBeInTheDocument();
@@ -107,7 +109,7 @@ describe('DeleteTransactionModal', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Delete Transaction' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Delete transaction' })).not.toBeInTheDocument();
     });
     expect(onDeleted).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -138,7 +140,7 @@ describe('DeleteTransactionModal', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Delete request failed');
-    expect(screen.getByRole('heading', { name: 'Delete Transaction' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Delete transaction' })).toBeInTheDocument();
     expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
     expect(screen.getByText('€80.00 EUR')).toBeInTheDocument();
     expect(onDeleted).not.toHaveBeenCalled();
@@ -164,14 +166,14 @@ describe('DeleteTransactionModal', () => {
     await user.click(getDialogBackdrop());
     await user.keyboard('{Escape}');
 
-    expect(screen.getByRole('dialog', { name: 'Delete Transaction' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Delete transaction' })).toBeInTheDocument();
     expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
     expect(onDeleted).not.toHaveBeenCalled();
 
     retryResponse.resolve();
 
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Delete Transaction' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Delete transaction' })).not.toBeInTheDocument();
     });
     expect(requestedIds).toEqual(['7', '7', '7']);
     expect(onDeleted).toHaveBeenCalledTimes(1);

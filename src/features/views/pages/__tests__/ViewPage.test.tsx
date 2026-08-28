@@ -27,6 +27,7 @@ vi.mock('@/components/SaveAsViewButton', () => ({
     transactionIds: number[];
     isTransactionIdsReady: boolean;
     label?: string;
+    dialogTitle?: string;
   }) => {
     saveAsProps.current = props;
     return (
@@ -181,6 +182,7 @@ describe('ViewPage static collections', () => {
       transactionIds: [1],
       isTransactionIdsReady: true,
       label: 'Clone View',
+      dialogTitle: 'Clone view',
     });
     expect(saveAsProps.current).not.toHaveProperty('sourceViewId');
   });

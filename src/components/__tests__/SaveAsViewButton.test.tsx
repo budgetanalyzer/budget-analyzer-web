@@ -20,7 +20,12 @@ describe('SaveAsViewButton', () => {
 
   it('passes the exact visible ids and opens the modal', async () => {
     renderWithProviders(
-      <SaveAsViewButton transactionIds={[9, 3]} isTransactionIdsReady label="Clone View" />,
+      <SaveAsViewButton
+        transactionIds={[9, 3]}
+        isTransactionIdsReady
+        label="Clone View"
+        dialogTitle="Clone view"
+      />,
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Clone View' }));
@@ -30,7 +35,7 @@ describe('SaveAsViewButton', () => {
         open: true,
         transactionIds: [9, 3],
         isTransactionIdsReady: true,
-        title: 'Clone View',
+        title: 'Clone view',
       }),
     );
   });

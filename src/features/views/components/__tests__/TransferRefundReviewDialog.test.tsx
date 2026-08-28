@@ -88,6 +88,10 @@ describe('TransferRefundReviewDialog', () => {
   it('shows nonmember evidence without presenting it as removal history or a selectable row', () => {
     renderDialog();
 
+    const dialog = screen.getByRole('dialog', {
+      name: 'Review possible transfers and refunds',
+    });
+    expect(dialog.querySelector('.lucide-triangle-alert')).not.toBeInTheDocument();
     const transfer = screen.getByRole('region', { name: 'Possible transfer' });
     expect(transfer).toHaveTextContent('Not currently in this view; shown as supporting evidence');
     expect(within(transfer).getAllByRole('checkbox')).toHaveLength(1);

@@ -62,7 +62,8 @@ describe('DeleteViewModal', () => {
   it('shows the view delete impact before confirmation', () => {
     renderDeleteViewModal();
 
-    expect(screen.getByRole('heading', { name: 'Delete View' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Delete view' });
+    expect(dialog.querySelector('.lucide-triangle-alert')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByText(/delete .*Groceries/)).toBeInTheDocument();
     expect(screen.getByText(/12 transaction memberships/)).toBeInTheDocument();
     expect(screen.getByText(/transactions will not be deleted/)).toBeInTheDocument();
@@ -112,7 +113,7 @@ describe('DeleteViewModal', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Delete request failed');
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1');
-    expect(screen.getByRole('heading', { name: 'Delete View' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Delete view' })).toBeInTheDocument();
     expect(screen.getByText(/12 transaction memberships/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
@@ -137,7 +138,7 @@ describe('DeleteViewModal', () => {
     await user.keyboard('{Escape}');
 
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog', { name: 'Delete View' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Delete view' })).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('/views/view-1');
 
     retryResponse.resolve();

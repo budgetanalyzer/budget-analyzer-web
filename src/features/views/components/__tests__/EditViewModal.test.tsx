@@ -48,6 +48,7 @@ describe('EditViewModal', () => {
       }),
     );
     const { onClose } = renderEditViewModal();
+    expect(screen.getByRole('dialog', { name: 'Rename view' })).toBeInTheDocument();
     const input = screen.getByLabelText('View Name');
 
     expect(input).toHaveAttribute('maxlength', '255');
@@ -111,7 +112,7 @@ describe('EditViewModal', () => {
     await user.keyboard('{Escape}');
 
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog', { name: 'Rename View' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Rename view' })).toBeInTheDocument();
     expect(input).toHaveValue('Retained draft');
 
     retryResponse.resolve();
