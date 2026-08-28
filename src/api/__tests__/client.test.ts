@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
+import { AxiosError as AxiosTransportError, type AxiosAdapter } from 'axios';
 import { apiClient } from '@/api/client';
 import { server } from '@/testing/mocks/server';
 import { ApiError } from '@/types/apiError';
@@ -40,6 +41,29 @@ describe('apiClient error normalization', () => {
     );
 
     await expect(apiClient.get('/v1/client-error/network')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 503,
+      response: {
+        type: 'SERVICE_UNAVAILABLE',
+        message: 'Unable to reach the server. Please try again later.',
+      },
+    });
+  });
+
+  it('bounds hanging requests and maps transport timeouts to service-unavailable ApiErrors', async () => {
+    const timeoutAdapter: AxiosAdapter = async (config) => {
+      expect(config.timeout).toBe(10_000);
+      throw new AxiosTransportError(
+        'timeout of 10000ms exceeded',
+        AxiosTransportError.ECONNABORTED,
+        config,
+        {},
+      );
+    };
+
+    await expect(
+      apiClient.get('/v1/client-error/hanging', { adapter: timeoutAdapter }),
+    ).rejects.toMatchObject({
       name: 'ApiError',
       status: 503,
       response: {

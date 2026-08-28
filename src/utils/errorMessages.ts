@@ -23,6 +23,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   TRANSACTION_DATE_TOO_FAR_IN_FUTURE: 'Transaction dates in the future are not supported',
 
   // Saved-view errors
+  SAVED_VIEW_NAME_ALREADY_EXISTS: 'You already have a saved view with this name.',
   SAVED_VIEW_MEMBERSHIP_STALE:
     'The transaction snapshot changed and must be refreshed before updating this saved view.',
 
