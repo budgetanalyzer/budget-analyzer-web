@@ -2,8 +2,28 @@
 
 ## Status and Goal
 
-Open audit issue. Address the findings independently and close each checklist
-item only after its intended product behavior and applicable tests are in place.
+**Overall status:** In progress. Three of seven findings are resolved; four
+remain open.
+
+| Finding | Status | Current result or remaining decision |
+| --- | --- | --- |
+| 1. Compact confirmation spacing | Resolved | The shared footer owns content and button spacing. |
+| 2. Mutation feedback | Resolved | The application adopted contextual feedback and removed the toast system. |
+| 3. Removal button treatment | Open | Choose and apply one saved-view membership-removal taxonomy. |
+| 4. Rename and delete failures | Resolved | Both dialogs preserve context and show persistent normalized errors. |
+| 5. Pending dismissal | Open | Choose one policy and represent it through every dismissal mechanism. |
+| 6. Dialog hierarchy and copy | Open | Establish title, icon, and transaction-context conventions. |
+| 7. Dialog semantics and focus | Open | Upgrade the shared primitive and verify real-browser behavior. |
+
+The implementation did not follow the original suggested order. Finding 1 was
+completed first. Findings 2 and 4 were then completed together: removing the
+toast system required mutation failures to move to persistent contextual
+surfaces, so fixing the missing rename and delete feedback belonged in the
+same application-wide pass. This was a coherent dependency-driven reorder,
+not an incomplete toast restyling effort.
+
+Keep the audit open. Close each remaining checklist item only after its
+intended product behavior and applicable tests are in place.
 
 Make saved-view dialogs and mutation feedback feel like one interface while
 preserving the repository's strict CSP requirements. This audit records source
@@ -217,11 +237,15 @@ Manual removal uses a red `destructive` confirmation button in
 while transfer/refund review uses the default primary button in
 [`TransferRefundReviewDialog`](../../src/features/views/components/TransferRefundReviewDialog.tsx).
 Both submit the same saved-view membership-removal request and both explicitly
-state that the transactions are not deleted.
+state that the transactions are not deleted. The manual selection bar and
+single-row removal control also use destructive coloring, so the decision must
+cover the initiating affordances as well as the two confirmation buttons.
 
 - [ ] Decide whether removing membership is destructive within this product's
       button taxonomy.
 - [ ] Use the same variant for manual and assisted removal.
+- [ ] Keep the initiating manual-removal controls consistent with the adopted
+      taxonomy.
 
 ### 4. Rename and delete view failures have no user-facing feedback
 
@@ -246,9 +270,9 @@ TanStack Query mutation hooks.
 The transfer/refund review hides its close icon and rejects dismissal while its
 mutation is pending. Compact removal and bulk transaction deletion reject the
 dismissal callback but leave the close icon visible, making it appear clickable
-even though it is inert. Rename, delete-view, and single-transaction deletion
-allow close-icon, backdrop, or Escape dismissal while their mutation is
-pending.
+even though it is inert. Create-view, rename, delete-view, and single-transaction
+deletion allow close-icon, backdrop, or Escape dismissal while their mutation
+is pending even though their Cancel buttons are disabled.
 
 - [ ] Choose whether pending mutations may be dismissed.
 - [ ] When dismissal is blocked, make every dismissal affordance accurately
@@ -298,19 +322,37 @@ is shared-component debt, not a view-only inconsistency.
 - [ ] Add focused shared-component tests and browser verification where DOM
       emulation cannot establish real focus behavior.
 
-## Suggested Resolution Order
+## Remaining Resolution Order
 
-1. Fix compact confirmation spacing.
-2. Standardize the removal action variant.
-3. Add missing rename and delete error feedback.
-4. Standardize pending dismissal behavior.
-5. Decide and document the notification presentation rule.
-6. Normalize remaining dialog hierarchy and confirmation context.
-7. Upgrade shared dialog semantics and focus management as a dedicated,
-   higher-risk change.
+The original suggested order is superseded by the completed work above. The
+recommended sequence for the four remaining findings is:
 
-Items 1 through 6 can be handled separately. Item 7 affects every dialog and
-should receive its own implementation and verification pass.
+1. Resolve finding 3 as a small, isolated product-taxonomy change. The current
+   application otherwise reserves destructive actions for deleting data,
+   deactivating a user, or disabling a currency. Because membership removal
+   retains the transaction and can be reversed, the recommended rule is to use
+   the default primary treatment for confirmation and non-destructive styling
+   for its initiating controls.
+2. Decide the finding 5 policy before changing individual dialogs. The
+   recommended rule is to block dismissal while a mutation is pending because
+   closing the dialog does not cancel the request and can falsely imply that
+   the operation was cancelled. Disabled Cancel, hidden close control, ignored
+   Escape, and ignored backdrop click must all express that same state.
+3. Implement finding 7 as a dedicated shared-primitive change. Give the
+   primitive one dismissal contract that can express the finding 5 pending
+   rule, then add dialog semantics, title and description associations,
+   initial focus, focus containment, and focus restoration. Migrate the
+   affected dialogs to that contract and close finding 5 in the same pass so
+   feature components do not reproduce dismissal logic.
+4. Resolve finding 6 after the behavioral foundation is stable. Use sentence
+   case for dialog titles, reserve warning iconography for the agreed class of
+   consequential destructive actions, and add identifying transaction context
+   when a confirmation affects exactly one transaction.
+
+Finding 7 remains the highest-risk change because it affects every dialog. It
+requires focused shared-component tests plus the external browser verification
+described by the testing documentation; the user-managed application
+environment must not be started by an agent.
 
 ## Completion Criteria
 
