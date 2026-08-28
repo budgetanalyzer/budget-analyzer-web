@@ -1,4 +1,5 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
+import { MessageBanner } from '@/components/MessageBanner';
 import { Button } from '@/components/ui/Button';
 import {
   Dialog,
@@ -9,7 +10,6 @@ import {
   DialogTitle,
 } from '@/components/ui/Dialog';
 import { createRemoveViewTransactionsRequest, useUpdateViewTransactions } from '@/hooks/useViews';
-import { toast } from '@/hooks/useToast';
 import { formatApiError } from '@/utils/errorMessages';
 
 interface RemoveViewTransactionsModalProps {
@@ -30,43 +30,50 @@ export function RemoveViewTransactionsModal({
   onSuccess,
 }: RemoveViewTransactionsModalProps) {
   const { mutate: updateViewTransactions, isPending } = useUpdateViewTransactions();
+  const [mutationErrorMessage, setMutationErrorMessage] = useState<string | null>(null);
   const request = createRemoveViewTransactionsRequest(transactionIds);
   const removeCount = request.removeTransactionIds.length;
 
+  const handleDismissMutationError = useCallback(() => {
+    setMutationErrorMessage(null);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setMutationErrorMessage(null);
+    onOpenChange(false);
+  }, [onOpenChange]);
+
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      if (!isPending) {
-        onOpenChange(nextOpen);
-      }
+      if (isPending) return;
+
+      if (nextOpen) onOpenChange(true);
+      else handleClose();
     },
-    [isPending, onOpenChange],
+    [handleClose, isPending, onOpenChange],
   );
 
   const handleCancel = useCallback(() => {
-    if (!isPending) {
-      onOpenChange(false);
-    }
-  }, [isPending, onOpenChange]);
+    if (!isPending) handleClose();
+  }, [handleClose, isPending]);
 
   const handleConfirm = useCallback(() => {
     if (removeCount === 0 || isPending) return;
 
+    setMutationErrorMessage(null);
     updateViewTransactions(
       { viewId, request },
       {
         onSuccess: () => {
-          toast.success(
-            `Removed ${removeCount} transaction${removeCount !== 1 ? 's' : ''} from this view`,
-          );
-          onOpenChange(false);
+          handleClose();
           onSuccess();
         },
         onError: (error) => {
-          toast.error(formatApiError(error, REMOVE_FAILURE_MESSAGE));
+          setMutationErrorMessage(formatApiError(error, REMOVE_FAILURE_MESSAGE));
         },
       },
     );
-  }, [isPending, onOpenChange, onSuccess, removeCount, request, updateViewTransactions, viewId]);
+  }, [handleClose, isPending, onSuccess, removeCount, request, updateViewTransactions, viewId]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -78,6 +85,15 @@ export function RemoveViewTransactionsModal({
             transaction{removeCount !== 1 ? 's' : ''} will not be deleted.
           </DialogDescription>
         </DialogHeader>
+        {mutationErrorMessage && (
+          <div className="mt-4">
+            <MessageBanner
+              type="error"
+              message={mutationErrorMessage}
+              onClose={handleDismissMutationError}
+            />
+          </div>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel} disabled={isPending}>
             Cancel

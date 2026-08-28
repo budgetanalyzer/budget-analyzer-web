@@ -15,6 +15,7 @@ describe('error message utilities', () => {
       'This preview has expired or is no longer valid. Please preview the file again.',
     ],
     ['PREVIEW_IMPORT_TOKEN_EXPIRED', 'This preview has expired. Please preview the file again.'],
+    ['SAVED_VIEW_NAME_ALREADY_EXISTS', 'You already have a saved view with this name.'],
     [
       'SAVED_VIEW_MEMBERSHIP_STALE',
       'The transaction snapshot changed and must be refreshed before updating this saved view.',

@@ -24,6 +24,7 @@ export const useBulkDeleteTransactions = () => {
         return oldData.filter((transaction) => !successfullyDeletedIds.includes(transaction.id));
       });
 
+      queryClient.invalidateQueries({ queryKey: transactionKeys.list() });
       queryClient.invalidateQueries({ queryKey: transactionKeys.count() });
       queryClient.invalidateQueries({ queryKey: viewKeys.all });
     },

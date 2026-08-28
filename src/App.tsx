@@ -6,7 +6,6 @@ import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SessionHeartbeatProvider } from '@/components/SessionHeartbeatProvider';
-import { Toaster } from '@/components/ui/Toaster';
 
 // Admin imports
 import { AdminRoute } from '@/features/admin/components/AdminRoute';
@@ -123,6 +122,7 @@ function LazyRoute({ children }: { children: ReactNode }) {
 function App() {
   return (
     <ErrorBoundary>
+      <SessionHeartbeatProvider />
       <Routes>
         <Route element={<AuthenticatedRoute />}>
           {/* Admin — top-level, separate layout */}
@@ -297,8 +297,6 @@ function App() {
         <Route path="/oops" element={<ErrorPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
       </Routes>
-      <SessionHeartbeatProvider />
-      <Toaster />
     </ErrorBoundary>
   );
 }

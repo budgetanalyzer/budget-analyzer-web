@@ -14,10 +14,7 @@ vi.mock('@/features/auth/utils/loginRedirect', () => ({
   replaceWithLogin: vi.fn(),
 }));
 vi.mock('@/components/SessionHeartbeatProvider', () => ({
-  SessionHeartbeatProvider: () => null,
-}));
-vi.mock('@/components/ui/Toaster', () => ({
-  Toaster: () => null,
+  SessionHeartbeatProvider: () => <div data-testid="session-heartbeat-provider" />,
 }));
 vi.mock('@/components/Layout', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
@@ -40,7 +37,7 @@ vi.mock('@/features/transactions/pages/TransactionsPage', () => ({
   TransactionsPage: () => {
     routeMounts.transactions();
     routeMounts.dataHook();
-    return 'transactions home';
+    return <div>transactions home</div>;
   },
 }));
 vi.mock('@/features/auth/pages/LoginPage', () => ({
@@ -149,6 +146,19 @@ describe('App route authorization', () => {
 
     expect(await screen.findByText('currencies list page')).toBeInTheDocument();
     expect(mockUsePermission).toHaveBeenCalledWith('currencies:read');
+  });
+
+  it('places session status before the authenticated route tree', async () => {
+    mockRegularAuth();
+
+    renderApp('/');
+
+    const sessionStatus = screen.getByTestId('session-heartbeat-provider');
+    const routeContent = await screen.findByText('transactions home');
+
+    expect(sessionStatus.compareDocumentPosition(routeContent)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 
   it('redirects denied admin routes to the unauthorized page', async () => {

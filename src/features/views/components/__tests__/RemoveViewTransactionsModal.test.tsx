@@ -6,6 +6,15 @@ import { RemoveViewTransactionsModal } from '@/features/views/components/RemoveV
 import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
 
+function createDeferredPromise() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
+
 function renderModal(transactionIds = [3, 3, 8]) {
   const onOpenChange = vi.fn();
   const onSuccess = vi.fn();
@@ -44,6 +53,7 @@ describe('RemoveViewTransactionsModal', () => {
     );
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
     expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('cancels without issuing a membership delta', async () => {
@@ -63,12 +73,16 @@ describe('RemoveViewTransactionsModal', () => {
     expect(requestCount).toBe(0);
   });
 
-  it('keeps the dialog and caller selection intact after failure', async () => {
+  it('shows a normalized dismissible alert while keeping the dialog and selection intact', async () => {
     server.use(
       http.patch('/api/v1/views/:id/transactions', () =>
         HttpResponse.json(
-          { type: 'INTERNAL_ERROR', message: 'Membership update failed' },
-          { status: 500 },
+          {
+            type: 'APPLICATION_ERROR',
+            message: 'Snapshot rejected',
+            code: 'SAVED_VIEW_MEMBERSHIP_STALE',
+          },
+          { status: 422 },
         ),
       ),
     );
@@ -81,7 +95,53 @@ describe('RemoveViewTransactionsModal', () => {
 
     expect(onOpenChange).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The transaction snapshot changed and must be refreshed before updating this saved view.',
+    );
     expect(screen.getByRole('heading', { name: 'Remove from view' })).toBeInTheDocument();
     expect(screen.getByText(/Remove 1 transaction from this view/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss message' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText(/Remove 1 transaction from this view/)).toBeInTheDocument();
+  });
+
+  it('clears a prior error and completes a successful retry with the same atomic selection', async () => {
+    const retryResponse = createDeferredPromise();
+    const requestBodies: unknown[] = [];
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', async ({ request }) => {
+        requestBodies.push(await request.json());
+        if (requestBodies.length === 1) {
+          return HttpResponse.json(
+            { type: 'INTERNAL_ERROR', message: 'Membership update failed' },
+            { status: 500 },
+          );
+        }
+
+        await retryResponse.promise;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { onOpenChange, onSuccess } = renderModal([5]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove from view' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Membership update failed');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove from view' }));
+    expect(await screen.findByRole('button', { name: 'Removing...' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText(/Remove 1 transaction from this view/)).toBeInTheDocument();
+
+    retryResponse.resolve();
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(requestBodies).toEqual([
+      { addTransactionIds: [], removeTransactionIds: [5] },
+      { addTransactionIds: [], removeTransactionIds: [5] },
+    ]);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });

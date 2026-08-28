@@ -1,13 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { http, HttpResponse } from 'msw';
 
-const transactionHookMocks = vi.hoisted(() => ({
-  deleteMutate: vi.fn(),
-  updateMutate: vi.fn(),
-}));
 const saveAsViewButtonProps = vi.hoisted(() => ({
   current: undefined as { transactionIds: number[]; isTransactionIdsReady: boolean } | undefined,
 }));
@@ -23,16 +19,9 @@ vi.mock('@/components/SaveAsViewButton', () => ({
     );
   },
 }));
-vi.mock('@/hooks/useTransactions', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks/useTransactions')>();
-  return {
-    ...actual,
-    useUpdateTransaction: () => ({ mutate: transactionHookMocks.updateMutate, isPending: false }),
-    useDeleteTransaction: () => ({ mutate: transactionHookMocks.deleteMutate, isPending: false }),
-  };
-});
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { TransactionTable } from '@/features/transactions/components/TransactionTable';
+import { useTransactions } from '@/hooks/useTransactions';
 import { Transaction } from '@/types/transaction';
 import type { ExchangeRateResponse } from '@/types/currency';
 import { renderWithProviders } from '@/testing/test-utils';
@@ -176,6 +165,18 @@ function renderTable({
   });
 }
 
+function QueryBackedTable() {
+  const { data } = useTransactions();
+
+  return data ? createTable(data, new Map()) : <div>Loading transactions...</div>;
+}
+
+function renderQueryBackedTable() {
+  return renderWithProviders(<QueryBackedTable />, {
+    initialEntries: ['/transactions'],
+  });
+}
+
 function expectDescriptionOrder(expectedDescriptions: string[]) {
   const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
 
@@ -192,9 +193,11 @@ async function openFirstRowMenu() {
 
 beforeEach(() => {
   mockUsePermission.mockReset();
-  transactionHookMocks.deleteMutate.mockReset();
-  transactionHookMocks.updateMutate.mockReset();
   saveAsViewButtonProps.current = undefined;
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('TransactionTable permission gating', () => {
@@ -266,6 +269,224 @@ describe('TransactionTable permission gating', () => {
     const headerRow = within(table).getAllByRole('row')[0];
     // Select + Date, Description, Bank, Account, Type, Amount, Actions = 8 columns.
     expect(within(headerRow).getAllByRole('columnheader')).toHaveLength(8);
+  });
+});
+
+describe('TransactionTable bulk deletion', () => {
+  it.each([
+    {
+      resultName: 'full deletion',
+      response: { deletedCount: 2, notFoundIds: [] },
+    },
+    {
+      resultName: 'partial deletion',
+      response: { deletedCount: 1, notFoundIds: [2] },
+    },
+    {
+      resultName: 'all selected transactions already absent',
+      response: { deletedCount: 0, notFoundIds: [1, 2] },
+    },
+  ])(
+    'clears selection and converges on the refreshed table after $resultName',
+    async ({ response }) => {
+      let bulkDeleteCompleted = false;
+      let transactionRequestCount = 0;
+      let requestBody: unknown;
+      server.use(
+        http.get('/api/v1/transactions', () => {
+          transactionRequestCount += 1;
+          return HttpResponse.json(bulkDeleteCompleted ? [] : transactions);
+        }),
+        http.post('/api/v1/transactions/bulk-delete', async ({ request }) => {
+          requestBody = await request.json();
+          bulkDeleteCompleted = true;
+          return HttpResponse.json(response);
+        }),
+      );
+      const user = userEvent.setup();
+      mockUsePermission.mockReturnValue(true);
+      renderQueryBackedTable();
+
+      await screen.findByText('Salary');
+      await user.click(
+        screen.getByRole('checkbox', {
+          name: 'Select transactions on this page for deletion',
+        }),
+      );
+      expect(screen.getByText('2 transactions selected')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+      const dialogHeading = screen.getByRole('heading', { name: 'Delete Transactions' });
+      const dialogContent = dialogHeading.parentElement?.parentElement;
+      expect(dialogContent).not.toBeNull();
+      await user.click(
+        within(dialogContent as HTMLElement).getByRole('button', { name: 'Delete' }),
+      );
+
+      await waitFor(() => {
+        expect(transactionRequestCount).toBeGreaterThan(1);
+        expect(screen.queryByText('Coffee')).not.toBeInTheDocument();
+        expect(screen.queryByText('Salary')).not.toBeInTheDocument();
+      });
+      expect(requestBody).toEqual({ ids: [1, 2] });
+      await waitFor(() => {
+        expect(screen.queryByText('2 transactions selected')).not.toBeInTheDocument();
+      });
+      expect(
+        screen.queryByRole('heading', { name: 'Delete Transactions' }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    },
+  );
+});
+
+describe('TransactionTable inline editing', () => {
+  it('keeps both drafts and a full-width row alert after failure, then supports dismissal and cancellation', async () => {
+    let requestBody: unknown;
+    server.use(
+      http.get('/api/v1/transactions', () => HttpResponse.json(transactions)),
+      http.patch('/api/v1/transactions/:id', async ({ request }) => {
+        requestBody = await request.json();
+        return HttpResponse.json(
+          { type: 'SERVICE_UNAVAILABLE', message: 'Inline update unavailable' },
+          { status: 503 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    mockUsePermission.mockReturnValue(true);
+    renderQueryBackedTable();
+
+    await screen.findByText('Salary');
+    await openFirstRowMenu();
+    await user.click(screen.getByRole('menuitem', { name: /Edit/ }));
+    const descriptionInput = screen.getByDisplayValue('Salary');
+    const accountInput = screen.getByDisplayValue('acct-1');
+    await user.clear(descriptionInput);
+    await user.type(descriptionInput, 'Rejected salary update');
+    await user.clear(accountInput);
+    await user.type(accountInput, 'acct-2');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Inline update unavailable');
+    expect(requestBody).toEqual({
+      description: 'Rejected salary update',
+      accountId: 'acct-2',
+    });
+    expect(descriptionInput).toHaveValue('Rejected salary update');
+    expect(accountInput).toHaveValue('acct-2');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+
+    const editedRow = descriptionInput.closest('tr');
+    const alertRow = alert.closest('tr');
+    const alertCell = alert.closest('td') as HTMLTableCellElement;
+    const headerCells = within(screen.getByRole('table')).getAllByRole('columnheader');
+    expect(editedRow?.nextElementSibling).toBe(alertRow);
+    expect(alertCell.colSpan).toBe(headerCells.length);
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(descriptionInput).toHaveValue('Rejected salary update');
+    expect(accountInput).toHaveValue('acct-2');
+
+    await user.click(accountInput);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByDisplayValue('Rejected salary update')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('acct-2')).not.toBeInTheDocument();
+    expect(screen.getByText('Salary')).toBeInTheDocument();
+  });
+
+  it('clears the alert before retry and closes only after accepted server data arrives', async () => {
+    const retryResponse = createDeferredPromise();
+    const requestBodies: unknown[] = [];
+    let requestCount = 0;
+    const acceptedTransaction = {
+      ...transactions[1],
+      description: 'Accepted salary update',
+      accountId: 'acct-2',
+      updatedAt: '2026-01-17T00:00:00Z',
+    };
+    server.use(
+      http.get('/api/v1/transactions', () => HttpResponse.json(transactions)),
+      http.patch('/api/v1/transactions/:id', async ({ request }) => {
+        requestCount += 1;
+        requestBodies.push(await request.json());
+
+        if (requestCount === 1) {
+          return HttpResponse.json(
+            { type: 'SERVICE_UNAVAILABLE', message: 'Try the inline update again' },
+            { status: 503 },
+          );
+        }
+
+        await retryResponse.promise;
+        return HttpResponse.json(acceptedTransaction);
+      }),
+    );
+    const user = userEvent.setup();
+    mockUsePermission.mockReturnValue(true);
+    renderQueryBackedTable();
+
+    await screen.findByText('Salary');
+    await openFirstRowMenu();
+    await user.click(screen.getByRole('menuitem', { name: /Edit/ }));
+    const descriptionInput = screen.getByDisplayValue('Salary');
+    const accountInput = screen.getByDisplayValue('acct-1');
+    await user.clear(descriptionInput);
+    await user.type(descriptionInput, 'Accepted salary update');
+    await user.clear(accountInput);
+    await user.type(accountInput, 'acct-2');
+
+    const saveButton = screen.getByRole('button', { name: 'Save' });
+    saveButton.focus();
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Try the inline update again');
+    expect(descriptionInput).toHaveValue('Accepted salary update');
+    expect(accountInput).toHaveValue('acct-2');
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(requestCount).toBe(2));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(descriptionInput).toHaveValue('Accepted salary update');
+    expect(accountInput).toHaveValue('acct-2');
+    expect(descriptionInput).toBeDisabled();
+    expect(accountInput).toBeDisabled();
+
+    await act(async () => retryResponse.resolve());
+
+    expect(await screen.findByText('Accepted salary update')).toBeInTheDocument();
+    expect(screen.getByText('acct-2')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    expect(requestBodies).toEqual([
+      { description: 'Accepted salary update', accountId: 'acct-2' },
+      { description: 'Accepted salary update', accountId: 'acct-2' },
+    ]);
+  });
+
+  it('closes a no-change edit without making an update request', async () => {
+    const updateRequest = vi.fn();
+    server.use(
+      http.get('/api/v1/transactions', () => HttpResponse.json(transactions)),
+      http.patch('/api/v1/transactions/:id', () => {
+        updateRequest();
+        return HttpResponse.json(transactions[1]);
+      }),
+    );
+    const user = userEvent.setup();
+    mockUsePermission.mockReturnValue(true);
+    renderQueryBackedTable();
+
+    await screen.findByText('Salary');
+    await openFirstRowMenu();
+    await user.click(screen.getByRole('menuitem', { name: /Edit/ }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(updateRequest).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    expect(screen.getByText('Salary')).toBeInTheDocument();
   });
 });
 

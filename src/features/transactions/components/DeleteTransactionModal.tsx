@@ -1,9 +1,11 @@
 // src/features/transactions/components/DeleteTransactionModal.tsx
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
+import { MessageBanner } from '@/components/MessageBanner';
 import { Transaction } from '@/types/transaction';
 import type { DisplayAmount } from '@/types/displayAmount';
 import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate } from '@/utils/dates';
+import { formatApiError } from '@/utils/errorMessages';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +16,6 @@ import {
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { useDeleteTransaction } from '@/hooks/useTransactions';
-import { toast } from '@/hooks/useToast';
 
 interface DeleteTransactionModalProps {
   transaction: Transaction | null;
@@ -24,6 +25,8 @@ interface DeleteTransactionModalProps {
   onDeleted?: () => void;
 }
 
+const DELETE_FAILURE_MESSAGE = 'Failed to delete transaction';
+
 export function DeleteTransactionModal({
   transaction,
   displayAmount,
@@ -32,29 +35,46 @@ export function DeleteTransactionModal({
   onDeleted,
 }: DeleteTransactionModalProps) {
   const { mutate: deleteTransaction, isPending: isDeleting } = useDeleteTransaction();
+  const [mutationErrorMessage, setMutationErrorMessage] = useState<string | null>(null);
 
-  const handleCancel = useCallback(() => {
+  const handleDismissMutationError = useCallback(() => {
+    setMutationErrorMessage(null);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setMutationErrorMessage(null);
     onOpenChange(false);
   }, [onOpenChange]);
+
+  const handleCancel = useCallback(() => {
+    handleClose();
+  }, [handleClose]);
 
   const handleDelete = useCallback(() => {
     if (!transaction) return;
 
+    setMutationErrorMessage(null);
     deleteTransaction(transaction.id, {
       onSuccess: () => {
-        toast.success('Transaction deleted successfully');
-        onOpenChange(false);
+        handleClose();
         onDeleted?.();
       },
       onError: (error) => {
-        const errorMessage = error.message || 'Failed to delete transaction';
-        toast.error(errorMessage);
+        setMutationErrorMessage(formatApiError(error, DELETE_FAILURE_MESSAGE));
       },
     });
-  }, [deleteTransaction, onDeleted, onOpenChange, transaction]);
+  }, [deleteTransaction, handleClose, onDeleted, transaction]);
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) onOpenChange(true);
+      else handleClose();
+    },
+    [handleClose, onOpenChange],
+  );
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete Transaction</DialogTitle>
@@ -99,6 +119,15 @@ export function DeleteTransactionModal({
                 </div>
               )}
             </div>
+          </div>
+        )}
+        {mutationErrorMessage && (
+          <div className="mt-4">
+            <MessageBanner
+              type="error"
+              message={mutationErrorMessage}
+              onClose={handleDismissMutationError}
+            />
           </div>
         )}
         <DialogFooter>

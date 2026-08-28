@@ -1,29 +1,11 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TransferRefundReviewDialog } from '@/features/views/components/TransferRefundReviewDialog';
 import type { TransferRefundCandidate } from '@/features/views/types/transferRefundReview';
-import { ApiError } from '@/types/apiError';
-
-const hookMocks = vi.hoisted(() => ({
-  mutate: vi.fn(),
-  isPending: false,
-}));
-
-const toastMocks = vi.hoisted(() => ({
-  success: vi.fn(),
-  error: vi.fn(),
-}));
-
-vi.mock('@/hooks/useViews', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/hooks/useViews')>()),
-  useUpdateViewTransactions: () => ({
-    mutate: hookMocks.mutate,
-    isPending: hookMocks.isPending,
-  }),
-}));
-
-vi.mock('@/hooks/useToast', () => ({ toast: toastMocks }));
+import { server } from '@/testing/mocks/server';
+import { renderWithProviders } from '@/testing/test-utils';
 
 const candidate: TransferRefundCandidate = {
   key: 'TRANSFER:1:2',
@@ -70,10 +52,15 @@ const defaultProps = {
 };
 
 type DialogProps = React.ComponentProps<typeof TransferRefundReviewDialog>;
-type MutationOptions = {
-  onSuccess: () => void;
-  onError: (error: Error) => void;
-};
+
+function createDeferredPromise() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
 
 function renderDialog(overrides: Partial<DialogProps> = {}) {
   const props = {
@@ -83,19 +70,8 @@ function renderDialog(overrides: Partial<DialogProps> = {}) {
     onComplete: vi.fn(),
     ...overrides,
   };
-  return { props, ...render(<TransferRefundReviewDialog {...props} />) };
+  return { props, ...renderWithProviders(<TransferRefundReviewDialog {...props} />) };
 }
-
-function mutationOptions(): MutationOptions {
-  return hookMocks.mutate.mock.calls[0][1] as MutationOptions;
-}
-
-beforeEach(() => {
-  hookMocks.mutate.mockReset();
-  hookMocks.isPending = false;
-  toastMocks.success.mockReset();
-  toastMocks.error.mockReset();
-});
 
 afterEach(() => {
   cleanup();
@@ -119,55 +95,113 @@ describe('TransferRefundReviewDialog', () => {
   });
 
   it('submits only selected current member IDs in an atomic removal delta', async () => {
-    renderDialog();
+    let requestBody: unknown;
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', async ({ request }) => {
+        requestBody = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { props } = renderDialog();
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove 1 from this view' }));
 
-    expect(hookMocks.mutate).toHaveBeenCalledWith(
-      {
-        viewId: 'view-1',
-        request: { addTransactionIds: [], removeTransactionIds: [1] },
-      },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    await waitFor(() =>
+      expect(requestBody).toEqual({ addTransactionIds: [], removeTransactionIds: [1] }),
     );
+    await waitFor(() => expect(props.onComplete).toHaveBeenCalledOnce());
+    expect(props.onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('allows cancellation without issuing a membership delta', async () => {
+    let requestCount = 0;
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', () => {
+        requestCount += 1;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
     const { props } = renderDialog();
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(props.onClose).toHaveBeenCalledOnce();
-    expect(hookMocks.mutate).not.toHaveBeenCalled();
+    expect(requestCount).toBe(0);
   });
 
-  it('retains the dialog and selection after a mutation failure', async () => {
+  it('shows a normalized dismissible mutation alert while retaining the dialog and selection', async () => {
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', () =>
+        HttpResponse.json(
+          {
+            type: 'APPLICATION_ERROR',
+            message: 'Snapshot rejected',
+            code: 'SAVED_VIEW_MEMBERSHIP_STALE',
+          },
+          { status: 422 },
+        ),
+      ),
+    );
     const { props } = renderDialog();
-    const error = new ApiError(500, {
-      type: 'INTERNAL_ERROR',
-      message: 'Membership could not be updated',
-    });
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove 1 from this view' }));
-    mutationOptions().onError(error);
 
-    expect(toastMocks.error).toHaveBeenCalledWith('Membership could not be updated');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The transaction snapshot changed and must be refreshed before updating this saved view.',
+    );
     expect(props.onClose).not.toHaveBeenCalled();
     expect(props.onComplete).not.toHaveBeenCalled();
     expect(
       screen.getByRole('checkbox', { name: 'Remove debit transaction 1 from this view' }),
     ).toBeChecked();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss message' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: 'Remove debit transaction 1 from this view' }),
+    ).toBeChecked();
   });
 
-  it('closes and completes after bodyless mutation success', async () => {
+  it('clears a prior error and completes a successful retry with the same selection', async () => {
+    const retryResponse = createDeferredPromise();
+    const requestBodies: unknown[] = [];
+    server.use(
+      http.patch('/api/v1/views/:id/transactions', async ({ request }) => {
+        requestBodies.push(await request.json());
+        if (requestBodies.length === 1) {
+          return HttpResponse.json(
+            { type: 'INTERNAL_ERROR', message: 'Membership could not be updated' },
+            { status: 500 },
+          );
+        }
+
+        await retryResponse.promise;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
     const { props } = renderDialog();
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove 1 from this view' }));
-    mutationOptions().onSuccess();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Membership could not be updated');
 
-    expect(toastMocks.success).toHaveBeenCalledWith('Removed 1 transaction from this view');
+    await userEvent.click(screen.getByRole('button', { name: 'Remove 1 from this view' }));
+    expect(await screen.findByRole('button', { name: 'Removing...' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: 'Remove debit transaction 1 from this view' }),
+    ).toBeChecked();
+
+    retryResponse.resolve();
+
+    await waitFor(() => expect(props.onComplete).toHaveBeenCalledOnce());
     expect(props.onClose).toHaveBeenCalledOnce();
-    expect(props.onComplete).toHaveBeenCalledOnce();
+    expect(requestBodies).toEqual([
+      { addTransactionIds: [], removeTransactionIds: [1] },
+      { addTransactionIds: [], removeTransactionIds: [1] },
+    ]);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('blocks stale candidates during loading and retries discovery errors', async () => {

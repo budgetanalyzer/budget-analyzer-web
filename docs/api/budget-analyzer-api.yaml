@@ -223,7 +223,8 @@ paths:
                 type: INVALID_REQUEST
                 message: Bad Request
         '422':
-          description: Unprocessable Entity
+          description: SAVED_VIEW_MEMBERSHIP_STALE for unavailable membership or SAVED_VIEW_NAME_ALREADY_EXISTS
+            for a same-owner name conflict
           content:
             application/json:
               schema:
@@ -1208,6 +1209,12 @@ paths:
               example:
                 type: NOT_FOUND
                 message: Not Found
+        '422':
+          description: SAVED_VIEW_NAME_ALREADY_EXISTS for a same-owner name conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
         '500':
           description: Internal Server Error
           content:

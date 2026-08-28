@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/Dialog';
+import { MessageBanner } from '@/components/MessageBanner';
 import { Button } from '@/components/ui/Button';
 import { PreviewTable } from '@/features/transactions/components/PreviewTable';
 import { PreviewFileImportWarningBanner } from '@/features/transactions/components/PreviewFileImportWarningBanner';
@@ -25,7 +26,6 @@ import type {
   EditablePreviewTransactionField,
   EditablePreviewTransactionValue,
 } from '@/features/transactions/types/preview';
-import { toast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
 import { formatApiError } from '@/utils/errorMessages';
 
@@ -152,6 +152,7 @@ export function TransactionPreviewModal({
   const [editableFiles, setEditableFiles] = useState<EditablePreviewFile[]>(() =>
     toEditableFiles(previewData),
   );
+  const [importErrorMessage, setImportErrorMessage] = useState<string | null>(null);
   const { mutate: batchImport, isPending: isImporting } = useBatchImport();
 
   const reviewData = useMemo<AggregateReviewData>(() => {
@@ -181,6 +182,9 @@ export function TransactionPreviewModal({
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!isImporting) {
+        if (!open) {
+          setImportErrorMessage(null);
+        }
         onOpenChange(open);
       }
     },
@@ -249,6 +253,7 @@ export function TransactionPreviewModal({
       return;
     }
 
+    setImportErrorMessage(null);
     batchImport(
       {
         files: editableFiles.map((file) => ({
@@ -258,11 +263,12 @@ export function TransactionPreviewModal({
       },
       {
         onSuccess: (data) => {
+          setImportErrorMessage(null);
           onOpenChange(false);
           onImportComplete(data.created, data.duplicatesSkipped, data.duplicatesImported);
         },
         onError: (error) => {
-          toast.error(formatApiError(error, 'Failed to import transactions'));
+          setImportErrorMessage(formatApiError(error, 'Failed to import transactions'));
         },
       },
     );
@@ -276,9 +282,14 @@ export function TransactionPreviewModal({
 
   const handleCancel = useCallback(() => {
     if (!isImporting) {
+      setImportErrorMessage(null);
       onOpenChange(false);
     }
   }, [isImporting, onOpenChange]);
+
+  const handleDismissImportError = useCallback(() => {
+    setImportErrorMessage(null);
+  }, []);
 
   const importButtonLabel = buildImportButtonLabel(
     reviewData.totalVisibleRows,
@@ -321,6 +332,14 @@ export function TransactionPreviewModal({
             />
           </div>
         </div>
+
+        {importErrorMessage ? (
+          <MessageBanner
+            type="error"
+            message={importErrorMessage}
+            onClose={handleDismissImportError}
+          />
+        ) : null}
 
         <DialogFooter className="border-t pt-4">
           <Button variant="outline" onClick={handleCancel} disabled={isImporting}>

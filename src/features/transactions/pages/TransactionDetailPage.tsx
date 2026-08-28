@@ -6,6 +6,7 @@ import { useTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { fadeInVariants, fadeTransition, layoutTransition } from '@/lib/animations';
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { MessageBanner } from '@/components/MessageBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { BackButton } from '@/components/BackButton';
 import { IconLabel } from '@/components/IconLabel';
@@ -33,7 +34,6 @@ import {
 } from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';
 import { usePermission } from '@/features/auth/hooks/usePermission';
-import { toast } from '@/hooks/useToast';
 import { formatApiError } from '@/utils/errorMessages';
 
 export function TransactionDetailPage() {
@@ -49,6 +49,7 @@ export function TransactionDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingDescription, setEditingDescription] = useState('');
   const [editingAccountId, setEditingAccountId] = useState('');
+  const [mutationErrorMessage, setMutationErrorMessage] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Fetch exchange rates and build map for currency conversion
@@ -64,15 +65,21 @@ export function TransactionDetailPage() {
   const handleStartEdit = useCallback(() => {
     if (!transaction) return;
 
+    setMutationErrorMessage(null);
     setEditingDescription(transaction.description);
     setEditingAccountId(transaction.accountId || '');
     setIsEditing(true);
   }, [transaction]);
 
   const handleCancelEdit = useCallback(() => {
+    setMutationErrorMessage(null);
     setIsEditing(false);
     setEditingDescription('');
     setEditingAccountId('');
+  }, []);
+
+  const handleDismissMutationError = useCallback(() => {
+    setMutationErrorMessage(null);
   }, []);
 
   const handleDescriptionChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -86,6 +93,7 @@ export function TransactionDetailPage() {
   const handleSaveEdit = useCallback(() => {
     if (!transaction) return;
 
+    setMutationErrorMessage(null);
     const descriptionChanged = editingDescription !== transaction.description;
     const accountIdChanged = editingAccountId !== (transaction.accountId || '');
 
@@ -104,11 +112,10 @@ export function TransactionDetailPage() {
       },
       {
         onSuccess: () => {
-          toast.success('Transaction updated');
           handleCancelEdit();
         },
         onError: (updateError) => {
-          toast.error(formatApiError(updateError, 'Failed to update transaction'));
+          setMutationErrorMessage(formatApiError(updateError, 'Failed to update transaction'));
         },
       },
     );
@@ -163,40 +170,50 @@ export function TransactionDetailPage() {
       transition={fadeTransition}
       className="space-y-6"
     >
-      <div className="flex items-center justify-between">
-        <BackButton />
-        <div className="flex items-center gap-2">
-          {isEditing ? (
-            <>
-              <Button variant="outline" onClick={handleCancelEdit} disabled={isUpdating}>
-                <X className="mr-2 h-4 w-4" />
-                Cancel
-              </Button>
-              <Button onClick={handleSaveEdit} disabled={isUpdating}>
-                <Check className="mr-2 h-4 w-4" />
-                {isUpdating ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </>
-          ) : (
-            <>
-              {canEditTransaction && (
-                <Button variant="outline" onClick={handleStartEdit}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit Details
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <BackButton />
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <>
+                <Button variant="outline" onClick={handleCancelEdit} disabled={isUpdating}>
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
                 </Button>
-              )}
-              {canDeleteTransaction && (
-                <Button variant="destructive" onClick={handleOpenDeleteDialog}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                <Button onClick={handleSaveEdit} disabled={isUpdating}>
+                  <Check className="mr-2 h-4 w-4" />
+                  {isUpdating ? 'Saving...' : 'Save Changes'}
                 </Button>
-              )}
-              <Link to="/">
-                <Button variant="outline">View All</Button>
-              </Link>
-            </>
-          )}
+              </>
+            ) : (
+              <>
+                {canEditTransaction && (
+                  <Button variant="outline" onClick={handleStartEdit}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Details
+                  </Button>
+                )}
+                {canDeleteTransaction && (
+                  <Button variant="destructive" onClick={handleOpenDeleteDialog}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                )}
+                <Link to="/">
+                  <Button variant="outline">View All</Button>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
+
+        {isEditing && mutationErrorMessage && (
+          <MessageBanner
+            type="error"
+            message={mutationErrorMessage}
+            onClose={handleDismissMutationError}
+          />
+        )}
       </div>
 
       <div>

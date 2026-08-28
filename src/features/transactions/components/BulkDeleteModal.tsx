@@ -1,4 +1,6 @@
 // src/features/transactions/components/BulkDeleteModal.tsx
+import { useCallback, useState } from 'react';
+import { MessageBanner } from '@/components/MessageBanner';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +11,7 @@ import {
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { useBulkDeleteTransactions } from '@/hooks/useBulkDeleteTransactions';
-import { toast } from '@/hooks/useToast';
+import { formatApiError } from '@/utils/errorMessages';
 
 interface BulkDeleteModalProps {
   selectedIds: number[];
@@ -18,6 +20,8 @@ interface BulkDeleteModalProps {
   onSuccess: () => void;
 }
 
+const BULK_DELETE_FAILURE_MESSAGE = 'Failed to delete transactions';
+
 export function BulkDeleteModal({
   selectedIds,
   isOpen,
@@ -25,40 +29,48 @@ export function BulkDeleteModal({
   onSuccess,
 }: BulkDeleteModalProps) {
   const { mutate: bulkDelete, isPending: isDeleting } = useBulkDeleteTransactions();
+  const [mutationErrorMessage, setMutationErrorMessage] = useState<string | null>(null);
 
-  const handleDelete = () => {
+  const handleDismissMutationError = useCallback(() => {
+    setMutationErrorMessage(null);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setMutationErrorMessage(null);
+    onOpenChange(false);
+  }, [onOpenChange]);
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (isDeleting) return;
+
+      if (open) onOpenChange(true);
+      else handleClose();
+    },
+    [handleClose, isDeleting, onOpenChange],
+  );
+
+  const handleCancel = useCallback(() => {
+    if (!isDeleting) handleClose();
+  }, [handleClose, isDeleting]);
+
+  const handleDelete = useCallback(() => {
+    if (isDeleting || selectedIds.length === 0) return;
+
+    setMutationErrorMessage(null);
     bulkDelete(selectedIds, {
-      onSuccess: (result) => {
-        const { deletedCount, notFoundIds } = result;
-        const totalCount = selectedIds.length;
-
-        if (notFoundIds.length === 0) {
-          // All deleted successfully
-          toast.success(
-            `Successfully deleted ${deletedCount} transaction${deletedCount !== 1 ? 's' : ''}`,
-          );
-        } else if (deletedCount > 0) {
-          // Partial success
-          toast.warning(
-            `Deleted ${deletedCount} of ${totalCount}. ${notFoundIds.length} not found or already deleted.`,
-          );
-        } else {
-          // All failed
-          toast.error('Failed to delete transactions');
-        }
-
-        onOpenChange(false);
+      onSuccess: () => {
+        handleClose();
         onSuccess();
       },
       onError: (error) => {
-        const errorMessage = error.message || 'Failed to delete transactions';
-        toast.error(errorMessage);
+        setMutationErrorMessage(formatApiError(error, BULK_DELETE_FAILURE_MESSAGE));
       },
     });
-  };
+  }, [bulkDelete, handleClose, isDeleting, onSuccess, selectedIds]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !isDeleting && onOpenChange(open)}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete Transactions</DialogTitle>
@@ -67,8 +79,17 @@ export function BulkDeleteModal({
             {selectedIds.length !== 1 ? 's' : ''}? This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
+        {mutationErrorMessage && (
+          <div className="mt-4">
+            <MessageBanner
+              type="error"
+              message={mutationErrorMessage}
+              onClose={handleDismissMutationError}
+            />
+          </div>
+        )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isDeleting}>
+          <Button variant="outline" onClick={handleCancel} disabled={isDeleting}>
             Cancel
           </Button>
           <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>

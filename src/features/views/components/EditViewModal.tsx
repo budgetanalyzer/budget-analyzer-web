@@ -1,4 +1,5 @@
 import { useCallback, useState, type ChangeEvent, type FormEvent } from 'react';
+import { MessageBanner } from '@/components/MessageBanner';
 import { Button } from '@/components/ui/Button';
 import {
   Dialog,
@@ -10,6 +11,7 @@ import {
 import { Input } from '@/components/ui/Input';
 import { useUpdateView } from '@/hooks/useViews';
 import type { SavedViewMetadata } from '@/types/view';
+import { formatApiError } from '@/utils/errorMessages';
 
 interface EditViewModalProps {
   open: boolean;
@@ -17,9 +19,21 @@ interface EditViewModalProps {
   view: SavedViewMetadata;
 }
 
+const RENAME_FAILURE_MESSAGE = 'Failed to rename this view';
+
 export function EditViewModal({ open, onClose, view }: EditViewModalProps) {
   const [name, setName] = useState(view.name);
+  const [mutationErrorMessage, setMutationErrorMessage] = useState<string | null>(null);
   const { mutate: updateView, isPending } = useUpdateView();
+
+  const handleDismissMutationError = useCallback(() => {
+    setMutationErrorMessage(null);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setMutationErrorMessage(null);
+    onClose();
+  }, [onClose]);
 
   const handleSubmit = useCallback(
     (event: FormEvent) => {
@@ -28,9 +42,18 @@ export function EditViewModal({ open, onClose, view }: EditViewModalProps) {
       const trimmedName = name.trim();
       if (!trimmedName || trimmedName === view.name) return;
 
-      updateView({ id: view.id, request: { name: trimmedName } }, { onSuccess: onClose });
+      setMutationErrorMessage(null);
+      updateView(
+        { id: view.id, request: { name: trimmedName } },
+        {
+          onSuccess: handleClose,
+          onError: (error) => {
+            setMutationErrorMessage(formatApiError(error, RENAME_FAILURE_MESSAGE));
+          },
+        },
+      );
     },
-    [name, onClose, updateView, view.id, view.name],
+    [handleClose, name, updateView, view.id, view.name],
   );
 
   const handleNameChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -39,9 +62,9 @@ export function EditViewModal({ open, onClose, view }: EditViewModalProps) {
 
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
-      if (!isOpen) onClose();
+      if (!isOpen) handleClose();
     },
-    [onClose],
+    [handleClose],
   );
 
   return (
@@ -66,8 +89,18 @@ export function EditViewModal({ open, onClose, view }: EditViewModalProps) {
             />
           </div>
 
+          {mutationErrorMessage && (
+            <div className="mt-4">
+              <MessageBanner
+                type="error"
+                message={mutationErrorMessage}
+                onClose={handleDismissMutationError}
+              />
+            </div>
+          )}
+
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
               Cancel
             </Button>
             <Button type="submit" disabled={isPending || !name.trim() || name.trim() === view.name}>

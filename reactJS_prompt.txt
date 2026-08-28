@@ -76,7 +76,7 @@ a retry button that triggers a React Query refetch
 
 Use async/await and proper TypeScript types for all API calls.
 
-When API calls fail (e.g., HTTP 404, 500, 503), parse the ApiErrorResponse object and display the title and detail to the user in a styled ErrorBanner or toast notification.
+When API calls fail (e.g., HTTP 404, 500, 503), parse the ApiErrorResponse object and display the title and detail in a persistent ErrorBanner or contextual alert.
 
 The UI should gracefully handle and display API downtime (503) or not found (404).
 

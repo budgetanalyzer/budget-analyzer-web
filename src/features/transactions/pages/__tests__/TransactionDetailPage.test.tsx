@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router';
 import { TransactionDetailPage } from '@/features/transactions/pages/TransactionDetailPage';
-import { toast } from '@/hooks/useToast';
 import { server } from '@/testing/mocks/server';
 import { createTestQueryClient, renderWithProviders } from '@/testing/test-utils';
 import type { Transaction } from '@/types/transaction';
@@ -121,9 +120,8 @@ describe('TransactionDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
 
-  it('updates editable detail fields and surfaces success feedback', async () => {
+  it('updates editable detail fields without a redundant success notification', async () => {
     const user = userEvent.setup();
-    const successToast = vi.spyOn(toast, 'success');
     let requestBody: unknown;
 
     useDetailReferenceHandlers();
@@ -154,15 +152,14 @@ describe('TransactionDetailPage', () => {
         description: 'Coffee and bagel',
         accountId: 'savings-987',
       });
-      expect(successToast).toHaveBeenCalledWith('Transaction updated');
     });
     expect(await screen.findByText('Coffee and bagel')).toBeInTheDocument();
     expect(screen.getByText('savings-987')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Details' })).toBeInTheDocument();
   });
 
-  it('keeps edit mode open and surfaces failure feedback when update fails', async () => {
+  it('keeps both edit drafts available when update fails and preserves them on dismissal', async () => {
     const user = userEvent.setup();
-    const errorToast = vi.spyOn(toast, 'error');
 
     useDetailReferenceHandlers();
     server.use(
@@ -180,17 +177,100 @@ describe('TransactionDetailPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Edit Details' }));
     await user.clear(screen.getByLabelText('Description'));
     await user.type(screen.getByLabelText('Description'), 'Rejected description');
+    await user.clear(screen.getByLabelText('Account ID'));
+    await user.type(screen.getByLabelText('Account ID'), 'rejected-account');
     await user.click(screen.getByRole('button', { name: 'Save Changes' }));
 
-    await waitFor(() => {
-      expect(errorToast).toHaveBeenCalledWith('Description is too long');
-    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Description is too long');
     expect(screen.getByLabelText('Description')).toHaveValue('Rejected description');
+    expect(screen.getByLabelText('Account ID')).toHaveValue('rejected-account');
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Description')).toHaveValue('Rejected description');
+    expect(screen.getByLabelText('Account ID')).toHaveValue('rejected-account');
   });
 
-  it('deletes the transaction, shows success feedback, and returns to the list', async () => {
+  it('clears failed edit feedback and drafts when editing is cancelled', async () => {
     const user = userEvent.setup();
-    const successToast = vi.spyOn(toast, 'success');
+
+    useDetailReferenceHandlers();
+    server.use(
+      http.get('/api/v1/transactions/:id', () => HttpResponse.json(transaction)),
+      http.patch('/api/v1/transactions/:id', () =>
+        HttpResponse.json({ type: 'APPLICATION_ERROR', message: 'Update failed' }, { status: 500 }),
+      ),
+    );
+
+    renderDetailPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Details' }));
+    await user.clear(screen.getByLabelText('Description'));
+    await user.type(screen.getByLabelText('Description'), 'Rejected description');
+    await user.clear(screen.getByLabelText('Account ID'));
+    await user.type(screen.getByLabelText('Account ID'), 'rejected-account');
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Update failed');
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Details' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Description')).toHaveValue('Coffee shop');
+    expect(screen.getByLabelText('Account ID')).toHaveValue('checking-123');
+  });
+
+  it('clears failed edit feedback on retry and exits edit mode after a successful retry', async () => {
+    const user = userEvent.setup();
+    let updateAttempts = 0;
+
+    useDetailReferenceHandlers();
+    server.use(
+      http.get('/api/v1/transactions/:id', () => HttpResponse.json(transaction)),
+      http.patch('/api/v1/transactions/:id', async () => {
+        updateAttempts += 1;
+
+        if (updateAttempts === 1) {
+          return HttpResponse.json(
+            { type: 'APPLICATION_ERROR', message: 'Update failed' },
+            { status: 500 },
+          );
+        }
+
+        await delay(150);
+        return HttpResponse.json({
+          ...transaction,
+          description: 'Coffee and bagel',
+          accountId: 'savings-987',
+          updatedAt: '2026-05-01T13:00:00Z',
+        });
+      }),
+    );
+
+    renderDetailPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Details' }));
+    await user.clear(screen.getByLabelText('Description'));
+    await user.type(screen.getByLabelText('Description'), 'Coffee and bagel');
+    await user.clear(screen.getByLabelText('Account ID'));
+    await user.type(screen.getByLabelText('Account ID'), 'savings-987');
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Update failed');
+
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Saving...' })).toBeDisabled();
+    expect(await screen.findByText('Coffee and bagel')).toBeInTheDocument();
+    expect(screen.getByText('savings-987')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Details' })).toBeInTheDocument();
+  });
+
+  it('deletes the transaction and returns to the list without a redundant success notification', async () => {
+    const user = userEvent.setup();
 
     useDetailReferenceHandlers();
     server.use(
@@ -206,16 +286,12 @@ describe('TransactionDetailPage', () => {
     const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
     await user.click(deleteButtons[deleteButtons.length - 1]);
 
-    await waitFor(() => {
-      expect(successToast).toHaveBeenCalledWith('Transaction deleted successfully');
-    });
-    expect(queryClient.getQueryState(['transaction', transaction.id])?.isInvalidated).toBe(true);
     expect(await screen.findByRole('heading', { name: 'Transaction List' })).toBeInTheDocument();
+    expect(queryClient.getQueryState(['transaction', transaction.id])?.isInvalidated).toBe(true);
   });
 
   it('keeps the delete dialog open and surfaces failure feedback when delete fails', async () => {
     const user = userEvent.setup();
-    const errorToast = vi.spyOn(toast, 'error');
 
     useDetailReferenceHandlers();
     server.use(
@@ -232,10 +308,9 @@ describe('TransactionDetailPage', () => {
     const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
     await user.click(deleteButtons[deleteButtons.length - 1]);
 
-    await waitFor(() => {
-      expect(errorToast).toHaveBeenCalledWith('Delete failed');
-    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete failed');
     expect(screen.getByRole('heading', { name: 'Delete Transaction' })).toBeInTheDocument();
+    expect(screen.getAllByText('Coffee shop')).toHaveLength(2);
   });
 
   it('shows positive native disclosure and two-leg weekend publication provenance', async () => {

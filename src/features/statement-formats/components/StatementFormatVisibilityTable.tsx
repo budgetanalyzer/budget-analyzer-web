@@ -1,5 +1,6 @@
-import { useCallback } from 'react';
+import { Fragment, useCallback } from 'react';
 import { Eye, EyeOff, FileSpreadsheet } from 'lucide-react';
+import { MessageBanner } from '@/components/MessageBanner';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import {
@@ -16,8 +17,10 @@ import type { StatementFormat } from '@/types/statementFormat';
 interface StatementFormatVisibilityTableProps {
   formats: StatementFormat[];
   pendingFormatId: number | null;
+  visibilityMutationError: { formatId: number; message: string } | null;
   onHide: (format: StatementFormat) => void;
   onUnhide: (format: StatementFormat) => void;
+  onDismissVisibilityError: () => void;
 }
 
 interface StatementFormatVisibilityRowProps {
@@ -93,8 +96,10 @@ function StatementFormatVisibilityRow({
 export function StatementFormatVisibilityTable({
   formats,
   pendingFormatId,
+  visibilityMutationError,
   onHide,
   onUnhide,
+  onDismissVisibilityError,
 }: StatementFormatVisibilityTableProps) {
   const canWriteFormats = usePermission('statementformats:write');
 
@@ -126,14 +131,26 @@ export function StatementFormatVisibilityTable({
             </TableRow>
           ) : (
             formats.map((format) => (
-              <StatementFormatVisibilityRow
-                key={format.id}
-                format={format}
-                canWriteFormats={canWriteFormats}
-                isPending={pendingFormatId === format.id}
-                onHide={onHide}
-                onUnhide={onUnhide}
-              />
+              <Fragment key={format.id}>
+                <StatementFormatVisibilityRow
+                  format={format}
+                  canWriteFormats={canWriteFormats}
+                  isPending={pendingFormatId === format.id}
+                  onHide={onHide}
+                  onUnhide={onUnhide}
+                />
+                {visibilityMutationError?.formatId === format.id && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="pt-0">
+                      <MessageBanner
+                        type="error"
+                        message={visibilityMutationError.message}
+                        onClose={onDismissVisibilityError}
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
             ))
           )}
         </TableBody>
