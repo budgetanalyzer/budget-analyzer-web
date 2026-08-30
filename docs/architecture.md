@@ -58,6 +58,13 @@ order for visual stacking and keyboard ownership, so the most recently opened
 dialog is both visible above and receives modal keyboard interaction before
 earlier dialogs.
 
+Dialogs portal to `document.body` by default. A layout that owns scoped CSS
+custom properties must register a dialog portal host beneath that scope through
+`DialogPortalContainerProvider` so dialogs opened by its descendants inherit
+the layout's theme variables. The administrative layout follows this contract
+with a host beneath `.admin`; global and ordinary dialogs continue to use the
+body fallback.
+
 `DialogContent` is dismissible by default. Its single `dismissible` input owns
 all shared dismissal mechanisms: when false, the close control is absent and
 backdrop clicks and Escape do not request closure. This does not prevent the

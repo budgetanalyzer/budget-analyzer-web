@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { StrictMode, useCallback, useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogFooter,
+  DialogPortalContainerProvider,
   DialogTitle,
 } from '@/components/ui/Dialog';
 
@@ -74,6 +75,49 @@ function RestorableDialog() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function ConditionallyMountedRestorableDialog() {
+  const [open, setOpen] = useState(false);
+  const handleOpen = useCallback(() => setOpen(true), []);
+
+  return (
+    <>
+      <button type="button" onClick={handleOpen}>
+        Open conditional dialog
+      </button>
+      {open && (
+        <Dialog open onOpenChange={setOpen}>
+          <DialogContent>
+            <DialogTitle>Conditionally mounted dialog</DialogTitle>
+            <input aria-label="Conditional dialog name" autoFocus />
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
+  );
+}
+
+function ScopedPortalDialog() {
+  const [open, setOpen] = useState(false);
+  const portalContainerRef = useRef<HTMLDivElement>(null);
+  const handleOpen = useCallback(() => setOpen(true), []);
+
+  return (
+    <DialogPortalContainerProvider containerRef={portalContainerRef}>
+      <div data-testid="dialog-scope">
+        <button type="button" onClick={handleOpen}>
+          Open scoped dialog
+        </button>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent>
+            <DialogTitle>Scoped dialog</DialogTitle>
+          </DialogContent>
+        </Dialog>
+        <div ref={portalContainerRef} data-testid="dialog-portal-container" />
+      </div>
+    </DialogPortalContainerProvider>
   );
 }
 
@@ -212,6 +256,26 @@ describe('Dialog accessibility', () => {
     );
     expect(firstDialog).toHaveAccessibleDescription('First description');
     expect(secondDialog).toHaveAccessibleDescription('Second description');
+  });
+});
+
+describe('Dialog portal container', () => {
+  it('portals into a registered container', async () => {
+    const user = userEvent.setup();
+    render(<ScopedPortalDialog />);
+
+    await user.click(screen.getByRole('button', { name: 'Open scoped dialog' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Scoped dialog' });
+    expect(screen.getByTestId('dialog-portal-container')).toContainElement(dialog);
+    expect(screen.getByTestId('dialog-scope')).toContainElement(dialog);
+  });
+
+  it('portals to the document body without a registered container', () => {
+    render(<BasicDialog />);
+
+    const portalLayer = screen.getByRole('dialog', { name: 'Account details' }).parentElement;
+    expect(portalLayer?.parentElement).toBe(document.body);
   });
 });
 
@@ -406,6 +470,22 @@ describe('Dialog focus lifecycle', () => {
     const trigger = screen.getByRole('button', { name: 'Open dialog' });
     await user.click(trigger);
     expect(screen.getByRole('textbox', { name: 'Dialog name' })).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(trigger).toHaveFocus();
+  });
+
+  it('restores focus when mounted already open with an autofocus target', async () => {
+    const user = userEvent.setup();
+    render(
+      <StrictMode>
+        <ConditionallyMountedRestorableDialog />
+      </StrictMode>,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Open conditional dialog' });
+    await user.click(trigger);
 
     await user.click(screen.getByRole('button', { name: 'Close' }));
 

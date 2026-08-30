@@ -25,6 +25,24 @@ interface DialogContentContextValue {
 
 const DialogContext = React.createContext<DialogContextValue | undefined>(undefined);
 const DialogContentContext = React.createContext<DialogContentContextValue | undefined>(undefined);
+const DialogPortalContainerContext =
+  React.createContext<React.RefObject<HTMLElement | null> | null>(null);
+
+interface DialogPortalContainerProviderProps {
+  children: React.ReactNode;
+  containerRef: React.RefObject<HTMLElement | null>;
+}
+
+export function DialogPortalContainerProvider({
+  children,
+  containerRef,
+}: DialogPortalContainerProviderProps) {
+  return (
+    <DialogPortalContainerContext.Provider value={containerRef}>
+      {children}
+    </DialogPortalContainerContext.Provider>
+  );
+}
 
 const FOCUSABLE_ELEMENT_SELECTOR = [
   'a[href]',
@@ -40,6 +58,10 @@ const FOCUSABLE_ELEMENT_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 const openDialogStack: HTMLElement[] = [];
+
+function getActiveHTMLElement(): HTMLElement | null {
+  return document.activeElement instanceof HTMLElement ? document.activeElement : null;
+}
 
 const useDialog = () => {
   const context = React.useContext(DialogContext);
@@ -142,9 +164,22 @@ class DialogMountBoundary extends React.Component<
   Record<string, never>,
   HTMLElement | null
 > {
+  private readonly initiallyFocusedElement: HTMLElement | null;
+
+  constructor(props: DialogMountBoundaryProps) {
+    super(props);
+    this.initiallyFocusedElement = props.open ? getActiveHTMLElement() : null;
+  }
+
+  componentDidMount() {
+    if (this.props.open) {
+      this.props.onOpening(this.initiallyFocusedElement);
+    }
+  }
+
   getSnapshotBeforeUpdate(previousProps: DialogMountBoundaryProps): HTMLElement | null {
     if (!previousProps.open && this.props.open) {
-      return document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      return getActiveHTMLElement();
     }
 
     return null;
@@ -167,6 +202,7 @@ class DialogMountBoundary extends React.Component<
 
 export function DialogContent({ children, className, dismissible = true }: DialogContentProps) {
   const { open, setOpen } = useDialog();
+  const portalContainerRef = React.useContext(DialogPortalContainerContext);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = React.useRef<HTMLElement | null>(null);
   const titleId = React.useId();
@@ -309,7 +345,7 @@ export function DialogContent({ children, className, dismissible = true }: Dialo
                 </DialogContentContext.Provider>
               </div>
             </div>,
-            document.body,
+            portalContainerRef?.current ?? document.body,
           )
         : null}
     </DialogMountBoundary>
