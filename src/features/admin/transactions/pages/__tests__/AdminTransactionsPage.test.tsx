@@ -159,7 +159,7 @@ describe('AdminTransactionsPage', () => {
     expect(screen.getByDisplayValue('GBP')).toBeInTheDocument();
     expect(screen.getByDisplayValue('-15')).toBeInTheDocument();
     expect(
-      screen.getByText(/Amount bounds and amount sorting compare raw stored numbers/i),
+      screen.getByText(/Amount bounds and amount sorting compare stored signed numeric amounts/i),
     ).toBeInTheDocument();
 
     await waitFor(() => {

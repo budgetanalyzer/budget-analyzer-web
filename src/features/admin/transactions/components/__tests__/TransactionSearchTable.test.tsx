@@ -60,7 +60,7 @@ function renderTable(onSortChange = vi.fn(), onPageChange = vi.fn()) {
 }
 
 describe('TransactionSearchTable', () => {
-  it('formats signed rows in their native ISO currencies', () => {
+  it('formats signed rows in their stored ISO currencies', () => {
     renderTable();
 
     expect(screen.getByText('-€5.00')).toBeInTheDocument();

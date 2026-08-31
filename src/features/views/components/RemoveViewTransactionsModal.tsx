@@ -19,7 +19,7 @@ import { formatApiError } from '@/utils/errorMessages';
 interface RemoveViewTransactionsModalProps {
   viewId: string;
   transactionIds: number[];
-  transaction: Transaction | null;
+  transaction: Pick<Transaction, 'id' | 'date' | 'description'> | null;
   displayAmount: DisplayAmount | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -102,25 +102,18 @@ export function RemoveViewTransactionsModal({
               <dd className="min-w-0 break-words text-right font-medium">
                 {singleTransaction.description}
               </dd>
-              <dt className="text-muted-foreground">Native amount:</dt>
-              <dd className="text-right font-medium">
-                {formatCurrency(
-                  displayAmount?.sourceMagnitude ?? Math.abs(singleTransaction.amount),
-                  singleTransaction.currencyIsoCode,
-                )}{' '}
-                {singleTransaction.currencyIsoCode}
-              </dd>
               {displayAmount && (
                 <>
-                  <dt className="text-muted-foreground">Selected amount:</dt>
+                  <dt className="text-muted-foreground">
+                    Amount in {displayAmount.targetCurrency}:
+                  </dt>
                   {displayAmount.available ? (
                     <dd className="text-right font-medium">
-                      {formatCurrency(displayAmount.value, displayAmount.targetCurrency)}{' '}
-                      {displayAmount.targetCurrency}
+                      {formatCurrency(displayAmount.value, displayAmount.targetCurrency)}
                     </dd>
                   ) : (
                     <dd className="text-right font-medium text-warning">
-                      Conversion to {displayAmount.targetCurrency} unavailable
+                      Amount in {displayAmount.targetCurrency} unavailable
                     </dd>
                   )}
                 </>

@@ -112,7 +112,7 @@ transaction fetch.
 
 Cross-user administrative transaction search is the deliberate exception. It
 remains a backend-filtered, backend-sorted paged response whose amount bounds
-and amount sorting use stored native numeric values rather than the user's
+and amount sorting use stored signed numeric amounts rather than the user's
 display-currency projection. This architecture introduces neither transport
 pagination for the current-user snapshot nor a client or server performance
 benchmark; future scaling changes require a separately designed contract.

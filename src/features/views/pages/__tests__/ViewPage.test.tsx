@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewPage } from '@/features/views/pages/ViewPage';
@@ -15,6 +15,7 @@ import { renderWithProviders } from '@/testing/test-utils';
 import { ApiError } from '@/types/apiError';
 import type { Transaction } from '@/types/transaction';
 import type { SavedViewMetadata } from '@/types/view';
+import { buildExchangeRateMap } from '@/utils/currency';
 
 const saveAsProps = vi.hoisted(() => ({ current: undefined as unknown }));
 
@@ -208,7 +209,7 @@ describe('ViewPage static collections', () => {
     );
   });
 
-  it('uses the shared projection for native disclosure and partial saved-view totals', () => {
+  it('uses only selected-currency row presentation with partial saved-view totals', () => {
     const mixedTransactions = [
       transactions[0],
       { ...transactions[1], currencyIsoCode: 'GBP', amount: 20 },
@@ -230,8 +231,9 @@ describe('ViewPage static collections', () => {
     renderPage();
 
     expect(screen.getByText('Sum of visible debits · Partial; 1 unavailable')).toBeInTheDocument();
-    expect(screen.getByText('£20.00')).toBeInTheDocument();
-    expect(screen.getByText('Conversion to USD unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Amount in USD unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('£20.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('GBP')).not.toBeInTheDocument();
     expect(saveAsProps.current).toEqual(
       expect.objectContaining({ transactionIds: [1, 2], isTransactionIdsReady: true }),
     );
@@ -322,16 +324,44 @@ describe('ViewPage static collections', () => {
   });
 
   it('uses nonmembers only as transfer/refund evidence', async () => {
-    const outsideCredit: Transaction = {
+    const memberDebit: Transaction = {
       ...transactions[0],
+      currencyIsoCode: 'EUR',
+      amount: 10,
+    };
+    const outsideCredit: Transaction = {
+      ...memberDebit,
       id: 3,
       date: '2026-01-16',
       type: 'CREDIT',
       description: 'Coffee refund',
     };
+    mockUseExchangeRatesMap.mockReturnValue({
+      exchangeRatesMap: buildExchangeRateMap([
+        {
+          baseCurrency: 'USD',
+          targetCurrency: 'EUR',
+          date: memberDebit.date,
+          publishedDate: memberDebit.date,
+          rate: 0.5,
+        },
+        {
+          baseCurrency: 'USD',
+          targetCurrency: 'EUR',
+          date: outsideCredit.date,
+          publishedDate: outsideCredit.date,
+          rate: 0.5,
+        },
+      ]),
+      exchangeRatesData: [],
+      pendingCurrencies: [],
+      failedCurrencies: [],
+      isLoading: false,
+      error: undefined,
+    });
     mockUseViewTransactions.mockReturnValue({
-      data: [transactions[0]],
-      allTransactions: [transactions[0], outsideCredit],
+      data: [memberDebit],
+      allTransactions: [memberDebit, outsideCredit],
       memberTransactionIds: [1],
       missingTransactionIds: [],
       isLoading: false,
@@ -346,7 +376,9 @@ describe('ViewPage static collections', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Find Transfers & Refunds' }));
 
-    expect(await screen.findByRole('region', { name: 'Possible refund' })).toBeInTheDocument();
+    const refund = await screen.findByRole('region', { name: 'Possible refund' });
+    expect(within(refund).getAllByText('$20.00')).toHaveLength(2);
+    expect(within(refund).queryByText('€10.00')).not.toBeInTheDocument();
     expect(
       screen.getByText('Not currently in this view; shown as supporting evidence'),
     ).toBeInTheDocument();

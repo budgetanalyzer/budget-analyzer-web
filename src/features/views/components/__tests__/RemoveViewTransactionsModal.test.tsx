@@ -46,7 +46,10 @@ function getDialogBackdrop() {
   return backdrop;
 }
 
-function renderModal(transactionIds = [3, 3, 8], selectedDisplayAmount = displayAmount) {
+function renderModal(
+  transactionIds = [3, 3, 8],
+  selectedDisplayAmount: DisplayAmount | null = displayAmount,
+) {
   const onOpenChange = vi.fn();
   const onSuccess = vi.fn();
   const uniqueIds = Array.from(new Set(transactionIds));
@@ -98,13 +101,14 @@ describe('RemoveViewTransactionsModal', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('identifies one transaction with native and available selected-currency amounts', () => {
+  it('identifies one transaction with only its available selected-currency amount', () => {
     renderModal([5, 5]);
 
     expect(screen.getByText('Jan 4, 2026')).toBeInTheDocument();
     expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
-    expect(screen.getByText('€80.00 EUR')).toBeInTheDocument();
-    expect(screen.getByText('$100.00 USD')).toBeInTheDocument();
+    expect(screen.getByText('Amount in USD:')).toBeInTheDocument();
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+    expect(screen.queryByText('€80.00')).not.toBeInTheDocument();
   });
 
   it('identifies one transaction when its selected-currency projection is unavailable', () => {
@@ -118,9 +122,19 @@ describe('RemoveViewTransactionsModal', () => {
 
     expect(screen.getByText('Jan 4, 2026')).toBeInTheDocument();
     expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
-    expect(screen.getByText('€80.00 EUR')).toBeInTheDocument();
-    expect(screen.getByText('Conversion to USD unavailable')).toBeInTheDocument();
-    expect(screen.queryByText('$80.00 USD')).not.toBeInTheDocument();
+    expect(screen.getByText('Amount in USD:')).toBeInTheDocument();
+    expect(screen.getByText('Amount in USD unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('€80.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('$80.00')).not.toBeInTheDocument();
+  });
+
+  it('keeps single-transaction context and omits the amount when no projection exists', () => {
+    renderModal([5], null);
+
+    expect(screen.getByText('Jan 4, 2026')).toBeInTheDocument();
+    expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
+    expect(screen.queryByText(/Amount in/)).not.toBeInTheDocument();
+    expect(screen.queryByText('€80.00')).not.toBeInTheDocument();
   });
 
   it('cancels without issuing a membership delta', async () => {

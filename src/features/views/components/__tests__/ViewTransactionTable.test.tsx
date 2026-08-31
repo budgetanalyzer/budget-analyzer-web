@@ -200,7 +200,26 @@ describe('ViewTransactionTable', () => {
   });
 
   it('opens row removal without navigating away', async () => {
-    renderTable();
+    const eurTransaction = {
+      ...transactions[0],
+      currencyIsoCode: 'EUR',
+      amount: 10,
+    };
+    const displayAmounts = new Map<number, DisplayAmount>([
+      [
+        eurTransaction.id,
+        {
+          available: true,
+          sourceMagnitude: 10,
+          sourceCurrency: 'EUR',
+          targetCurrency: 'USD',
+          minorUnitCount: 2,
+          value: 20,
+          rateLegs: [],
+        },
+      ],
+    ]);
+    renderTable({ rows: [eurTransaction], displayAmounts });
 
     const coffeeRow = screen.getByText('Coffee').closest('tr');
     expect(coffeeRow).not.toBeNull();
@@ -213,7 +232,9 @@ describe('ViewTransactionTable', () => {
     expect(within(dialog).getByText(/Remove 1 transaction from this view/)).toBeInTheDocument();
     expect(within(dialog).getByText('Jan 15, 2026')).toBeInTheDocument();
     expect(within(dialog).getByText('Coffee')).toBeInTheDocument();
-    expect(within(dialog).getAllByText('$10.00 USD')).toHaveLength(2);
+    expect(within(dialog).getByText('Amount in USD:')).toBeInTheDocument();
+    expect(within(dialog).getByText('$20.00')).toBeInTheDocument();
+    expect(within(dialog).queryByText('€10.00')).not.toBeInTheDocument();
   });
 
   it('retains bulk selection after cancellation and mutation failure', async () => {

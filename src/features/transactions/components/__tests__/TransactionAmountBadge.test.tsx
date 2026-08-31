@@ -18,10 +18,11 @@ describe('TransactionAmountBadge', () => {
     render(<TransactionAmountBadge displayAmount={displayAmount} isCredit />);
 
     expect(screen.getByText('€9.25')).toBeInTheDocument();
-    expect(screen.getByText('USD')).toBeInTheDocument();
+    expect(screen.queryByText('$10.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('USD')).not.toBeInTheDocument();
   });
 
-  it('discloses the native amount and unavailable target instead of relabeling it', () => {
+  it('renders target-currency unavailability without disclosing the stored amount', () => {
     const displayAmount: DisplayAmount = {
       available: false,
       sourceMagnitude: 12.5,
@@ -32,8 +33,9 @@ describe('TransactionAmountBadge', () => {
 
     render(<TransactionAmountBadge displayAmount={displayAmount} isCredit={false} />);
 
-    expect(screen.getByText('£12.50')).toBeInTheDocument();
-    expect(screen.getByText('Conversion to EUR unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Amount in EUR unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('£12.50')).not.toBeInTheDocument();
+    expect(screen.queryByText('GBP')).not.toBeInTheDocument();
     expect(screen.queryByText('€12.50')).not.toBeInTheDocument();
   });
 });

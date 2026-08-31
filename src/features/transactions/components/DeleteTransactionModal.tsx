@@ -2,8 +2,8 @@
 import { useCallback, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { MessageBanner } from '@/components/MessageBanner';
-import { Transaction } from '@/types/transaction';
 import type { DisplayAmount } from '@/types/displayAmount';
+import type { Transaction } from '@/types/transaction';
 import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate } from '@/utils/dates';
 import { formatApiError } from '@/utils/errorMessages';
@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/Button';
 import { useDeleteTransaction } from '@/hooks/useTransactions';
 
 interface DeleteTransactionModalProps {
-  transaction: Transaction | null;
+  transaction: Pick<Transaction, 'id' | 'date' | 'description'> | null;
   displayAmount: DisplayAmount | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -99,27 +99,18 @@ export function DeleteTransactionModal({
                 <span className="text-muted-foreground">Description:</span>
                 <span className="font-medium">{transaction.description}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Native amount:</span>
-                <span className="font-medium">
-                  {formatCurrency(
-                    displayAmount?.sourceMagnitude ?? Math.abs(transaction.amount),
-                    transaction.currencyIsoCode,
-                  )}{' '}
-                  {transaction.currencyIsoCode}
-                </span>
-              </div>
               {displayAmount && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Selected amount:</span>
+                  <span className="text-muted-foreground">
+                    Amount in {displayAmount.targetCurrency}:
+                  </span>
                   {displayAmount.available ? (
                     <span className="font-medium">
-                      {formatCurrency(displayAmount.value, displayAmount.targetCurrency)}{' '}
-                      {displayAmount.targetCurrency}
+                      {formatCurrency(displayAmount.value, displayAmount.targetCurrency)}
                     </span>
                   ) : (
                     <span className="font-medium text-warning">
-                      Conversion to {displayAmount.targetCurrency} unavailable
+                      Amount in {displayAmount.targetCurrency} unavailable
                     </span>
                   )}
                 </div>

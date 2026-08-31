@@ -238,9 +238,9 @@ export function TransactionSearchFiltersPanel({
           </div>
 
           <p id="admin-txn-amount-contract" className="w-full text-xs text-muted-foreground">
-            Amount bounds and amount sorting compare raw stored numbers without FX normalization. An
-            amount-only search can span currencies; combine a currency with bounds to make the
-            comparison currency-specific.
+            Amount bounds and amount sorting compare stored signed numeric amounts without FX
+            normalization. An amount-only search can span currencies; combine a currency with bounds
+            to make the comparison currency-specific.
           </p>
 
           <Input

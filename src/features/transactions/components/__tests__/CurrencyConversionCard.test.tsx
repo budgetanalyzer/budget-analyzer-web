@@ -35,18 +35,19 @@ const triangulatedAmount: DisplayAmount = {
 };
 
 describe('CurrencyConversionCard', () => {
-  it('discloses the native magnitude, selected amount, and both triangulation legs', () => {
+  it('shows the selected amount and both triangulation legs without repeating the stored amount', () => {
     render(<CurrencyConversionCard displayAmount={triangulatedAmount} transactionType="DEBIT" />);
 
-    expect(screen.getByText(/€80\.00 EUR/)).toBeInTheDocument();
+    expect(screen.getByText('Amount in GBP')).toBeInTheDocument();
     expect(screen.getByText('£50.00')).toBeInTheDocument();
+    expect(screen.queryByText('€80.00')).not.toBeInTheDocument();
     expect(screen.getByText('EUR to USD exchange-rate leg')).toBeInTheDocument();
     expect(screen.getByText('USD to GBP exchange-rate leg')).toBeInTheDocument();
     expect(screen.getAllByText(/Effective for transaction date Jan 4, 2026/)).toHaveLength(2);
     expect(screen.getAllByText(/Currency Service carried forward/)).toHaveLength(2);
   });
 
-  it('renders an unavailable selected amount without relabeling the native value', () => {
+  it('renders selected-currency unavailability without repeating the stored amount', () => {
     const unavailableAmount: DisplayAmount = {
       available: false,
       sourceMagnitude: 80,
@@ -57,14 +58,15 @@ describe('CurrencyConversionCard', () => {
 
     render(<CurrencyConversionCard displayAmount={unavailableAmount} transactionType="DEBIT" />);
 
-    expect(screen.getByText(/€80\.00 EUR/)).toBeInTheDocument();
-    expect(screen.getByText('Conversion to GBP unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Amount in GBP')).toBeInTheDocument();
+    expect(screen.getByText('Amount in GBP unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('€80.00')).not.toBeInTheDocument();
     expect(screen.queryByText('£80.00')).not.toBeInTheDocument();
     expect(screen.queryByText(/exchange-rate leg/)).not.toBeInTheDocument();
   });
 
   it('does not render a conversion card for a same-currency projection', () => {
-    const nativeAmount: DisplayAmount = {
+    const sameCurrencyAmount: DisplayAmount = {
       available: true,
       sourceMagnitude: 10,
       sourceCurrency: 'USD',
@@ -74,7 +76,7 @@ describe('CurrencyConversionCard', () => {
       rateLegs: [],
     };
 
-    render(<CurrencyConversionCard displayAmount={nativeAmount} transactionType="CREDIT" />);
+    render(<CurrencyConversionCard displayAmount={sameCurrencyAmount} transactionType="CREDIT" />);
 
     expect(screen.queryByText('Currency Conversion')).not.toBeInTheDocument();
   });
