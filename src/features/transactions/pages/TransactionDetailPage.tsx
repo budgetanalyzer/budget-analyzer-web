@@ -236,7 +236,9 @@ export function TransactionDetailPage() {
               <div className="flex items-start gap-3">
                 <Banknote className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Amount</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Amount in {transaction.currencyIsoCode}
+                  </p>
                   <p
                     className={`text-2xl font-bold ${
                       transaction.type === 'CREDIT'
@@ -244,11 +246,7 @@ export function TransactionDetailPage() {
                         : 'text-foreground'
                     }`}
                   >
-                    {formatCurrency(
-                      displayAmount?.sourceMagnitude ?? Math.abs(transaction.amount),
-                      transaction.currencyIsoCode,
-                    )}{' '}
-                    {transaction.currencyIsoCode}
+                    {formatCurrency(Math.abs(transaction.amount), transaction.currencyIsoCode)}
                   </p>
                 </div>
                 <Badge variant={transaction.type === 'CREDIT' ? 'success' : 'secondary'}>

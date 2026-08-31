@@ -52,8 +52,8 @@ export function MissingExchangeRatesBanner({
           <AlertTriangle className="h-5 w-5 flex-shrink-0" />
           <span className="font-medium">
             {formatCurrencyList(disabledCurrencies)}{' '}
-            {disabledCurrencies.length === 1 ? 'is' : 'are'} disabled. Amounts shown in original
-            currency.
+            {disabledCurrencies.length === 1 ? 'is' : 'are'} disabled. Amounts are unavailable in
+            the selected currency.
           </span>
         </div>
       )}
@@ -62,9 +62,8 @@ export function MissingExchangeRatesBanner({
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 flex-shrink-0" />
             <span className="font-medium">
-              Exchange rates for {formatCurrencyList(pendingCurrencies)}{' '}
-              {pendingCurrencies.length === 1 ? 'is' : 'are'} being imported. Amounts shown in
-              original currency.
+              Exchange rates for {formatCurrencyList(pendingCurrencies)} are being imported. Amounts
+              are unavailable in the selected currency.
             </span>
           </div>
           <Button

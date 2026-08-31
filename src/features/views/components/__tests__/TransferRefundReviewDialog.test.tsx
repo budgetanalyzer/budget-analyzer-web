@@ -6,6 +6,7 @@ import { TransferRefundReviewDialog } from '@/features/views/components/Transfer
 import type { TransferRefundCandidate } from '@/features/views/types/transferRefundReview';
 import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
+import type { DisplayAmount } from '@/types/displayAmount';
 
 const candidate: TransferRefundCandidate = {
   key: 'TRANSFER:1:2',
@@ -40,10 +41,36 @@ const candidate: TransferRefundCandidate = {
   eligibleRemovalTransactionIds: [1],
 };
 
+const displayAmounts = new Map<number, DisplayAmount>([
+  [
+    1,
+    {
+      available: true,
+      sourceMagnitude: 100,
+      sourceCurrency: 'USD',
+      targetCurrency: 'EUR',
+      minorUnitCount: 2,
+      value: 80,
+      rateLegs: [],
+    },
+  ],
+  [
+    2,
+    {
+      available: false,
+      sourceMagnitude: 100,
+      sourceCurrency: 'USD',
+      targetCurrency: 'EUR',
+      reason: 'MISSING_TARGET_RATE',
+    },
+  ],
+]);
+
 const defaultProps = {
   viewId: 'view-1',
   viewName: 'Monthly activity',
   candidates: [candidate],
+  displayAmounts,
   isLoading: false,
   error: null,
   onRetry: vi.fn(),
@@ -85,6 +112,15 @@ afterEach(() => {
 });
 
 describe('TransferRefundReviewDialog', () => {
+  it('shows only selected-currency candidate amounts and unavailability', () => {
+    renderDialog();
+
+    const transfer = screen.getByRole('region', { name: 'Possible transfer' });
+    expect(within(transfer).getByText('€80.00')).toBeInTheDocument();
+    expect(within(transfer).getByText('Amount in EUR unavailable')).toBeInTheDocument();
+    expect(within(transfer).queryByText('$100.00')).not.toBeInTheDocument();
+  });
+
   it('shows nonmember evidence without presenting it as removal history or a selectable row', () => {
     renderDialog();
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router';
@@ -89,7 +89,8 @@ describe('TransactionDetailPage', () => {
     expect(screen.getByText('Coffee shop')).toBeInTheDocument();
     expect(screen.getByText('Acme Bank')).toBeInTheDocument();
     expect(screen.getByText('checking-123')).toBeInTheDocument();
-    expect(screen.getByText('$42.50 USD')).toBeInTheDocument();
+    expect(screen.getByText('Amount in USD')).toBeInTheDocument();
+    expect(screen.getByText('$42.50')).toBeInTheDocument();
     expect(screen.getByText('May 1, 2026')).toBeInTheDocument();
   });
 
@@ -313,7 +314,8 @@ describe('TransactionDetailPage', () => {
     expect(screen.getAllByText('Coffee shop')).toHaveLength(2);
   });
 
-  it('shows positive native disclosure and two-leg weekend publication provenance', async () => {
+  it('shows one positive stored-amount disclosure and separate selected-currency provenance', async () => {
+    const user = userEvent.setup();
     const eurTransaction = {
       ...transaction,
       amount: -80,
@@ -351,12 +353,60 @@ describe('TransactionDetailPage', () => {
 
     renderDetailPage(authenticatedUser.permissions, 'GBP');
 
-    expect(await screen.findAllByText('€80.00 EUR')).toHaveLength(2);
+    expect(await screen.findByText('Amount in EUR')).toBeInTheDocument();
+    expect(screen.getByText('€80.00')).toBeInTheDocument();
     expect(screen.queryByText(/-€80\.00/)).not.toBeInTheDocument();
+    expect(screen.getByText('Amount in GBP')).toBeInTheDocument();
     expect(await screen.findByText('£50.00')).toBeInTheDocument();
     expect(screen.getByText('EUR to USD exchange-rate leg')).toBeInTheDocument();
     expect(screen.getByText('USD to GBP exchange-rate leg')).toBeInTheDocument();
     expect(screen.getAllByText(/Published Jan 2, 2026/)).toHaveLength(2);
     expect(screen.getAllByText(/Currency Service carried forward/)).toHaveLength(2);
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete transaction' });
+    expect(within(dialog).getByText('£50.00')).toBeInTheDocument();
+    expect(within(dialog).queryByText('€80.00')).not.toBeInTheDocument();
+  });
+
+  it('keeps the stored amount visible when the selected-currency conversion is unavailable', async () => {
+    const eurTransaction = {
+      ...transaction,
+      amount: -80,
+      currencyIsoCode: 'EUR',
+      date: '2026-01-04',
+    };
+
+    useDetailReferenceHandlers();
+    server.use(
+      http.get('/api/v1/transactions', () => HttpResponse.json([eurTransaction])),
+      http.get('/api/v1/transactions/:id', () => HttpResponse.json(eurTransaction)),
+      http.get('/api/v1/exchange-rates', ({ request }) => {
+        const targetCurrency = new URL(request.url).searchParams.get('targetCurrency');
+
+        return HttpResponse.json(
+          targetCurrency === 'EUR'
+            ? [
+                {
+                  baseCurrency: 'USD',
+                  targetCurrency: 'EUR',
+                  date: '2026-01-04',
+                  publishedDate: '2026-01-02',
+                  rate: 0.8,
+                },
+              ]
+            : [],
+        );
+      }),
+    );
+
+    renderDetailPage(authenticatedUser.permissions, 'GBP');
+
+    expect(await screen.findByText('Amount in EUR')).toBeInTheDocument();
+    expect(screen.getByText('€80.00')).toBeInTheDocument();
+    expect(screen.getByText('Amount in GBP')).toBeInTheDocument();
+    expect(screen.getByText('Amount in GBP unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('£80.00')).not.toBeInTheDocument();
+    expect(screen.queryByText(/exchange-rate leg/)).not.toBeInTheDocument();
   });
 });

@@ -47,11 +47,11 @@ function getDialogBackdrop() {
   return backdrop;
 }
 
-function renderModal(displayAmount: DisplayAmount) {
+function renderModal(selectedDisplayAmount: DisplayAmount | null) {
   return renderWithProviders(
     <DeleteTransactionModal
       transaction={transaction}
-      displayAmount={displayAmount}
+      displayAmount={selectedDisplayAmount}
       isOpen
       onOpenChange={vi.fn()}
     />,
@@ -73,17 +73,18 @@ function InteractiveModal({ onDeleted }: { onDeleted: () => void }) {
 }
 
 describe('DeleteTransactionModal', () => {
-  it('always discloses a positive native amount and shows an available selected amount', () => {
+  it('shows only the available selected-currency amount', () => {
     renderModal(displayAmount);
 
     const dialog = screen.getByRole('dialog', { name: 'Delete transaction' });
     expect(dialog.querySelector('.lucide-triangle-alert')).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByText('€80.00 EUR')).toBeInTheDocument();
+    expect(screen.getByText('Amount in USD:')).toBeInTheDocument();
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+    expect(screen.queryByText('€80.00')).not.toBeInTheDocument();
     expect(screen.queryByText(/-€80\.00/)).not.toBeInTheDocument();
-    expect(screen.getByText('$100.00 USD')).toBeInTheDocument();
   });
 
-  it('shows an unavailable selected amount without substituting the native number', () => {
+  it('shows selected-currency unavailability without substituting the stored number', () => {
     renderModal({
       available: false,
       sourceMagnitude: 80,
@@ -92,9 +93,19 @@ describe('DeleteTransactionModal', () => {
       reason: 'MISSING_SOURCE_RATE',
     });
 
-    expect(screen.getByText('€80.00 EUR')).toBeInTheDocument();
-    expect(screen.getByText('Conversion to USD unavailable')).toBeInTheDocument();
-    expect(screen.queryByText('$80.00 USD')).not.toBeInTheDocument();
+    expect(screen.getByText('Amount in USD:')).toBeInTheDocument();
+    expect(screen.getByText('Amount in USD unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('€80.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('$80.00')).not.toBeInTheDocument();
+  });
+
+  it('keeps identifying context and omits the amount when no projection exists', () => {
+    renderModal(null);
+
+    expect(screen.getByText('Jan 4, 2026')).toBeInTheDocument();
+    expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
+    expect(screen.queryByText(/Amount in/)).not.toBeInTheDocument();
+    expect(screen.queryByText('€80.00')).not.toBeInTheDocument();
   });
 
   it('closes and runs the deletion callback without a redundant success notification', async () => {
@@ -142,7 +153,8 @@ describe('DeleteTransactionModal', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Delete request failed');
     expect(screen.getByRole('heading', { name: 'Delete transaction' })).toBeInTheDocument();
     expect(screen.getByText('Weekend purchase')).toBeInTheDocument();
-    expect(screen.getByText('€80.00 EUR')).toBeInTheDocument();
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+    expect(screen.queryByText('€80.00')).not.toBeInTheDocument();
     expect(onDeleted).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Dismiss message' }));

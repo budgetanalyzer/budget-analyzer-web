@@ -11,6 +11,7 @@ const { transactionTableMock, transactionData, currencyHookState, viewHookMocks 
     currencyHookState: {
       exchangeRatesMap: new Map(),
       pendingCurrencies: [] as string[],
+      disabledCurrencies: [] as string[],
       isExchangeRatesLoading: false,
       enabledCurrencies: [] as Array<{ currencyCode: string }>,
       isCurrenciesLoading: false,
@@ -43,7 +44,7 @@ vi.mock('@/hooks/useCurrencies', () => ({
   }),
 }));
 vi.mock('@/hooks/useMissingCurrencies', () => ({
-  useMissingCurrencies: () => [],
+  useMissingCurrencies: () => currencyHookState.disabledCurrencies,
 }));
 vi.mock('@/hooks/useViews', () => ({
   useView: viewHookMocks.useView,
@@ -187,6 +188,7 @@ beforeEach(() => {
   transactionData.splice(0);
   currencyHookState.exchangeRatesMap = new Map();
   currencyHookState.pendingCurrencies = [];
+  currencyHookState.disabledCurrencies = [];
   currencyHookState.isExchangeRatesLoading = false;
   currencyHookState.enabledCurrencies = [];
   currencyHookState.isCurrenciesLoading = false;
@@ -252,6 +254,26 @@ describe('TransactionsPage Import button gating', () => {
         "Failed to preview file 'bad-statement.csv': Missing required Description column",
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe('TransactionsPage exchange-rate warnings', () => {
+  it('reports selected-currency unavailability for disabled and pending rates', () => {
+    currencyHookState.disabledCurrencies = ['EUR'];
+    currencyHookState.pendingCurrencies = ['GBP'];
+    mockUsePermission.mockReturnValue(false);
+
+    renderPage();
+
+    expect(
+      screen.getByText('EUR is disabled. Amounts are unavailable in the selected currency.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Exchange rates for GBP are being imported. Amounts are unavailable in the selected currency.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 });
 

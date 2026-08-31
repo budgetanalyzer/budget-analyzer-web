@@ -196,14 +196,14 @@ view endpoints. Their contract is documented in
 
 ## Selected-Currency Amount Contracts
 
-Ordinary current-user transaction surfaces project each stored amount through
-the shared discriminated display-amount contract. The projection normalizes the
-native amount to a positive magnitude. Currency Service returns a dense row for
-each date in the requested inclusive range; conversion uses only a row whose
-effective `date` exactly equals the transaction LocalDate. The frontend never
-searches another date. A missing or invalid exact row produces an unavailable
-result; consumers must not relabel or aggregate the native value as selected
-currency.
+Ordinary current-user transaction surfaces project each stored transaction
+amount through the shared discriminated display-amount contract. The projection
+normalizes the stored transaction amount to a positive magnitude. Currency
+Service returns a dense row for each date in the requested inclusive range;
+conversion uses only a row whose effective `date` exactly equals the transaction
+LocalDate. The frontend never searches another date. A missing or invalid exact
+row produces an unavailable result; consumers must not display, relabel, or
+aggregate the stored transaction amount as selected currency.
 
 An available result retains zero, one, or two rate legs. Each leg preserves the
 effective transaction `date` and Currency Service's `publishedDate`. When the
@@ -215,9 +215,17 @@ Transaction lists and static saved views build one projection per transaction
 at their page boundary. Each available result is quantized once at the selected
 ISO currency's minor-unit precision before it becomes authoritative for amount
 filtering, sorting, cells, and per-transaction summing; saved-view creation IDs
-come from that same filtered collection. Detail and delete surfaces always
-disclose the positive native magnitude and ISO code, then render the selected-
-currency value only when the projection is available.
+come from that same filtered collection. Ordinary current-user presentation
+shows only that selected-currency value, or a persistent selected-currency
+unavailability state when the projection is unavailable. It does not fall back
+to the stored transaction amount.
+
+The dedicated transaction detail page is the sole ordinary current-user surface
+that also discloses the positive stored transaction amount and its ISO currency.
+When the stored and selected currencies differ, the detail page presents that
+stored amount once and presents the selected-currency conversion separately with
+its rate-leg provenance. An unavailable conversion does not hide the detail
+page's explicit stored-amount disclosure.
 
 Analytics counts every qualifying debit or credit but sums only available,
 already-quantized display values. A mixed period is visibly partial and exposes

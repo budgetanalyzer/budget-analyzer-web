@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/Dialog';
 import type { TransferRefundCandidate } from '@/features/views/types/transferRefundReview';
 import { createRemoveViewTransactionsRequest, useUpdateViewTransactions } from '@/hooks/useViews';
+import type { DisplayAmount } from '@/types/displayAmount';
 import type { Transaction } from '@/types/transaction';
 import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate } from '@/utils/dates';
@@ -24,6 +25,7 @@ interface TransferRefundReviewDialogProps {
   viewId: string;
   viewName: string;
   candidates: TransferRefundCandidate[];
+  displayAmounts: ReadonlyMap<number, DisplayAmount>;
   isLoading: boolean;
   error: Error | null;
   onRetry: () => void;
@@ -39,6 +41,7 @@ export function TransferRefundReviewDialog({
   viewId,
   viewName,
   candidates,
+  displayAmounts,
   isLoading,
   error,
   onRetry,
@@ -145,6 +148,7 @@ export function TransferRefundReviewDialog({
           ) : (
             <CandidateGroup
               candidates={candidates}
+              displayAmounts={displayAmounts}
               selectedIds={selectedIdSet}
               isPending={isPending}
               onSelectionChange={handleSelectionChange}
@@ -177,6 +181,7 @@ export function TransferRefundReviewDialog({
 
 interface CandidateGroupProps {
   candidates: TransferRefundCandidate[];
+  displayAmounts: ReadonlyMap<number, DisplayAmount>;
   selectedIds: ReadonlySet<number>;
   isPending: boolean;
   onSelectionChange: (transactionId: number, selected: boolean) => void;
@@ -184,6 +189,7 @@ interface CandidateGroupProps {
 
 function CandidateGroup({
   candidates,
+  displayAmounts,
   selectedIds,
   isPending,
   onSelectionChange,
@@ -198,6 +204,7 @@ function CandidateGroup({
           <CandidateReview
             key={candidate.key}
             candidate={candidate}
+            displayAmounts={displayAmounts}
             selectedIds={selectedIds}
             isPending={isPending}
             onSelectionChange={onSelectionChange}
@@ -210,6 +217,7 @@ function CandidateGroup({
 
 interface CandidateReviewProps {
   candidate: TransferRefundCandidate;
+  displayAmounts: ReadonlyMap<number, DisplayAmount>;
   selectedIds: ReadonlySet<number>;
   isPending: boolean;
   onSelectionChange: (transactionId: number, selected: boolean) => void;
@@ -217,6 +225,7 @@ interface CandidateReviewProps {
 
 function CandidateReview({
   candidate,
+  displayAmounts,
   selectedIds,
   isPending,
   onSelectionChange,
@@ -243,6 +252,7 @@ function CandidateReview({
           candidateKey={candidate.key}
           side="debit"
           transaction={candidate.debit}
+          displayAmount={displayAmounts.get(candidate.debit.id)}
           isEligible={candidate.eligibleRemovalTransactionIds.includes(candidate.debit.id)}
           isSelected={selectedIds.has(candidate.debit.id)}
           isPending={isPending}
@@ -252,6 +262,7 @@ function CandidateReview({
           candidateKey={candidate.key}
           side="credit"
           transaction={candidate.credit}
+          displayAmount={displayAmounts.get(candidate.credit.id)}
           isEligible={candidate.eligibleRemovalTransactionIds.includes(candidate.credit.id)}
           isSelected={selectedIds.has(candidate.credit.id)}
           isPending={isPending}
@@ -265,7 +276,8 @@ function CandidateReview({
 interface CandidateTransactionRowProps {
   candidateKey: string;
   side: CandidateSide;
-  transaction: Transaction;
+  transaction: Pick<Transaction, 'id' | 'date' | 'description' | 'bankName' | 'accountId'>;
+  displayAmount: DisplayAmount | undefined;
   isEligible: boolean;
   isSelected: boolean;
   isPending: boolean;
@@ -276,6 +288,7 @@ function CandidateTransactionRow({
   candidateKey,
   side,
   transaction,
+  displayAmount,
   isEligible,
   isSelected,
   isPending,
@@ -296,9 +309,17 @@ function CandidateTransactionRow({
     <div className="flex min-w-0 flex-col gap-3 rounded-md bg-muted/40 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm font-medium">{sideLabel}</p>
-        <p className="font-mono text-sm font-semibold">
-          {formatCurrency(Math.abs(transaction.amount), transaction.currencyIsoCode)}
-        </p>
+        {displayAmount && (
+          <p className="font-mono text-sm font-semibold">
+            {displayAmount.available ? (
+              formatCurrency(displayAmount.value, displayAmount.targetCurrency)
+            ) : (
+              <span className="font-sans text-sm font-medium text-warning">
+                Amount in {displayAmount.targetCurrency} unavailable
+              </span>
+            )}
+          </p>
+        )}
       </div>
       <dl className="grid min-w-0 grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-sm">
         <dt className="text-muted-foreground">Date</dt>

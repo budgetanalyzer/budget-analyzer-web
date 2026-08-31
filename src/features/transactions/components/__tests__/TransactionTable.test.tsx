@@ -270,6 +270,33 @@ describe('TransactionTable permission gating', () => {
     // Select + Date, Description, Bank, Account, Type, Amount, Actions = 8 columns.
     expect(within(headerRow).getAllByRole('columnheader')).toHaveLength(8);
   });
+
+  it('passes only the selected-currency projection to row deletion confirmation', async () => {
+    const eurTransaction = {
+      ...transactions[0],
+      currencyIsoCode: 'EUR',
+      amount: 100,
+    };
+    const exchangeRatesMap = buildExchangeRateMap([
+      {
+        baseCurrency: 'USD',
+        targetCurrency: 'EUR',
+        date: eurTransaction.date,
+        publishedDate: eurTransaction.date,
+        rate: 0.5,
+      },
+    ]);
+    const user = userEvent.setup();
+    mockUsePermission.mockReturnValue(true);
+    renderTable({ rows: [eurTransaction], exchangeRatesMap });
+
+    await openFirstRowMenu();
+    await user.click(screen.getByRole('menuitem', { name: /Delete/ }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Delete transaction' });
+    expect(within(dialog).getByText('$200.00')).toBeInTheDocument();
+    expect(within(dialog).queryByText('€100.00')).not.toBeInTheDocument();
+  });
 });
 
 describe('TransactionTable bulk deletion', () => {

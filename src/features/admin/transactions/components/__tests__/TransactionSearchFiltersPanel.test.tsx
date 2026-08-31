@@ -14,7 +14,7 @@ function createQuery(overrides: Partial<TransactionSearchQuery> = {}): Transacti
 }
 
 describe('TransactionSearchFiltersPanel', () => {
-  it('shows the currency and signed amount controls with persistent native-amount guidance', () => {
+  it('shows the currency and signed amount controls with persistent stored-amount guidance', () => {
     render(
       <TransactionSearchFiltersPanel
         query={createQuery({ currencyIsoCode: 'EUR', minAmount: -10 })}
@@ -32,7 +32,7 @@ describe('TransactionSearchFiltersPanel', () => {
     expect(screen.getByLabelText('Minimum amount')).not.toHaveAttribute('min');
     expect(screen.getByLabelText('Maximum amount')).not.toHaveAttribute('min');
     expect(
-      screen.getByText(/Amount bounds and amount sorting compare raw stored numbers/i),
+      screen.getByText(/Amount bounds and amount sorting compare stored signed numeric amounts/i),
     ).toHaveTextContent(
       'An amount-only search can span currencies; combine a currency with bounds to make the comparison currency-specific.',
     );

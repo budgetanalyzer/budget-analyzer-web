@@ -175,12 +175,12 @@ function ViewPageContent({ id }: { id: string }) {
   const displayAmounts = useMemo(
     () =>
       new Map(
-        (transactions ?? []).map((transaction) => [
+        (allTransactions ?? transactions ?? []).map((transaction) => [
           transaction.id,
           projectDisplayAmount(transaction, displayCurrency, exchangeRatesMap),
         ]),
       ),
-    [displayCurrency, exchangeRatesMap, transactions],
+    [allTransactions, displayCurrency, exchangeRatesMap, transactions],
   );
 
   const filterResult = useMemo(() => {
@@ -448,6 +448,7 @@ function ViewPageContent({ id }: { id: string }) {
           viewId={view.id}
           viewName={view.name}
           candidates={transferRefundCandidates}
+          displayAmounts={displayAmounts}
           isLoading={isTransactionsLoading || isExchangeRatesLoading}
           error={transferRefundDiscoveryError}
           onRetry={handleTransferRefundDiscoveryRetry}
