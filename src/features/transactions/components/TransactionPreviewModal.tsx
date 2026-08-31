@@ -181,14 +181,12 @@ export function TransactionPreviewModal({
   // Handle user-initiated open/close
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (!isImporting) {
-        if (!open) {
-          setImportErrorMessage(null);
-        }
-        onOpenChange(open);
+      if (!open) {
+        setImportErrorMessage(null);
       }
+      onOpenChange(open);
     },
-    [isImporting, onOpenChange],
+    [onOpenChange],
   );
 
   const handleUpdateTransaction = useCallback(
@@ -281,11 +279,9 @@ export function TransactionPreviewModal({
   ]);
 
   const handleCancel = useCallback(() => {
-    if (!isImporting) {
-      setImportErrorMessage(null);
-      onOpenChange(false);
-    }
-  }, [isImporting, onOpenChange]);
+    setImportErrorMessage(null);
+    onOpenChange(false);
+  }, [onOpenChange]);
 
   const handleDismissImportError = useCallback(() => {
     setImportErrorMessage(null);
@@ -301,6 +297,7 @@ export function TransactionPreviewModal({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
+        dismissible={!isImporting}
         className={cn(
           'max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-hidden flex flex-col',
           hasDuplicateRows ? 'xl:max-w-7xl' : 'xl:max-w-5xl',

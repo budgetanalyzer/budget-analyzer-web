@@ -46,6 +46,43 @@ mobile buttons and desktop rows. Feature dialogs should use the default
 specialized separators such as a top border may be added without replacing the
 shared spacing.
 
+Shared dialogs follow the
+[WAI-ARIA modal dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
+`DialogContent` supplies modal dialog semantics and associates its
+`DialogTitle` and optional `DialogDescription` through stable generated
+identifiers. When a dialog opens, it honors an intentional autofocus target,
+otherwise focuses the first focusable element or the dialog container. Focus
+remains contained while the dialog is open and returns to the previously
+focused connected element when it closes. Overlapping dialogs share opening
+order for visual stacking and keyboard ownership, so the most recently opened
+dialog is both visible above and receives modal keyboard interaction before
+earlier dialogs.
+
+Dialogs portal to `document.body` by default. A layout that owns scoped CSS
+custom properties must register a dialog portal host beneath that scope through
+`DialogPortalContainerProvider` so dialogs opened by its descendants inherit
+the layout's theme variables. The administrative layout follows this contract
+with a host beneath `.admin`; global and ordinary dialogs continue to use the
+body fallback.
+
+`DialogContent` is dismissible by default. Its single `dismissible` input owns
+all shared dismissal mechanisms: when false, the close control is absent and
+backdrop clicks and Escape do not request closure. This does not prevent the
+controlling feature from closing a controlled dialog after successful work.
+Feature-owned Cancel controls must reflect the same state when dismissal is
+disabled. A dialog that owns an in-flight mutation passes `dismissible={false}`
+and disables Cancel until the request settles because closing the dialog does
+not cancel the request. Successful mutation callbacks may still close it
+programmatically. Dialogs continue to use the reference-counted body scroll
+lock described in the CSP contract below.
+
+New and changed visible dialog titles use sentence case, including titles
+supplied through component inputs. Consequential destructive confirmations,
+such as deleting data that cannot be restored through the interface, include a
+warning icon; the icon is decorative when the title and description already
+communicate the warning. Reversible actions such as removing transaction
+membership from a saved view do not use warning iconography.
+
 ## State Boundary
 
 The application separates state by lifetime and authority:

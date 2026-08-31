@@ -1,5 +1,6 @@
 // src/features/transactions/components/DeleteTransactionModal.tsx
 import { useCallback, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { MessageBanner } from '@/components/MessageBanner';
 import { Transaction } from '@/types/transaction';
 import type { DisplayAmount } from '@/types/displayAmount';
@@ -75,10 +76,15 @@ export function DeleteTransactionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent dismissible={!isDeleting}>
         <DialogHeader>
-          <DialogTitle>Delete Transaction</DialogTitle>
-          <DialogDescription>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle aria-hidden="true" className="h-5 w-5 text-destructive" />
+            </div>
+            <DialogTitle>Delete transaction</DialogTitle>
+          </div>
+          <DialogDescription className="pt-2">
             Are you sure you want to delete this transaction? This action cannot be undone.
           </DialogDescription>
         </DialogHeader>

@@ -62,6 +62,12 @@ function createDeferredPromise() {
   return { promise, resolve };
 }
 
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
+}
+
 function renderDialog(overrides: Partial<DialogProps> = {}) {
   const props = {
     ...defaultProps,
@@ -82,6 +88,10 @@ describe('TransferRefundReviewDialog', () => {
   it('shows nonmember evidence without presenting it as removal history or a selectable row', () => {
     renderDialog();
 
+    const dialog = screen.getByRole('dialog', {
+      name: 'Review possible transfers and refunds',
+    });
+    expect(dialog.querySelector('.lucide-triangle-alert')).not.toBeInTheDocument();
     const transfer = screen.getByRole('region', { name: 'Possible transfer' });
     expect(transfer).toHaveTextContent('Not currently in this view; shown as supporting evidence');
     expect(within(transfer).getAllByRole('checkbox')).toHaveLength(1);
@@ -104,7 +114,11 @@ describe('TransferRefundReviewDialog', () => {
     );
     const { props } = renderDialog();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove 1 from this view' }));
+    const confirmButton = screen.getByRole('button', { name: 'Remove 1 from this view' });
+    expect(confirmButton).toHaveClass('bg-primary', 'text-primary-foreground');
+    expect(confirmButton).not.toHaveClass('bg-destructive', 'text-destructive-foreground');
+
+    await userEvent.click(confirmButton);
 
     await waitFor(() =>
       expect(requestBody).toEqual({ addTransactionIds: [], removeTransactionIds: [1] }),
@@ -188,7 +202,20 @@ describe('TransferRefundReviewDialog', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove 1 from this view' }));
     expect(await screen.findByRole('button', { name: 'Removing...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: 'Remove debit transaction 1 from this view' }),
+    ).toBeChecked();
+
+    await userEvent.click(getDialogBackdrop());
+    await userEvent.keyboard('{Escape}');
+
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('dialog', { name: 'Review possible transfers and refunds' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('checkbox', { name: 'Remove debit transaction 1 from this view' }),
     ).toBeChecked();

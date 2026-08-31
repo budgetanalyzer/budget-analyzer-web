@@ -17,7 +17,11 @@ describe('RemoveViewTransactionsBar', () => {
     );
 
     expect(screen.getByText('12 transactions selected')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Remove from view' }));
+    const removeButton = screen.getByRole('button', { name: 'Remove from view' });
+    expect(removeButton).toHaveClass('border', 'border-input', 'bg-background');
+    expect(removeButton).not.toHaveClass('bg-destructive', 'text-destructive');
+
+    await userEvent.click(removeButton);
     await userEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
 
     expect(onRemove).toHaveBeenCalledOnce();

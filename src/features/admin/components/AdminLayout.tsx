@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router';
 import {
   DollarSign,
@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { DialogPortalContainerProvider } from '@/components/ui/Dialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -34,6 +35,7 @@ export function AdminLayout() {
   const dispatch = useAppDispatch();
   const sidebarOpen = useAppSelector((s) => s.ui.adminSidebarOpen);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const dialogPortalContainerRef = useRef<HTMLDivElement>(null);
 
   const canReadCurrencies = usePermission('currencies:read');
   const canReadFormats = usePermission('statementformats:read');
@@ -128,7 +130,7 @@ export function AdminLayout() {
         .slice(0, 2)
     : (user?.email[0].toUpperCase() ?? '?');
 
-  return (
+  const layout = (
     <div className="admin relative flex h-screen bg-background">
       {/* Sidebar */}
       <aside
@@ -321,6 +323,14 @@ export function AdminLayout() {
 
         <Outlet />
       </main>
+
+      <div ref={dialogPortalContainerRef} />
     </div>
+  );
+
+  return (
+    <DialogPortalContainerProvider containerRef={dialogPortalContainerRef}>
+      {layout}
+    </DialogPortalContainerProvider>
   );
 }

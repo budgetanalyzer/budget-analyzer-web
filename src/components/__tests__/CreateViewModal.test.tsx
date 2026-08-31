@@ -26,6 +26,12 @@ function createDeferredPromise() {
   return { promise, resolve };
 }
 
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
+}
+
 function createdView(name: string, transactionCount: number) {
   return {
     id: 'created-view',
@@ -86,6 +92,7 @@ describe('CreateViewModal', () => {
       }),
     );
     renderModal({ transactionIds: [8, 2] });
+    expect(screen.getByRole('dialog', { name: 'Save as view' })).toBeInTheDocument();
     const nameInput = screen.getByLabelText('View Name');
 
     expect(nameInput).toHaveAttribute('maxlength', '255');
@@ -179,9 +186,18 @@ describe('CreateViewModal', () => {
     await user.click(screen.getByRole('button', { name: 'Save View' }));
 
     expect(await screen.findByRole('button', { name: 'Saving...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(nameInput).toHaveValue('Coffee collection');
     expect(screen.getByTestId('location')).toHaveTextContent('q=coffee');
+
+    await user.click(getDialogBackdrop());
+    await user.keyboard('{Escape}');
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Save as view' })).toBeInTheDocument();
+    expect(nameInput).toHaveValue('Coffee collection');
 
     retryResponse.resolve();
 

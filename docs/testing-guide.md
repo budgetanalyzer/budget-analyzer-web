@@ -295,11 +295,19 @@ between browser policy and stricter repository authoring rules.
 
 ### Current Coverage and Temporary Gate
 
-The only application workflow currently covered is an authenticated desktop
-transaction list with deterministic mocked data: select one row, observe the
-bulk-action bar, and clear the selection. The Playwright project is desktop
-Chromium only. This is not exhaustive route, form, mobile, dropdown,
-cross-browser, or Motion-API evidence.
+Application coverage currently uses an authenticated desktop transaction list
+with deterministic mocked data. One workflow selects a row, observes the bulk-
+action bar, and clears the selection. A second workflow opens bulk deletion and
+verifies the shared dialog's accessible name and description, initial focus,
+forward and reverse focus containment, normal Escape dismissal, and focus
+restoration to its connected initiator. During a deferred deletion it verifies
+that Cancel is disabled, the close control is absent, backdrop and Escape do
+not dismiss, and mutation success can still close the dialog. Both workflows
+also assert that the CSP monitor reports no policy violation or prohibited
+runtime or final stylesheet.
+
+The Playwright project is desktop Chromium only. This is not exhaustive route,
+form, mobile, dropdown, cross-browser, or Motion-API evidence.
 
 In particular, the browser suite does not yet cover desktop and mobile dropdown
 interaction, real placement and viewport fallback, top-layer clipping escape,

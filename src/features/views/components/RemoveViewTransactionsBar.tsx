@@ -35,7 +35,7 @@ export function RemoveViewTransactionsBar({
               <Button variant="outline" size="sm" onClick={onClearSelection}>
                 Clear selection
               </Button>
-              <Button variant="destructive" size="sm" onClick={onRemove}>
+              <Button variant="outline" size="sm" onClick={onRemove}>
                 <X className="mr-2 h-4 w-4" />
                 Remove from view
               </Button>

@@ -1,6 +1,8 @@
+import { useCallback, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router';
 
 vi.mock('@/features/auth/hooks/useAuth');
 vi.mock('@/features/auth/hooks/usePermission');
@@ -8,6 +10,7 @@ vi.mock('@/features/auth/hooks/usePermission');
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { AdminLayout } from '@/features/admin/components/AdminLayout';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/Dialog';
 import { renderWithProviders } from '@/testing/test-utils';
 
 const mockUseAuth = vi.mocked(useAuth);
@@ -18,6 +21,35 @@ function renderLayout(initialPath: string = '/admin') {
   return renderWithProviders(<AdminLayout />, {
     initialEntries: [initialPath],
   });
+}
+
+function AdminDialogHarness() {
+  const [open, setOpen] = useState(false);
+  const handleOpen = useCallback(() => setOpen(true), []);
+
+  return (
+    <>
+      <button type="button" onClick={handleOpen}>
+        Open admin dialog
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogTitle>Admin dialog</DialogTitle>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function renderLayoutWithDialog() {
+  return renderWithProviders(
+    <Routes>
+      <Route element={<AdminLayout />}>
+        <Route path="/admin" element={<AdminDialogHarness />} />
+      </Route>
+    </Routes>,
+    { initialEntries: ['/admin'] },
+  );
 }
 
 beforeEach(() => {
@@ -104,6 +136,18 @@ describe('AdminLayout nav active state', () => {
     const usersLink = screen.getByRole('link', { name: /Users/ });
     expect(usersLink.className).toContain('bg-primary/10');
     expect(usersLink.className).toContain('text-primary');
+  });
+});
+
+describe('AdminLayout dialog portal scope', () => {
+  it('keeps dialogs opened by an admin route beneath the admin theme scope', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithDialog();
+
+    await user.click(screen.getByRole('button', { name: 'Open admin dialog' }));
+
+    const adminScope = document.querySelector('.admin');
+    expect(screen.getByRole('dialog', { name: 'Admin dialog' }).closest('.admin')).toBe(adminScope);
   });
 });
 

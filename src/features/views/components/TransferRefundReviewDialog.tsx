@@ -83,14 +83,14 @@ export function TransferRefundReviewDialog({
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      if (!nextOpen && !isPending) handleClose();
+      if (!nextOpen) handleClose();
     },
-    [handleClose, isPending],
+    [handleClose],
   );
 
   const handleCancel = useCallback(() => {
-    if (!isPending) handleClose();
-  }, [handleClose, isPending]);
+    handleClose();
+  }, [handleClose]);
 
   const handleRetry = useCallback(() => {
     onRetry();
@@ -119,7 +119,7 @@ export function TransferRefundReviewDialog({
 
   return (
     <Dialog open onOpenChange={handleOpenChange}>
-      <DialogContent className="flex max-h-[85vh] max-w-4xl flex-col" showClose={!isPending}>
+      <DialogContent className="flex max-h-[85vh] max-w-4xl flex-col" dismissible={!isPending}>
         <DialogHeader>
           <DialogTitle>Review possible transfers and refunds</DialogTitle>
           <DialogDescription>

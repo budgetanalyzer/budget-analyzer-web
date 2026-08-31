@@ -16,6 +16,12 @@ function createDeferredPromise() {
   return { promise, resolve };
 }
 
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
+}
+
 function ModalHarness({
   selectedIds = [1, 2],
   onSuccess,
@@ -46,6 +52,13 @@ function ModalHarness({
 }
 
 describe('BulkDeleteModal', () => {
+  it('uses a sentence-case title and decorative warning icon for irreversible deletion', () => {
+    renderWithProviders(<ModalHarness onSuccess={vi.fn()} />);
+
+    const dialog = screen.getByRole('dialog', { name: 'Delete transactions' });
+    expect(dialog.querySelector('.lucide-triangle-alert')).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it.each([
     {
       resultName: 'full deletion',
@@ -76,7 +89,7 @@ describe('BulkDeleteModal', () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByRole('heading', { name: 'Delete Transactions' }),
+        screen.queryByRole('heading', { name: 'Delete transactions' }),
       ).not.toBeInTheDocument();
     });
     expect(requestBody).toEqual({ ids: [1, 2] });
@@ -127,14 +140,22 @@ describe('BulkDeleteModal', () => {
 
     expect(await screen.findByRole('button', { name: 'Deleting...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByText(/delete 2 transactions/i)).toBeInTheDocument();
+
+    await user.click(getDialogBackdrop());
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('dialog', { name: 'Delete transactions' })).toBeInTheDocument();
+    expect(screen.getByText(/delete 2 transactions/i)).toBeInTheDocument();
+    expect(onSuccess).not.toHaveBeenCalled();
 
     retryResponse.resolve();
 
     await waitFor(() => {
       expect(
-        screen.queryByRole('heading', { name: 'Delete Transactions' }),
+        screen.queryByRole('heading', { name: 'Delete transactions' }),
       ).not.toBeInTheDocument();
     });
     expect(requestCount).toBe(3);
@@ -161,7 +182,7 @@ describe('BulkDeleteModal', () => {
     await user.click(screen.getByRole('button', { name: 'Close' }));
     await user.click(screen.getByRole('button', { name: 'Open bulk delete' }));
 
-    expect(screen.getByRole('heading', { name: 'Delete Transactions' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Delete transactions' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByText(/delete 2 transactions/i)).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();

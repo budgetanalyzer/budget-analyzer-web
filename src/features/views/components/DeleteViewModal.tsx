@@ -59,13 +59,13 @@ export function DeleteViewModal({ open, onClose, view }: DeleteViewModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px]" dismissible={!isPending}>
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <AlertTriangle aria-hidden="true" className="h-5 w-5 text-destructive" />
             </div>
-            <DialogTitle>Delete View</DialogTitle>
+            <DialogTitle>Delete view</DialogTitle>
           </div>
           <DialogDescription className="pt-2">
             Are you sure you want to delete &ldquo;{view.name}&rdquo; and its{' '}

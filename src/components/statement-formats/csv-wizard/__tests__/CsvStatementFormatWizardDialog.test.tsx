@@ -161,6 +161,12 @@ async function previewMapping(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole('button', { name: /Save Format/ });
 }
 
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
+}
+
 describe('CsvStatementFormatWizardDialog', () => {
   it('analyzes a sample, previews a read-only parse, and saves the created format', async () => {
     const user = userEvent.setup();
@@ -322,6 +328,30 @@ describe('CsvStatementFormatWizardDialog', () => {
     expect(analyzeMutate).not.toHaveBeenCalled();
     expect(previewMutate).not.toHaveBeenCalled();
     expect(saveMutate).not.toHaveBeenCalled();
+  });
+
+  it('blocks every dismissal mechanism while a wizard request is pending', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    const { analyzeMutate } = mockHookDefaults();
+    mockUseAnalyzeCsvWizardSample.mockReturnValue({
+      mutate: analyzeMutate,
+      isPending: true,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useAnalyzeCsvWizardSample>);
+
+    renderWithProviders(
+      <CsvStatementFormatWizardDialog open onOpenChange={onOpenChange} onSaved={vi.fn()} />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+
+    await user.click(getDialogBackdrop());
+    await user.keyboard('{Escape}');
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Create statement format' })).toBeInTheDocument();
   });
 
   it('cancels from mapping without saving', async () => {

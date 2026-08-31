@@ -227,6 +227,7 @@ export function CsvStatementFormatWizardDialog({
   const isAnalyzePending = analyzeMutation.isPending;
   const isPreviewPending = previewMutation.isPending;
   const isSavePending = saveMutation.isPending;
+  const isMutationPending = isAnalyzePending || isPreviewPending || isSavePending;
 
   const resetWizardState = useCallback(() => {
     setStep('upload');
@@ -422,7 +423,10 @@ export function CsvStatementFormatWizardDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto sm:max-w-4xl"
+        dismissible={!isMutationPending}
+      >
         <DialogHeader>
           <DialogTitle>Create statement format</DialogTitle>
           <DialogDescription>
@@ -732,7 +736,12 @@ export function CsvStatementFormatWizardDialog({
         <DialogFooter>
           {step === 'upload' ? (
             <>
-              <Button type="button" variant="outline" onClick={handleCancel}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancel}
+                disabled={isMutationPending}
+              >
                 Cancel
               </Button>
               <Button
@@ -752,7 +761,12 @@ export function CsvStatementFormatWizardDialog({
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <Button type="button" variant="outline" onClick={handleCancel}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancel}
+                disabled={isMutationPending}
+              >
                 Cancel
               </Button>
               <Button
@@ -771,7 +785,12 @@ export function CsvStatementFormatWizardDialog({
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <Button type="button" variant="outline" onClick={handleCancel}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancel}
+                disabled={isMutationPending}
+              >
                 Cancel
               </Button>
               <Button type="button" onClick={handleSave} disabled={!canSave || isSavePending}>

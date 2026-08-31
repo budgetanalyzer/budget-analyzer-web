@@ -50,7 +50,7 @@ export function InactivityWarningModal({
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent showClose={false}>
+      <DialogContent dismissible={false}>
         <DialogHeader>
           <DialogTitle>Session Expiring</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

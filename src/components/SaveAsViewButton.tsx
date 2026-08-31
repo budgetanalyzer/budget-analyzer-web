@@ -7,12 +7,14 @@ interface SaveAsViewButtonProps {
   transactionIds: number[];
   isTransactionIdsReady: boolean;
   label?: string;
+  dialogTitle?: string;
 }
 
 export function SaveAsViewButton({
   transactionIds,
   isTransactionIdsReady,
   label = 'Save as View',
+  dialogTitle = 'Save as view',
 }: SaveAsViewButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -40,7 +42,7 @@ export function SaveAsViewButton({
         onClose={handleCloseModal}
         transactionIds={transactionIds}
         isTransactionIdsReady={isTransactionIdsReady}
-        title={label}
+        title={dialogTitle}
       />
     </>
   );

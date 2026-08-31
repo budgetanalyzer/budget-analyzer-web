@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { http, HttpResponse } from 'msw';
@@ -7,6 +7,21 @@ import { http, HttpResponse } from 'msw';
 import { UserDetailPage } from '@/features/admin/users/pages/UserDetailPage';
 import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
+
+function createDeferredPromise() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
+
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
+}
 
 function renderPage(initialPath: string) {
   return renderWithProviders(
@@ -95,6 +110,45 @@ describe('UserDetailPage', () => {
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Deactivate User' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('blocks dialog dismissal while deactivation is pending and closes after success', async () => {
+    const user = userEvent.setup();
+    const response = createDeferredPromise();
+    server.use(
+      http.post('/api/v1/users/:id/deactivate', async () => {
+        await response.promise;
+        return HttpResponse.json({
+          userId: 'usr_abc123',
+          status: 'DEACTIVATED',
+          rolesRemoved: 1,
+          sessionsRevoked: true,
+        });
+      }),
+    );
+
+    renderPage('/admin/users/usr_abc123');
+
+    await user.click(await screen.findByRole('button', { name: 'Deactivate User' }));
+    await user.click(screen.getByRole('button', { name: 'Deactivate Account' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Deactivate Admin User?' });
+    expect(within(dialog).getByRole('button', { name: 'Deactivating...' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(within(dialog).queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+
+    await user.click(getDialogBackdrop());
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('dialog', { name: 'Deactivate Admin User?' })).toBeInTheDocument();
+
+    response.resolve();
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Deactivate Admin User?' }),
+      ).not.toBeInTheDocument();
     });
   });
 

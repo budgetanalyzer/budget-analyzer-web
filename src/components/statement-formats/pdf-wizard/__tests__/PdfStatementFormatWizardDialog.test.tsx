@@ -161,7 +161,42 @@ async function analyzeAndOpenMapping(user: ReturnType<typeof userEvent.setup>, f
   await user.click(await screen.findByRole('button', { name: /Continue Mapping/ }));
 }
 
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
+}
+
 describe('PdfStatementFormatWizardDialog', () => {
+  it('blocks every dismissal mechanism while a wizard request is pending', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    mockHookDefaults();
+    mockUseAnalyzePdfWizardSample.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: true,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useAnalyzePdfWizardSample>);
+
+    renderWithProviders(
+      <PdfStatementFormatWizardDialog
+        open
+        onOpenChange={onOpenChange}
+        initialAccountId="checking-001"
+        onSaved={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+
+    await user.click(getDialogBackdrop());
+    await user.keyboard('{Escape}');
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Create PDF statement format' })).toBeInTheDocument();
+  });
+
   it('opens the mapping step with required markers but no required errors', async () => {
     const user = userEvent.setup();
     const file = new File(['%PDF-1.7'], 'sample.pdf', { type: 'application/pdf' });

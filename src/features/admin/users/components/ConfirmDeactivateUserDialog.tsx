@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -23,9 +24,16 @@ export function ConfirmDeactivateUserDialog({
   onConfirm,
   onCancel,
 }: ConfirmDeactivateUserDialogProps) {
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) onCancel();
+    },
+    [onCancel],
+  );
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !isSubmitting && !open && onCancel()}>
-      <DialogContent>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent dismissible={!isSubmitting}>
         <DialogHeader>
           <DialogTitle>Deactivate {userLabel}?</DialogTitle>
           <DialogDescription className="space-y-2">

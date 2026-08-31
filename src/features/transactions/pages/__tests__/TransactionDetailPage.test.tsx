@@ -282,7 +282,7 @@ describe('TransactionDetailPage', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(queryClient.getQueryData(['transaction', transaction.id])).toEqual(transaction);
-    expect(await screen.findByRole('heading', { name: 'Delete Transaction' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Delete transaction' })).toBeInTheDocument();
     const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
     await user.click(deleteButtons[deleteButtons.length - 1]);
 
@@ -304,12 +304,12 @@ describe('TransactionDetailPage', () => {
     renderDetailPage();
 
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
-    expect(await screen.findByRole('heading', { name: 'Delete Transaction' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Delete transaction' })).toBeInTheDocument();
     const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
     await user.click(deleteButtons[deleteButtons.length - 1]);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Delete failed');
-    expect(screen.getByRole('heading', { name: 'Delete Transaction' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Delete transaction' })).toBeInTheDocument();
     expect(screen.getAllByText('Coffee shop')).toHaveLength(2);
   });
 

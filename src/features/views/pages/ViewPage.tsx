@@ -348,6 +348,7 @@ function ViewPageContent({ id }: { id: string }) {
                 transactionIds={visibleTransactionIds}
                 isTransactionIdsReady={!isAmountFilterLoading}
                 label="Clone View"
+                dialogTitle="Clone view"
               />
             )}
             {canReviewTransfersAndRefunds && (

@@ -1,5 +1,6 @@
 // src/features/transactions/components/BulkDeleteModal.tsx
 import { useCallback, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { MessageBanner } from '@/components/MessageBanner';
 import {
   Dialog,
@@ -42,17 +43,15 @@ export function BulkDeleteModal({
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (isDeleting) return;
-
       if (open) onOpenChange(true);
       else handleClose();
     },
-    [handleClose, isDeleting, onOpenChange],
+    [handleClose, onOpenChange],
   );
 
   const handleCancel = useCallback(() => {
-    if (!isDeleting) handleClose();
-  }, [handleClose, isDeleting]);
+    handleClose();
+  }, [handleClose]);
 
   const handleDelete = useCallback(() => {
     if (isDeleting || selectedIds.length === 0) return;
@@ -71,10 +70,15 @@ export function BulkDeleteModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent dismissible={!isDeleting}>
         <DialogHeader>
-          <DialogTitle>Delete Transactions</DialogTitle>
-          <DialogDescription>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle aria-hidden="true" className="h-5 w-5 text-destructive" />
+            </div>
+            <DialogTitle>Delete transactions</DialogTitle>
+          </div>
+          <DialogDescription className="pt-2">
             Are you sure you want to delete {selectedIds.length} transaction
             {selectedIds.length !== 1 ? 's' : ''}? This action cannot be undone.
           </DialogDescription>

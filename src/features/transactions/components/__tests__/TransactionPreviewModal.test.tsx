@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { delay, http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '@/testing/mocks/server';
 import { transactionKeys } from '@/queryKeys';
@@ -22,6 +22,12 @@ function createDeferredPromise() {
   });
 
   return { promise, resolve };
+}
+
+function getDialogBackdrop() {
+  const backdrop = screen.getByRole('dialog').previousElementSibling;
+  if (!backdrop) throw new Error('Expected a dialog backdrop');
+  return backdrop;
 }
 
 const basePreviewTransaction: PreviewTransaction = {
@@ -912,11 +918,13 @@ describe('TransactionPreviewModal', () => {
   });
 
   it('disables close actions while an import is pending', async () => {
-    const { onImportComplete } = renderModal();
+    const user = userEvent.setup();
+    const importResponse = createDeferredPromise();
+    const { onOpenChange, onImportComplete } = renderModal();
 
     server.use(
       http.post('/api/v1/transactions/batch', async () => {
-        await delay(100);
+        await importResponse.promise;
         return HttpResponse.json({
           created: 1,
           duplicatesSkipped: 0,
@@ -926,13 +934,23 @@ describe('TransactionPreviewModal', () => {
       }),
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Import 1 Transaction' }));
+    await user.click(screen.getByRole('button', { name: 'Import 1 Transaction' }));
 
     expect(screen.getByRole('button', { name: 'Importing...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+
+    await user.click(getDialogBackdrop());
+    await user.keyboard('{Escape}');
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Preview Import' })).toBeInTheDocument();
+
+    importResponse.resolve();
 
     await waitFor(() => {
       expect(onImportComplete).toHaveBeenCalledWith(1, 0, 0);
     });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

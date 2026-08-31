@@ -127,6 +127,8 @@ export function ViewTransactionTable({
   );
   const bulkRemovalIds = selectAllMatching ? allFilteredIds : selectedIds;
   const idsToRemove = rowRemovalId === null ? bulkRemovalIds : [rowRemovalId];
+  const singleRemovalRow =
+    idsToRemove.length === 1 ? (rows.find((row) => row.id === idsToRemove[0]) ?? null) : null;
 
   const handleRowRemove = useCallback((transactionId: number) => {
     setRowRemovalId(transactionId);
@@ -491,6 +493,8 @@ export function ViewTransactionTable({
         <RemoveViewTransactionsModal
           viewId={viewId}
           transactionIds={idsToRemove}
+          transaction={singleRemovalRow}
+          displayAmount={singleRemovalRow?.displayAmount ?? null}
           open={removeDialogOpen}
           onOpenChange={handleRemoveDialogOpenChange}
           onSuccess={handleRemoveSuccess}
@@ -559,12 +563,7 @@ function RemoveViewTransactionButton({
   );
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={handleClick}
-      className="border border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-    >
+    <Button variant="outline" size="sm" onClick={handleClick}>
       <X className="mr-2 h-4 w-4" />
       Remove from view
     </Button>

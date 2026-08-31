@@ -316,12 +316,8 @@ describe('TransactionTable bulk deletion', () => {
       expect(screen.getByText('2 transactions selected')).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Delete' }));
 
-      const dialogHeading = screen.getByRole('heading', { name: 'Delete Transactions' });
-      const dialogContent = dialogHeading.parentElement?.parentElement;
-      expect(dialogContent).not.toBeNull();
-      await user.click(
-        within(dialogContent as HTMLElement).getByRole('button', { name: 'Delete' }),
-      );
+      const dialog = screen.getByRole('dialog', { name: 'Delete transactions' });
+      await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
       await waitFor(() => {
         expect(transactionRequestCount).toBeGreaterThan(1);
@@ -333,7 +329,7 @@ describe('TransactionTable bulk deletion', () => {
         expect(screen.queryByText('2 transactions selected')).not.toBeInTheDocument();
       });
       expect(
-        screen.queryByRole('heading', { name: 'Delete Transactions' }),
+        screen.queryByRole('heading', { name: 'Delete transactions' }),
       ).not.toBeInTheDocument();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
