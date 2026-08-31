@@ -24,6 +24,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 
   // Saved-view errors
   SAVED_VIEW_NAME_ALREADY_EXISTS: 'You already have a saved view with this name.',
+  SAVED_VIEW_MEMBERSHIP_LIMIT_EXCEEDED: 'A saved view can contain at most 10,000 transactions.',
   SAVED_VIEW_MEMBERSHIP_STALE:
     'The transaction snapshot changed and must be refreshed before updating this saved view.',
 
