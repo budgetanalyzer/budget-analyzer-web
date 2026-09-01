@@ -3,6 +3,7 @@ import { apiClient } from '@/api/client';
 import { assertArrayResponse } from '@/api/collectionResponse';
 import { ApiError } from '@/types/apiError';
 import {
+  CloneSavedViewRequest,
   SavedViewMetadata,
   CreateSavedViewRequest,
   UpdateSavedViewRequest,
@@ -65,6 +66,19 @@ export const viewApi = {
     const response = await apiClient.post<SavedViewMetadata>('/v1/views', {
       name: request.name,
       transactionIds: request.transactionIds,
+    });
+    return response.data;
+  },
+
+  /**
+   * Clone a static saved view under a new name
+   */
+  cloneView: async (
+    sourceViewId: string,
+    request: CloneSavedViewRequest,
+  ): Promise<SavedViewMetadata> => {
+    const response = await apiClient.post<SavedViewMetadata>(`/v1/views/${sourceViewId}/clone`, {
+      name: request.name,
     });
     return response.data;
   },

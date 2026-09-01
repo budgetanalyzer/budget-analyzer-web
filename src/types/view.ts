@@ -19,6 +19,13 @@ export interface CreateSavedViewRequest {
 }
 
 /**
+ * Request to clone a static saved view.
+ */
+export interface CloneSavedViewRequest {
+  name: string;
+}
+
+/**
  * Request to rename a static saved view.
  */
 export interface UpdateSavedViewRequest {

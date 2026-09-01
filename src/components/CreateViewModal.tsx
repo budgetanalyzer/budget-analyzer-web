@@ -10,33 +10,54 @@ import {
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { useCreateView } from '@/hooks/useViews';
+import { useCloneView, useCreateView } from '@/hooks/useViews';
+import type { ApiError } from '@/types/apiError';
 import { formatApiError } from '@/utils/errorMessages';
 
-interface CreateViewModalProps {
+interface CreateViewModalCommonProps {
   open: boolean;
   onClose: () => void;
-  transactionIds: number[];
-  isTransactionIdsReady: boolean;
   title?: string;
 }
 
+interface CreateViewModeProps {
+  transactionIds: number[];
+  isTransactionIdsReady: boolean;
+  sourceViewId?: never;
+}
+
+interface CloneViewModeProps {
+  sourceViewId: string;
+  transactionIds?: never;
+  isTransactionIdsReady?: never;
+}
+
+type CreateViewModalProps = CreateViewModalCommonProps & (CreateViewModeProps | CloneViewModeProps);
+
 const CREATE_FAILURE_MESSAGE = 'Failed to save view';
+const CLONE_FAILURE_MESSAGE = 'Failed to clone view';
 const STALE_MEMBERSHIP_MESSAGE =
   'The visible transaction set changed. The transaction snapshot was refreshed; review the current set and save again.';
+const STALE_CLONE_MEMBERSHIP_MESSAGE =
+  'The source view membership changed. Refresh the source view and try cloning again.';
 
-export function CreateViewModal({
-  open,
-  onClose,
-  transactionIds,
-  isTransactionIdsReady,
-  title = 'Save as view',
-}: CreateViewModalProps) {
+function isCloneMode(
+  props: CreateViewModalProps,
+): props is CreateViewModalCommonProps & CloneViewModeProps {
+  return props.sourceViewId !== undefined;
+}
+
+export function CreateViewModal(props: CreateViewModalProps) {
+  const { open, onClose, title = 'Save as view' } = props;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [name, setName] = useState('');
   const [mutationErrorMessage, setMutationErrorMessage] = useState<string | null>(null);
-  const { mutate: createView, isPending } = useCreateView();
+  const { mutate: createView, isPending: isCreatePending } = useCreateView();
+  const { mutate: cloneView, isPending: isClonePending } = useCloneView();
+  const cloneMode = isCloneMode(props);
+  const isPending = cloneMode ? isClonePending : isCreatePending;
+  const isSubmissionReady = cloneMode || props.isTransactionIdsReady;
 
   const handleDismissMutationError = useCallback(() => {
     setMutationErrorMessage(null);
@@ -71,11 +92,34 @@ export function CreateViewModal({
       event.preventDefault();
 
       const trimmedName = name.trim();
-      if (!trimmedName || !isTransactionIdsReady) return;
+      if (!trimmedName) return;
+      if (!isCloneMode(props) && !props.isTransactionIdsReady) return;
 
       setMutationErrorMessage(null);
+
+      if (isCloneMode(props)) {
+        cloneView(
+          { sourceViewId: props.sourceViewId, request: { name: trimmedName } },
+          {
+            onSuccess: (clonedView) => {
+              handleClose();
+              navigate(`/views/${clonedView.id}`);
+            },
+            onError: (error: ApiError) => {
+              if (error.response.code === 'SAVED_VIEW_MEMBERSHIP_STALE') {
+                setMutationErrorMessage(STALE_CLONE_MEMBERSHIP_MESSAGE);
+                return;
+              }
+
+              setMutationErrorMessage(formatApiError(error, CLONE_FAILURE_MESSAGE));
+            },
+          },
+        );
+        return;
+      }
+
       createView(
-        { name: trimmedName, transactionIds },
+        { name: trimmedName, transactionIds: props.transactionIds },
         {
           onSuccess: (newView) => {
             clearTransactionFilterParams();
@@ -93,15 +137,7 @@ export function CreateViewModal({
         },
       );
     },
-    [
-      clearTransactionFilterParams,
-      createView,
-      handleClose,
-      isTransactionIdsReady,
-      name,
-      navigate,
-      transactionIds,
-    ],
+    [clearTransactionFilterParams, cloneView, createView, handleClose, name, navigate, props],
   );
 
   const handleOpenChange = useCallback(
@@ -140,9 +176,11 @@ export function CreateViewModal({
             </div>
 
             <p className="text-sm text-muted-foreground">
-              {transactionIds.length === 1
-                ? '1 currently visible transaction will be saved.'
-                : `${transactionIds.length} currently visible transactions will be saved.`}
+              {cloneMode
+                ? 'The complete saved view will be copied, regardless of active filters.'
+                : props.transactionIds.length === 1
+                  ? '1 currently visible transaction will be saved.'
+                  : `${props.transactionIds.length} currently visible transactions will be saved.`}
             </p>
           </div>
 
@@ -160,7 +198,7 @@ export function CreateViewModal({
             <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending || !name.trim() || !isTransactionIdsReady}>
+            <Button type="submit" disabled={isPending || !name.trim() || !isSubmissionReady}>
               {isPending ? 'Saving...' : 'Save View'}
             </Button>
           </DialogFooter>

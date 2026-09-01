@@ -24,18 +24,9 @@ vi.mock('@/hooks/useCurrencies');
 vi.mock('@/hooks/useMissingCurrencies');
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/components/SaveAsViewButton', () => ({
-  SaveAsViewButton: (props: {
-    transactionIds: number[];
-    isTransactionIdsReady: boolean;
-    label?: string;
-    dialogTitle?: string;
-  }) => {
+  SaveAsViewButton: (props: { sourceViewId: string; label?: string; dialogTitle?: string }) => {
     saveAsProps.current = props;
-    return (
-      <button type="button" disabled={!props.isTransactionIdsReady}>
-        {props.label}
-      </button>
-    );
+    return <button type="button">{props.label}</button>;
   },
 }));
 
@@ -176,16 +167,16 @@ describe('ViewPage static collections', () => {
     expect(screen.getByText('No transactions in this view.')).toBeInTheDocument();
   });
 
-  it('passes the exact locally filtered ids to an independent clone action', () => {
+  it('passes the source view id to cloning regardless of text filters', () => {
     renderPage(`/views/${viewId}?q=coffee`);
 
     expect(saveAsProps.current).toEqual({
-      transactionIds: [1],
-      isTransactionIdsReady: true,
+      sourceViewId: viewId,
       label: 'Clone View',
       dialogTitle: 'Clone view',
     });
-    expect(saveAsProps.current).not.toHaveProperty('sourceViewId');
+    expect(saveAsProps.current).not.toHaveProperty('transactionIds');
+    expect(saveAsProps.current).not.toHaveProperty('isTransactionIdsReady');
   });
 
   it('builds a filtered add-mode link with an explicit clean return destination', () => {
@@ -202,11 +193,9 @@ describe('ViewPage static collections', () => {
     );
   });
 
-  it('uses settled selected-currency amount filtering for clone ids', () => {
+  it('keeps the source view id independent of settled amount filters', () => {
     renderPage(`/views/${viewId}?minAmount=15&amountCurrency=USD`);
-    expect(saveAsProps.current).toEqual(
-      expect.objectContaining({ transactionIds: [2], isTransactionIdsReady: true }),
-    );
+    expect(saveAsProps.current).toEqual(expect.objectContaining({ sourceViewId: viewId }));
   });
 
   it('uses only selected-currency row presentation with partial saved-view totals', () => {
@@ -234,9 +223,7 @@ describe('ViewPage static collections', () => {
     expect(screen.getByText('Amount in USD unavailable')).toBeInTheDocument();
     expect(screen.queryByText('£20.00')).not.toBeInTheDocument();
     expect(screen.queryByText('GBP')).not.toBeInTheDocument();
-    expect(saveAsProps.current).toEqual(
-      expect.objectContaining({ transactionIds: [1, 2], isTransactionIdsReady: true }),
-    );
+    expect(saveAsProps.current).toEqual(expect.objectContaining({ sourceViewId: viewId }));
   });
 
   it('renders an all-unavailable saved-view spend total as unavailable', () => {
@@ -264,7 +251,7 @@ describe('ViewPage static collections', () => {
     expect(screen.getByText('Unavailable')).toBeInTheDocument();
   });
 
-  it('disables cloning while an active amount filter is unresolved', () => {
+  it('keeps cloning enabled with the source id while an amount filter is unresolved', () => {
     mockUseExchangeRatesMap.mockReturnValue({
       exchangeRatesMap: new Map(),
       exchangeRatesData: [],
@@ -275,8 +262,12 @@ describe('ViewPage static collections', () => {
     });
     renderPage(`/views/${viewId}?minAmount=15&amountCurrency=USD`);
 
-    expect(screen.getByRole('button', { name: 'Clone View' })).toBeDisabled();
-    expect(saveAsProps.current).toEqual(expect.objectContaining({ isTransactionIdsReady: false }));
+    expect(screen.getByRole('button', { name: 'Clone View' })).toBeEnabled();
+    expect(saveAsProps.current).toEqual({
+      sourceViewId: viewId,
+      label: 'Clone View',
+      dialogTitle: 'Clone view',
+    });
   });
 
   it('reports stale snapshot memberships without fetching rows itself', () => {
