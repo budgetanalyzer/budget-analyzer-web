@@ -79,12 +79,14 @@ function renderTable({
   ),
   isAmountFilterLoading = false,
   unavailableAmountFilterCount = 0,
+  onReviewPossibleTransfersAndRefunds,
 }: {
   rows?: Transaction[];
   filters?: TransactionFilterValues;
   displayAmounts?: ReadonlyMap<number, DisplayAmount>;
   isAmountFilterLoading?: boolean;
   unavailableAmountFilterCount?: number;
+  onReviewPossibleTransfersAndRefunds?: () => void;
 } = {}) {
   return renderWithProviders(
     <>
@@ -99,6 +101,7 @@ function renderTable({
         displayAmounts={displayAmounts}
         isDisplayAmountLoading={false}
         isAmountFilterLoading={isAmountFilterLoading}
+        onReviewPossibleTransfersAndRefunds={onReviewPossibleTransfersAndRefunds}
         unavailableAmountFilterCount={unavailableAmountFilterCount}
       />
       <LocationProbe />
@@ -111,6 +114,27 @@ describe('ViewTransactionTable', () => {
   beforeEach(() => {
     mockUsePermission.mockReset();
     mockUsePermission.mockImplementation((permission) => permission === 'views:write');
+  });
+
+  it('associates the optional review action with the Transactions region and invokes it', async () => {
+    const user = userEvent.setup();
+    const onReviewPossibleTransfersAndRefunds = vi.fn();
+    const withReview = renderTable({ onReviewPossibleTransfersAndRefunds });
+
+    const transactionsRegion = screen.getByRole('region', { name: 'Transactions' });
+    expect(within(transactionsRegion).getByRole('heading', { name: 'Transactions' })).toBeVisible();
+    await user.click(
+      within(transactionsRegion).getByRole('button', {
+        name: 'Review possible transfers and refunds',
+      }),
+    );
+    expect(onReviewPossibleTransfersAndRefunds).toHaveBeenCalledOnce();
+
+    withReview.unmount();
+    renderTable();
+    expect(
+      screen.queryByRole('button', { name: 'Review possible transfers and refunds' }),
+    ).not.toBeInTheDocument();
   });
 
   it('hides membership actions without views:write and preserves row navigation', async () => {

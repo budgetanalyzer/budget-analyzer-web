@@ -13,14 +13,29 @@ const view: SavedViewMetadata = {
 };
 
 describe('ViewCard', () => {
-  it('renders only static metadata and collection navigation', () => {
+  it('renders static metadata and two clearly named collection destinations', () => {
     renderWithProviders(<ViewCard view={view} />, { initialEntries: ['/views'] });
 
     expect(screen.getByText('Static collection')).toBeInTheDocument();
     expect(screen.getByText('4 transactions')).toBeInTheDocument();
     expect(screen.getByText(/Updated/)).toBeInTheDocument();
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'Open Static collection view' })).toHaveAttribute(
+      'href',
+      '/views/view-1',
+    );
+    expect(screen.getByRole('link', { name: 'Open Static collection view' })).toHaveTextContent(
+      'Open view',
+    );
     expect(
-      screen.getByRole('link', { name: 'View details for Static collection' }),
-    ).toHaveAttribute('href', '/views/view-1');
+      screen.getByRole('link', { name: 'Open Static collection in Analytics' }),
+    ).toHaveAttribute(
+      'href',
+      '/analytics?scope=view&viewId=view-1&viewMode=monthly&transactionType=debit',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Open Static collection in Analytics' }),
+    ).toHaveTextContent('Open in Analytics');
   });
 });
