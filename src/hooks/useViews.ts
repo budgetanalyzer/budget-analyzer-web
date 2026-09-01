@@ -6,6 +6,7 @@ import { savedViewInvalidationKeys, viewKeys } from '@/queryKeys';
 import type { ApiError } from '@/types/apiError';
 import type { Transaction } from '@/types/transaction';
 import type {
+  CloneSavedViewRequest,
   CreateSavedViewRequest,
   SavedViewMetadata,
   UpdateSavedViewRequest,
@@ -116,6 +117,22 @@ export const useCreateView = () => {
       if (error.response.code === 'SAVED_VIEW_MEMBERSHIP_STALE') {
         void invalidateKeys(queryClient, savedViewInvalidationKeys.staleCreation());
       }
+    },
+  });
+};
+
+interface CloneViewVariables {
+  sourceViewId: string;
+  request: CloneSavedViewRequest;
+}
+
+export const useCloneView = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<SavedViewMetadata, ApiError, CloneViewVariables>({
+    mutationFn: ({ sourceViewId, request }) => viewApi.cloneView(sourceViewId, request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: viewKeys.list() });
     },
   });
 };

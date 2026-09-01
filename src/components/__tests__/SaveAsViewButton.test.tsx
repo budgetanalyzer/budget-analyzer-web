@@ -18,14 +18,25 @@ describe('SaveAsViewButton', () => {
     modalProps.current = undefined;
   });
 
-  it('passes the exact visible ids and opens the modal', async () => {
+  it('passes the exact visible ids and readiness in create mode', async () => {
+    renderWithProviders(<SaveAsViewButton transactionIds={[9, 3]} isTransactionIdsReady />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save as View' }));
+
+    expect(modalProps.current).toEqual(
+      expect.objectContaining({
+        open: true,
+        transactionIds: [9, 3],
+        isTransactionIdsReady: true,
+        title: 'Save as view',
+      }),
+    );
+    expect(modalProps.current).not.toHaveProperty('sourceViewId');
+  });
+
+  it('passes only the source view identity in clone mode', async () => {
     renderWithProviders(
-      <SaveAsViewButton
-        transactionIds={[9, 3]}
-        isTransactionIdsReady
-        label="Clone View"
-        dialogTitle="Clone view"
-      />,
+      <SaveAsViewButton sourceViewId="source-view" label="Clone View" dialogTitle="Clone view" />,
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Clone View' }));
@@ -33,15 +44,21 @@ describe('SaveAsViewButton', () => {
     expect(modalProps.current).toEqual(
       expect.objectContaining({
         open: true,
-        transactionIds: [9, 3],
-        isTransactionIdsReady: true,
+        sourceViewId: 'source-view',
         title: 'Clone view',
       }),
     );
+    expect(modalProps.current).not.toHaveProperty('transactionIds');
+    expect(modalProps.current).not.toHaveProperty('isTransactionIdsReady');
   });
 
   it('disables creation while the visible id set is unresolved', () => {
     renderWithProviders(<SaveAsViewButton transactionIds={[1]} isTransactionIdsReady={false} />);
     expect(screen.getByRole('button', { name: 'Save as View' })).toBeDisabled();
+  });
+
+  it('keeps clone mode available without transaction readiness', () => {
+    renderWithProviders(<SaveAsViewButton sourceViewId="source-view" label="Clone View" />);
+    expect(screen.getByRole('button', { name: 'Clone View' })).toBeEnabled();
   });
 });

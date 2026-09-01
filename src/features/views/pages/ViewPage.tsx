@@ -192,11 +192,6 @@ function ViewPageContent({ id }: { id: string }) {
     return filterTransactionsByDisplayAmount(transactions ?? [], effectiveFilters, displayAmounts);
   }, [displayAmounts, filters, isAmountCurrencyInvalid, isAmountFilterLoading, transactions]);
   const filteredTransactions = filterResult.transactions;
-  const visibleTransactionIds = useMemo(
-    () => filteredTransactions.map((transaction) => transaction.id),
-    [filteredTransactions],
-  );
-
   const availableBankNames = useMemo(
     () => [...new Set((transactions ?? []).map((transaction) => transaction.bankName))].sort(),
     [transactions],
@@ -345,8 +340,7 @@ function ViewPageContent({ id }: { id: string }) {
             )}
             {canClone && (
               <SaveAsViewButton
-                transactionIds={visibleTransactionIds}
-                isTransactionIdsReady={!isAmountFilterLoading}
+                sourceViewId={view.id}
                 label="Clone View"
                 dialogTitle="Clone view"
               />

@@ -32,9 +32,9 @@ function getDialogBackdrop() {
   return backdrop;
 }
 
-function createdView(name: string, transactionCount: number) {
+function createdView(name: string, transactionCount: number, id = 'created-view') {
   return {
-    id: 'created-view',
+    id,
     name,
     transactionCount,
     createdAt: '2026-01-01T00:00:00Z',
@@ -76,6 +76,28 @@ function renderModal({
     </Routes>,
     {
       initialEntries: ['/transactions?q=coffee&minAmount=10&amountCurrency=USD'],
+      router: 'dom',
+    },
+  );
+  return { onClose, ...result };
+}
+
+function renderCloneModal({ onClose = vi.fn() }: { onClose?: () => void } = {}) {
+  const result = renderWithProviders(
+    <Routes>
+      <Route
+        path="/views/source-view"
+        element={
+          <>
+            <CreateViewModal open onClose={onClose} sourceViewId="source-view" title="Clone view" />
+            <LocationProbe />
+          </>
+        }
+      />
+      <Route path="/views/:id" element={<LocationProbe />} />
+    </Routes>,
+    {
+      initialEntries: ['/views/source-view?q=coffee&minAmount=10&amountCurrency=USD'],
       router: 'dom',
     },
   );
@@ -234,5 +256,117 @@ describe('CreateViewModal', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/visible transaction set changed/i);
     expect(screen.getByRole('alert')).toHaveTextContent(/snapshot was refreshed/i);
     expect(nameInput).toHaveValue('Coffee collection');
+  });
+
+  it('explains and clones the complete saved view before navigating without source filters', async () => {
+    let cloneRequestBody: unknown;
+    let createRequestCount = 0;
+    server.use(
+      http.post('/api/v1/views/:sourceViewId/clone', async ({ request, params }) => {
+        expect(params.sourceViewId).toBe('source-view');
+        cloneRequestBody = await request.json();
+        return HttpResponse.json(createdView('Complete copy', 2, 'cloned-view'), { status: 201 });
+      }),
+      http.post('/api/v1/views', () => {
+        createRequestCount += 1;
+        return HttpResponse.json(createdView('Wrong endpoint', 0), { status: 201 });
+      }),
+    );
+    const { onClose } = renderCloneModal();
+    const nameInput = screen.getByLabelText('View Name');
+
+    expect(screen.getByRole('dialog', { name: 'Clone view' })).toBeInTheDocument();
+    expect(screen.getByText(/complete saved view will be copied/i)).toHaveTextContent(
+      /regardless of active filters/i,
+    );
+    expect(nameInput).toHaveAttribute('maxlength', '255');
+
+    await userEvent.type(nameInput, '  Complete copy  ');
+    await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
+
+    await waitFor(() => expect(cloneRequestBody).toEqual({ name: 'Complete copy' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/views/cloned-view'),
+    );
+    expect(screen.getByTestId('location')).not.toHaveTextContent('q=coffee');
+    expect(createRequestCount).toBe(0);
+  });
+
+  it('preserves clone input after a persistent failure and locks dismissal during retry', async () => {
+    const user = userEvent.setup();
+    const retryResponse = createDeferredPromise();
+    let requestCount = 0;
+    server.use(
+      http.post('/api/v1/views/:sourceViewId/clone', async () => {
+        requestCount += 1;
+        if (requestCount === 1) {
+          return HttpResponse.json(
+            { type: 'INTERNAL_ERROR', message: 'Could not clone collection' },
+            { status: 500 },
+          );
+        }
+
+        await retryResponse.promise;
+        return HttpResponse.json(createdView('Retry copy', 2, 'retry-clone'), { status: 201 });
+      }),
+    );
+    const { onClose } = renderCloneModal();
+    const nameInput = screen.getByLabelText('View Name');
+    await user.type(nameInput, 'Retry copy');
+    await user.click(screen.getByRole('button', { name: 'Save View' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not clone collection');
+    expect(nameInput).toHaveValue('Retry copy');
+    expect(onClose).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save View' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Save View' }));
+
+    expect(await screen.findByRole('button', { name: 'Saving...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(nameInput).toHaveValue('Retry copy');
+
+    await user.click(getDialogBackdrop());
+    await user.keyboard('{Escape}');
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Clone view' })).toBeInTheDocument();
+
+    retryResponse.resolve();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(requestCount).toBe(2);
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/views/retry-clone'),
+    );
+  });
+
+  it('uses source-view recovery wording for stale clone membership without retrying', async () => {
+    let requestCount = 0;
+    server.use(
+      http.post('/api/v1/views/:sourceViewId/clone', () => {
+        requestCount += 1;
+        return HttpResponse.json(
+          {
+            type: 'APPLICATION_ERROR',
+            message: 'Stale',
+            code: 'SAVED_VIEW_MEMBERSHIP_STALE',
+          },
+          { status: 422 },
+        );
+      }),
+    );
+    renderCloneModal();
+    const nameInput = screen.getByLabelText('View Name');
+    await userEvent.type(nameInput, 'Stale copy');
+    await userEvent.click(screen.getByRole('button', { name: 'Save View' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/source view membership changed/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/refresh the source view/i);
+    expect(nameInput).toHaveValue('Stale copy');
+    expect(requestCount).toBe(1);
   });
 });

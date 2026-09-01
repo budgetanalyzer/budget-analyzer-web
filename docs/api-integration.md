@@ -149,9 +149,16 @@ placement rules are in [State architecture](state-architecture.md).
 
 Saved views are static transaction collections. Creation sends a name and the
 exact currently visible transaction ID array; an empty array is valid. Cloning
-sends another independent `{name, transactionIds}` request and does not persist
-the source view, filters, sort order, or other lineage. Rename uses `PATCH` with
-`{name}` only.
+instead sends `{name}` to `POST /v1/views/{sourceViewId}/clone`. The backend
+copies the complete canonical source membership into an independent view,
+regardless of local filters, sorting, display currency, or client cache
+completeness.
+
+Clone success invalidates the saved-view list and navigates to the returned
+view. Clone failures remain contextual in the initiating dialog with the name
+available for a user-driven retry. The frontend neither retries the mutation
+automatically nor falls back to recreating the source through `POST /v1/views`.
+Rename uses `PATCH` with `{name}` only.
 
 `GET /v1/views/{id}/transactions` returns the complete deterministically ordered
 `transactionIds` membership. `useViewTransactions` intersects that order with

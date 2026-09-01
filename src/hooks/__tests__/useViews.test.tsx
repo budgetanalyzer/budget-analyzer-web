@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createAddViewTransactionsRequest,
   createRemoveViewTransactionsRequest,
+  useCloneView,
   useCreateView,
   useDeleteView,
   useUpdateView,
@@ -158,6 +159,81 @@ describe('static saved-view mutations', () => {
 
     expect(requestBody).toEqual({ name: 'Empty', transactionIds: [] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: viewKeys.list() });
+  });
+
+  it('clones a view and invalidates the list', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    server.use(
+      http.post('/api/v1/views/:sourceViewId/clone', ({ params }) => {
+        expect(params.sourceViewId).toBe('view-1');
+        return HttpResponse.json(
+          { ...savedView, id: 'view-2', name: 'January Groceries copy' },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const { result } = renderHook(useCloneView, { wrapper: createWrapper(queryClient) });
+    await expect(
+      result.current.mutateAsync({
+        sourceViewId: 'view-1',
+        request: { name: 'January Groceries copy' },
+      }),
+    ).resolves.toMatchObject({ id: 'view-2', name: 'January Groceries copy' });
+
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: viewKeys.list() });
+  });
+
+  it('surfaces clone failures without falling back to create or rewriting membership', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const calls: Array<{ method: string; path: string }> = [];
+    server.use(
+      http.post('/api/v1/views/:sourceViewId/clone', ({ request }) => {
+        calls.push({ method: request.method, path: new URL(request.url).pathname });
+        return HttpResponse.json(
+          {
+            type: 'APPLICATION_ERROR',
+            message: 'Source membership is stale',
+            code: 'SAVED_VIEW_MEMBERSHIP_STALE',
+          },
+          { status: 422 },
+        );
+      }),
+      http.post('/api/v1/views', ({ request }) => {
+        calls.push({ method: request.method, path: new URL(request.url).pathname });
+        return HttpResponse.json(savedView, { status: 201 });
+      }),
+      http.patch('/api/v1/views/:viewId/transactions', ({ request }) => {
+        calls.push({ method: request.method, path: new URL(request.url).pathname });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    const { result } = renderHook(useCloneView, { wrapper: createWrapper(queryClient) });
+    await expect(
+      result.current.mutateAsync({
+        sourceViewId: 'view-1',
+        request: { name: 'January Groceries copy' },
+      }),
+    ).rejects.toMatchObject({
+      status: 422,
+      message: 'Source membership is stale',
+      response: {
+        type: 'APPLICATION_ERROR',
+        code: 'SAVED_VIEW_MEMBERSHIP_STALE',
+      },
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toMatchObject({
+      status: 422,
+      response: { code: 'SAVED_VIEW_MEMBERSHIP_STALE' },
+    });
+    expect(calls).toEqual([{ method: 'POST', path: '/api/v1/views/view-1/clone' }]);
+    expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
   it('refreshes the complete snapshot after stale creation without retrying', async () => {

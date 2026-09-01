@@ -4,6 +4,7 @@ import { viewApi } from '@/api/viewApi';
 import { server } from '@/testing/mocks/server';
 import { ApiError } from '@/types/apiError';
 import type {
+  CloneSavedViewRequest,
   CreateSavedViewRequest,
   SavedViewMetadata,
   UpdateSavedViewRequest,
@@ -84,6 +85,39 @@ describe('viewApi', () => {
 
     await expect(viewApi.createView(request)).resolves.toMatchObject({ name: request.name });
     expect(capturedBody).toEqual(request);
+  });
+
+  it('posts a name-only clone request to the source-view path and returns its metadata', async () => {
+    const request: CloneSavedViewRequest & { transactionIds: number[] } = {
+      name: 'January Groceries copy',
+      transactionIds: [7, 3],
+    };
+    const clonedView: SavedViewMetadata = {
+      ...savedView,
+      id: 'view-2',
+      name: request.name,
+    };
+    let capturedMethod = '';
+    let capturedPath = '';
+    let capturedBody: unknown;
+
+    server.use(
+      http.post(
+        '/api/v1/views/:sourceViewId/clone',
+        async ({ request: interceptedRequest, params }) => {
+          expect(params.sourceViewId).toBe('view-1');
+          capturedMethod = interceptedRequest.method;
+          capturedPath = new URL(interceptedRequest.url).pathname;
+          capturedBody = await interceptedRequest.json();
+          return HttpResponse.json(clonedView, { status: 201 });
+        },
+      ),
+    );
+
+    await expect(viewApi.cloneView('view-1', request)).resolves.toEqual(clonedView);
+    expect(capturedMethod).toBe('POST');
+    expect(capturedPath).toBe('/api/v1/views/view-1/clone');
+    expect(capturedBody).toEqual({ name: 'January Groceries copy' });
   });
 
   it('patches a rename with name as the only field', async () => {

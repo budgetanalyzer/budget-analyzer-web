@@ -3,20 +3,29 @@ import { Bookmark } from 'lucide-react';
 import { CreateViewModal } from '@/components/CreateViewModal';
 import { Button } from '@/components/ui/Button';
 
-interface SaveAsViewButtonProps {
-  transactionIds: number[];
-  isTransactionIdsReady: boolean;
+interface SaveAsViewButtonCommonProps {
   label?: string;
   dialogTitle?: string;
 }
 
-export function SaveAsViewButton({
-  transactionIds,
-  isTransactionIdsReady,
-  label = 'Save as View',
-  dialogTitle = 'Save as view',
-}: SaveAsViewButtonProps) {
+type SaveAsViewButtonProps = SaveAsViewButtonCommonProps &
+  (
+    | {
+        transactionIds: number[];
+        isTransactionIdsReady: boolean;
+        sourceViewId?: never;
+      }
+    | {
+        sourceViewId: string;
+        transactionIds?: never;
+        isTransactionIdsReady?: never;
+      }
+  );
+
+export function SaveAsViewButton(props: SaveAsViewButtonProps) {
+  const { label = 'Save as View', dialogTitle = 'Save as view' } = props;
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const isCloneMode = props.sourceViewId !== undefined;
 
   const handleOpenModal = useCallback(() => {
     setIsModalOpen(true);
@@ -30,7 +39,7 @@ export function SaveAsViewButton({
     <>
       <Button
         onClick={handleOpenModal}
-        disabled={!isTransactionIdsReady}
+        disabled={!isCloneMode && !props.isTransactionIdsReady}
         size="default"
         variant="outline"
       >
@@ -40,9 +49,13 @@ export function SaveAsViewButton({
       <CreateViewModal
         open={isModalOpen}
         onClose={handleCloseModal}
-        transactionIds={transactionIds}
-        isTransactionIdsReady={isTransactionIdsReady}
         title={dialogTitle}
+        {...(isCloneMode
+          ? { sourceViewId: props.sourceViewId }
+          : {
+              transactionIds: props.transactionIds,
+              isTransactionIdsReady: props.isTransactionIdsReady,
+            })}
       />
     </>
   );
