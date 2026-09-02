@@ -240,11 +240,15 @@ describe('ViewPage static collections', () => {
     renderPage();
 
     const pageTitle = screen.getByRole('heading', { name: 'Static collection' });
-    const pageHeader = pageTitle.parentElement?.parentElement;
+    const transactionCount = screen.getByText('2 transactions');
+    const metadataRow = transactionCount.parentElement;
+    const pageHeader = metadataRow?.parentElement?.parentElement;
+    expect(pageTitle).toBeInTheDocument();
+    expect(metadataRow).not.toBeNull();
     expect(pageHeader).not.toBeNull();
     expect(within(pageHeader!).getAllByRole('link')).toHaveLength(2);
     expect(within(pageHeader!).getAllByRole('button')).toHaveLength(1);
-    const analyticsLink = within(pageHeader!).getByRole('link', { name: 'Open in Analytics' });
+    const analyticsLink = within(metadataRow!).getByRole('link', { name: 'Open in Analytics' });
     const addTransactionsLink = within(pageHeader!).getByRole('link', {
       name: 'Add transactions',
     });

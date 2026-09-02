@@ -6,10 +6,11 @@ import { ReactNode } from 'react';
 export interface PageHeaderProps {
   title: string;
   description: string;
+  descriptionAction?: ReactNode;
   action?: ReactNode;
 }
 
-export function PageHeader({ title, description, action }: PageHeaderProps) {
+export function PageHeader({ title, description, descriptionAction, action }: PageHeaderProps) {
   return (
     <motion.div
       variants={fadeInVariants}
@@ -18,9 +19,12 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
       transition={fadeTransition}
       className="flex items-start justify-between"
     >
-      <div>
+      <div className="min-w-0">
         <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-        <p className="text-muted-foreground">{description}</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="text-muted-foreground">{description}</p>
+          {descriptionAction}
+        </div>
       </div>
       {action}
     </motion.div>

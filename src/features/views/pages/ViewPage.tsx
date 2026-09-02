@@ -327,15 +327,17 @@ function ViewPageContent({ id }: { id: string }) {
       <PageHeader
         title={view.name}
         description={`${view.transactionCount} transactions`}
+        descriptionAction={
+          <Link
+            to={analyzeViewUrl}
+            className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Open in Analytics
+          </Link>
+        }
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to={analyzeViewUrl}
-              className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Open in Analytics
-            </Link>
             {canWrite && addTransactionsUrl && (
               <Link
                 to={addTransactionsUrl}
