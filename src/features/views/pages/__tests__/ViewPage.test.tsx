@@ -244,11 +244,20 @@ describe('ViewPage static collections', () => {
     expect(pageHeader).not.toBeNull();
     expect(within(pageHeader!).getAllByRole('link')).toHaveLength(2);
     expect(within(pageHeader!).getAllByRole('button')).toHaveLength(1);
-    expect(within(pageHeader!).getByRole('link', { name: 'Add transactions' })).toBeInTheDocument();
-    expect(within(pageHeader!).getByRole('button', { name: 'View actions' })).toBeInTheDocument();
-    expect(within(pageHeader!).getByRole('link', { name: 'Open in Analytics' })).toHaveAttribute(
+    const analyticsLink = within(pageHeader!).getByRole('link', { name: 'Open in Analytics' });
+    const addTransactionsLink = within(pageHeader!).getByRole('link', {
+      name: 'Add transactions',
+    });
+    const viewActionsButton = within(pageHeader!).getByRole('button', { name: 'View actions' });
+    expect(analyticsLink).toHaveAttribute(
       'href',
       `/analytics?scope=view&viewId=${viewId}&viewMode=monthly&transactionType=debit`,
+    );
+    expect(analyticsLink.compareDocumentPosition(addTransactionsLink)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(addTransactionsLink.compareDocumentPosition(viewActionsButton)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(screen.queryByRole('link', { name: 'Analyze View' })).not.toBeInTheDocument();
   });

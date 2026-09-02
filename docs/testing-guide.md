@@ -298,11 +298,11 @@ between browser policy and stricter repository authoring rules.
 Application coverage uses authenticated desktop routes with deterministic
 mocked data. Two transaction-list workflows cover row selection and the shared
 bulk-deletion dialog, including focus containment, dismissal, focus restoration,
-and in-flight mutation behavior. A saved-view-detail workflow opens the visible
-`View actions` dropdown, verifies the ordered rename, duplicate, and separated
-delete actions, opens and dismisses `Duplicate view`, and verifies focus
-restoration. Every workflow also asserts that the CSP monitor reports no policy
-violation or prohibited runtime or final stylesheet.
+and in-flight mutation behavior. A saved-view-detail workflow opens the
+horizontal-ellipsis dropdown named `View actions`, verifies the ordered rename,
+duplicate, and separated delete actions, opens and dismisses `Duplicate view`,
+and verifies focus restoration. Every workflow also asserts that the CSP monitor
+reports no policy violation or prohibited runtime or final stylesheet.
 
 The Playwright project is desktop Chromium only. The saved-view test covers one
 application-owned dropdown at the default desktop viewport; it does not assert

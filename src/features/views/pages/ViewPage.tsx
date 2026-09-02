@@ -329,6 +329,13 @@ function ViewPageContent({ id }: { id: string }) {
         description={`${view.transactionCount} transactions`}
         action={
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={analyzeViewUrl}
+              className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Open in Analytics
+            </Link>
             {canWrite && addTransactionsUrl && (
               <Link
                 to={addTransactionsUrl}
@@ -343,13 +350,6 @@ function ViewPageContent({ id }: { id: string }) {
               onDuplicateClick={handleDuplicateClick}
               onDeleteClick={handleDeleteClick}
             />
-            <Link
-              to={analyzeViewUrl}
-              className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Open in Analytics
-            </Link>
           </div>
         }
       />

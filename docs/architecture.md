@@ -95,8 +95,10 @@ dialog. This keeps navigation semantics consistent with the
 When a page has a primary action, it visually distinguishes one and does not
 present competing primary actions. Frequent and domain-specific actions remain
 visible near the content they affect, while rare object operations use
-progressive disclosure through a visibly labeled menu, not an icon-only
-trigger. These rules follow the distinction between links and actions in the
+progressive disclosure through an overflow menu. A conventional horizontal
+ellipsis trigger may be icon-only when it retains a precise accessible name;
+unfamiliar menu triggers remain visibly labeled. These rules follow the
+distinction between links and actions in the
 [USWDS button guidance](https://designsystem.digital.gov/components/button/)
 and [GOV.UK button guidance](https://design-system.service.gov.uk/components/button/),
 along with the rationale in Nielsen Norman Group's

@@ -13,7 +13,7 @@ describe('ViewActionsMenu', () => {
     mockUsePermission.mockReset();
   });
 
-  it('uses a visible trigger and closes before dispatching each action', async () => {
+  it('uses an accessible icon-only trigger and closes before dispatching each action', async () => {
     mockUsePermission.mockReturnValue(true);
     const onRenameClick = vi.fn();
     const onDuplicateClick = vi.fn();
@@ -28,7 +28,8 @@ describe('ViewActionsMenu', () => {
     );
 
     const trigger = screen.getByRole('button', { name: 'View actions' });
-    expect(trigger).toHaveTextContent('View actions');
+    expect(trigger).toHaveAttribute('aria-label', 'View actions');
+    expect(trigger).toHaveTextContent('');
 
     await user.click(trigger);
     await user.click(screen.getByRole('menuitem', { name: 'Rename view' }));
