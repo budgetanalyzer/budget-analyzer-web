@@ -5,6 +5,8 @@ import type { Transaction } from '@/types/transaction';
 import type { SavedViewMetadata, ViewMembershipResponse } from '@/types/view';
 
 export const SAVED_VIEW_FIXTURE_ID = '0d4c3eb4-c8f9-4d44-8f4e-a726b23596ec';
+export const SAVED_VIEW_MEMBER_TRANSACTION_ID = 1001;
+export const SAVED_VIEW_ELIGIBLE_TRANSACTION_ID = 1002;
 
 export function buildAuthenticatedUser(overrides: Partial<User> = {}): User {
   return {
@@ -29,7 +31,7 @@ export function buildSessionStatus(overrides: Partial<SessionStatus> = {}): Sess
 
 export function buildTransaction(overrides: Partial<Transaction> = {}): Transaction {
   return {
-    id: 1001,
+    id: SAVED_VIEW_MEMBER_TRANSACTION_ID,
     accountId: 'e2e-checking-001',
     bankName: 'Fixture Bank',
     date: '2026-08-15',
@@ -72,7 +74,7 @@ export function buildViewMembership(
   overrides: Partial<ViewMembershipResponse> = {},
 ): ViewMembershipResponse {
   return {
-    transactionIds: [buildTransaction().id],
+    transactionIds: [SAVED_VIEW_MEMBER_TRANSACTION_ID],
     ...overrides,
   };
 }

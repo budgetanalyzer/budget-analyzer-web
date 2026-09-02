@@ -17,7 +17,7 @@ This snapshot is based on current production source and excludes tests:
 
 - zero global transient toast emissions, providers, or primitives;
 - 25 `MessageBanner` render sites;
-- 13 `ErrorBanner` render sites;
+- 12 `ErrorBanner` render sites;
 - nine specialized persistent condition-callout categories; and
 - one session-warning modal.
 
@@ -74,7 +74,7 @@ The changed interface is the feedback for successful direct manipulations:
 
 - inline and detail transaction edits;
 - single transaction deletion;
-- saved-view creation, rename, deletion, and both membership-removal flows;
+- saved-view creation, rename, deletion, and membership addition/removal flows;
 - statement-format hide and restore; and
 - user deactivation.
 
@@ -102,7 +102,7 @@ true, so the message remains until the condition resolves.
 | Disabled currencies or exchange rates still being imported | Warning callout | Reused on Transactions, saved-view detail, and Analytics. Pending rates provide Refresh; disabled currencies do not. [`MissingExchangeRatesBanner.tsx`](../../src/components/MissingExchangeRatesBanner.tsx#L19) |
 | Transactions excluded because conversion is unavailable | Status callout | Appears above ordinary and saved-view transaction tables until no rows are excluded. [`TransactionTable.tsx`](../../src/features/transactions/components/TransactionTable.tsx#L439), [`ViewTransactionTable.tsx`](../../src/features/views/components/ViewTransactionTable.tsx#L344) |
 | Saved-view memberships absent from the current snapshot | Status callout | Persistent diagnostic on the saved-view page. [`ViewPage.tsx`](../../src/features/views/pages/ViewPage.tsx#L389) |
-| Add-to-view mutation fails or membership becomes stale | Inline error alert | Appears beside selection controls until selection changes or another attempt occurs. [`TransactionTable.tsx`](../../src/features/transactions/components/TransactionTable.tsx#L624) |
+| Saved-view membership addition fails or becomes stale | Inline error alert | Remains inside the add-transactions dialog with the reviewed selection until selection changes, another attempt occurs, or the dialog closes. [`ViewTransactionPicker.tsx`](../../src/features/views/components/ViewTransactionPicker.tsx#L487) |
 | Uploaded file was already imported | Warning alert | Persistent inside the preview dialog with prior-import details. [`PreviewFileImportWarningBanner.tsx`](../../src/features/transactions/components/PreviewFileImportWarningBanner.tsx#L33) |
 | CSV analysis or preview produces warnings | Warning callout | Server-provided warnings at the relevant wizard step. [`CsvStatementFormatWizardDialog.tsx`](../../src/components/statement-formats/csv-wizard/CsvStatementFormatWizardDialog.tsx#L125) |
 | PDF cannot be used to create a format | Blocking inline error state | Displays all unsupported reasons and changes the available next steps. [`PdfStatementFormatWizardDialog.tsx`](../../src/components/statement-formats/pdf-wizard/PdfStatementFormatWizardDialog.tsx#L1093) |
@@ -125,11 +125,10 @@ There is one interruptive notification:
 displays the server message and error code, optionally with Retry, and remains
 until the query succeeds or the user leaves.
 
-Its 13 render sites cover:
+Its 12 render sites cover:
 
-- Transactions and add-to-view target loading:
-  [`TransactionsPage.tsx`](../../src/features/transactions/pages/TransactionsPage.tsx#L259),
-  [`TransactionsPage.tsx`](../../src/features/transactions/pages/TransactionsPage.tsx#L83)
+- Transactions:
+  [`TransactionsPage.tsx`](../../src/features/transactions/pages/TransactionsPage.tsx#L177)
 - Transaction detail:
   [`TransactionDetailPage.tsx`](../../src/features/transactions/pages/TransactionDetailPage.tsx#L154)
 - Saved-view list and detail:

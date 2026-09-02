@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { ArrowLeft, BarChart3, Calendar, Hash, Plus } from 'lucide-react';
-import { Link, useLocation, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { CreateViewModal } from '@/components/CreateViewModal';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -16,6 +16,7 @@ import { usePermission } from '@/features/auth/hooks/usePermission';
 import { TransactionStatsGrid } from '@/features/transactions/components/TransactionStatsGrid';
 import type { StatCardConfig } from '@/features/transactions/components/TransactionStatsGrid';
 import { useTransactionStats } from '@/features/transactions/hooks/useTransactionStats';
+import { AddViewTransactionsDialog } from '@/features/views/components/AddViewTransactionsDialog';
 import { DeleteViewModal } from '@/features/views/components/DeleteViewModal';
 import { EditViewModal } from '@/features/views/components/EditViewModal';
 import { TransferRefundReviewDialog } from '@/features/views/components/TransferRefundReviewDialog';
@@ -33,7 +34,6 @@ import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate, getDateRange } from '@/utils/dates';
 import { projectDisplayAmount } from '@/utils/displayAmount';
 import { filterTransactionsByDisplayAmount } from '@/utils/transactionFilters';
-import { buildAddTransactionsModeUrl } from '@/utils/addTransactionsMode';
 
 function describeViewAmountTotal(
   baseDescription: string,
@@ -56,16 +56,25 @@ export function ViewPage() {
 
 function ViewPageContent({ id }: { id: string }) {
   const queryClient = useQueryClient();
-  const location = useLocation();
   const dispatch = useAppDispatch();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const canWrite = usePermission('views:write');
   const canDelete = usePermission('views:delete');
+  const [isAddTransactionsDialogOpen, setIsAddTransactionsDialogOpen] = useState(false);
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isTransferRefundReviewOpen, setIsTransferRefundReviewOpen] = useState(false);
 
+  const handleAddTransactionsOpen = useCallback(() => {
+    setIsAddTransactionsDialogOpen(true);
+  }, []);
+  const handleAddTransactionsClose = useCallback(() => {
+    setIsAddTransactionsDialogOpen(false);
+  }, []);
+  const handleAddTransactionsSuccess = useCallback(() => {
+    setIsAddTransactionsDialogOpen(false);
+  }, []);
   const handleDuplicateClick = useCallback(() => setIsDuplicateModalOpen(true), []);
   const handleRenameClick = useCallback(() => setIsRenameModalOpen(true), []);
   const handleDeleteClick = useCallback(() => setIsDeleteModalOpen(true), []);
@@ -307,7 +316,7 @@ function ViewPageContent({ id }: { id: string }) {
     );
   }
 
-  if (!view || !transactions) return null;
+  if (!view || !transactions || !allTransactions) return null;
 
   const analyzeViewUrl = buildAnalyticsReturnUrl({
     scope: 'view',
@@ -315,13 +324,6 @@ function ViewPageContent({ id }: { id: string }) {
     viewMode: 'monthly',
     transactionType: 'debit',
   });
-  const returnTo = `${location.pathname}${location.search}${location.hash}`;
-  const addTransactionsUrl = buildAddTransactionsModeUrl({
-    viewId: view.id,
-    returnTo,
-    sourceSearchParams: new URLSearchParams(location.search),
-  });
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -338,14 +340,11 @@ function ViewPageContent({ id }: { id: string }) {
         }
         action={
           <div className="flex flex-wrap items-center gap-2">
-            {canWrite && addTransactionsUrl && (
-              <Link
-                to={addTransactionsUrl}
-                className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
+            {canWrite && (
+              <Button type="button" onClick={handleAddTransactionsOpen}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add transactions
-              </Link>
+              </Button>
             )}
             <ViewActionsMenu
               onRenameClick={handleRenameClick}
@@ -427,6 +426,19 @@ function ViewPageContent({ id }: { id: string }) {
         </motion.div>
       </LayoutGroup>
 
+      {canWrite && isAddTransactionsDialogOpen && (
+        <AddViewTransactionsDialog
+          viewId={view.id}
+          viewName={view.name}
+          allTransactions={allTransactions}
+          memberTransactionIds={memberTransactionIds}
+          displayCurrency={displayCurrency}
+          displayAmounts={displayAmounts}
+          isDisplayAmountLoading={isDisplayAmountLoading}
+          onClose={handleAddTransactionsClose}
+          onSuccess={handleAddTransactionsSuccess}
+        />
+      )}
       {canWrite && isDuplicateModalOpen && (
         <CreateViewModal
           open

@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
-import { TransactionAmountBadge } from '@/features/transactions/components/TransactionAmountBadge';
+import { TransactionAmountBadge } from '@/components/TransactionAmountBadge';
 import { formatLocalDate } from '@/utils/dates';
 import { MoreVertical, Pencil, Trash2, Check, X } from 'lucide-react';
 
@@ -43,9 +43,7 @@ interface EditableTransactionRowProps {
   canEdit: boolean;
   canDelete: boolean;
   isSelected: boolean;
-  selectionDisabled?: boolean;
   selectionLabel?: string;
-  selectionStatus?: string;
   onSelectionChange: (checked: boolean) => void;
 }
 
@@ -63,9 +61,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
   canEdit,
   canDelete,
   isSelected,
-  selectionDisabled = false,
   selectionLabel,
-  selectionStatus,
   onSelectionChange,
 }: EditableTransactionRowProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -170,7 +166,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
             <Checkbox
               checked={isSelected}
               onCheckedChange={onSelectionChange}
-              disabled={isEditing || selectionDisabled}
+              disabled={isEditing}
               aria-label={selectionLabel}
             />
           </TableCell>
@@ -192,14 +188,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
               autoFocus
             />
           ) : (
-            <div className="flex items-center gap-2">
-              <div className="truncate">{transaction.description}</div>
-              {selectionStatus && (
-                <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                  {selectionStatus}
-                </span>
-              )}
-            </div>
+            <div className="truncate">{transaction.description}</div>
           )}
         </TableCell>
 

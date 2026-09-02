@@ -105,8 +105,9 @@ Current contextual mutation boundaries are:
 
 - Saved-view creation failures remain in the create dialog, including the
   stale-snapshot instruction. Rename, deletion, and both membership-removal
-  workflows keep persistent errors beside their dialog actions. Add-to-view
-  failures remain beside the page selection controls.
+  workflows keep persistent errors beside their dialog actions. Membership
+  addition failures and stale-review instructions remain inside the
+  add-transactions dialog with its selection available.
 - Inline transaction edit failures render below the affected row. Detail-page
   edit failures remain beside the edit controls. Single- and bulk-deletion
   request failures remain inside their confirmation dialogs, preserving the
@@ -182,9 +183,9 @@ inventing partial-success or updated-count semantics.
 Membership addition uses the same endpoint once per reviewed selection with
 `{addTransactionIds: [...], removeTransactionIds: []}`. The frontend removes
 known members and duplicate IDs before submission. A stale addition keeps the
-mode and remaining selection, refreshes the complete transaction snapshot plus
-view metadata and membership, and requires another user selection change before
-resubmission; it is never retried automatically.
+dialog and remaining selection open, refreshes the complete transaction
+snapshot plus view metadata and membership, and requires another user selection
+change before resubmission; it is never retried automatically.
 
 Transfer/refund assistance compares ordinary transactions against the current
 member-ID set. A nonmember may be displayed as supporting evidence but is not

@@ -298,20 +298,29 @@ between browser policy and stricter repository authoring rules.
 Application coverage uses authenticated desktop routes with deterministic
 mocked data. Two transaction-list workflows cover row selection and the shared
 bulk-deletion dialog, including focus containment, dismissal, focus restoration,
-and in-flight mutation behavior. A saved-view-detail workflow opens the
-horizontal-ellipsis dropdown named `View actions`, verifies the ordered rename,
-duplicate, and separated delete actions, opens and dismisses `Duplicate view`,
-and verifies focus restoration. Every workflow also asserts that the CSP monitor
-reports no policy violation or prohibited runtime or final stylesheet.
+and in-flight mutation behavior. Saved-view-detail coverage includes two exact
+workflows: one opens the horizontal-ellipsis dropdown named `View actions`,
+verifies the ordered rename, duplicate, and separated delete actions, opens and
+dismisses `Duplicate view`, and verifies focus restoration; the other opens the
+initially unfiltered add-transactions dialog, verifies member and eligible rows,
+submits an exact atomic membership delta, proves dismissal is blocked while the
+response is pending, and verifies close and focus restoration after success.
+Every workflow also fails on unexpected protected requests and asserts that the
+CSP monitor reports no policy violation or prohibited runtime or final
+stylesheet.
 
-The Playwright project is desktop Chromium only. The saved-view test covers one
-application-owned dropdown at the default desktop viewport; it does not assert
-real placement, viewport fallback, or top-layer clipping escape. Other desktop
-dropdown workflows, mobile dropdown interaction, cross-browser behavior, and
-Motion APIs remain uncovered. The new workflow therefore supplies CSP and
-runtime/final-stylesheet evidence for its exact interaction, not equivalent
-desktop/mobile dropdown coverage. Until the Architecture removal condition is
-met, the temporary dropdown gate remains in `npm run build:prod-smoke`; see
+The Playwright project is desktop Chromium only. The saved-view dropdown test
+covers one application-owned dropdown at the default desktop viewport; it does
+not assert real placement, viewport fallback, or top-layer clipping escape. The
+saved-view addition test covers only its deterministic local-filter, selection,
+pending, success, and focus path; it does not cover failure or stale-review
+responses, pagination, all-matching selection, mobile layout, or another
+browser. Other desktop dropdown workflows, mobile dropdown interaction,
+cross-browser behavior, and Motion APIs remain uncovered. These workflows
+therefore supply CSP and runtime/final-stylesheet evidence only for their exact
+interactions, not equivalent desktop/mobile dropdown coverage. Until the
+Architecture removal condition is met, the temporary dropdown gate remains in
+`npm run build:prod-smoke`; see
 [Development](development.md#production-smoke-build-and-dropdown-gate).
 
 ### Artifacts

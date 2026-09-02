@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { MemoryRouter as DomMemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewPage } from '@/features/views/pages/ViewPage';
@@ -8,6 +8,7 @@ import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useCurrencies, useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
 import {
+  createAddViewTransactionsRequest,
   createRemoveViewTransactionsRequest,
   useCloneView,
   useCreateView,
@@ -31,6 +32,7 @@ const mockUseCreateView = vi.mocked(useCreateView);
 const mockUseView = vi.mocked(useView);
 const mockUseViewTransactions = vi.mocked(useViewTransactions);
 const mockUseUpdateViewTransactions = vi.mocked(useUpdateViewTransactions);
+const mockCreateAddViewTransactionsRequest = vi.mocked(createAddViewTransactionsRequest);
 const mockCreateRemoveViewTransactionsRequest = vi.mocked(createRemoveViewTransactionsRequest);
 const mockUseCurrencies = vi.mocked(useCurrencies);
 const mockUseExchangeRatesMap = vi.mocked(useExchangeRatesMap);
@@ -38,6 +40,8 @@ const mockUseMissingCurrencies = vi.mocked(useMissingCurrencies);
 const mockUsePermission = vi.mocked(usePermission);
 const mockCloneViewMutate = vi.fn();
 const mockCreateViewMutate = vi.fn();
+const mockUpdateViewTransactionsMutate =
+  vi.fn<ReturnType<typeof useUpdateViewTransactions>['mutate']>();
 const viewId = '11111111-1111-4111-8111-111111111111';
 
 const view: SavedViewMetadata = {
@@ -75,6 +79,30 @@ const transactions: Transaction[] = [
   },
 ];
 
+const availableTransaction: Transaction = {
+  id: 3,
+  accountId: 'savings',
+  bankName: 'Second Bank',
+  date: '2026-01-17',
+  currencyIsoCode: 'USD',
+  amount: 30,
+  type: 'CREDIT',
+  description: 'Salary',
+  createdAt: '2026-01-17T00:00:00Z',
+  updatedAt: '2026-01-17T00:00:00Z',
+};
+
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <output aria-label="Current location">
+      {location.pathname}
+      {location.search}
+      {location.hash}
+    </output>
+  );
+}
+
 function renderPage(initialEntry = `/views/${viewId}`) {
   return renderWithProviders(
     <Routes>
@@ -83,6 +111,7 @@ function renderPage(initialEntry = `/views/${viewId}`) {
         element={
           <DomMemoryRouter initialEntries={[initialEntry]}>
             <ViewPage />
+            <LocationProbe />
           </DomMemoryRouter>
         }
       />
@@ -96,6 +125,8 @@ beforeEach(() => {
   mockUsePermission.mockReturnValue(true);
   mockCloneViewMutate.mockReset();
   mockCreateViewMutate.mockReset();
+  mockUseUpdateViewTransactions.mockReset();
+  mockUpdateViewTransactionsMutate.mockReset();
   mockUseCloneView.mockReturnValue({
     mutate: mockCloneViewMutate,
     isPending: false,
@@ -104,13 +135,19 @@ beforeEach(() => {
     mutate: mockCreateViewMutate,
     isPending: false,
   } as unknown as ReturnType<typeof useCreateView>);
+  mockCreateAddViewTransactionsRequest.mockImplementation((transactionIds) => ({
+    addTransactionIds: [...new Set(transactionIds)],
+    removeTransactionIds: [],
+  }));
   mockCreateRemoveViewTransactionsRequest.mockImplementation((transactionIds) => ({
     addTransactionIds: [],
     removeTransactionIds: [...new Set(transactionIds)],
   }));
   mockUseUpdateViewTransactions.mockReturnValue({
-    mutate: vi.fn(),
+    mutate: mockUpdateViewTransactionsMutate,
     isPending: false,
+    error: null,
+    reset: vi.fn(),
   } as unknown as ReturnType<typeof useUpdateViewTransactions>);
   mockUseMissingCurrencies.mockReturnValue([]);
   mockUseCurrencies.mockReturnValue({
@@ -162,10 +199,7 @@ describe('ViewPage static collections', () => {
         name: 'Review possible transfers and refunds',
       }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Add transactions' })).toHaveAttribute(
-      'href',
-      expect.stringContaining(`addToView=${viewId}`),
-    );
+    expect(screen.getByRole('button', { name: 'Add transactions' })).toBeInTheDocument();
     expect(screen.getAllByRole('checkbox')).toHaveLength(3);
     expect(screen.getAllByRole('button', { name: 'Remove from view' })).toHaveLength(2);
   });
@@ -222,18 +256,113 @@ describe('ViewPage static collections', () => {
     expect(mockCreateViewMutate).not.toHaveBeenCalled();
   });
 
-  it('builds a filtered add-mode link with an explicit clean return destination', () => {
-    renderPage(`/views/${viewId}?q=coffee&bankName=Example+Bank`);
+  it('opens over the current URL with the complete snapshot and resets on every opening', async () => {
+    const initialEntry = `/views/${viewId}?q=coffee&bankName=Example+Bank`;
+    mockUseViewTransactions.mockReturnValue({
+      data: transactions,
+      allTransactions: [...transactions, availableTransaction],
+      memberTransactionIds: [1, 2],
+      missingTransactionIds: [],
+      isLoading: false,
+      isPending: false,
+      isFetching: false,
+      isError: false,
+      isSuccess: true,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderPage(initialEntry);
 
-    const href = screen.getByRole('link', { name: 'Add transactions' }).getAttribute('href');
-    const url = new URL(href!, 'https://budgetanalyzer.invalid');
-    expect(url.pathname).toBe('/');
-    expect(url.searchParams.get('q')).toBe('coffee');
-    expect(url.searchParams.get('bankName')).toBe('Example Bank');
-    expect(url.searchParams.get('addToView')).toBe(viewId);
-    expect(url.searchParams.get('addToViewReturnTo')).toBe(
-      `/views/${viewId}?q=coffee&bankName=Example+Bank`,
+    const user = userEvent.setup();
+    const trigger = screen.getByRole('button', { name: 'Add transactions' });
+    expect(screen.getByLabelText('Current location')).toHaveTextContent(initialEntry);
+
+    await user.click(trigger);
+
+    let dialog = screen.getByRole('dialog', { name: 'Add transactions to Static collection' });
+    expect(within(dialog).getByPlaceholderText('Search descriptions ↵')).toHaveValue('');
+    expect(within(dialog).getByText('Coffee')).toBeInTheDocument();
+    expect(within(dialog).getByText('Groceries')).toBeInTheDocument();
+    expect(within(dialog).getByText('Salary')).toBeInTheDocument();
+    expect(screen.getByLabelText('Current location')).toHaveTextContent(initialEntry);
+
+    await user.type(within(dialog).getByPlaceholderText('Search descriptions ↵'), 'salary{Enter}');
+    expect(within(dialog).queryByText('Coffee')).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(dialog).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+
+    await user.click(trigger);
+
+    dialog = screen.getByRole('dialog', { name: 'Add transactions to Static collection' });
+    expect(within(dialog).getByPlaceholderText('Search descriptions ↵')).toHaveValue('');
+    expect(within(dialog).getByText('Coffee')).toBeInTheDocument();
+    expect(within(dialog).getByText('Salary')).toBeInTheDocument();
+  });
+
+  it('closes on successful addition and presents refreshed membership on the same URL', async () => {
+    const initialEntry = `/views/${viewId}?q=salary`;
+    mockUseViewTransactions.mockReturnValue({
+      data: transactions,
+      allTransactions: [...transactions, availableTransaction],
+      memberTransactionIds: [1, 2],
+      missingTransactionIds: [],
+      isLoading: false,
+      isPending: false,
+      isFetching: false,
+      isError: false,
+      isSuccess: true,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mockUpdateViewTransactionsMutate.mockImplementation((_variables, options) => {
+      mockUseView.mockReturnValue({
+        data: { ...view, transactionCount: 3 },
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      } as unknown as ReturnType<typeof useView>);
+      mockUseViewTransactions.mockReturnValue({
+        data: [...transactions, availableTransaction],
+        allTransactions: [...transactions, availableTransaction],
+        memberTransactionIds: [1, 2, 3],
+        missingTransactionIds: [],
+        isLoading: false,
+        isPending: false,
+        isFetching: false,
+        isError: false,
+        isSuccess: true,
+        error: null,
+        refetch: vi.fn(),
+      });
+      const onSuccess = options?.onSuccess as (() => void) | undefined;
+      onSuccess?.();
+    });
+    renderPage(initialEntry);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Add transactions' }));
+    const dialog = screen.getByRole('dialog', { name: 'Add transactions to Static collection' });
+    await user.click(
+      within(dialog).getByRole('checkbox', {
+        name: 'Select transaction 3 to add to Static collection',
+      }),
     );
+    await user.click(within(dialog).getByRole('button', { name: 'Add transactions' }));
+
+    expect(mockUpdateViewTransactionsMutate).toHaveBeenCalledWith(
+      {
+        viewId,
+        request: { addTransactionIds: [3], removeTransactionIds: [] },
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByText('3 transactions')).toBeInTheDocument();
+    expect(screen.getByText('Salary')).toBeInTheDocument();
+    expect(screen.getByLabelText('Current location')).toHaveTextContent(initialEntry);
+    expect(screen.queryByText(/successfully added/i)).not.toBeInTheDocument();
   });
 
   it('exposes one primary action, object actions, and explicit view-scoped Analytics navigation', () => {
@@ -246,10 +375,10 @@ describe('ViewPage static collections', () => {
     expect(pageTitle).toBeInTheDocument();
     expect(metadataRow).not.toBeNull();
     expect(pageHeader).not.toBeNull();
-    expect(within(pageHeader!).getAllByRole('link')).toHaveLength(2);
-    expect(within(pageHeader!).getAllByRole('button')).toHaveLength(1);
+    expect(within(pageHeader!).getAllByRole('link')).toHaveLength(1);
+    expect(within(pageHeader!).getAllByRole('button')).toHaveLength(2);
     const analyticsLink = within(metadataRow!).getByRole('link', { name: 'Open in Analytics' });
-    const addTransactionsLink = within(pageHeader!).getByRole('link', {
+    const addTransactionsButton = within(pageHeader!).getByRole('button', {
       name: 'Add transactions',
     });
     const viewActionsButton = within(pageHeader!).getByRole('button', { name: 'View actions' });
@@ -257,10 +386,10 @@ describe('ViewPage static collections', () => {
       'href',
       `/analytics?scope=view&viewId=${viewId}&viewMode=monthly&transactionType=debit`,
     );
-    expect(analyticsLink.compareDocumentPosition(addTransactionsLink)).toBe(
+    expect(analyticsLink.compareDocumentPosition(addTransactionsButton)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(addTransactionsLink.compareDocumentPosition(viewActionsButton)).toBe(
+    expect(addTransactionsButton.compareDocumentPosition(viewActionsButton)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(screen.queryByRole('link', { name: 'Analyze View' })).not.toBeInTheDocument();
@@ -359,12 +488,13 @@ describe('ViewPage static collections', () => {
     mockUsePermission.mockReturnValue(false);
     renderPage();
 
-    expect(screen.queryByRole('link', { name: 'Add transactions' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add transactions' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'View actions' })).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Review possible transfers and refunds' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove from view' })).not.toBeInTheDocument();
+    expect(mockUseUpdateViewTransactions).not.toHaveBeenCalled();
   });
 
   it('keeps write and delete object actions independently permission-gated', async () => {
@@ -372,7 +502,7 @@ describe('ViewPage static collections', () => {
     mockUsePermission.mockImplementation((permission) => permission === 'views:write');
     const writeOnly = renderPage();
 
-    expect(screen.getByRole('link', { name: 'Add transactions' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add transactions' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'View actions' }));
     expect(screen.getByRole('menuitem', { name: 'Rename view' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Duplicate view' })).toBeInTheDocument();
@@ -382,7 +512,7 @@ describe('ViewPage static collections', () => {
     mockUsePermission.mockImplementation((permission) => permission === 'views:delete');
     renderPage();
 
-    expect(screen.queryByRole('link', { name: 'Add transactions' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add transactions' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'View actions' }));
     expect(screen.queryByRole('menuitem', { name: 'Rename view' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Duplicate view' })).not.toBeInTheDocument();

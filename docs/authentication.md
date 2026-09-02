@@ -213,12 +213,12 @@ permission directly, and `hasPermission` remains a literal membership check.
 If a bundle contains write or delete without the corresponding read permission,
 fix the backend grant rather than adding frontend inference or redundant gates.
 
-Saved-view membership actions, including adding from the Transactions page and
-row, bulk, or transfer/refund-assisted removal, require `views:write`. The entry
-action and complete add-mode subtree use that permission, so a denied deep link
-does not mount target-view queries. Membership selection controls do not depend
-on `transactions:delete`; deleting the underlying transaction remains a
-separate transaction workflow with its own permission.
+Saved-view membership actions, including the saved-view detail add-transactions
+dialog and row, bulk, or transfer/refund-assisted removal, require
+`views:write`. The add button and complete dialog subtree use that permission,
+so denied users do not mount the mutation-owning workflow. Membership selection
+controls do not depend on `transactions:delete`; deleting the underlying
+transaction remains a separate transaction workflow with its own permission.
 
 `views:read` gates the saved-view list and detail routes plus query-owning
 navigation and selectors. `views:write` gates creation, cloning, rename, and

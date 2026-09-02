@@ -40,18 +40,6 @@ import { formatApiError } from '@/utils/errorMessages';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { columnWidthClass } from '@/utils/columnWidth';
 import { TransactionFilterBar } from '@/components/TransactionFilterBar';
-import { createAddViewTransactionsRequest, useUpdateViewTransactions } from '@/hooks/useViews';
-
-export type TransactionSelectionPurpose =
-  | { type: 'delete' }
-  | {
-      type: 'add-to-view';
-      viewId: string;
-      viewName: string;
-      memberTransactionIds: number[];
-      onCancel: () => void;
-      onSuccess: () => void;
-    };
 
 type TransactionTableRow = Transaction & {
   displayAmount: DisplayAmount;
@@ -76,7 +64,6 @@ interface TransactionTableProps {
   availableAccountIds: string[];
   viewTransactionIds?: number[];
   isViewTransactionIdsReady?: boolean;
-  selectionPurpose: TransactionSelectionPurpose;
 }
 
 export function TransactionTable({
@@ -98,7 +85,6 @@ export function TransactionTable({
   availableAccountIds,
   viewTransactionIds,
   isViewTransactionIdsReady = true,
-  selectionPurpose,
 }: TransactionTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
@@ -109,23 +95,9 @@ export function TransactionTable({
   const [selectAllMatching, setSelectAllMatching] = useState(false);
   const navigate = useNavigate();
   const { mutate: updateTransaction, isPending: isUpdating } = useUpdateTransaction();
-  const {
-    mutate: addTransactionsToView,
-    isPending: isAddingTransactions,
-    error: addTransactionsError,
-    reset: resetAddTransactions,
-  } = useUpdateViewTransactions();
   const canBulkDelete = usePermission('transactions:delete');
-  const canAddToView = usePermission('views:write');
   const canEditTransactions = usePermission('transactions:write');
   const canCreateViews = usePermission('views:write');
-  const addSelectionPurpose = selectionPurpose.type === 'add-to-view' ? selectionPurpose : null;
-  const isAddToViewPurpose = addSelectionPurpose !== null;
-  const selectionEnabled = isAddToViewPurpose ? canAddToView : canBulkDelete;
-  const existingMemberIds = useMemo(
-    () => new Set(addSelectionPurpose?.memberTransactionIds ?? []),
-    [addSelectionPurpose],
-  );
 
   const tableRows = useMemo<TransactionTableRow[]>(
     () =>
@@ -167,29 +139,25 @@ export function TransactionTable({
   );
 
   // Get selected transaction IDs (from row selection)
-  const selectedIds = useMemo(() => {
+  const selectedTransactionIds = useMemo(() => {
     return Array.from(
       new Set(
         Object.keys(rowSelection)
           .filter((key) => rowSelection[key])
-          .map((key) => Number.parseInt(key, 10))
-          .filter((id) => !existingMemberIds.has(id)),
+          .map((key) => Number.parseInt(key, 10)),
       ),
     );
-  }, [existingMemberIds, rowSelection]);
+  }, [rowSelection]);
 
   // Get all filtered transaction IDs (for "select all matching" mode)
-  const allFilteredIds = useMemo(() => {
-    return Array.from(
-      new Set(
-        transactions
-          .map((transaction) => transaction.id)
-          .filter((id) => !existingMemberIds.has(id)),
-      ),
-    );
-  }, [existingMemberIds, transactions]);
+  const allFilteredTransactionIds = useMemo(
+    () => Array.from(new Set(transactions.map((transaction) => transaction.id))),
+    [transactions],
+  );
 
-  const selectedPurposeIds = selectAllMatching ? allFilteredIds : selectedIds;
+  const transactionIdsToDelete = selectAllMatching
+    ? allFilteredTransactionIds
+    : selectedTransactionIds;
 
   // Handle bulk delete
   const handleBulkDelete = useCallback(() => {
@@ -201,42 +169,14 @@ export function TransactionTable({
     setSelectAllMatching(false);
   }, []);
 
-  const resetAddTransactionsAfterSelectionChange = useCallback(() => {
-    if (!isAddingTransactions) {
-      resetAddTransactions();
-    }
-  }, [isAddingTransactions, resetAddTransactions]);
-
   const handleClearSelection = useCallback(() => {
     setRowSelection({});
     setSelectAllMatching(false);
-    resetAddTransactionsAfterSelectionChange();
-  }, [resetAddTransactionsAfterSelectionChange]);
+  }, []);
 
   const handleSelectAllMatching = useCallback(() => {
     setSelectAllMatching(true);
-    resetAddTransactionsAfterSelectionChange();
-  }, [resetAddTransactionsAfterSelectionChange]);
-
-  const handleAddTransactions = useCallback(() => {
-    if (!addSelectionPurpose || selectedPurposeIds.length === 0) {
-      return;
-    }
-
-    addTransactionsToView(
-      {
-        viewId: addSelectionPurpose.viewId,
-        request: createAddViewTransactionsRequest(selectedPurposeIds),
-      },
-      {
-        onSuccess: () => {
-          setRowSelection({});
-          setSelectAllMatching(false);
-          addSelectionPurpose.onSuccess();
-        },
-      },
-    );
-  }, [addSelectionPurpose, addTransactionsToView, selectedPurposeIds]);
+  }, []);
 
   // Define columns for TanStack Table
   // Note: Cell rendering is handled by EditableTransactionRow, not by these column definitions
@@ -254,11 +194,7 @@ export function TransactionTable({
                 : false
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label={
-            isAddToViewPurpose
-              ? 'Select eligible transactions on this page'
-              : 'Select transactions on this page for deletion'
-          }
+          aria-label="Select transactions on this page for deletion"
         />
       ),
       size: 50,
@@ -271,7 +207,7 @@ export function TransactionTable({
         accessorFn: (row) => (row.displayAmount.available ? 0 : 1),
         sortingFn: 'basic',
       },
-      ...(selectionEnabled ? [selectColumn] : []),
+      ...(canBulkDelete ? [selectColumn] : []),
       {
         accessorKey: 'date',
         header: ({ column }) => {
@@ -360,7 +296,7 @@ export function TransactionTable({
         maxSize: 60,
       },
     ];
-  }, [isAddToViewPurpose, selectionEnabled]);
+  }, [canBulkDelete]);
 
   const handleSortingChange = useCallback((updater: Updater<SortingState>) => {
     setSorting((currentSorting) => {
@@ -386,11 +322,10 @@ export function TransactionTable({
       rowSelection,
       columnVisibility: { amountAvailability: false },
     },
-    enableRowSelection: (row) => selectionEnabled && !existingMemberIds.has(row.original.id),
+    enableRowSelection: canBulkDelete,
     onRowSelectionChange: (updater) => {
       const newSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
       setRowSelection(newSelection);
-      resetAddTransactionsAfterSelectionChange();
       // Reset "select all matching" when selection changes manually
       if (selectAllMatching) {
         setSelectAllMatching(false);
@@ -424,7 +359,7 @@ export function TransactionTable({
         onAmountFilterChange={onAmountFilterChange}
         onClearAllFilters={onClearAllFilters}
         contextualAction={
-          !isAddToViewPurpose && canCreateViews && viewTransactionIds !== undefined ? (
+          canCreateViews && viewTransactionIds !== undefined ? (
             <SaveAsViewButton
               transactionIds={viewTransactionIds}
               isTransactionIdsReady={isViewTransactionIdsReady}
@@ -442,32 +377,30 @@ export function TransactionTable({
       )}
 
       {/* Select all matching banner */}
-      {selectionEnabled &&
+      {canBulkDelete &&
         table.getIsAllPageRowsSelected() &&
-        allFilteredIds.length >
+        allFilteredTransactionIds.length >
           table.getRowModel().rows.filter((row) => row.getCanSelect()).length &&
         !selectAllMatching && (
           <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
             <span>
-              All {table.getRowModel().rows.filter((row) => row.getCanSelect()).length}{' '}
-              {isAddToViewPurpose ? 'eligible ' : ''}transactions on this page are selected.
+              All {table.getRowModel().rows.filter((row) => row.getCanSelect()).length} transactions
+              on this page are selected.
             </span>
             <button
               onClick={handleSelectAllMatching}
               className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
             >
-              Select all {allFilteredIds.length} {isAddToViewPurpose ? 'eligible ' : ''}
-              transactions matching this filter
+              Select all {allFilteredTransactionIds.length} transactions matching this filter
             </button>
           </div>
         )}
 
       {/* Confirmation banner when all matching are selected */}
-      {selectionEnabled && selectAllMatching && (
+      {canBulkDelete && selectAllMatching && (
         <div className="flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-800 dark:bg-blue-950">
           <span>
-            All {allFilteredIds.length} {isAddToViewPurpose ? 'eligible ' : ''}transactions matching
-            this filter are selected.
+            All {allFilteredTransactionIds.length} transactions matching this filter are selected.
           </span>
           <button
             onClick={handleClearSelection}
@@ -517,21 +450,11 @@ export function TransactionTable({
                       table.getAllColumns().map((col) => [col.id, columnWidthClass(col.getSize())]),
                     )}
                     visibleColumnCount={visibleColumnCount}
-                    canSelect={selectionEnabled}
+                    canSelect={canBulkDelete}
                     canEdit={canEditTransactions}
                     canDelete={canBulkDelete}
                     isSelected={row.getCanSelect() && row.getIsSelected()}
-                    selectionDisabled={!row.getCanSelect()}
-                    selectionLabel={
-                      isAddToViewPurpose
-                        ? row.getCanSelect()
-                          ? `Select transaction ${row.original.id} to add to ${addSelectionPurpose?.viewName}`
-                          : `Transaction ${row.original.id} is already in ${addSelectionPurpose?.viewName}`
-                        : `Select transaction ${row.original.id} for deletion`
-                    }
-                    selectionStatus={
-                      isAddToViewPurpose && !row.getCanSelect() ? 'Already in view' : undefined
-                    }
+                    selectionLabel={`Select transaction ${row.original.id} for deletion`}
                     onSelectionChange={(checked) => row.toggleSelected(checked)}
                   />
                 ))
@@ -610,54 +533,16 @@ export function TransactionTable({
 
       {/* Bulk Delete Bar */}
       <BulkDeleteBar
-        selectedCount={selectedPurposeIds.length}
+        selectedCount={transactionIdsToDelete.length}
         onDelete={handleBulkDelete}
         onClearSelection={handleClearSelection}
-        isVisible={
-          !isAddToViewPurpose && canBulkDelete && (selectedIds.length > 0 || selectAllMatching)
-        }
+        isVisible={canBulkDelete && (selectedTransactionIds.length > 0 || selectAllMatching)}
       />
 
-      {isAddToViewPurpose && addTransactionsError && (
-        <div
-          className="rounded-md bg-destructive/15 px-4 py-3 text-sm text-destructive"
-          role="alert"
-        >
-          {addTransactionsError.response.code === 'SAVED_VIEW_MEMBERSHIP_STALE'
-            ? 'The transaction snapshot changed. Membership and transactions were refreshed; review your selection before submitting again.'
-            : formatApiError(addTransactionsError, 'Failed to add transactions to this view')}
-        </div>
-      )}
-
-      {addSelectionPurpose && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background px-4 py-3">
-          <span className="text-sm font-medium">
-            {selectedPurposeIds.length} transaction
-            {selectedPurposeIds.length === 1 ? '' : 's'} selected to add
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={addSelectionPurpose.onCancel}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAddTransactions}
-              disabled={
-                selectedPurposeIds.length === 0 ||
-                isAmountFilterLoading ||
-                isAddingTransactions ||
-                addTransactionsError?.response.code === 'SAVED_VIEW_MEMBERSHIP_STALE'
-              }
-            >
-              {isAddingTransactions ? 'Adding...' : 'Add transactions'}
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Bulk Delete Confirmation Dialog */}
-      {!isAddToViewPurpose && canBulkDelete && (
+      {canBulkDelete && (
         <BulkDeleteModal
-          selectedIds={selectedPurposeIds}
+          selectedIds={transactionIdsToDelete}
           isOpen={bulkDeleteDialogOpen}
           onOpenChange={setBulkDeleteDialogOpen}
           onSuccess={handleBulkDeleteSuccess}

@@ -1,8 +1,7 @@
-// src/features/transactions/components/TransactionAmountBadge.tsx
-import { formatCurrency } from '@/utils/currency';
-import type { DisplayAmount } from '@/types/displayAmount';
 import { motion } from 'motion/react';
 import { fadeInVariants, fadeTransition } from '@/lib/animations';
+import type { DisplayAmount } from '@/types/displayAmount';
+import { formatCurrency } from '@/utils/currency';
 
 interface TransactionAmountBadgeProps {
   displayAmount: DisplayAmount;
