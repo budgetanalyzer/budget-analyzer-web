@@ -83,6 +83,34 @@ warning icon; the icon is decorative when the title and description already
 communicate the warning. Reversible actions such as removing transaction
 membership from a saved view do not use warning iconography.
 
+## Navigation and action hierarchy
+
+Global navigation exposes stable destinations. Contextual links may open those
+destinations with explicit URL state, but the global destination itself does not
+infer context from the page being left. Page-to-page navigation uses links;
+buttons are reserved for actions such as submitting work or opening a menu or
+dialog. This keeps navigation semantics consistent with the
+[WAI-ARIA button pattern](https://www.w3.org/WAI/ARIA/apg/patterns/button/).
+
+When a page has a primary action, it visually distinguishes one and does not
+present competing primary actions. Frequent and domain-specific actions remain
+visible near the content they affect, while rare object operations use
+progressive disclosure through an overflow menu. A conventional horizontal
+ellipsis trigger may be icon-only when it retains a precise accessible name;
+unfamiliar menu triggers remain visibly labeled. These rules follow the
+distinction between links and actions in the
+[USWDS button guidance](https://designsystem.digital.gov/components/button/)
+and [GOV.UK button guidance](https://design-system.service.gov.uk/components/button/),
+along with the rationale in Nielsen Norman Group's
+[progressive-disclosure](https://www.nngroup.com/articles/progressive-disclosure/)
+and [icon-usability](https://www.nngroup.com/articles/icon-usability/) guidance.
+
+Object-action menus put destructive items last and separate them from other
+operations, consistent with the
+[Carbon overflow-menu guidance](https://carbondesignsystem.com/components/overflow-menu/usage/).
+New and changed labels use sentence case and lead with a clear verb where an
+action is performed.
+
 ## State Boundary
 
 The application separates state by lifetime and authority:

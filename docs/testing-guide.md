@@ -295,25 +295,23 @@ between browser policy and stricter repository authoring rules.
 
 ### Current Coverage and Temporary Gate
 
-Application coverage currently uses an authenticated desktop transaction list
-with deterministic mocked data. One workflow selects a row, observes the bulk-
-action bar, and clears the selection. A second workflow opens bulk deletion and
-verifies the shared dialog's accessible name and description, initial focus,
-forward and reverse focus containment, normal Escape dismissal, and focus
-restoration to its connected initiator. During a deferred deletion it verifies
-that Cancel is disabled, the close control is absent, backdrop and Escape do
-not dismiss, and mutation success can still close the dialog. Both workflows
-also assert that the CSP monitor reports no policy violation or prohibited
-runtime or final stylesheet.
+Application coverage uses authenticated desktop routes with deterministic
+mocked data. Two transaction-list workflows cover row selection and the shared
+bulk-deletion dialog, including focus containment, dismissal, focus restoration,
+and in-flight mutation behavior. A saved-view-detail workflow opens the
+horizontal-ellipsis dropdown named `View actions`, verifies the ordered rename,
+duplicate, and separated delete actions, opens and dismisses `Duplicate view`,
+and verifies focus restoration. Every workflow also asserts that the CSP monitor
+reports no policy violation or prohibited runtime or final stylesheet.
 
-The Playwright project is desktop Chromium only. This is not exhaustive route,
-form, mobile, dropdown, cross-browser, or Motion-API evidence.
-
-In particular, the browser suite does not yet cover desktop and mobile dropdown
-interaction, real placement and viewport fallback, top-layer clipping escape,
-CSP violations, and prohibited runtime/final stylesheets for those workflows.
-Until that equivalent coverage exists, the temporary dropdown gate remains in
-`npm run build:prod-smoke`; see
+The Playwright project is desktop Chromium only. The saved-view test covers one
+application-owned dropdown at the default desktop viewport; it does not assert
+real placement, viewport fallback, or top-layer clipping escape. Other desktop
+dropdown workflows, mobile dropdown interaction, cross-browser behavior, and
+Motion APIs remain uncovered. The new workflow therefore supplies CSP and
+runtime/final-stylesheet evidence for its exact interaction, not equivalent
+desktop/mobile dropdown coverage. Until the Architecture removal condition is
+met, the temporary dropdown gate remains in `npm run build:prod-smoke`; see
 [Development](development.md#production-smoke-build-and-dropdown-gate).
 
 ### Artifacts

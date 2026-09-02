@@ -2,6 +2,9 @@ import type { User } from '@/types/auth';
 import type { CurrencySeriesResponse } from '@/types/currency';
 import type { SessionStatus } from '@/types/session';
 import type { Transaction } from '@/types/transaction';
+import type { SavedViewMetadata, ViewMembershipResponse } from '@/types/view';
+
+export const SAVED_VIEW_FIXTURE_ID = '0d4c3eb4-c8f9-4d44-8f4e-a726b23596ec';
 
 export function buildAuthenticatedUser(overrides: Partial<User> = {}): User {
   return {
@@ -50,6 +53,26 @@ export function buildCurrency(
     enabled: true,
     createdAt: '2026-08-15T12:00:00Z',
     updatedAt: '2026-08-15T12:00:00Z',
+    ...overrides,
+  };
+}
+
+export function buildSavedView(overrides: Partial<SavedViewMetadata> = {}): SavedViewMetadata {
+  return {
+    id: SAVED_VIEW_FIXTURE_ID,
+    name: 'Production smoke view',
+    transactionCount: 1,
+    createdAt: '2026-08-15T12:00:00Z',
+    updatedAt: '2026-08-15T12:00:00Z',
+    ...overrides,
+  };
+}
+
+export function buildViewMembership(
+  overrides: Partial<ViewMembershipResponse> = {},
+): ViewMembershipResponse {
+  return {
+    transactionIds: [buildTransaction().id],
     ...overrides,
   };
 }

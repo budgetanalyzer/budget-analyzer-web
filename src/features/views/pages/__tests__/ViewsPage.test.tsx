@@ -82,7 +82,7 @@ describe('ViewsPage', () => {
     expect(refetch).toHaveBeenCalledOnce();
   });
 
-  it('renders saved views as detail links without aggregate stats UI', () => {
+  it('renders saved views with explicit view and Analytics destinations', () => {
     mockUseViews.mockReturnValue({
       data: savedViews,
       isLoading: false,
@@ -96,13 +96,20 @@ describe('ViewsPage', () => {
     expect(screen.getByText('Groceries')).toBeInTheDocument();
     expect(screen.getByText('12 transactions')).toBeInTheDocument();
     expect(screen.getByText(/Updated/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'View details for Groceries' })).toHaveAttribute(
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'Open Groceries view' })).toHaveAttribute(
       'href',
       '/views/view-groceries',
     );
-    expect(screen.getByRole('link', { name: 'Analyze Groceries' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open Groceries view' })).toHaveTextContent(
+      'Open view',
+    );
+    expect(screen.getByRole('link', { name: 'Open Groceries in Analytics' })).toHaveAttribute(
       'href',
       '/analytics?scope=view&viewId=view-groceries&viewMode=monthly&transactionType=debit',
+    );
+    expect(screen.getByRole('link', { name: 'Open Groceries in Analytics' })).toHaveTextContent(
+      'Open in Analytics',
     );
     expect(screen.queryByText('Aggregate Statistics')).not.toBeInTheDocument();
     expect(screen.queryByText(/views selected/i)).not.toBeInTheDocument();

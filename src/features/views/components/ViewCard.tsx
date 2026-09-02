@@ -41,17 +41,17 @@ export function ViewCard({ view }: ViewCardProps) {
             <Link
               to={analyzeViewUrl}
               className="flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
-              aria-label={`Analyze ${view.name}`}
+              aria-label={`Open ${view.name} in Analytics`}
             >
               <BarChart3 className="h-4 w-4" />
-              Analyze
+              Open in Analytics
             </Link>
             <Link
               to={`/views/${view.id}`}
               className="flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
-              aria-label={`View details for ${view.name}`}
+              aria-label={`Open ${view.name} view`}
             >
-              View Details
+              Open view
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

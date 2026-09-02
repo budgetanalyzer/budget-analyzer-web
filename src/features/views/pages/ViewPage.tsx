@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
-import { ArrowLeft, BarChart3, Calendar, Hash, Plus, Search } from 'lucide-react';
+import { ArrowLeft, BarChart3, Calendar, Hash, Plus } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router';
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { CreateViewModal } from '@/components/CreateViewModal';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { MessageBanner } from '@/components/MessageBanner';
 import { MissingExchangeRatesBanner } from '@/components/MissingExchangeRatesBanner';
 import { PageHeader } from '@/components/PageHeader';
-import { SaveAsViewButton } from '@/components/SaveAsViewButton';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { buildAnalyticsReturnUrl } from '@/features/analytics/utils/urlState';
@@ -19,7 +19,7 @@ import { useTransactionStats } from '@/features/transactions/hooks/useTransactio
 import { DeleteViewModal } from '@/features/views/components/DeleteViewModal';
 import { EditViewModal } from '@/features/views/components/EditViewModal';
 import { TransferRefundReviewDialog } from '@/features/views/components/TransferRefundReviewDialog';
-import { ViewSettingsMenu } from '@/features/views/components/ViewSettingsMenu';
+import { ViewActionsMenu } from '@/features/views/components/ViewActionsMenu';
 import { ViewTransactionTable } from '@/features/views/components/ViewTransactionTable';
 import { findTransferRefundCandidates } from '@/features/views/utils/findTransferRefundCandidates';
 import { useCurrencies, useExchangeRatesMap } from '@/hooks/useCurrencies';
@@ -59,17 +59,17 @@ function ViewPageContent({ id }: { id: string }) {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
-  const canClone = usePermission('views:write');
-  const canAddTransactions = usePermission('views:write');
-  const canRename = usePermission('views:write');
+  const canWrite = usePermission('views:write');
   const canDelete = usePermission('views:delete');
-  const canReviewTransfersAndRefunds = usePermission('views:write');
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isTransferRefundReviewOpen, setIsTransferRefundReviewOpen] = useState(false);
 
+  const handleDuplicateClick = useCallback(() => setIsDuplicateModalOpen(true), []);
   const handleRenameClick = useCallback(() => setIsRenameModalOpen(true), []);
   const handleDeleteClick = useCallback(() => setIsDeleteModalOpen(true), []);
+  const handleDuplicateClose = useCallback(() => setIsDuplicateModalOpen(false), []);
   const handleRenameClose = useCallback(() => setIsRenameModalOpen(false), []);
   const handleDeleteClose = useCallback(() => setIsDeleteModalOpen(false), []);
   const handleTransferRefundReviewOpen = useCallback(() => {
@@ -329,7 +329,14 @@ function ViewPageContent({ id }: { id: string }) {
         description={`${view.transactionCount} transactions`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            {canAddTransactions && addTransactionsUrl && (
+            <Link
+              to={analyzeViewUrl}
+              className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Open in Analytics
+            </Link>
+            {canWrite && addTransactionsUrl && (
               <Link
                 to={addTransactionsUrl}
                 className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -338,27 +345,11 @@ function ViewPageContent({ id }: { id: string }) {
                 Add transactions
               </Link>
             )}
-            {canClone && (
-              <SaveAsViewButton
-                sourceViewId={view.id}
-                label="Clone View"
-                dialogTitle="Clone view"
-              />
-            )}
-            {canReviewTransfersAndRefunds && (
-              <Button variant="outline" onClick={handleTransferRefundReviewOpen}>
-                <Search className="mr-2 h-4 w-4" />
-                Find Transfers &amp; Refunds
-              </Button>
-            )}
-            <Link
-              to={analyzeViewUrl}
-              className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Analyze View
-            </Link>
-            <ViewSettingsMenu onRenameClick={handleRenameClick} onDeleteClick={handleDeleteClick} />
+            <ViewActionsMenu
+              onRenameClick={handleRenameClick}
+              onDuplicateClick={handleDuplicateClick}
+              onDeleteClick={handleDeleteClick}
+            />
           </div>
         }
       />
@@ -420,6 +411,9 @@ function ViewPageContent({ id }: { id: string }) {
                 displayAmounts={displayAmounts}
                 isDisplayAmountLoading={isDisplayAmountLoading}
                 isAmountFilterLoading={isAmountFilterLoading}
+                onReviewPossibleTransfersAndRefunds={
+                  canWrite ? handleTransferRefundReviewOpen : undefined
+                }
                 unavailableAmountFilterCount={
                   hasAmountFilter && !isAmountFilterLoading && !isAmountCurrencyInvalid
                     ? filterResult.unavailableAmountCount
@@ -431,13 +425,21 @@ function ViewPageContent({ id }: { id: string }) {
         </motion.div>
       </LayoutGroup>
 
-      {canRename && isRenameModalOpen && (
+      {canWrite && isDuplicateModalOpen && (
+        <CreateViewModal
+          open
+          onClose={handleDuplicateClose}
+          sourceViewId={view.id}
+          title="Duplicate view"
+        />
+      )}
+      {canWrite && isRenameModalOpen && (
         <EditViewModal open onClose={handleRenameClose} view={view} />
       )}
       {canDelete && isDeleteModalOpen && (
         <DeleteViewModal open onClose={handleDeleteClose} view={view} />
       )}
-      {canReviewTransfersAndRefunds && isTransferRefundReviewOpen && (
+      {canWrite && isTransferRefundReviewOpen && (
         <TransferRefundReviewDialog
           viewId={view.id}
           viewName={view.name}

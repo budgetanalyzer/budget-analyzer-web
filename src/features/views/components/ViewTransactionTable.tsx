@@ -18,6 +18,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Search,
   X,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
@@ -64,6 +65,7 @@ interface ViewTransactionTableProps {
   displayAmounts: ReadonlyMap<number, DisplayAmount>;
   isDisplayAmountLoading: boolean;
   isAmountFilterLoading: boolean;
+  onReviewPossibleTransfersAndRefunds?: () => void;
   unavailableAmountFilterCount: number;
 }
 
@@ -84,6 +86,7 @@ export function ViewTransactionTable({
   displayAmounts,
   isDisplayAmountLoading,
   isAmountFilterLoading,
+  onReviewPossibleTransfersAndRefunds,
   unavailableAmountFilterCount,
 }: ViewTransactionTableProps) {
   const navigate = useNavigate();
@@ -328,7 +331,19 @@ export function ViewTransactionTable({
     : 'No transactions in this view.';
 
   return (
-    <div className="space-y-4">
+    <section aria-labelledby="view-transactions-heading" className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="view-transactions-heading" className="text-xl font-semibold">
+          Transactions
+        </h2>
+        {onReviewPossibleTransfersAndRefunds && (
+          <Button variant="secondary" onClick={onReviewPossibleTransfersAndRefunds}>
+            <Search className="mr-2 h-4 w-4" />
+            Review possible transfers and refunds
+          </Button>
+        )}
+      </div>
+
       <TransactionFilterBar
         key={viewId}
         filters={filters}
@@ -500,7 +515,7 @@ export function ViewTransactionTable({
           onSuccess={handleRemoveSuccess}
         />
       )}
-    </div>
+    </section>
   );
 }
 

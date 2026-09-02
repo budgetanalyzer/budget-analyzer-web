@@ -58,23 +58,24 @@ Omit `--model MODEL` to use the wrapper's configured or default model.
 
 ## Authoritative Documentation
 
-| Concern                               | Owner                                                                                                         |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Setup, commands, environment, builds  | [Development](docs/development.md)                                                                            |
-| Structure, browser support, CSP       | [Architecture](docs/architecture.md)                                                                          |
-| Authentication, sessions, permissions | [Authentication](docs/authentication.md)                                                                      |
-| Frontend API behavior                 | [API integration](docs/api-integration.md)                                                                    |
-| Endpoint schemas and payloads         | [Unified API](docs/api/budget-analyzer-api.yaml) and [Session Gateway API](docs/api/session-gateway-api.yaml) |
-| State placement                       | [State architecture](docs/state-architecture.md)                                                              |
-| Tests, coverage, Playwright           | [Testing guide](docs/testing-guide.md)                                                                        |
-| Hooks, lifecycle, effects             | [React hooks guide](docs/react-hooks-lifecycle-mental-model.md)                                               |
+| Concern                                                             | Owner                                                                                                         |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Setup, commands, environment, builds                                | [Development](docs/development.md)                                                                            |
+| Structure, navigation/actions, menus/overlays, browser support, CSP | [Architecture](docs/architecture.md)                                                                          |
+| Authentication, sessions, permissions                               | [Authentication](docs/authentication.md)                                                                      |
+| Frontend API behavior                                               | [API integration](docs/api-integration.md)                                                                    |
+| Endpoint schemas and payloads                                       | [Unified API](docs/api/budget-analyzer-api.yaml) and [Session Gateway API](docs/api/session-gateway-api.yaml) |
+| State placement                                                     | [State architecture](docs/state-architecture.md)                                                              |
+| Tests, coverage, Playwright                                         | [Testing guide](docs/testing-guide.md)                                                                        |
+| Hooks, lifecycle, effects                                           | [React hooks guide](docs/react-hooks-lifecycle-mental-model.md)                                               |
 
 Consult these owners when the corresponding work applies:
 
 - Read Development before changing setup, environment, build behavior, or
   repository commands, and when a build or local-runtime prerequisite fails.
-- Read Architecture before changing application structure, browser support,
-  CSP policy, UI dependencies, Motion usage, or overlay behavior.
+- Read Architecture before changing application structure, navigation or
+  action hierarchy, menus, overlays, browser support, CSP policy, UI
+  dependencies, or Motion usage.
 - Read Authentication before changing sessions, roles, permissions, route
   protection, or action gating.
 - Read API integration and the generated API specifications before changing
