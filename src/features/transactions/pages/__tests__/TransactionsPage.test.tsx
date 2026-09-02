@@ -2,26 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Transaction } from '@/types/transaction';
-import { Route, Routes, useLocation, useNavigate } from 'react-router';
 
-const { transactionTableMock, transactionData, currencyHookState, viewHookMocks } = vi.hoisted(
-  () => ({
-    transactionTableMock: vi.fn(),
-    transactionData: [] as Transaction[],
-    currencyHookState: {
-      exchangeRatesMap: new Map(),
-      pendingCurrencies: [] as string[],
-      disabledCurrencies: [] as string[],
-      isExchangeRatesLoading: false,
-      enabledCurrencies: [] as Array<{ currencyCode: string }>,
-      isCurrenciesLoading: false,
-    },
-    viewHookMocks: {
-      useView: vi.fn(),
-      useViewMembership: vi.fn(),
-    },
-  }),
-);
+const { transactionTableMock, transactionData, currencyHookState } = vi.hoisted(() => ({
+  transactionTableMock: vi.fn(),
+  transactionData: [] as Transaction[],
+  currencyHookState: {
+    exchangeRatesMap: new Map(),
+    pendingCurrencies: [] as string[],
+    disabledCurrencies: [] as string[],
+    isExchangeRatesLoading: false,
+    enabledCurrencies: [] as Array<{ currencyCode: string }>,
+    isCurrenciesLoading: false,
+  },
+}));
 
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/hooks/useTransactions', () => ({
@@ -46,11 +39,6 @@ vi.mock('@/hooks/useCurrencies', () => ({
 vi.mock('@/hooks/useMissingCurrencies', () => ({
   useMissingCurrencies: () => currencyHookState.disabledCurrencies,
 }));
-vi.mock('@/hooks/useViews', () => ({
-  useView: viewHookMocks.useView,
-  useViewMembership: viewHookMocks.useViewMembership,
-}));
-
 vi.mock('@/features/transactions/components/TransactionTable', () => ({
   TransactionTable: (props: {
     viewTransactionIds?: number[];
@@ -61,15 +49,6 @@ vi.mock('@/features/transactions/components/TransactionTable', () => ({
     availableAccountIds: string[];
     isAmountFilterLoading: boolean;
     unavailableAmountFilterCount: number;
-    selectionPurpose:
-      | { type: 'delete' }
-      | {
-          type: 'add-to-view';
-          viewName: string;
-          memberTransactionIds: number[];
-          onCancel: () => void;
-          onSuccess: () => void;
-        };
   }) => {
     transactionTableMock(props);
     return (
@@ -83,24 +62,7 @@ vi.mock('@/features/transactions/components/TransactionTable', () => ({
         data-account-options={props.availableAccountIds.join(',')}
         data-amount-loading={props.isAmountFilterLoading.toString()}
         data-unavailable-count={props.unavailableAmountFilterCount.toString()}
-        data-selection-purpose={props.selectionPurpose.type}
-        data-member-ids={
-          props.selectionPurpose.type === 'add-to-view'
-            ? props.selectionPurpose.memberTransactionIds.join(',')
-            : undefined
-        }
-      >
-        {props.selectionPurpose.type === 'add-to-view' && (
-          <>
-            <button type="button" onClick={props.selectionPurpose.onCancel}>
-              Cancel add mode
-            </button>
-            <button type="button" onClick={props.selectionPurpose.onSuccess}>
-              Complete add mode
-            </button>
-          </>
-        )}
-      </div>
+      />
     );
   },
 }));
@@ -136,50 +98,13 @@ vi.mock('@/features/transactions/components/ImportButton', () => ({
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage';
 import { renderWithProviders } from '@/testing/test-utils';
-import type { useView, useViewMembership } from '@/hooks/useViews';
 
 const mockUsePermission = vi.mocked(usePermission);
-
-const viewId = '11111111-1111-4111-8111-111111111111';
-
-function HistoryProbe() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  return (
-    <>
-      <div data-testid="page-location">{`${location.pathname}${location.search}`}</div>
-      <button type="button" onClick={() => navigate(-1)}>
-        Browser back
-      </button>
-      <button type="button" onClick={() => navigate(1)}>
-        Browser forward
-      </button>
-    </>
-  );
-}
 
 function renderPage(initialEntry: string | string[] = '/transactions') {
   return renderWithProviders(<TransactionsPage />, {
     initialEntries: typeof initialEntry === 'string' ? [initialEntry] : initialEntry,
   });
-}
-
-function renderPageWithHistory(initialEntries: string[]) {
-  return renderWithProviders(
-    <>
-      <TransactionsPage />
-      <HistoryProbe />
-    </>,
-    { initialEntries },
-  );
-}
-
-function addModeUrl(returnTo = `/views/${viewId}`) {
-  const params = new URLSearchParams({
-    addToView: viewId,
-    addToViewReturnTo: returnTo,
-  });
-  return `/?${params.toString()}`;
 }
 
 beforeEach(() => {
@@ -192,26 +117,6 @@ beforeEach(() => {
   currencyHookState.isExchangeRatesLoading = false;
   currencyHookState.enabledCurrencies = [];
   currencyHookState.isCurrenciesLoading = false;
-  viewHookMocks.useView.mockReset();
-  viewHookMocks.useViewMembership.mockReset();
-  viewHookMocks.useView.mockReturnValue({
-    data: {
-      id: viewId,
-      name: 'Static collection',
-      transactionCount: 1,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    },
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
-  } as unknown as ReturnType<typeof useView>);
-  viewHookMocks.useViewMembership.mockReturnValue({
-    data: { transactionIds: [1] },
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
-  } as unknown as ReturnType<typeof useViewMembership>);
 });
 
 describe('TransactionsPage Import button gating', () => {
@@ -483,146 +388,6 @@ describe('TransactionsPage shared transaction filters', () => {
     expect(screen.getByTestId('transaction-table-stub')).toHaveAttribute(
       'data-view-transaction-ids-ready',
       'false',
-    );
-  });
-});
-
-describe('TransactionsPage add-to-view navigation mode', () => {
-  it('resolves metadata and membership only for a valid, permitted mode', async () => {
-    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
-    transactionData.push({
-      id: 2,
-      accountId: 'checking',
-      bankName: 'Bank',
-      date: '2026-01-01',
-      currencyIsoCode: 'USD',
-      amount: 10,
-      type: 'DEBIT',
-      description: 'Coffee',
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    });
-
-    renderPage(`${addModeUrl()}&q=coffee`);
-
-    const table = await screen.findByTestId('transaction-table-stub');
-    expect(viewHookMocks.useView).toHaveBeenCalledWith(viewId);
-    expect(viewHookMocks.useViewMembership).toHaveBeenCalledWith(viewId);
-    expect(table).toHaveAttribute('data-selection-purpose', 'add-to-view');
-    expect(table).toHaveAttribute('data-member-ids', '1');
-    expect(
-      screen.getByRole('heading', { name: 'Add transactions to Static collection' }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Import Transactions/ })).not.toBeInTheDocument();
-  });
-
-  it('passes only rows from a settled active amount filter to add selection', async () => {
-    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
-    transactionData.push(
-      {
-        id: 2,
-        accountId: 'checking',
-        bankName: 'Bank',
-        date: '2026-01-01',
-        currencyIsoCode: 'USD',
-        amount: 5,
-        type: 'DEBIT',
-        description: 'Below range',
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-01-01T00:00:00Z',
-      },
-      {
-        id: 3,
-        accountId: 'checking',
-        bankName: 'Bank',
-        date: '2026-01-01',
-        currencyIsoCode: 'USD',
-        amount: 20,
-        type: 'DEBIT',
-        description: 'Inside range',
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-01-01T00:00:00Z',
-      },
-    );
-
-    renderPage(`${addModeUrl()}&minAmount=10&amountCurrency=USD`);
-
-    const table = await screen.findByTestId('transaction-table-stub');
-    expect(table).toHaveAttribute('data-selection-purpose', 'add-to-view');
-    expect(table).toHaveAttribute('data-transaction-ids', '3');
-    expect(table).toHaveAttribute('data-amount-loading', 'false');
-  });
-
-  it('does not mount target queries or a selectable table for a denied deep link', () => {
-    mockUsePermission.mockReturnValue(false);
-    renderWithProviders(
-      <Routes>
-        <Route path="/" element={<TransactionsPage />} />
-        <Route path="/unauthorized" element={<div>Unauthorized route</div>} />
-      </Routes>,
-      { initialEntries: [addModeUrl()] },
-    );
-
-    expect(viewHookMocks.useView).not.toHaveBeenCalled();
-    expect(viewHookMocks.useViewMembership).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('transaction-table-stub')).not.toBeInTheDocument();
-    expect(screen.getByText('Unauthorized route')).toBeInTheDocument();
-  });
-
-  it('cleans malformed or external mode state before rendering ordinary transactions', async () => {
-    mockUsePermission.mockReturnValue(false);
-    const externalParams = new URLSearchParams({
-      q: 'coffee',
-      addToView: viewId,
-      addToViewReturnTo: 'https://example.com/views/anything',
-    });
-    renderPageWithHistory([`/?${externalParams.toString()}`]);
-
-    const table = await screen.findByTestId('transaction-table-stub');
-    expect(table).toHaveAttribute('data-selection-purpose', 'delete');
-    expect(screen.getByTestId('page-location')).toHaveTextContent('/?q=coffee');
-    expect(viewHookMocks.useView).not.toHaveBeenCalled();
-    expect(viewHookMocks.useViewMembership).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ['cancel', 'Cancel add mode'],
-    ['success', 'Complete add mode'],
-  ])('returns to a clean source view after %s', async (_outcome, buttonName) => {
-    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
-    const returnTo = `/views/${viewId}?q=coffee`;
-    renderPageWithHistory([addModeUrl(returnTo)]);
-
-    await userEvent.click(await screen.findByRole('button', { name: buttonName }));
-
-    expect(screen.getByTestId('page-location')).toHaveTextContent(returnTo);
-    expect(screen.getByTestId('page-location')).not.toHaveTextContent('addToView');
-  });
-
-  it('tracks add mode through browser back and forward navigation', async () => {
-    mockUsePermission.mockImplementation((permission) => permission === 'views:write');
-    const user = userEvent.setup();
-    renderPageWithHistory([`/views/${viewId}`, addModeUrl()]);
-
-    expect(await screen.findByTestId('transaction-table-stub')).toHaveAttribute(
-      'data-selection-purpose',
-      'add-to-view',
-    );
-    await user.click(screen.getByRole('button', { name: 'Browser back' }));
-    await waitFor(() =>
-      expect(screen.getByTestId('page-location')).toHaveTextContent(`/views/${viewId}`),
-    );
-    expect(screen.getByTestId('transaction-table-stub')).toHaveAttribute(
-      'data-selection-purpose',
-      'delete',
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Browser forward' }));
-    await waitFor(() =>
-      expect(screen.getByTestId('transaction-table-stub')).toHaveAttribute(
-        'data-selection-purpose',
-        'add-to-view',
-      ),
     );
   });
 });

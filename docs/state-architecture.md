@@ -86,14 +86,9 @@ criteria.
 The applied search term lives in `q`. `TransactionFilterBar` keeps the user's
 unsubmitted search text and amount values in local draft state, committing
 search on Enter and amounts after their debounce. Clearing all filters removes
-the transaction parameters and the drilldown navigation context.
-
-Static-view addition is also URL-owned navigation context. `addToView` contains
-a validated saved-view UUID and `addToViewReturnTo` contains the matching
-internal `/views/{id}` source URL. Entering the mode copies ordinary transaction
-filters to `/`; filter edits preserve the mode, while cancel and successful
-addition return to the clean source URL. Malformed, external, mismatched, or
-recursive targets are removed before saved-view queries mount.
+the transaction parameters and the drilldown navigation context. Saved-view
+member-table filters remain URL-backed while its contextual transaction picker
+is open; they do not seed or track the picker.
 
 ### Analytics controls and source
 
@@ -172,10 +167,14 @@ It is not reported upward as a second filtered-row state and is not persisted in
 Redux. Saved-view removal can promote the current page selection to all locally
 filtered members; that mode derives the complete filtered ID array and clears
 only after atomic membership removal succeeds or the user explicitly clears it.
-Add-to-view selection is a mutually exclusive table purpose that derives only
-nonmember IDs from the filtered complete snapshot. A stale addition retains the
-selection but blocks resubmission until the user changes it after refreshed
-transaction and membership data arrive.
+The saved-view add-transactions dialog owns its visibility and its picker's
+initially unset filters, sorting, pagination, row selection, and
+select-all-matching state. Each opening derives eligible nonmember IDs from the
+complete active transaction snapshot while retaining disabled member rows for
+context. Closing discards all picker mechanics and mutation feedback. A stale
+addition keeps the dialog and selection open but blocks resubmission until the
+user changes that selection after refreshed transaction and membership data
+arrive.
 
 Use `useMemo` or plain calculations for filtered collections, statistics,
 membership maps, display-amount projections, and option lists. Sorting and

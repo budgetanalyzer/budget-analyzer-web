@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { TransactionAmountBadge } from '@/features/transactions/components/TransactionAmountBadge';
+import { TransactionAmountBadge } from '@/components/TransactionAmountBadge';
 import type { DisplayAmount } from '@/types/displayAmount';
 
 describe('TransactionAmountBadge', () => {

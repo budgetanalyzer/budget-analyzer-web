@@ -27,86 +27,9 @@ import { setDisplayCurrency } from '@/store/uiSlice';
 import { filterTransactionsByDisplayAmount } from '@/utils/transactionFilters';
 import { projectDisplayAmount } from '@/utils/displayAmount';
 import { usePermission } from '@/features/auth/hooks/usePermission';
-import { PermissionGuard } from '@/features/auth/components/PermissionGuard';
-import { Navigate, useNavigate, useSearchParams } from 'react-router';
-import { useView, useViewMembership } from '@/hooks/useViews';
-import {
-  hasAddTransactionsModeParams,
-  parseAddTransactionsMode,
-  removeAddTransactionsModeParams,
-  type AddTransactionsMode,
-} from '@/utils/addTransactionsMode';
 
 export function TransactionsPage() {
-  const [searchParams] = useSearchParams();
-  const addMode = parseAddTransactionsMode(searchParams);
-
-  if (hasAddTransactionsModeParams(searchParams) && !addMode) {
-    const cleanedParams = removeAddTransactionsModeParams(searchParams);
-    const cleanedSearch = cleanedParams.toString();
-    return <Navigate to={`/${cleanedSearch ? `?${cleanedSearch}` : ''}`} replace />;
-  }
-
-  if (addMode) {
-    return (
-      <PermissionGuard permission="views:write">
-        <AddTransactionsPage mode={addMode} />
-      </PermissionGuard>
-    );
-  }
-
-  return <TransactionsPageContent />;
-}
-
-function AddTransactionsPage({ mode }: { mode: AddTransactionsMode }) {
-  const viewQuery = useView(mode.viewId);
-  const membershipQuery = useViewMembership(mode.viewId);
-
-  const handleRetry = useCallback(() => {
-    viewQuery.refetch();
-    membershipQuery.refetch();
-  }, [membershipQuery, viewQuery]);
-
-  if (viewQuery.isLoading || membershipQuery.isLoading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <LoadingSpinner size="lg" text="Loading saved view..." />
-      </div>
-    );
-  }
-
-  const targetError = viewQuery.error || membershipQuery.error;
-  if (targetError) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="w-full max-w-md">
-          <ErrorBanner error={targetError} onRetry={handleRetry} />
-        </div>
-      </div>
-    );
-  }
-
-  if (!viewQuery.data || !membershipQuery.data) return null;
-
-  return (
-    <TransactionsPageContent
-      addMode={{
-        ...mode,
-        viewName: viewQuery.data.name,
-        memberTransactionIds: membershipQuery.data.transactionIds,
-      }}
-    />
-  );
-}
-
-interface ActiveAddMode extends AddTransactionsMode {
-  viewName: string;
-  memberTransactionIds: number[];
-}
-
-function TransactionsPageContent({ addMode }: { addMode?: ActiveAddMode }) {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
@@ -238,11 +161,6 @@ function TransactionsPageContent({ addMode }: { addMode?: ActiveAddMode }) {
   const handleClearInvalidAmountFilter = useCallback(() => {
     handleAmountFilterChange(null, null);
   }, [handleAmountFilterChange]);
-  const handleLeaveAddMode = useCallback(() => {
-    if (addMode) {
-      navigate(addMode.returnTo, { replace: true });
-    }
-  }, [addMode, navigate]);
 
   if (isLoading) {
     return (
@@ -265,14 +183,10 @@ function TransactionsPageContent({ addMode }: { addMode?: ActiveAddMode }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={addMode ? `Add transactions to ${addMode.viewName}` : 'Transactions'}
-        description={
-          addMode
-            ? 'Select transactions from the complete active snapshot.'
-            : 'View and manage transactions'
-        }
+        title="Transactions"
+        description="View and manage transactions"
         action={
-          !addMode && canImportTransactions ? (
+          canImportTransactions ? (
             <ImportButton onSuccess={handleImportSuccess} onError={handleImportError} />
           ) : undefined
         }
@@ -345,18 +259,6 @@ function TransactionsPageContent({ addMode }: { addMode?: ActiveAddMode }) {
                   availableAccountIds={availableAccountIds}
                   viewTransactionIds={visibleTransactionIds}
                   isViewTransactionIdsReady={!isAmountFilterLoading}
-                  selectionPurpose={
-                    addMode
-                      ? {
-                          type: 'add-to-view',
-                          viewId: addMode.viewId,
-                          viewName: addMode.viewName,
-                          memberTransactionIds: addMode.memberTransactionIds,
-                          onCancel: handleLeaveAddMode,
-                          onSuccess: handleLeaveAddMode,
-                        }
-                      : { type: 'delete' }
-                  }
                 />
               )}
             </CardContent>

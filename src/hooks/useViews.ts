@@ -170,7 +170,7 @@ export function createRemoveViewTransactionsRequest(
 }
 
 /**
- * Build a deduplicated atomic delta for add-to-view selection.
+ * Build a deduplicated atomic delta for saved-view membership additions.
  */
 export function createAddViewTransactionsRequest(
   transactionIds: number[],

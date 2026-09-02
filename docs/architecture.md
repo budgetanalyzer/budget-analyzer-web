@@ -111,6 +111,15 @@ operations, consistent with the
 New and changed labels use sentence case and lead with a clear verb where an
 action is performed.
 
+Saved-view detail presents `Add transactions` as its contextual primary action.
+It opens a modal over the current view rather than navigating to a separate
+destination or encoding the workflow in the URL. The modal initially shows the
+complete active transaction snapshot without filters, keeps existing members
+visible but unavailable for selection, and submits only selected nonmembers.
+Saved-view member-table URL filters remain unchanged behind it. Cancel closes
+without changing membership; success closes in place and restores focus to the
+initiating action after membership refresh begins.
+
 ## State Boundary
 
 The application separates state by lifetime and authority:

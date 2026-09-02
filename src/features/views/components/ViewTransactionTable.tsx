@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { TransactionFilterBar } from '@/components/TransactionFilterBar';
+import { TransactionAmountBadge } from '@/components/TransactionAmountBadge';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Checkbox } from '@/components/ui/Checkbox';
@@ -35,7 +36,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/Table';
-import { TransactionAmountBadge } from '@/features/transactions/components/TransactionAmountBadge';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { RemoveViewTransactionsBar } from '@/features/views/components/RemoveViewTransactionsBar';
 import { RemoveViewTransactionsModal } from '@/features/views/components/RemoveViewTransactionsModal';
