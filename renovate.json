@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>budgetanalyzer/orchestration//renovate-presets/default"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "description": "Keep React and React DOM on a reviewed compatible release",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["react", "react-dom"],
+      "groupName": "React packages"
+    },
+    {
+      "description": "Keep the Vitest runner, UI, and coverage provider compatible",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["vitest", "@vitest/**"],
+      "groupName": "Vitest packages"
+    }
+  ]
+}

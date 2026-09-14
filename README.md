@@ -49,6 +49,7 @@ Table, Tailwind CSS, Axios, Vitest, Testing Library, MSW, and Playwright.
 | State ownership                                  | [docs/state-architecture.md](docs/state-architecture.md)                                                      |
 | Test policy, coverage, and Playwright            | [docs/testing-guide.md](docs/testing-guide.md)                                                                |
 | React hooks, lifecycle, and effects              | [docs/react-hooks-lifecycle-mental-model.md](docs/react-hooks-lifecycle-mental-model.md)                      |
+| Dependency updates and audit evidence            | [docs/dependency-automation.md](docs/dependency-automation.md)                                                |
 
 ## Related Repositories
 

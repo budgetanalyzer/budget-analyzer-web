@@ -68,6 +68,7 @@ Omit `--model MODEL` to use the wrapper's configured or default model.
 | State placement                                                     | [State architecture](docs/state-architecture.md)                                                              |
 | Tests, coverage, Playwright                                         | [Testing guide](docs/testing-guide.md)                                                                        |
 | Hooks, lifecycle, effects                                           | [React hooks guide](docs/react-hooks-lifecycle-mental-model.md)                                               |
+| Dependency updates, lockfile maintenance, audit evidence            | [Dependency automation](docs/dependency-automation.md)                                                        |
 
 Consult these owners when the corresponding work applies:
 
@@ -87,6 +88,9 @@ Consult these owners when the corresponding work applies:
   or shared test infrastructure, and when a verifier or browser harness fails.
 - Read the React hooks guide before changing hooks, effects, subscriptions,
   timers, listeners, or other lifecycle behavior.
+- Read Dependency automation before changing Renovate configuration,
+  dependency-update grouping or scheduling, the dependency-audit workflow, or
+  npm audit evidence handling.
 
 ## Implementation Guardrails
 
@@ -213,6 +217,13 @@ Before finishing, run the gates that apply to the changed surface:
   environment is available and the Testing guide requires them.
 - UI dependency, Motion, overlay, or CSP-sensitive changes: also run the static
   scan and browser-audit gates required by the Strict CSP section.
+- Dependency-automation configuration or workflow changes: format changed
+  files, run strict Renovate configuration validation and extraction, run
+  `actionlint`, and run both `npm audit --json` and
+  `npm audit --omit=dev --json` against the existing lockfile. Treat findings
+  separately from installation, registry, malformed-report, and tool failures.
+  Confirm `package.json` and `package-lock.json` remain unchanged unless an
+  explicit dependency upgrade is in scope.
 
 If a required verifier cannot run because a tool, credential, service, browser,
 or user-managed environment is unavailable, report that explicitly. Do not
@@ -230,6 +241,11 @@ ls docs/api/budget-analyzer-api.yaml docs/api/session-gateway-api.yaml
 # Package scripts and dependencies
 jq '.scripts' package.json
 jq '.dependencies' package.json
+
+# Dependency automation and evidence workflows
+sed -n '1,240p' renovate.json
+sed -n '1,320p' docs/dependency-automation.md
+find .github/workflows -maxdepth 1 -type f -print | sort
 
 # Source structure, API adapters, and shared hooks
 find src -maxdepth 2 -type d | sort
