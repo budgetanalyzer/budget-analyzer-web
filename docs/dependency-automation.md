@@ -36,16 +36,19 @@ verify the selected tag/digest supports the required platform before merging.
 
 ## Audit evidence
 
-`.github/workflows/dependency-audit.yml` runs weekly and on manual dispatch. It
-installs exactly `package-lock.json` with `npm ci`, then independently captures:
+`.github/workflows/dependency-audit.yml` preserves weekly and manual operation on
+`main` and also accepts direct runs of the exact trial ref. It installs exactly
+`package-lock.json` with `npm ci`, then independently captures:
 
 - `npm audit --json` as `npm-audit-full.json`;
 - `npm audit --omit=dev --json` as `npm-audit-production.json`.
 
-Download the `npm-audit-reports` artifact from the workflow run to compare the
-raw JSON reports. The artifact is retained for seven days and also includes each
-command's stderr and `status.txt`. The job summary presents severity counts for
-the two scopes.
+On `main`, download the seven-day `npm-audit-reports` artifact from the workflow
+run to compare the raw JSON reports. Trial runs start with schedules, optional
+npm caching, and uploads off. They measure the complete report directory and can
+upload only one sealed one-day archive beneath the 25 MiB cap after the operator
+enables the repository upload variable. The job summary presents severity counts
+for the two scopes and the trial archive measurement.
 
 An npm audit exit status caused by findings does not fail this scheduled report;
 the existing backlog remains visible without blocking unrelated pull requests.
@@ -53,6 +56,14 @@ Missing or malformed JSON, an npm-reported registry error, an unexpected command
 status, or an `npm ci` failure does fail the workflow. Installation errors remain
 separate in the named install step's log, while audit errors and partial report
 files remain available through the always-upload artifact step.
+
+`build.yml` also accepts pushes to the exact trial branch and pull requests based
+on either `main` or that branch. Trial builds disable the optional npm cache and
+measure `dist`, coverage output, and the complete build log before any upload.
+The exact schedule, cache, and upload variables are owned by the
+[orchestration trial workflow policy](../../orchestration/docs/dependency-automation.md#trial-workflow-controls).
+Production `main` build uploads remain unchanged; release publishing is outside
+the trial changes.
 
 The credential-free onboarding run on 2026-09-06 reproduced the saved review
 against the unchanged lockfile:

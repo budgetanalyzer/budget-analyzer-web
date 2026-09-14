@@ -68,7 +68,7 @@ Omit `--model MODEL` to use the wrapper's configured or default model.
 | State placement                                                     | [State architecture](docs/state-architecture.md)                                                              |
 | Tests, coverage, Playwright                                         | [Testing guide](docs/testing-guide.md)                                                                        |
 | Hooks, lifecycle, effects                                           | [React hooks guide](docs/react-hooks-lifecycle-mental-model.md)                                               |
-| Dependency updates, lockfile maintenance, audit evidence            | [Dependency automation](docs/dependency-automation.md)                                                        |
+| Dependency updates, lockfile maintenance, audit and trial evidence  | [Dependency automation](docs/dependency-automation.md)                                                        |
 
 Consult these owners when the corresponding work applies:
 
@@ -90,7 +90,7 @@ Consult these owners when the corresponding work applies:
   timers, listeners, or other lifecycle behavior.
 - Read Dependency automation before changing Renovate configuration,
   dependency-update grouping or scheduling, the dependency-audit workflow, or
-  npm audit evidence handling.
+  npm audit/trial evidence handling, caches, or artifact uploads.
 
 ## Implementation Guardrails
 

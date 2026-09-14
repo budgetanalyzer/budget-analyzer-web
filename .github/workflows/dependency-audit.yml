@@ -1,6 +1,8 @@
 name: Dependency Audit
 
 on:
+  push:
+    branches: [dependency-automation-trial]
   schedule:
     - cron: '17 6 * * 1'
   workflow_dispatch:
@@ -17,13 +19,36 @@ env:
 
 jobs:
   npm-audit:
+    if: >-
+      ${{
+        (github.ref == 'refs/heads/main' &&
+          (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) ||
+        (github.ref == 'refs/heads/dependency-automation-trial' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+            (github.event_name == 'schedule' && vars.DEPENDENCY_AUTOMATION_TRIAL_SCHEDULES_ENABLED == 'true')))
+      }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Node.js
+      - name: Set up Node.js without a trial cache
+        if: >-
+          ${{
+            github.ref == 'refs/heads/dependency-automation-trial' &&
+            vars.DEPENDENCY_AUTOMATION_TRIAL_CACHES_ENABLED != 'true'
+          }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Set up Node.js with cache
+        if: >-
+          ${{
+            github.ref == 'refs/heads/main' ||
+            vars.DEPENDENCY_AUTOMATION_TRIAL_CACHES_ENABLED == 'true'
+          }}
         uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -128,10 +153,43 @@ jobs:
           fi
 
       - name: Upload audit reports
-        if: ${{ always() }}
+        if: ${{ always() && github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@v7
         with:
           name: npm-audit-reports
           path: dependency-audit-reports/
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Measure complete trial audit evidence
+        id: trial-evidence
+        if: ${{ always() && github.ref == 'refs/heads/dependency-automation-trial' }}
+        run: >-
+          bash .github/scripts/prepare-trial-evidence.sh
+          dependency-automation-evidence/audit-evidence.tar.gz
+          'Trial npm audit'
+          dependency-audit-reports
+
+      - name: Upload capped trial audit evidence
+        if: >-
+          ${{
+            always() && vars.DEPENDENCY_AUTOMATION_TRIAL_UPLOADS_ENABLED == 'true' &&
+            steps.trial-evidence.outputs.upload_allowed == 'true'
+          }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: trial-npm-audit-evidence-${{ github.run_id }}
+          path: dependency-automation-evidence/audit-evidence.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+      - name: Enforce complete trial audit evidence delivery
+        if: >-
+          ${{
+            always() && vars.DEPENDENCY_AUTOMATION_TRIAL_UPLOADS_ENABLED == 'true' &&
+            steps.trial-evidence.outputs.upload_allowed != 'true'
+          }}
+        run: |
+          echo 'The complete trial npm audit evidence exceeds the capped upload allowance.' >&2
+          exit 1
