@@ -1,0 +1,138 @@
+name: Dependency Audit
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-audit
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  npm-audit:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Prepare report directory
+        run: mkdir -p dependency-audit-reports
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Capture full and production audits
+        shell: bash
+        run: |
+          set -u
+
+          set +e
+          npm audit --json \
+            > dependency-audit-reports/npm-audit-full.json \
+            2> dependency-audit-reports/npm-audit-full.stderr.log
+          full_status=$?
+          npm audit --omit=dev --json \
+            > dependency-audit-reports/npm-audit-production.json \
+            2> dependency-audit-reports/npm-audit-production.stderr.log
+          production_status=$?
+          set -e
+
+          audit_operational_failure=0
+
+          classify_audit() {
+            scope="$1"
+            report="$2"
+            command_status="$3"
+
+            if [[ ! -s "${report}" ]]; then
+              echo "${scope} npm audit produced no JSON report." >&2
+              audit_operational_failure=1
+              return
+            fi
+
+            if ! jq -e 'type == "object"' "${report}" > /dev/null; then
+              echo "${scope} npm audit produced invalid JSON." >&2
+              audit_operational_failure=1
+              return
+            fi
+
+            if jq -e '.error != null' "${report}" > /dev/null; then
+              jq -r '"npm audit error: \(.error.code // "unknown"): \(.error.summary // .error.message // "no message")"' "${report}" >&2
+              audit_operational_failure=1
+              return
+            fi
+
+            if ! jq -e '.metadata.vulnerabilities.total | numbers' "${report}" > /dev/null; then
+              echo "${scope} npm audit JSON has no vulnerability metadata." >&2
+              audit_operational_failure=1
+              return
+            fi
+
+            total="$(jq -r '.metadata.vulnerabilities.total' "${report}")"
+            if [[ "${command_status}" -eq 0 && "${total}" -ne 0 ]] \
+              || [[ "${command_status}" -eq 1 && "${total}" -eq 0 ]] \
+              || [[ "${command_status}" -ne 0 && "${command_status}" -ne 1 ]]; then
+              echo "${scope} npm audit returned unexpected status ${command_status} for ${total} findings." >&2
+              audit_operational_failure=1
+              return
+            fi
+
+            jq -r --arg scope "${scope}" '
+              .metadata.vulnerabilities |
+              "| \($scope) | \(.critical) | \(.high) | \(.moderate) | \(.low) | \(.total) |"
+            ' "${report}" >> "${GITHUB_STEP_SUMMARY}"
+          }
+
+          {
+            echo '## npm audit results'
+            echo
+            echo '| Scope | Critical | High | Moderate | Low | Total |'
+            echo '| --- | ---: | ---: | ---: | ---: | ---: |'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          classify_audit \
+            "Full dependency tree" \
+            dependency-audit-reports/npm-audit-full.json \
+            "${full_status}"
+          classify_audit \
+            "Production dependencies" \
+            dependency-audit-reports/npm-audit-production.json \
+            "${production_status}"
+
+          {
+            printf 'full_status=%s\n' "${full_status}"
+            printf 'production_status=%s\n' "${production_status}"
+            printf 'operational_failure=%s\n' "${audit_operational_failure}"
+          } > dependency-audit-reports/status.txt
+
+          if [[ "${audit_operational_failure}" -ne 0 ]]; then
+            exit 1
+          fi
+
+          if [[ "${full_status}" -eq 1 || "${production_status}" -eq 1 ]]; then
+            echo 'Vulnerability findings were retained as evidence and do not fail this scheduled report.' >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload short-lived audit evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-audit-reports
+          path: dependency-audit-reports
+          if-no-files-found: error
+          retention-days: 7
