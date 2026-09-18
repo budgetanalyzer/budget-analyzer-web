@@ -14,5 +14,5 @@ of adding a second explanation elsewhere.
 | Server, URL, Redux, local, derived, and navigation state                                          | [State architecture](state-architecture.md)                                                                 |
 | Test policy, shared utilities, coverage, and Playwright                                           | [Testing guide](testing-guide.md)                                                                           |
 | React lifecycle and effect conventions                                                            | [React hooks, lifecycle, and effects](react-hooks-lifecycle-mental-model.md)                                |
-| Dependency updates, lockfile maintenance, audit evidence, and activation handoff                  | [Dependency automation](dependency-automation.md)                                                           |
+| Dependency updates, lockfile maintenance, and audit evidence                                      | [Dependency automation](dependency-automation.md)                                                           |
 | Agent-only rules and discovery commands                                                           | [AGENTS.md](../AGENTS.md)                                                                                   |
