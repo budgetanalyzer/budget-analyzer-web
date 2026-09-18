@@ -40,20 +40,19 @@ manual execution on `main`. It installs exactly `package-lock.json` with
 - `npm audit --json` as `npm-audit-full.json`;
 - `npm audit --omit=dev --json` as `npm-audit-production.json`.
 
-The workflow packages only `dependency-audit-reports` into one gzip archive.
-The helper rejects a compressed payload above 24 MiB (25,165,824 bytes), and
-the workflow uploads the precompressed archive with upload-action compression
-disabled. The `npm-audit-reports` artifact is retained for seven days. The job
-summary presents severity counts and the archive measurement for the two audit
-scopes.
+The workflow uploads `dependency-audit-reports` directly as the single
+`npm-audit-reports` artifact and retains it for seven days. A successful run
+must include the audit status and both complete audit reports; incomplete
+successful-run evidence fails under the shared orchestration policy. The job
+summary presents severity counts for the two audit scopes.
 
 An npm audit exit status caused by findings does not fail this scheduled report;
 the backlog remains visible without blocking unrelated pull requests. Missing
 or malformed JSON, an npm-reported registry error, an unexpected command
 status, or an `npm ci` failure does fail the workflow. Installation errors
 remain separate in the named install step's log. Audit errors and any partial
-reports are still packaged by the always-run evidence steps when the report
-directory is available.
+reports are still uploaded by the always-run evidence step when the report
+directory is available, while the original error keeps the workflow failed.
 
 Audit reports are inputs to human triage, not proof of reachability. In
 particular, development-server findings are not production-browser findings,
