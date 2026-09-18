@@ -128,21 +128,11 @@ jobs:
             echo 'Vulnerability findings were retained as evidence and do not fail this scheduled report.' >> "${GITHUB_STEP_SUMMARY}"
           fi
 
-      - name: Prepare capped audit evidence
-        id: audit-evidence
+      - name: Upload short-lived audit evidence
         if: ${{ always() }}
-        run: >-
-          bash .github/scripts/prepare-dependency-evidence.sh
-          dependency-automation-evidence/npm-audit-reports.tar.gz
-          'npm audit'
-          dependency-audit-reports
-
-      - name: Upload capped audit evidence
-        if: ${{ always() && steps.audit-evidence.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
           name: npm-audit-reports
-          path: dependency-automation-evidence/npm-audit-reports.tar.gz
+          path: dependency-audit-reports
           if-no-files-found: error
           retention-days: 7
-          compression-level: 0
