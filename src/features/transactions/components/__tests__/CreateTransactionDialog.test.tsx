@@ -1,10 +1,11 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreateTransactionDialog } from '@/features/transactions/components/CreateTransactionDialog';
 import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
+import type { CurrencySeriesResponse } from '@/types/currency';
 import type { Transaction } from '@/types/transaction';
 import { getCurrentLocalDate } from '@/utils/dates';
 
@@ -18,6 +19,19 @@ const createdTransaction: Transaction = {
   createdAt: '2026-09-19T06:00:00Z',
   updatedAt: '2026-09-19T06:00:00Z',
 };
+
+function currency(id: number, currencyCode: string, enabled = true): CurrencySeriesResponse {
+  return {
+    id,
+    currencyCode,
+    providerSeriesId: `SERIES-${currencyCode}-${id}`,
+    enabled,
+    createdAt: '2026-09-18T06:00:00Z',
+    updatedAt: '2026-09-18T06:00:00Z',
+  };
+}
+
+const defaultCurrencies = [currency(2, 'EUR'), currency(3, 'CAD')];
 
 function createDeferredPromise() {
   let resolve!: () => void;
@@ -49,13 +63,58 @@ function renderDialog(displayCurrency = 'USD') {
   return { onClose, onCreated };
 }
 
+async function getReadyCurrencySelect() {
+  const currencySelect = screen.getByLabelText('Currency');
+  await waitFor(() => expect(currencySelect).not.toBeDisabled());
+  return currencySelect;
+}
+
 async function enterAmount(amount: string) {
   const amountInput = screen.getByLabelText('Amount');
   await userEvent.clear(amountInput);
   await userEvent.type(amountInput, amount);
 }
 
+beforeEach(() => {
+  server.use(http.get('/api/v1/currencies', () => HttpResponse.json(defaultCurrencies)));
+});
+
 describe('CreateTransactionDialog', () => {
+  it('renders USD first with deduplicated enabled currencies and defaults to the available display currency', async () => {
+    let enabledOnly: string | null = null;
+    server.use(
+      http.get('/api/v1/currencies', ({ request }) => {
+        enabledOnly = new URL(request.url).searchParams.get('enabledOnly');
+        return HttpResponse.json([
+          currency(5, 'GBP'),
+          currency(1, 'USD'),
+          currency(4, 'CAD'),
+          currency(2, 'EUR'),
+          currency(6, 'CAD'),
+          currency(7, 'JPY', false),
+          currency(8, 'USD'),
+        ]);
+      }),
+    );
+
+    renderDialog('EUR');
+
+    const currencySelect = await getReadyCurrencySelect();
+    expect(enabledOnly).toBe('true');
+    expect(currencySelect).toHaveValue('EUR');
+    expect(
+      within(currencySelect)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['USD', 'CAD', 'EUR', 'GBP']);
+  });
+
+  it('falls back to USD when the display currency is not enabled', async () => {
+    renderDialog('JPY');
+
+    expect(await getReadyCurrencySelect()).toHaveValue('USD');
+  });
+
   it('submits defaults with an empty description and omits blank optional metadata', async () => {
     const user = userEvent.setup();
     let capturedBody: unknown;
@@ -63,18 +122,17 @@ describe('CreateTransactionDialog', () => {
       ...createdTransaction,
       date: getCurrentLocalDate(),
     };
-    const { onClose, onCreated } = renderDialog();
-
     server.use(
       http.post('/api/v1/transactions', async ({ request }) => {
         capturedBody = await request.json();
         return HttpResponse.json(response, { status: 201 });
       }),
     );
+    const { onClose, onCreated } = renderDialog();
 
     expect(screen.getByRole('dialog', { name: 'Create transaction' })).toBeInTheDocument();
     expect(screen.getByLabelText('Date')).toHaveValue(getCurrentLocalDate());
-    expect(screen.getByLabelText('Currency')).toHaveValue('USD');
+    expect(await getReadyCurrencySelect()).toHaveValue('USD');
     expect(screen.getByLabelText('Type')).toHaveValue('DEBIT');
 
     await enterAmount('12.345');
@@ -91,10 +149,10 @@ describe('CreateTransactionDialog', () => {
       });
     });
     expect(onCreated).toHaveBeenCalledWith(response);
-    expect(onClose).toHaveBeenCalledOnce();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('uppercases text currency, trims text, and submits CREDIT with optional metadata', async () => {
+  it('submits the selected currency, trimmed text, CREDIT, and optional metadata', async () => {
     const user = userEvent.setup();
     let capturedBody: unknown;
     const creditResponse: Transaction = {
@@ -107,19 +165,17 @@ describe('CreateTransactionDialog', () => {
       bankName: 'Community Bank',
       accountId: 'cash-1',
     };
-    renderDialog('EUR');
-
     server.use(
       http.post('/api/v1/transactions', async ({ request }) => {
         capturedBody = await request.json();
         return HttpResponse.json(creditResponse, { status: 201 });
       }),
     );
+    renderDialog('EUR');
 
     await user.type(screen.getByLabelText('Description'), '  Cash deposit  ');
     await enterAmount('500');
-    await user.clear(screen.getByLabelText('Currency'));
-    await user.type(screen.getByLabelText('Currency'), 'cad');
+    await user.selectOptions(await getReadyCurrencySelect(), 'CAD');
     await user.selectOptions(screen.getByLabelText('Type'), 'CREDIT');
     await user.type(screen.getByLabelText('Bank name (optional)'), '  Community Bank  ');
     await user.type(screen.getByLabelText('Account ID (optional)'), '  cash-1  ');
@@ -138,25 +194,22 @@ describe('CreateTransactionDialog', () => {
     });
   });
 
-  it('rejects empty or zero amounts and malformed currency before transport', async () => {
+  it('rejects empty or zero amounts before transport', async () => {
     const user = userEvent.setup();
     let requestCount = 0;
-    renderDialog();
-
     server.use(
       http.post('/api/v1/transactions', () => {
         requestCount += 1;
         return HttpResponse.json(createdTransaction, { status: 201 });
       }),
     );
+    renderDialog();
+    await getReadyCurrencySelect();
 
     await enterAmount('0');
-    await user.clear(screen.getByLabelText('Currency'));
-    await user.type(screen.getByLabelText('Currency'), 'u1');
     await user.click(screen.getByRole('button', { name: 'Create transaction' }));
 
     expect(screen.getByText('Enter a finite amount greater than zero.')).toBeInTheDocument();
-    expect(screen.getByText('Enter a three-letter currency code.')).toBeInTheDocument();
     expect(requestCount).toBe(0);
 
     await user.clear(screen.getByLabelText('Amount'));
@@ -166,10 +219,8 @@ describe('CreateTransactionDialog', () => {
     expect(requestCount).toBe(0);
   });
 
-  it('maps a 422 application code and preserves every draft value after failure', async () => {
+  it('maps a 422 currency rejection and preserves every draft value and selection', async () => {
     const user = userEvent.setup();
-    const { onClose, onCreated } = renderDialog();
-
     server.use(
       http.post('/api/v1/transactions', () =>
         HttpResponse.json(
@@ -182,11 +233,11 @@ describe('CreateTransactionDialog', () => {
         ),
       ),
     );
+    const { onClose, onCreated } = renderDialog();
 
     await user.type(screen.getByLabelText('Description'), 'Cash purchase');
     await enterAmount('8.75');
-    await user.clear(screen.getByLabelText('Currency'));
-    await user.type(screen.getByLabelText('Currency'), 'abc');
+    await user.selectOptions(await getReadyCurrencySelect(), 'CAD');
     await user.selectOptions(screen.getByLabelText('Type'), 'CREDIT');
     await user.type(screen.getByLabelText('Bank name (optional)'), 'Local Bank');
     await user.type(screen.getByLabelText('Account ID (optional)'), 'wallet-7');
@@ -197,7 +248,7 @@ describe('CreateTransactionDialog', () => {
     );
     expect(screen.getByLabelText('Description')).toHaveValue('Cash purchase');
     expect(screen.getByLabelText('Amount')).toHaveValue(8.75);
-    expect(screen.getByLabelText('Currency')).toHaveValue('ABC');
+    expect(screen.getByLabelText('Currency')).toHaveValue('CAD');
     expect(screen.getByLabelText('Type')).toHaveValue('CREDIT');
     expect(screen.getByLabelText('Bank name (optional)')).toHaveValue('Local Bank');
     expect(screen.getByLabelText('Account ID (optional)')).toHaveValue('wallet-7');
@@ -205,12 +256,77 @@ describe('CreateTransactionDialog', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it('blocks submission while currency choices are loading', async () => {
+    const responseGate = createDeferredPromise();
+    let requestCount = 0;
+    server.use(
+      http.get('/api/v1/currencies', async () => {
+        await responseGate.promise;
+        return HttpResponse.json(defaultCurrencies);
+      }),
+      http.post('/api/v1/transactions', () => {
+        requestCount += 1;
+        return HttpResponse.json(createdTransaction, { status: 201 });
+      }),
+    );
+    renderDialog();
+
+    const currencySelect = screen.getByLabelText('Currency');
+    expect(currencySelect).toBeDisabled();
+    expect(currencySelect).toHaveValue('');
+    expect(within(currencySelect).getByRole('option')).toHaveTextContent('Loading currencies...');
+    const createButton = screen.getByRole('button', { name: 'Create transaction' });
+    expect(createButton).toBeDisabled();
+
+    fireEvent.submit(createButton.closest('form')!);
+    expect(requestCount).toBe(0);
+
+    responseGate.resolve();
+
+    expect(await getReadyCurrencySelect()).toHaveValue('USD');
+    expect(createButton).toBeEnabled();
+  });
+
+  it('keeps a first-load currency failure blocking and retries it in context', async () => {
+    const user = userEvent.setup();
+    let requestCount = 0;
+    server.use(
+      http.get('/api/v1/currencies', () => {
+        requestCount += 1;
+        if (requestCount <= 2) {
+          return HttpResponse.json(
+            { type: 'SERVICE_UNAVAILABLE', message: 'Currency service unavailable' },
+            { status: 503 },
+          );
+        }
+        return HttpResponse.json(defaultCurrencies);
+      }),
+    );
+    renderDialog();
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: 'Currency service unavailable' },
+        { timeout: 3000 },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Currency')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create transaction' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await getReadyCurrencySelect()).toHaveValue('USD');
+    expect(
+      screen.queryByRole('heading', { name: 'Currency service unavailable' }),
+    ).not.toBeInTheDocument();
+    expect(requestCount).toBe(3);
+  });
+
   it('prevents duplicate submission and backdrop, Escape, or Cancel dismissal while pending', async () => {
     const user = userEvent.setup();
     const responseGate = createDeferredPromise();
     let requestCount = 0;
-    const { onClose, onCreated } = renderDialog();
-
     server.use(
       http.post('/api/v1/transactions', async () => {
         requestCount += 1;
@@ -218,6 +334,8 @@ describe('CreateTransactionDialog', () => {
         return HttpResponse.json(createdTransaction, { status: 201 });
       }),
     );
+    const { onClose, onCreated } = renderDialog();
+    await getReadyCurrencySelect();
 
     await enterAmount('12.345');
     await user.click(screen.getByRole('button', { name: 'Create transaction' }));
@@ -246,6 +364,6 @@ describe('CreateTransactionDialog', () => {
     responseGate.resolve();
 
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(createdTransaction));
-    expect(onClose).toHaveBeenCalledOnce();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

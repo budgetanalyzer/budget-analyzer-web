@@ -124,10 +124,10 @@ The Transactions page keeps statement import as its single primary action and
 places the secondary `Create transaction` action beside it. Both actions use
 the unscoped `transactions:write` permission and remain unmounted when that
 permission is absent. Manual creation opens a modal over the page, seeded with
-the selected display currency, while the page and its URL-backed filters remain
-in place. Success closes the modal; when active filters may hide the created
-row, a persistent dismissible page status explains that outcome without
-clearing those filters.
+the selected display currency. Success navigates to the created transaction's
+detail page with normal browser history, retaining the originating Transactions
+URL and its URL-backed filters for the detail page's Back action. Statement
+import remains the single primary action and keeps its existing result feedback.
 
 ## State Boundary
 

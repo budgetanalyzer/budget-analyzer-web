@@ -299,10 +299,12 @@ Application coverage uses authenticated desktop routes with deterministic
 mocked data. Two transaction-list workflows cover row selection and the shared
 bulk-deletion dialog, including focus containment, dismissal, focus restoration,
 and in-flight mutation behavior. A third transaction-list workflow opens manual
-creation for a user with read/write permission, submits an exact positive-amount
-payload while proving blank metadata is omitted, blocks Cancel, backdrop, and
-Escape dismissal while the response is pending, and verifies success rendering
-with missing-metadata markers plus trigger focus restoration. Saved-view-detail
+creation for a user with read/write permission, verifies the native currency
+select defaults to USD, exposes and exercises a server-backed enabled EUR
+choice, submits an exact positive-amount USD payload while proving blank
+metadata is omitted, blocks Cancel, backdrop, and Escape dismissal while the
+response is pending, and verifies navigation to the authoritative response ID
+plus cache-backed detail rendering with missing-metadata markers. Saved-view-detail
 coverage includes two exact workflows: one opens the horizontal-ellipsis
 dropdown named `View actions`, verifies the ordered rename, duplicate, and
 separated delete actions, opens and dismisses `Duplicate view`, and verifies
@@ -315,7 +317,7 @@ violation or prohibited runtime or final stylesheet.
 
 The Playwright project is desktop Chromium only. The manual-creation test covers
 only its deterministic pending/success path; it does not cover validation or
-server failure, active-filter feedback, mobile layout, or another browser. The
+server failure, mobile layout, or another browser. The
 saved-view dropdown test covers one application-owned dropdown at the default
 desktop viewport; it does not assert real placement, viewport fallback, or
 top-layer clipping escape. The saved-view addition test covers only its

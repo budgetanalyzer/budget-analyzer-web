@@ -147,8 +147,12 @@ placement rules are in [State architecture](state-architecture.md).
 ## Manual Transaction Creation
 
 Manual entry sends `POST /v1/transactions` with a positive finite `amount` and
-an independent `CREDIT` or `DEBIT` direction. The form trims its text inputs,
-normalizes the three-letter currency code to uppercase, and omits blank
+an independent `CREDIT` or `DEBIT` direction. Its native currency selector uses
+the enabled `GET /v1/currencies` response plus the always-available USD base
+currency. USD appears first, enabled non-USD choices are deduplicated and sorted,
+and the selected display currency is the default when available; stale display
+preferences fall back to USD. A first-load currency failure blocks submission
+and remains retryable in the form. The form trims its text inputs and omits blank
 `bankName` and `accountId` values; the API adapter defensively trims and omits
 those optional metadata fields again. The generated
 [Unified backend API](api/budget-analyzer-api.yaml) remains authoritative for
@@ -158,10 +162,15 @@ On success, the creation mutation prepends the authoritative response to the
 complete current-user transaction-list cache after removing any row with the
 same ID, writes the corresponding detail cache, and invalidates transaction
 counts. It does not add the transaction to a saved view or invalidate saved-view
-membership because membership is static and backend-owned. The creation dialog
-closes in place without a generic success toast. If any Transactions-page URL
-filter is active, the page instead keeps a dismissible status explaining that
-the new transaction may be hidden; filters are never cleared automatically.
+membership because membership is static and backend-owned. After those cache
+writes, the dialog passes the authoritative response to the Transactions page,
+which uses its numeric response ID to navigate to `/transactions/:id`. The
+detail page can therefore render from the seeded detail cache without normally
+issuing a follow-up request. Normal push navigation retains the originating
+Transactions URL, including URL-backed filters, in browser history. Creation
+does not clear filters, promise membership in the current saved view, or show a
+generic success message; local list sorting and pagination are not navigation
+state and reset when the list remounts.
 
 HTTP 422 application codes use the shared stable error mapping, including an
 invalid transaction currency and dates outside the accepted range. Other

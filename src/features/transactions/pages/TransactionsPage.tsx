@@ -2,6 +2,7 @@
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 import { Plus } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCurrencies, useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
@@ -31,9 +32,11 @@ import { filterTransactionsByDisplayAmount } from '@/utils/transactionFilters';
 import { projectDisplayAmount } from '@/utils/displayAmount';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { deriveTransactionMetadataFilterOptions } from '@/utils/transactionMetadata';
+import type { Transaction } from '@/types/transaction';
 
 export function TransactionsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
@@ -41,7 +44,6 @@ export function TransactionsPage() {
 
   const canWriteTransactions = usePermission('transactions:write');
   const [isCreateTransactionOpen, setIsCreateTransactionOpen] = useState(false);
-  const [createTransactionMessage, setCreateTransactionMessage] = useState<string | null>(null);
 
   const {
     filters,
@@ -180,16 +182,12 @@ export function TransactionsPage() {
     setIsCreateTransactionOpen(false);
   }, []);
 
-  const handleTransactionCreated = useCallback(() => {
-    setIsCreateTransactionOpen(false);
-    setCreateTransactionMessage(
-      hasActiveFilters() ? 'Transaction created. Active filters may hide it from this list.' : null,
-    );
-  }, [hasActiveFilters]);
-
-  const handleDismissCreateTransactionMessage = useCallback(() => {
-    setCreateTransactionMessage(null);
-  }, []);
+  const handleTransactionCreated = useCallback(
+    (createdTransaction: Transaction) => {
+      navigate(`/transactions/${createdTransaction.id}`);
+    },
+    [navigate],
+  );
 
   if (isLoading) {
     return (
@@ -242,13 +240,6 @@ export function TransactionsPage() {
               type={importMessage.type}
               message={importMessage.text}
               onClose={clearImportMessage}
-            />
-          )}
-          {createTransactionMessage && (
-            <MessageBanner
-              type="success"
-              message={createTransactionMessage}
-              onClose={handleDismissCreateTransactionMessage}
             />
           )}
           {isAmountCurrencyInvalid && (

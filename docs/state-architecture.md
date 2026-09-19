@@ -193,6 +193,14 @@ navigation uses browser history when available.
 filters. Normal links build them from existing internal URLs, and clearing the
 operational filters removes them with the filter parameters.
 
+Successful manual transaction creation uses normal push navigation from the
+Transactions URL to the response body's `/transactions/:id` route. Browser
+history retains the exact URL-backed list filters for Back navigation, while
+TanStack Query's seeded detail cache carries the authoritative created object.
+Neither the transaction nor the return path is copied into Redux or navigation
+state. Component-local table sorting and pagination reset when the list
+remounts.
+
 ## Placement Checklist
 
 - Data came from an API: TanStack Query.

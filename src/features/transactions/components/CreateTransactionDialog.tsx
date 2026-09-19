@@ -1,4 +1,5 @@
 import { useCallback, useState, type ChangeEvent, type FormEvent } from 'react';
+import { ErrorBanner } from '@/components/ErrorBanner';
 import { MessageBanner } from '@/components/MessageBanner';
 import { Button } from '@/components/ui/Button';
 import {
@@ -10,7 +11,9 @@ import {
   DialogTitle,
 } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
+import { useCurrencies } from '@/hooks/useCurrencies';
 import { useCreateTransaction } from '@/hooks/useTransactions';
+import type { CurrencySeriesResponse } from '@/types/currency';
 import type { CreateTransactionRequest, Transaction, TransactionType } from '@/types/transaction';
 import { getCurrentLocalDate } from '@/utils/dates';
 import { formatApiError } from '@/utils/errorMessages';
@@ -34,21 +37,19 @@ interface TransactionDraft {
 interface ValidationErrors {
   date?: string;
   amount?: string;
-  currencyIsoCode?: string;
   description?: string;
   bankName?: string;
   accountId?: string;
 }
 
 const CREATE_FAILURE_MESSAGE = 'Failed to create transaction';
-const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 
-function createInitialDraft(displayCurrency: string): TransactionDraft {
+function createInitialDraft(): TransactionDraft {
   return {
     date: getCurrentLocalDate(),
     description: '',
     amount: '',
-    currencyIsoCode: displayCurrency.trim().toUpperCase(),
+    currencyIsoCode: '',
     type: 'DEBIT',
     bankName: '',
     accountId: '',
@@ -64,9 +65,6 @@ function validateDraft(draft: TransactionDraft): ValidationErrors {
   }
   if (!draft.amount.trim() || !Number.isFinite(amount) || amount <= 0) {
     errors.amount = 'Enter a finite amount greater than zero.';
-  }
-  if (!CURRENCY_PATTERN.test(draft.currencyIsoCode.trim().toUpperCase())) {
-    errors.currencyIsoCode = 'Enter a three-letter currency code.';
   }
   if (draft.description.length > 500) {
     errors.description = 'Description must be 500 characters or fewer.';
@@ -85,7 +83,18 @@ function hasValidationErrors(errors: ValidationErrors): boolean {
   return Object.values(errors).some(Boolean);
 }
 
-function buildRequest(draft: TransactionDraft): CreateTransactionRequest {
+function buildCurrencyOptions(currencies: CurrencySeriesResponse[]): string[] {
+  const enabledCodes = new Set(
+    currencies
+      .filter((currency) => currency.enabled)
+      .map((currency) => currency.currencyCode)
+      .filter((currencyCode) => currencyCode !== 'USD'),
+  );
+
+  return ['USD', ...Array.from(enabledCodes).sort((a, b) => a.localeCompare(b))];
+}
+
+function buildRequest(draft: TransactionDraft, currencyIsoCode: string): CreateTransactionRequest {
   const bankName = draft.bankName.trim();
   const accountId = draft.accountId.trim();
 
@@ -93,7 +102,7 @@ function buildRequest(draft: TransactionDraft): CreateTransactionRequest {
     date: draft.date,
     description: draft.description.trim(),
     amount: Number(draft.amount),
-    currencyIsoCode: draft.currencyIsoCode.trim().toUpperCase(),
+    currencyIsoCode,
     type: draft.type,
     ...(bankName ? { bankName } : {}),
     ...(accountId ? { accountId } : {}),
@@ -105,10 +114,25 @@ export function CreateTransactionDialog({
   onClose,
   onCreated,
 }: CreateTransactionDialogProps) {
-  const [draft, setDraft] = useState<TransactionDraft>(() => createInitialDraft(displayCurrency));
+  const [draft, setDraft] = useState<TransactionDraft>(createInitialDraft);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [mutationErrorMessage, setMutationErrorMessage] = useState<string | null>(null);
+  const {
+    data: currencies,
+    error: currenciesError,
+    isFetching: areCurrenciesFetching,
+    refetch: refetchCurrencies,
+  } = useCurrencies(true);
   const { mutate: createTransaction, isPending } = useCreateTransaction();
+  const currenciesReady = currencies !== undefined;
+  const currencyOptions = buildCurrencyOptions(currencies ?? []);
+  const initialCurrency = currencyOptions.includes(displayCurrency) ? displayCurrency : 'USD';
+  const selectedCurrency = currenciesReady
+    ? currencyOptions.includes(draft.currencyIsoCode)
+      ? draft.currencyIsoCode
+      : initialCurrency
+    : '';
+  const blockingCurrenciesError = currenciesReady ? null : currenciesError;
 
   const clearValidationError = useCallback((field: keyof ValidationErrors) => {
     setValidationErrors((currentErrors) => ({ ...currentErrors, [field]: undefined }));
@@ -138,16 +162,12 @@ export function CreateTransactionDialog({
     [clearValidationError],
   );
 
-  const handleCurrencyChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      setDraft((currentDraft) => ({
-        ...currentDraft,
-        currencyIsoCode: event.target.value.toUpperCase(),
-      }));
-      clearValidationError('currencyIsoCode');
-    },
-    [clearValidationError],
-  );
+  const handleCurrencyChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      currencyIsoCode: event.target.value,
+    }));
+  }, []);
 
   const handleTypeChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
     setDraft((currentDraft) => ({
@@ -176,6 +196,10 @@ export function CreateTransactionDialog({
     setMutationErrorMessage(null);
   }, []);
 
+  const handleCurrenciesRetry = useCallback(() => {
+    void refetchCurrencies();
+  }, [refetchCurrencies]);
+
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!open && !isPending) onClose();
@@ -190,24 +214,23 @@ export function CreateTransactionDialog({
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (isPending) return;
+      if (isPending || !currenciesReady) return;
 
       const errors = validateDraft(draft);
       setValidationErrors(errors);
       if (hasValidationErrors(errors)) return;
 
       setMutationErrorMessage(null);
-      createTransaction(buildRequest(draft), {
+      createTransaction(buildRequest(draft, selectedCurrency), {
         onSuccess: (createdTransaction) => {
           onCreated(createdTransaction);
-          onClose();
         },
         onError: (error) => {
           setMutationErrorMessage(formatApiError(error, CREATE_FAILURE_MESSAGE));
         },
       });
     },
-    [createTransaction, draft, isPending, onClose, onCreated],
+    [createTransaction, currenciesReady, draft, isPending, onCreated, selectedCurrency],
   );
 
   return (
@@ -310,26 +333,31 @@ export function CreateTransactionDialog({
                 <label htmlFor="create-transaction-currency" className="text-sm font-medium">
                   Currency
                 </label>
-                <Input
+                <select
                   id="create-transaction-currency"
-                  value={draft.currencyIsoCode}
+                  value={selectedCurrency}
                   onChange={handleCurrencyChange}
-                  maxLength={3}
-                  autoCapitalize="characters"
-                  aria-invalid={Boolean(validationErrors.currencyIsoCode) || undefined}
-                  aria-describedby={
-                    validationErrors.currencyIsoCode
-                      ? 'create-transaction-currency-error'
-                      : undefined
-                  }
-                />
-                {validationErrors.currencyIsoCode && (
-                  <p id="create-transaction-currency-error" className="text-sm text-destructive">
-                    {validationErrors.currencyIsoCode}
-                  </p>
-                )}
+                  disabled={!currenciesReady || isPending}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {currenciesReady ? (
+                    currencyOptions.map((currencyCode) => (
+                      <option key={currencyCode} value={currencyCode}>
+                        {currencyCode}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">
+                      {areCurrenciesFetching ? 'Loading currencies...' : 'Currencies unavailable'}
+                    </option>
+                  )}
+                </select>
               </div>
             </div>
+
+            {blockingCurrenciesError && (
+              <ErrorBanner error={blockingCurrenciesError} onRetry={handleCurrenciesRetry} />
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -390,7 +418,7 @@ export function CreateTransactionDialog({
             <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending || !currenciesReady}>
               {isPending ? 'Creating...' : 'Create transaction'}
             </Button>
           </DialogFooter>

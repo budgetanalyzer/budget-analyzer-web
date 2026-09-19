@@ -1,5 +1,6 @@
 import type { BrowserMockController, DeferredApiMockController } from './browserMocks';
 import {
+  buildCurrency,
   buildManualTransaction,
   buildSavedView,
   buildTransaction,
@@ -17,7 +18,13 @@ export function registerTransactionPageResponses(browserMocks: BrowserMockContro
   browserMocks.mockApi({
     method: 'GET',
     url: '/api/v1/currencies?enabledOnly=true',
-    json: [],
+    json: [
+      buildCurrency({
+        id: 978,
+        currencyCode: 'EUR',
+        providerSeriesId: 'FIXTURE-EUR',
+      }),
+    ],
   });
   browserMocks.mockApi({
     method: 'GET',

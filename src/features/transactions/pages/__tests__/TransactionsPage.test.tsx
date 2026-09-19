@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes, useLocation } from 'react-router';
 import type { CreateTransactionRequest, Transaction } from '@/types/transaction';
 
 const { createTransactionMock, transactionTableMock, transactionData, currencyHookState } =
@@ -13,7 +14,7 @@ const { createTransactionMock, transactionTableMock, transactionData, currencyHo
       pendingCurrencies: [] as string[],
       disabledCurrencies: [] as string[],
       isExchangeRatesLoading: false,
-      enabledCurrencies: [] as Array<{ currencyCode: string }>,
+      enabledCurrencies: [] as Array<{ currencyCode: string; enabled: boolean }>,
       isCurrenciesLoading: false,
     },
   }));
@@ -103,21 +104,51 @@ vi.mock('@/features/transactions/components/ImportButton', () => ({
 
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage';
+import { BackButton } from '@/components/BackButton';
 import { renderWithProviders } from '@/testing/test-utils';
 
 const mockUsePermission = vi.mocked(usePermission);
 
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+}
+
+function TransactionDetailHarness() {
+  return (
+    <>
+      <BackButton />
+      <p>Transaction detail route</p>
+      <LocationProbe />
+    </>
+  );
+}
+
 function renderPage(initialEntry: string | string[] = '/transactions', displayCurrency = 'USD') {
-  return renderWithProviders(<TransactionsPage />, {
-    initialEntries: typeof initialEntry === 'string' ? [initialEntry] : initialEntry,
-    preloadedState: {
-      ui: {
-        theme: 'light',
-        displayCurrency,
-        adminSidebarOpen: true,
+  return renderWithProviders(
+    <Routes>
+      <Route
+        path="/transactions"
+        element={
+          <>
+            <TransactionsPage />
+            <LocationProbe />
+          </>
+        }
+      />
+      <Route path="/transactions/:id" element={<TransactionDetailHarness />} />
+    </Routes>,
+    {
+      initialEntries: typeof initialEntry === 'string' ? [initialEntry] : initialEntry,
+      preloadedState: {
+        ui: {
+          theme: 'light',
+          displayCurrency,
+          adminSidebarOpen: true,
+        },
       },
     },
-  });
+  );
 }
 
 beforeEach(() => {
@@ -193,15 +224,16 @@ describe('TransactionsPage write actions', () => {
 
   it('uses the selected display currency as the fresh dialog default', async () => {
     const user = userEvent.setup();
+    currencyHookState.enabledCurrencies = [{ currencyCode: 'GBP', enabled: true }];
     mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
     renderPage('/transactions', 'GBP');
 
     await user.click(screen.getByRole('button', { name: 'Create transaction' }));
 
-    expect(screen.getByRole('textbox', { name: 'Currency' })).toHaveValue('GBP');
+    expect(screen.getByRole('combobox', { name: 'Currency' })).toHaveValue('GBP');
   });
 
-  it('closes after creation and uses the cache-updated table as unfiltered feedback', async () => {
+  it('navigates to the authoritative created transaction detail route', async () => {
     const user = userEvent.setup();
     mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
     renderPage();
@@ -213,39 +245,35 @@ describe('TransactionsPage write actions', () => {
 
     expect(createTransactionMock).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog', { name: 'Create transaction' })).not.toBeInTheDocument();
-    expect(screen.getByTestId('transaction-table-stub')).toHaveAttribute(
-      'data-transaction-ids',
-      '101',
-    );
+    expect(screen.getByTestId('location')).toHaveTextContent('/transactions/101');
+    expect(screen.getByText('Transaction detail route')).toBeInTheDocument();
     expect(
       screen.queryByText('Transaction created. Active filters may hide it from this list.'),
     ).not.toBeInTheDocument();
   });
 
-  it('retains active filters and shows dismissible contextual creation feedback', async () => {
+  it('returns from created detail to the exact filtered list URL without creation feedback', async () => {
     const user = userEvent.setup();
     mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
-    renderPage('/transactions?q=salary');
+    renderPage('/transactions?q=salary&type=CREDIT');
 
     await user.click(screen.getByRole('button', { name: 'Create transaction' }));
     const dialog = screen.getByRole('dialog', { name: 'Create transaction' });
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Amount' }), '25');
     await user.click(within(dialog).getByRole('button', { name: 'Create transaction' }));
 
+    expect(screen.getByTestId('location')).toHaveTextContent('/transactions/101');
     expect(
-      screen.getByText('Transaction created. Active filters may hide it from this list.'),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('transaction-table-stub')).toHaveAttribute(
-      'data-filters',
-      expect.stringContaining('salary'),
-    );
+      screen.queryByText('Transaction created. Active filters may hide it from this list.'),
+    ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
-    await waitFor(() => {
-      expect(
-        screen.queryByText('Transaction created. Active filters may hide it from this list.'),
-      ).not.toBeInTheDocument();
-    });
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(await screen.findByTestId('transaction-table-stub')).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/transactions?q=salary&type=CREDIT');
+    expect(
+      screen.queryByText('Transaction created. Active filters may hide it from this list.'),
+    ).not.toBeInTheDocument();
   });
 
   it('uses aggregate grouped-import counts in the existing success banner', async () => {
@@ -479,7 +507,7 @@ describe('TransactionsPage shared transaction filters', () => {
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     });
-    currencyHookState.enabledCurrencies = [{ currencyCode: 'EUR' }];
+    currencyHookState.enabledCurrencies = [{ currencyCode: 'EUR', enabled: true }];
     mockUsePermission.mockReturnValue(false);
 
     const { store } = renderPage('/transactions?minAmount=10&maxAmount=10&amountCurrency=EUR');
@@ -517,7 +545,7 @@ describe('TransactionsPage shared transaction filters', () => {
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
       });
-      currencyHookState.enabledCurrencies = [{ currencyCode: 'EUR' }];
+      currencyHookState.enabledCurrencies = [{ currencyCode: 'EUR', enabled: true }];
       mockUsePermission.mockReturnValue(false);
 
       renderPage(`/transactions?minAmount=10&amountCurrency=${amountCurrency}`);
