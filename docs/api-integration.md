@@ -144,6 +144,30 @@ keys and feature-specific invalidation rules live with their hooks, including
 `src/hooks/useTransactions.ts` and `src/hooks/useViews.ts`. The complete state
 placement rules are in [State architecture](state-architecture.md).
 
+## Manual Transaction Creation
+
+Manual entry sends `POST /v1/transactions` with a positive finite `amount` and
+an independent `CREDIT` or `DEBIT` direction. The form trims its text inputs,
+normalizes the three-letter currency code to uppercase, and omits blank
+`bankName` and `accountId` values; the API adapter defensively trims and omits
+those optional metadata fields again. The generated
+[Unified backend API](api/budget-analyzer-api.yaml) remains authoritative for
+the complete request constraints and response shape.
+
+On success, the creation mutation prepends the authoritative response to the
+complete current-user transaction-list cache after removing any row with the
+same ID, writes the corresponding detail cache, and invalidates transaction
+counts. It does not add the transaction to a saved view or invalidate saved-view
+membership because membership is static and backend-owned. The creation dialog
+closes in place without a generic success toast. If any Transactions-page URL
+filter is active, the page instead keeps a dismissible status explaining that
+the new transaction may be hidden; filters are never cleared automatically.
+
+HTTP 422 application codes use the shared stable error mapping, including an
+invalid transaction currency and dates outside the accepted range. Other
+normalized failures use their server message. Every failure remains in the
+creation dialog with the draft available for correction or retry.
+
 ## Saved-View Integration Contracts
 
 ### Static membership and local filters

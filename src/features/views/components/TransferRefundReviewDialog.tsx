@@ -16,6 +16,7 @@ import {
 import type { TransferRefundCandidate } from '@/features/views/types/transferRefundReview';
 import { createRemoveViewTransactionsRequest, useUpdateViewTransactions } from '@/hooks/useViews';
 import type { DisplayAmount } from '@/types/displayAmount';
+import { formatTransactionMetadata } from '@/utils/transactionMetadata';
 import type { Transaction } from '@/types/transaction';
 import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate } from '@/utils/dates';
@@ -327,13 +328,9 @@ function CandidateTransactionRow({
         <dt className="text-muted-foreground">Description</dt>
         <dd className="min-w-0 break-words">{transaction.description}</dd>
         <dt className="text-muted-foreground">Bank</dt>
-        <dd className="min-w-0 break-words">{transaction.bankName}</dd>
-        {transaction.accountId && (
-          <>
-            <dt className="text-muted-foreground">Account</dt>
-            <dd className="min-w-0 break-words">{transaction.accountId}</dd>
-          </>
-        )}
+        <dd className="min-w-0 break-words">{formatTransactionMetadata(transaction.bankName)}</dd>
+        <dt className="text-muted-foreground">Account</dt>
+        <dd className="min-w-0 break-words">{formatTransactionMetadata(transaction.accountId)}</dd>
       </dl>
       {isEligible ? (
         <div className="flex items-start gap-2 border-t pt-3">

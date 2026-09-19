@@ -120,6 +120,15 @@ Saved-view member-table URL filters remain unchanged behind it. Cancel closes
 without changing membership; success closes in place and restores focus to the
 initiating action after membership refresh begins.
 
+The Transactions page keeps statement import as its single primary action and
+places the secondary `Create transaction` action beside it. Both actions use
+the unscoped `transactions:write` permission and remain unmounted when that
+permission is absent. Manual creation opens a modal over the page, seeded with
+the selected display currency, while the page and its URL-backed filters remain
+in place. Success closes the modal; when active filters may hide the created
+row, a persistent dismissible page status explains that outcome without
+clearing those filters.
+
 ## State Boundary
 
 The application separates state by lifetime and authority:

@@ -9,6 +9,8 @@ import type {
   BatchImportRequest,
   BatchImportResponse,
   BatchImportTransactionRequest,
+  CreateTransactionRequest,
+  Transaction,
 } from '@/types/transaction';
 import { ApiError } from '@/types/apiError';
 
@@ -44,6 +46,78 @@ describe('transactionApi.getTransactions', () => {
         type: 'INTERNAL_ERROR',
         code: 'INVALID_COLLECTION_RESPONSE',
       },
+    });
+  });
+});
+
+describe('transactionApi.createTransaction', () => {
+  it('posts the exact manual transaction payload and omits blank optional metadata', async () => {
+    let capturedBody: unknown;
+    const request: CreateTransactionRequest = {
+      date: '2026-09-19',
+      description: '',
+      amount: 12.345,
+      currencyIsoCode: 'USD',
+      type: 'DEBIT',
+      bankName: '   ',
+      accountId: '',
+    };
+    const createdTransaction: Transaction = {
+      id: 42,
+      date: request.date,
+      description: request.description,
+      amount: request.amount,
+      currencyIsoCode: request.currencyIsoCode,
+      type: request.type,
+      createdAt: '2026-09-19T06:00:00Z',
+      updatedAt: '2026-09-19T06:00:00Z',
+    };
+
+    server.use(
+      http.post('/api/v1/transactions', async ({ request: httpRequest }) => {
+        capturedBody = await httpRequest.json();
+        return HttpResponse.json(createdTransaction, { status: 201 });
+      }),
+    );
+
+    await expect(transactionApi.createTransaction(request)).resolves.toEqual(createdTransaction);
+    expect(capturedBody).toEqual({
+      date: '2026-09-19',
+      description: '',
+      amount: 12.345,
+      currencyIsoCode: 'USD',
+      type: 'DEBIT',
+    });
+  });
+
+  it('trims nonblank optional metadata', async () => {
+    let capturedBody: unknown;
+
+    server.use(
+      http.post('/api/v1/transactions', async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({ id: 43 }, { status: 201 });
+      }),
+    );
+
+    await transactionApi.createTransaction({
+      date: '2026-09-18',
+      description: 'Cash deposit',
+      amount: 50,
+      currencyIsoCode: 'CAD',
+      type: 'CREDIT',
+      bankName: '  Community Bank  ',
+      accountId: '  cash-1  ',
+    });
+
+    expect(capturedBody).toEqual({
+      date: '2026-09-18',
+      description: 'Cash deposit',
+      amount: 50,
+      currencyIsoCode: 'CAD',
+      type: 'CREDIT',
+      bankName: 'Community Bank',
+      accountId: 'cash-1',
     });
   });
 });

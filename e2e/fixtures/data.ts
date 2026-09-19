@@ -7,6 +7,7 @@ import type { SavedViewMetadata, ViewMembershipResponse } from '@/types/view';
 export const SAVED_VIEW_FIXTURE_ID = '0d4c3eb4-c8f9-4d44-8f4e-a726b23596ec';
 export const SAVED_VIEW_MEMBER_TRANSACTION_ID = 1001;
 export const SAVED_VIEW_ELIGIBLE_TRANSACTION_ID = 1002;
+export const MANUAL_TRANSACTION_ID = 1003;
 
 export function buildAuthenticatedUser(overrides: Partial<User> = {}): User {
   return {
@@ -42,6 +43,19 @@ export function buildTransaction(overrides: Partial<Transaction> = {}): Transact
     createdAt: '2026-08-15T12:00:00Z',
     updatedAt: '2026-08-15T12:00:00Z',
     ...overrides,
+  };
+}
+
+export function buildManualTransaction(): Transaction {
+  return {
+    id: MANUAL_TRANSACTION_ID,
+    date: '2026-09-18',
+    currencyIsoCode: 'USD',
+    amount: 73.45,
+    type: 'CREDIT',
+    description: 'Manual cash deposit',
+    createdAt: '2026-09-19T07:00:00Z',
+    updatedAt: '2026-09-19T07:00:00Z',
   };
 }
 

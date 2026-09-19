@@ -1,6 +1,10 @@
 // src/hooks/useTransactions.ts
 import { useQuery, useMutation, useQueryClient, UseQueryResult } from '@tanstack/react-query';
-import { Transaction, TransactionUpdateRequest } from '@/types/transaction';
+import {
+  CreateTransactionRequest,
+  Transaction,
+  TransactionUpdateRequest,
+} from '@/types/transaction';
 import { transactionApi } from '@/api/transactionApi';
 import { ApiError } from '@/types/apiError';
 import { transactionKeys, viewKeys } from '@/queryKeys';
@@ -30,6 +34,29 @@ export const useTransaction = (id: number): UseQueryResult<Transaction, ApiError
     staleTime: 1000 * 60 * 5,
     retry: 1,
     enabled: !!id,
+  });
+};
+
+export const useCreateTransaction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<Transaction, ApiError, CreateTransactionRequest>({
+    mutationFn: (request) => transactionApi.createTransaction(request),
+    onSuccess: (createdTransaction) => {
+      queryClient.setQueryData<Transaction[]>(transactionKeys.list(), (oldData) => {
+        if (!oldData) return oldData;
+
+        return [
+          createdTransaction,
+          ...oldData.filter((transaction) => transaction.id !== createdTransaction.id),
+        ];
+      });
+      queryClient.setQueryData<Transaction>(
+        transactionKeys.detail(createdTransaction.id),
+        createdTransaction,
+      );
+      queryClient.invalidateQueries({ queryKey: transactionKeys.count() });
+    },
   });
 };
 

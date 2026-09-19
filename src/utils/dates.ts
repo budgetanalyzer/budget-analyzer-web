@@ -30,6 +30,15 @@ import {
 // ============================================================================
 
 /**
+ * Get today's date as a LocalDate in the user's local timezone.
+ *
+ * @returns Current date in YYYY-MM-DD format
+ */
+export function getCurrentLocalDate(): string {
+  return format(new Date(), 'yyyy-MM-dd');
+}
+
+/**
  * Parse a LocalDate string (YYYY-MM-DD) into a Date object in local timezone.
  * This avoids the common pitfall where `new Date('2025-07-01')` treats the
  * string as UTC and converts to local time, causing off-by-one day errors.

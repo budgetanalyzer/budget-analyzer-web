@@ -116,6 +116,21 @@ describe('ViewTransactionTable', () => {
     mockUsePermission.mockImplementation((permission) => permission === 'views:write');
   });
 
+  it('renders the missing-value marker for nullish transaction metadata', () => {
+    renderTable({
+      rows: [
+        {
+          ...transactions[0],
+          bankName: undefined,
+          accountId: null,
+          description: 'Missing metadata',
+        },
+      ],
+    });
+
+    expect(within(screen.getByRole('table')).getAllByText('—')).toHaveLength(2);
+  });
+
   it('associates the optional review action with the Transactions region and invokes it', async () => {
     const user = userEvent.setup();
     const onReviewPossibleTransfersAndRefunds = vi.fn();

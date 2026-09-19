@@ -19,6 +19,7 @@ import {
 import { TransactionAmountBadge } from '@/components/TransactionAmountBadge';
 import { formatLocalDate } from '@/utils/dates';
 import { MoreVertical, Pencil, Trash2, Check, X } from 'lucide-react';
+import { formatTransactionMetadata } from '@/utils/transactionMetadata';
 
 export type EditableTransactionSaveHandler = (
   id: number,
@@ -194,7 +195,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
 
         {/* Bank Name */}
         <TableCell className={columnWidths.bankName}>
-          <div className="truncate">{transaction.bankName}</div>
+          <div className="truncate">{formatTransactionMetadata(transaction.bankName)}</div>
         </TableCell>
 
         {/* Account ID */}
@@ -209,7 +210,7 @@ export const EditableTransactionRow = memo(function EditableTransactionRow({
               maxLength={100}
             />
           ) : (
-            <div className="truncate">{transaction.accountId || ''}</div>
+            <div className="truncate">{formatTransactionMetadata(transaction.accountId)}</div>
           )}
         </TableCell>
 

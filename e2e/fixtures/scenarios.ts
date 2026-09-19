@@ -1,5 +1,6 @@
 import type { BrowserMockController, DeferredApiMockController } from './browserMocks';
 import {
+  buildManualTransaction,
   buildSavedView,
   buildTransaction,
   buildViewMembership,
@@ -37,6 +38,17 @@ export function registerDeferredBulkDeleteResponse(
     method: 'POST',
     url: '/api/v1/transactions/bulk-delete',
     json: { deletedCount: 1, notFoundIds: [] },
+  });
+}
+
+export function registerDeferredCreateTransactionResponse(
+  browserMocks: BrowserMockController,
+): DeferredApiMockController {
+  return browserMocks.mockDeferredApi({
+    method: 'POST',
+    url: '/api/v1/transactions',
+    status: 201,
+    json: buildManualTransaction(),
   });
 }
 

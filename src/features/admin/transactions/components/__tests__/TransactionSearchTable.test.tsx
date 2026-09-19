@@ -44,10 +44,14 @@ const transactions: TransactionSearchResult[] = [
   },
 ];
 
-function renderTable(onSortChange = vi.fn(), onPageChange = vi.fn()) {
+function renderTable(
+  onSortChange = vi.fn(),
+  onPageChange = vi.fn(),
+  data: TransactionSearchResult[] = transactions,
+) {
   renderWithProviders(
     <TransactionSearchTable
-      data={transactions}
+      data={data}
       metadata={metadata}
       sort={['date,DESC', 'id,DESC']}
       isLoading={false}
@@ -60,6 +64,14 @@ function renderTable(onSortChange = vi.fn(), onPageChange = vi.fn()) {
 }
 
 describe('TransactionSearchTable', () => {
+  it('renders missing bank and account metadata without truncation failures', () => {
+    const withoutMetadata: TransactionSearchResult = { ...transactions[0], accountId: null };
+    delete withoutMetadata.bankName;
+    renderTable(vi.fn(), vi.fn(), [withoutMetadata]);
+
+    expect(within(screen.getByRole('table')).getAllByText('—')).toHaveLength(2);
+  });
+
   it('formats signed rows in their stored ISO currencies', () => {
     renderTable();
 

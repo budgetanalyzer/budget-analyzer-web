@@ -183,6 +183,30 @@ afterEach(() => {
 });
 
 describe('TransactionTable permission gating', () => {
+  it('renders the missing-value marker for omitted and null transaction metadata', () => {
+    mockUsePermission.mockReturnValue(false);
+    renderTable({
+      rows: [
+        {
+          ...transactions[0],
+          id: 10,
+          bankName: undefined,
+          accountId: undefined,
+          description: 'Omitted metadata',
+        },
+        {
+          ...transactions[1],
+          id: 11,
+          bankName: null,
+          accountId: null,
+          description: 'Null metadata',
+        },
+      ],
+    });
+
+    expect(within(screen.getByRole('table')).getAllByText('—')).toHaveLength(4);
+  });
+
   it('shows the select column and Edit + Delete row actions when all permissions are granted', async () => {
     mockUsePermission.mockReturnValue(true);
     renderTable();

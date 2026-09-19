@@ -35,6 +35,7 @@ import {
 import { useAppSelector } from '@/store/hooks';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { formatApiError } from '@/utils/errorMessages';
+import { formatTransactionMetadata } from '@/utils/transactionMetadata';
 
 export function TransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -298,7 +299,11 @@ export function TransactionDetailPage() {
               <CardDescription>Bank and account details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <IconLabel icon={Building2} label="Bank Name" value={transaction.bankName} />
+              <IconLabel
+                icon={Building2}
+                label="Bank Name"
+                value={formatTransactionMetadata(transaction.bankName)}
+              />
 
               {isEditing ? (
                 <div className="flex items-start gap-3">
@@ -323,7 +328,7 @@ export function TransactionDetailPage() {
                 <IconLabel
                   icon={CreditCard}
                   label="Account ID"
-                  value={transaction.accountId}
+                  value={formatTransactionMetadata(transaction.accountId)}
                   valueClassName="text-base font-mono"
                 />
               )}

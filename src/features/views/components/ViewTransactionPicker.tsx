@@ -38,6 +38,10 @@ import {
   filterTransactionsByDisplayAmount,
   hasActiveTransactionFilters,
 } from '@/utils/transactionFilters';
+import {
+  deriveTransactionMetadataFilterOptions,
+  formatTransactionMetadata,
+} from '@/utils/transactionMetadata';
 
 const PAGE_SIZE = 10;
 const MAX_ADDITIONS_PER_REQUEST = 10_000;
@@ -99,14 +103,17 @@ export function ViewTransactionPicker({
 
   const memberIdSet = useMemo(() => new Set(memberTransactionIds), [memberTransactionIds]);
   const availableBankNames = useMemo(
-    () => [...new Set(allTransactions.map((transaction) => transaction.bankName))].sort(),
+    () =>
+      deriveTransactionMetadataFilterOptions(
+        allTransactions.map((transaction) => transaction.bankName),
+      ),
     [allTransactions],
   );
   const availableAccountIds = useMemo(
     () =>
-      [
-        ...new Set(allTransactions.map((transaction) => transaction.accountId).filter(Boolean)),
-      ].sort(),
+      deriveTransactionMetadataFilterOptions(
+        allTransactions.map((transaction) => transaction.accountId),
+      ),
     [allTransactions],
   );
   const hasAmountFilter = filters.amountFilter.min !== null || filters.amountFilter.max !== null;
@@ -287,7 +294,9 @@ export function ViewTransactionPicker({
       {
         accessorKey: 'bankName',
         header: 'Bank',
-        cell: ({ row }) => <div className="truncate">{row.original.bankName}</div>,
+        cell: ({ row }) => (
+          <div className="truncate">{formatTransactionMetadata(row.original.bankName)}</div>
+        ),
         size: 150,
         minSize: 120,
         maxSize: 150,
@@ -295,7 +304,9 @@ export function ViewTransactionPicker({
       {
         accessorKey: 'accountId',
         header: 'Account',
-        cell: ({ row }) => <div className="truncate">{row.original.accountId}</div>,
+        cell: ({ row }) => (
+          <div className="truncate">{formatTransactionMetadata(row.original.accountId)}</div>
+        ),
         size: 180,
         minSize: 150,
         maxSize: 200,

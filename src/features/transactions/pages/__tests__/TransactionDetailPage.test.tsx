@@ -94,6 +94,20 @@ describe('TransactionDetailPage', () => {
     expect(screen.getByText('May 1, 2026')).toBeInTheDocument();
   });
 
+  it('renders missing bank and account metadata intentionally', async () => {
+    const transactionWithoutMetadata: Transaction = { ...transaction, accountId: null };
+    delete transactionWithoutMetadata.bankName;
+    useDetailReferenceHandlers();
+    server.use(
+      http.get('/api/v1/transactions/:id', () => HttpResponse.json(transactionWithoutMetadata)),
+    );
+
+    renderDetailPage();
+
+    expect(await screen.findByRole('heading', { name: 'Transaction Details' })).toBeInTheDocument();
+    expect(screen.getAllByText('—')).toHaveLength(2);
+  });
+
   it.each([
     [404, 'NOT_FOUND', 'Transaction not found'],
     [403, 'FORBIDDEN', 'You do not have access to this transaction'],
