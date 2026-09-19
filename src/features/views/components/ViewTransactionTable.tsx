@@ -45,6 +45,7 @@ import type { TransactionFilterValues } from '@/types/transactionFilters';
 import { columnWidthClass } from '@/utils/columnWidth';
 import { compareLocalDates, formatLocalDate } from '@/utils/dates';
 import { hasActiveTransactionFilters } from '@/utils/transactionFilters';
+import { formatTransactionMetadata } from '@/utils/transactionMetadata';
 
 type ViewTransactionTableRow = Transaction & { displayAmount: DisplayAmount };
 
@@ -204,7 +205,9 @@ export function ViewTransactionTable({
       {
         accessorKey: 'bankName',
         header: 'Bank',
-        cell: ({ row }) => <div className="truncate">{row.original.bankName}</div>,
+        cell: ({ row }) => (
+          <div className="truncate">{formatTransactionMetadata(row.original.bankName)}</div>
+        ),
         size: 150,
         minSize: 120,
         maxSize: 150,
@@ -212,7 +215,9 @@ export function ViewTransactionTable({
       {
         accessorKey: 'accountId',
         header: 'Account',
-        cell: ({ row }) => <div className="truncate">{row.original.accountId || ''}</div>,
+        cell: ({ row }) => (
+          <div className="truncate">{formatTransactionMetadata(row.original.accountId)}</div>
+        ),
         size: 180,
         minSize: 150,
         maxSize: 200,

@@ -1,20 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Transaction } from '@/types/transaction';
+import { Route, Routes, useLocation } from 'react-router';
+import type { CreateTransactionRequest, Transaction } from '@/types/transaction';
 
-const { transactionTableMock, transactionData, currencyHookState } = vi.hoisted(() => ({
-  transactionTableMock: vi.fn(),
-  transactionData: [] as Transaction[],
-  currencyHookState: {
-    exchangeRatesMap: new Map(),
-    pendingCurrencies: [] as string[],
-    disabledCurrencies: [] as string[],
-    isExchangeRatesLoading: false,
-    enabledCurrencies: [] as Array<{ currencyCode: string }>,
-    isCurrenciesLoading: false,
-  },
-}));
+const { createTransactionMock, transactionTableMock, transactionData, currencyHookState } =
+  vi.hoisted(() => ({
+    createTransactionMock: vi.fn(),
+    transactionTableMock: vi.fn(),
+    transactionData: [] as Transaction[],
+    currencyHookState: {
+      exchangeRatesMap: new Map(),
+      pendingCurrencies: [] as string[],
+      disabledCurrencies: [] as string[],
+      isExchangeRatesLoading: false,
+      enabledCurrencies: [] as Array<{ currencyCode: string; enabled: boolean }>,
+      isCurrenciesLoading: false,
+    },
+  }));
 
 vi.mock('@/features/auth/hooks/usePermission');
 vi.mock('@/hooks/useTransactions', () => ({
@@ -23,6 +26,10 @@ vi.mock('@/hooks/useTransactions', () => ({
     isLoading: false,
     error: null,
     refetch: vi.fn(),
+  }),
+  useCreateTransaction: () => ({
+    mutate: createTransactionMock,
+    isPending: false,
   }),
 }));
 vi.mock('@/hooks/useCurrencies', () => ({
@@ -97,18 +104,56 @@ vi.mock('@/features/transactions/components/ImportButton', () => ({
 
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage';
+import { BackButton } from '@/components/BackButton';
 import { renderWithProviders } from '@/testing/test-utils';
 
 const mockUsePermission = vi.mocked(usePermission);
 
-function renderPage(initialEntry: string | string[] = '/transactions') {
-  return renderWithProviders(<TransactionsPage />, {
-    initialEntries: typeof initialEntry === 'string' ? [initialEntry] : initialEntry,
-  });
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+}
+
+function TransactionDetailHarness() {
+  return (
+    <>
+      <BackButton />
+      <p>Transaction detail route</p>
+      <LocationProbe />
+    </>
+  );
+}
+
+function renderPage(initialEntry: string | string[] = '/transactions', displayCurrency = 'USD') {
+  return renderWithProviders(
+    <Routes>
+      <Route
+        path="/transactions"
+        element={
+          <>
+            <TransactionsPage />
+            <LocationProbe />
+          </>
+        }
+      />
+      <Route path="/transactions/:id" element={<TransactionDetailHarness />} />
+    </Routes>,
+    {
+      initialEntries: typeof initialEntry === 'string' ? [initialEntry] : initialEntry,
+      preloadedState: {
+        ui: {
+          theme: 'light',
+          displayCurrency,
+          adminSidebarOpen: true,
+        },
+      },
+    },
+  );
 }
 
 beforeEach(() => {
   mockUsePermission.mockReset();
+  createTransactionMock.mockReset();
   transactionTableMock.mockReset();
   transactionData.splice(0);
   currencyHookState.exchangeRatesMap = new Map();
@@ -117,22 +162,118 @@ beforeEach(() => {
   currencyHookState.isExchangeRatesLoading = false;
   currencyHookState.enabledCurrencies = [];
   currencyHookState.isCurrenciesLoading = false;
+  createTransactionMock.mockImplementation(
+    (
+      request: CreateTransactionRequest,
+      callbacks?: { onSuccess?: (transaction: Transaction) => void },
+    ) => {
+      const createdTransaction: Transaction = {
+        id: 101,
+        ...request,
+        amount: request.type === 'DEBIT' ? -request.amount : request.amount,
+        createdAt: '2026-09-19T07:00:00Z',
+        updatedAt: '2026-09-19T07:00:00Z',
+      };
+      transactionData.unshift(createdTransaction);
+      callbacks?.onSuccess?.(createdTransaction);
+    },
+  );
 });
 
-describe('TransactionsPage Import button gating', () => {
-  it('renders the Import Transactions button when transactions:write is granted', () => {
+describe('TransactionsPage write actions', () => {
+  it('renders import and manual creation when transactions:write is granted', () => {
     mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
     renderPage();
 
     expect(screen.getByRole('button', { name: /Import Transactions/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create transaction' })).toBeInTheDocument();
     expect(mockUsePermission).toHaveBeenCalledWith('transactions:write');
   });
 
-  it('hides the Import Transactions button when transactions:write is missing', () => {
+  it('mounts neither write workflow when transactions:write is missing', () => {
     mockUsePermission.mockReturnValue(false);
     renderPage();
 
     expect(screen.queryByRole('button', { name: /Import Transactions/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create transaction' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('opens and closes a fresh dialog while restoring focus to its trigger', async () => {
+    const user = userEvent.setup();
+    mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
+    renderPage();
+
+    const trigger = screen.getByRole('button', { name: 'Create transaction' });
+    await user.click(trigger);
+
+    const dialog = screen.getByRole('dialog', { name: 'Create transaction' });
+    expect(dialog).toBeInTheDocument();
+    await user.type(within(dialog).getByRole('textbox', { name: 'Description' }), 'Discard me');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Create transaction' })).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+
+    await user.click(trigger);
+    const reopenedDialog = screen.getByRole('dialog', { name: 'Create transaction' });
+    expect(reopenedDialog).toBeInTheDocument();
+    expect(within(reopenedDialog).getByRole('textbox', { name: 'Description' })).toHaveValue('');
+  });
+
+  it('uses the selected display currency as the fresh dialog default', async () => {
+    const user = userEvent.setup();
+    currencyHookState.enabledCurrencies = [{ currencyCode: 'GBP', enabled: true }];
+    mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
+    renderPage('/transactions', 'GBP');
+
+    await user.click(screen.getByRole('button', { name: 'Create transaction' }));
+
+    expect(screen.getByRole('combobox', { name: 'Currency' })).toHaveValue('GBP');
+  });
+
+  it('navigates to the authoritative created transaction detail route', async () => {
+    const user = userEvent.setup();
+    mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Create transaction' }));
+    const dialog = screen.getByRole('dialog', { name: 'Create transaction' });
+    await user.type(within(dialog).getByRole('spinbutton', { name: 'Amount' }), '12.50');
+    await user.click(within(dialog).getByRole('button', { name: 'Create transaction' }));
+
+    expect(createTransactionMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog', { name: 'Create transaction' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/transactions/101');
+    expect(screen.getByText('Transaction detail route')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Transaction created. Active filters may hide it from this list.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('returns from created detail to the exact filtered list URL without creation feedback', async () => {
+    const user = userEvent.setup();
+    mockUsePermission.mockImplementation((permission) => permission === 'transactions:write');
+    renderPage('/transactions?q=salary&type=CREDIT');
+
+    await user.click(screen.getByRole('button', { name: 'Create transaction' }));
+    const dialog = screen.getByRole('dialog', { name: 'Create transaction' });
+    await user.type(within(dialog).getByRole('spinbutton', { name: 'Amount' }), '25');
+    await user.click(within(dialog).getByRole('button', { name: 'Create transaction' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/transactions/101');
+    expect(
+      screen.queryByText('Transaction created. Active filters may hide it from this list.'),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(await screen.findByTestId('transaction-table-stub')).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/transactions?q=salary&type=CREDIT');
+    expect(
+      screen.queryByText('Transaction created. Active filters may hide it from this list.'),
+    ).not.toBeInTheDocument();
   });
 
   it('uses aggregate grouped-import counts in the existing success banner', async () => {
@@ -183,6 +324,64 @@ describe('TransactionsPage exchange-rate warnings', () => {
 });
 
 describe('TransactionsPage shared transaction filters', () => {
+  it('omits nullish and blank metadata from dynamic filter choices', async () => {
+    transactionData.push(
+      {
+        id: 1,
+        date: '2026-01-01',
+        currencyIsoCode: 'USD',
+        amount: -10,
+        type: 'DEBIT',
+        description: 'No metadata',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        accountId: null,
+        bankName: null,
+        date: '2026-01-02',
+        currencyIsoCode: 'USD',
+        amount: -20,
+        type: 'DEBIT',
+        description: 'Null metadata',
+        createdAt: '2026-01-02T00:00:00Z',
+        updatedAt: '2026-01-02T00:00:00Z',
+      },
+      {
+        id: 3,
+        accountId: '   ',
+        bankName: '',
+        date: '2026-01-03',
+        currencyIsoCode: 'USD',
+        amount: -30,
+        type: 'DEBIT',
+        description: 'Blank metadata',
+        createdAt: '2026-01-03T00:00:00Z',
+        updatedAt: '2026-01-03T00:00:00Z',
+      },
+      {
+        id: 4,
+        accountId: 'checking',
+        bankName: 'Example Bank',
+        date: '2026-01-04',
+        currencyIsoCode: 'USD',
+        amount: -40,
+        type: 'DEBIT',
+        description: 'Complete metadata',
+        createdAt: '2026-01-04T00:00:00Z',
+        updatedAt: '2026-01-04T00:00:00Z',
+      },
+    );
+    mockUsePermission.mockReturnValue(false);
+
+    renderPage();
+
+    const table = await screen.findByTestId('transaction-table-stub');
+    expect(table).toHaveAttribute('data-bank-options', 'Example Bank');
+    expect(table).toHaveAttribute('data-account-options', 'checking');
+  });
+
   it('passes the shared model and independently applies a from date to table rows', async () => {
     transactionData.push(
       {
@@ -308,7 +507,7 @@ describe('TransactionsPage shared transaction filters', () => {
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     });
-    currencyHookState.enabledCurrencies = [{ currencyCode: 'EUR' }];
+    currencyHookState.enabledCurrencies = [{ currencyCode: 'EUR', enabled: true }];
     mockUsePermission.mockReturnValue(false);
 
     const { store } = renderPage('/transactions?minAmount=10&maxAmount=10&amountCurrency=EUR');
@@ -346,7 +545,7 @@ describe('TransactionsPage shared transaction filters', () => {
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
       });
-      currencyHookState.enabledCurrencies = [{ currencyCode: 'EUR' }];
+      currencyHookState.enabledCurrencies = [{ currencyCode: 'EUR', enabled: true }];
       mockUsePermission.mockReturnValue(false);
 
       renderPage(`/transactions?minAmount=10&amountCurrency=${amountCurrency}`);

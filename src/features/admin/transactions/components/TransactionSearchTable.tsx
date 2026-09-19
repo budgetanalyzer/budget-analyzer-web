@@ -43,6 +43,7 @@ import { formatCurrency } from '@/utils/currency';
 import { cn } from '@/utils/cn';
 import { columnWidthClass } from '@/utils/columnWidth';
 import { PAGE_SIZE_OPTIONS, type PageSize } from '@/features/admin/transactions/utils/urlState';
+import { formatTransactionMetadata } from '@/utils/transactionMetadata';
 
 interface TransactionSearchTableProps {
   data: TransactionSearchResult[];
@@ -179,7 +180,9 @@ export function TransactionSearchTable({
         header: () => (
           <SortableHeader label="Bank" field="bankName" sort={sort} onSortChange={onSortChange} />
         ),
-        cell: ({ row }) => <div className="truncate">{row.original.bankName}</div>,
+        cell: ({ row }) => (
+          <div className="truncate">{formatTransactionMetadata(row.original.bankName)}</div>
+        ),
         size: 150,
         minSize: 120,
         maxSize: 150,
@@ -195,7 +198,7 @@ export function TransactionSearchTable({
           />
         ),
         cell: ({ row }) => {
-          const accountId = row.original.accountId;
+          const accountId = formatTransactionMetadata(row.original.accountId);
           const truncated = accountId.length > 6 ? `…${accountId.slice(-6)}` : accountId;
           return (
             <span className="font-mono text-xs" title={accountId}>

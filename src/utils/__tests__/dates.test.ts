@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   compareLocalDates,
   formatISOTimestampAsLocalDate,
   formatLocalDate,
   formatTimestamp,
+  getCurrentLocalDate,
   getDaysBetween,
   getMonthBounds,
   getMonthKey,
@@ -14,7 +15,18 @@ import {
   parseLocalDate,
 } from '@/utils/dates';
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('dates utilities', () => {
+  it('returns the current date as a LocalDate in the local timezone', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T07:30:00Z'));
+
+    expect(getCurrentLocalDate()).toBe('2025-12-31');
+  });
+
   it('converts a LocalDate into local-day ISO timestamp bounds', () => {
     expect(localDateToStartOfDayISOTimestamp('2026-01-15')).toBe('2026-01-15T08:00:00.000Z');
     expect(localDateToEndOfDayISOTimestamp('2026-01-15')).toBe('2026-01-16T07:59:59.999Z');

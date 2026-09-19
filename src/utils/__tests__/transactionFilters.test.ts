@@ -105,6 +105,26 @@ describe('filterTransactions', () => {
     expect(ids({ ...emptyFilters, accountIdFilter: 'savings' })).toEqual([2]);
   });
 
+  it('does not make nullish metadata match the display marker', () => {
+    const rowsWithMissingMetadata: Transaction[] = [
+      { ...transactions[0], id: 5, bankName: null, accountId: undefined },
+      { ...transactions[1], id: 6, bankName: undefined, accountId: null },
+    ];
+
+    expect(
+      filterTransactions(rowsWithMissingMetadata, {
+        ...emptyFilters,
+        bankNameFilter: '—',
+      }),
+    ).toEqual([]);
+    expect(
+      filterTransactions(rowsWithMissingMetadata, {
+        ...emptyFilters,
+        accountIdFilter: '—',
+      }),
+    ).toEqual([]);
+  });
+
   it('matches transaction types exactly', () => {
     expect(ids({ ...emptyFilters, typeFilter: 'DEBIT' })).toEqual([1, 3]);
   });

@@ -3,8 +3,8 @@ export type TransactionType = 'CREDIT' | 'DEBIT';
 
 export interface Transaction {
   id: number;
-  accountId: string;
-  bankName: string;
+  accountId?: string | null;
+  bankName?: string | null;
   date: string;
   currencyIsoCode: string;
   amount: number;
@@ -12,6 +12,16 @@ export interface Transaction {
   description: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateTransactionRequest {
+  date: string;
+  description: string;
+  amount: number;
+  currencyIsoCode: string;
+  type: TransactionType;
+  bankName?: string;
+  accountId?: string;
 }
 
 export interface TransactionUpdateRequest {

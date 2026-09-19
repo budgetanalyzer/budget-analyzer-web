@@ -1,6 +1,8 @@
 // src/features/transactions/pages/TransactionsPage.tsx
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
+import { Plus } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCurrencies, useExchangeRatesMap } from '@/hooks/useCurrencies';
 import { useMissingCurrencies } from '@/hooks/useMissingCurrencies';
@@ -12,12 +14,14 @@ import { TransactionTable } from '@/features/transactions/components/Transaction
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { TransactionStatsGrid } from '@/features/transactions/components/TransactionStatsGrid';
+import { CreateTransactionDialog } from '@/features/transactions/components/CreateTransactionDialog';
 import { ImportButton } from '@/features/transactions/components/ImportButton';
 import { MessageBanner } from '@/components/MessageBanner';
 import { MissingExchangeRatesBanner } from '@/components/MissingExchangeRatesBanner';
 import { PageHeader } from '@/components/PageHeader';
+import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { useMemo, useCallback, useEffect } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import {
   buildMainStatsConfig,
   buildMonthlyStatsConfig,
@@ -27,15 +31,19 @@ import { setDisplayCurrency } from '@/store/uiSlice';
 import { filterTransactionsByDisplayAmount } from '@/utils/transactionFilters';
 import { projectDisplayAmount } from '@/utils/displayAmount';
 import { usePermission } from '@/features/auth/hooks/usePermission';
+import { deriveTransactionMetadataFilterOptions } from '@/utils/transactionMetadata';
+import type { Transaction } from '@/types/transaction';
 
 export function TransactionsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { data: transactions, isLoading, error, refetch } = useTransactions();
   const displayCurrency = useAppSelector((state) => state.ui.displayCurrency);
   const { data: enabledCurrencies, isLoading: isCurrenciesLoading } = useCurrencies(true);
 
-  const canImportTransactions = usePermission('transactions:write');
+  const canWriteTransactions = usePermission('transactions:write');
+  const [isCreateTransactionOpen, setIsCreateTransactionOpen] = useState(false);
 
   const {
     filters,
@@ -112,12 +120,16 @@ export function TransactionsPage() {
   // Compute available filter options from all transactions
   const availableBankNames = useMemo(() => {
     if (!transactions) return [];
-    return [...new Set(transactions.map((t) => t.bankName))].sort();
+    return deriveTransactionMetadataFilterOptions(
+      transactions.map((transaction) => transaction.bankName),
+    );
   }, [transactions]);
 
   const availableAccountIds = useMemo(() => {
     if (!transactions) return [];
-    return [...new Set(transactions.map((t) => t.accountId).filter(Boolean) as string[])].sort();
+    return deriveTransactionMetadataFilterOptions(
+      transactions.map((transaction) => transaction.accountId),
+    );
   }, [transactions]);
 
   // Apply filters to transactions
@@ -162,6 +174,21 @@ export function TransactionsPage() {
     handleAmountFilterChange(null, null);
   }, [handleAmountFilterChange]);
 
+  const handleCreateTransactionOpen = useCallback(() => {
+    setIsCreateTransactionOpen(true);
+  }, []);
+
+  const handleCreateTransactionClose = useCallback(() => {
+    setIsCreateTransactionOpen(false);
+  }, []);
+
+  const handleTransactionCreated = useCallback(
+    (createdTransaction: Transaction) => {
+      navigate(`/transactions/${createdTransaction.id}`);
+    },
+    [navigate],
+  );
+
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -186,8 +213,14 @@ export function TransactionsPage() {
         title="Transactions"
         description="View and manage transactions"
         action={
-          canImportTransactions ? (
-            <ImportButton onSuccess={handleImportSuccess} onError={handleImportError} />
+          canWriteTransactions ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <ImportButton onSuccess={handleImportSuccess} onError={handleImportError} />
+              <Button type="button" variant="outline" onClick={handleCreateTransactionOpen}>
+                <Plus aria-hidden="true" className="mr-2 h-4 w-4" />
+                Create transaction
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -265,6 +298,14 @@ export function TransactionsPage() {
           </Card>
         </motion.div>
       </LayoutGroup>
+
+      {canWriteTransactions && isCreateTransactionOpen && (
+        <CreateTransactionDialog
+          displayCurrency={displayCurrency}
+          onCreated={handleTransactionCreated}
+          onClose={handleCreateTransactionClose}
+        />
+      )}
     </div>
   );
 }

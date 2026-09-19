@@ -34,6 +34,7 @@ import { formatCurrency } from '@/utils/currency';
 import { formatLocalDate, getDateRange } from '@/utils/dates';
 import { projectDisplayAmount } from '@/utils/displayAmount';
 import { filterTransactionsByDisplayAmount } from '@/utils/transactionFilters';
+import { deriveTransactionMetadataFilterOptions } from '@/utils/transactionMetadata';
 
 function describeViewAmountTotal(
   baseDescription: string,
@@ -202,18 +203,17 @@ function ViewPageContent({ id }: { id: string }) {
   }, [displayAmounts, filters, isAmountCurrencyInvalid, isAmountFilterLoading, transactions]);
   const filteredTransactions = filterResult.transactions;
   const availableBankNames = useMemo(
-    () => [...new Set((transactions ?? []).map((transaction) => transaction.bankName))].sort(),
+    () =>
+      deriveTransactionMetadataFilterOptions(
+        (transactions ?? []).map((transaction) => transaction.bankName),
+      ),
     [transactions],
   );
   const availableAccountIds = useMemo(
     () =>
-      [
-        ...new Set(
-          (transactions ?? [])
-            .map((transaction) => transaction.accountId)
-            .filter(Boolean) as string[],
-        ),
-      ].sort(),
+      deriveTransactionMetadataFilterOptions(
+        (transactions ?? []).map((transaction) => transaction.accountId),
+      ),
     [transactions],
   );
 

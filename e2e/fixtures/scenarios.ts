@@ -1,5 +1,7 @@
 import type { BrowserMockController, DeferredApiMockController } from './browserMocks';
 import {
+  buildCurrency,
+  buildManualTransaction,
   buildSavedView,
   buildTransaction,
   buildViewMembership,
@@ -16,7 +18,13 @@ export function registerTransactionPageResponses(browserMocks: BrowserMockContro
   browserMocks.mockApi({
     method: 'GET',
     url: '/api/v1/currencies?enabledOnly=true',
-    json: [],
+    json: [
+      buildCurrency({
+        id: 978,
+        currencyCode: 'EUR',
+        providerSeriesId: 'FIXTURE-EUR',
+      }),
+    ],
   });
   browserMocks.mockApi({
     method: 'GET',
@@ -37,6 +45,17 @@ export function registerDeferredBulkDeleteResponse(
     method: 'POST',
     url: '/api/v1/transactions/bulk-delete',
     json: { deletedCount: 1, notFoundIds: [] },
+  });
+}
+
+export function registerDeferredCreateTransactionResponse(
+  browserMocks: BrowserMockController,
+): DeferredApiMockController {
+  return browserMocks.mockDeferredApi({
+    method: 'POST',
+    url: '/api/v1/transactions',
+    status: 201,
+    json: buildManualTransaction(),
   });
 }
 

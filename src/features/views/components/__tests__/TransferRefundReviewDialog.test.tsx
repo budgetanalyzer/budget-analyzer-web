@@ -112,6 +112,20 @@ afterEach(() => {
 });
 
 describe('TransferRefundReviewDialog', () => {
+  it('renders missing bank and account metadata in review rows', () => {
+    renderDialog({
+      candidates: [
+        {
+          ...candidate,
+          debit: { ...candidate.debit, bankName: null, accountId: undefined },
+        },
+      ],
+    });
+
+    const transfer = screen.getByRole('region', { name: 'Possible transfer' });
+    expect(within(transfer).getAllByText('—')).toHaveLength(2);
+  });
+
   it('shows only selected-currency candidate amounts and unavailability', () => {
     renderDialog();
 

@@ -4,8 +4,8 @@ import type { TransactionType } from '@/types/transaction';
 export interface TransactionSearchResult {
   id: number;
   ownerId: string; // opaque IdP subject (e.g. "usr_test123")
-  accountId: string;
-  bankName: string;
+  accountId?: string | null;
+  bankName?: string | null;
   date: string; // YYYY-MM-DD
   currencyIsoCode: string;
   amount: number;

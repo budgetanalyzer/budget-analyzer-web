@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ViewTransactionPicker } from '@/features/views/components/ViewTransactionPicker';
@@ -67,6 +67,20 @@ function renderPicker({
 }
 
 describe('ViewTransactionPicker', () => {
+  it('renders missing metadata without creating filter values', () => {
+    const row: Transaction = {
+      ...transactions[0],
+      bankName: null,
+      accountId: undefined,
+      description: 'Missing metadata',
+    };
+    renderPicker({ rows: [row] });
+
+    expect(within(screen.getByRole('table')).getAllByText('—')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Filter by bank' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Filter by account' })).not.toBeInTheDocument();
+  });
+
   it('starts with blank local filters and presents the complete supplied snapshot', async () => {
     const user = userEvent.setup();
     renderPicker();

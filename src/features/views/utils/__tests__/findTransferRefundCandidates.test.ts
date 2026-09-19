@@ -252,6 +252,22 @@ describe('findTransferRefundCandidates', () => {
     expect(discover([debit, ambiguousCredit])).toEqual([]);
   });
 
+  it('treats nullish bank or account identity as ambiguous rather than equal', () => {
+    const debit = transaction(1, 'DEBIT');
+    const creditWithoutBank = transaction(2, 'CREDIT', {
+      bankName: undefined,
+      accountId: 'savings',
+      date: '2026-01-02',
+    });
+    const creditWithNullAccount = transaction(3, 'CREDIT', {
+      accountId: null,
+      date: '2026-01-02',
+    });
+
+    expect(discover([debit, creditWithoutBank])).toEqual([]);
+    expect(discover([debit, creditWithNullAccount])).toEqual([]);
+  });
+
   it('rejects zero amounts and blank normalized currencies', () => {
     const zeroDebit = transaction(1, 'DEBIT', { amount: 0 });
     const zeroCredit = transaction(2, 'CREDIT', { amount: 0, date: '2026-01-02' });

@@ -10,7 +10,24 @@ import {
   BatchImportRequest,
   BatchImportTransactionRequest,
   BatchImportResponse,
+  CreateTransactionRequest,
 } from '@/types/transaction';
+
+function toCreateTransactionRequest(request: CreateTransactionRequest): CreateTransactionRequest {
+  const { date, description, amount, currencyIsoCode, type, bankName, accountId } = request;
+  const trimmedBankName = bankName?.trim();
+  const trimmedAccountId = accountId?.trim();
+
+  return {
+    date,
+    description,
+    amount,
+    currencyIsoCode,
+    type,
+    ...(trimmedBankName ? { bankName: trimmedBankName } : {}),
+    ...(trimmedAccountId ? { accountId: trimmedAccountId } : {}),
+  };
+}
 
 function toBatchImportTransaction(
   transaction: BatchImportTransactionRequest,
@@ -57,6 +74,14 @@ export const transactionApi = {
 
   getTransaction: async (id: number): Promise<Transaction> => {
     const response = await apiClient.get<Transaction>(`/v1/transactions/${id}`);
+    return response.data;
+  },
+
+  createTransaction: async (request: CreateTransactionRequest): Promise<Transaction> => {
+    const response = await apiClient.post<Transaction>(
+      '/v1/transactions',
+      toCreateTransactionRequest(request),
+    );
     return response.data;
   },
 
