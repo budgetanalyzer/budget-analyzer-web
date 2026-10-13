@@ -10,22 +10,22 @@ info:
     url: https://opensource.org/licenses/MIT
   version: '1.0'
 servers:
-  - url: http://localhost:8080
-    description: Local environment (via gateway)
-  - url: http://localhost:8081
-    description: Local environment (direct)
-  - url: https://api.budgetanalyzer.org
-    description: Production environment
+- url: http://localhost:8080
+  description: Local environment (via gateway)
+- url: http://localhost:8081
+  description: Local environment (direct)
+- url: https://api.budgetanalyzer.org
+  description: Production environment
 tags:
-  - name: User
-    description: Authentication status and user information
-  - name: Session
-    description: Session heartbeat and status
+- name: User
+  description: Authentication status and user information
+- name: Session
+  description: Session heartbeat and status
 paths:
   /logout:
     get:
       tags:
-        - logout-controller
+      - logout-controller
       operationId: logout
       responses:
         '200':
@@ -51,7 +51,7 @@ paths:
   /auth/v1/user:
     get:
       tags:
-        - User
+      - User
       summary: Get current user info
       description: Returns the authenticated user's profile, roles, and permissions.
         Returns 200 with user info if authenticated, or empty 401 if not.
@@ -86,7 +86,7 @@ paths:
   /auth/v1/session:
     get:
       tags:
-        - Session
+      - Session
       summary: Session heartbeat
       description: Validates the local session and extends its TTL. Returns 401 if
         no valid session.
@@ -148,15 +148,15 @@ components:
           type: array
           description: User's roles for UI visibility
           example:
-            - USER
+          - USER
           items:
             type: string
         permissions:
           type: array
           description: User's resolved permissions for action-level UI gating
           example:
-            - transactions:read
-            - transactions:read:any
+          - transactions:read
+          - transactions:read:any
           items:
             type: string
     SessionStatusResponse:
@@ -171,7 +171,7 @@ components:
           type: array
           description: User's roles
           example:
-            - USER
+          - USER
           items:
             type: string
         expiresAt:
@@ -186,14 +186,14 @@ components:
           type: string
           description: Error type categorization for API responses
           enum:
-            - INVALID_REQUEST
-            - VALIDATION_ERROR
-            - NOT_FOUND
-            - APPLICATION_ERROR
-            - SERVICE_UNAVAILABLE
-            - INTERNAL_ERROR
-            - UNAUTHORIZED
-            - FORBIDDEN
+          - INVALID_REQUEST
+          - VALIDATION_ERROR
+          - NOT_FOUND
+          - APPLICATION_ERROR
+          - SERVICE_UNAVAILABLE
+          - INTERNAL_ERROR
+          - UNAUTHORIZED
+          - FORBIDDEN
           example: APPLICATION_ERROR
         message:
           type: string
@@ -211,8 +211,8 @@ components:
           items:
             $ref: '#/components/schemas/FieldError'
       required:
-        - message
-        - type
+      - message
+      - type
     FieldError:
       description: Field-level validation error details
       properties:
@@ -235,5 +235,5 @@ components:
           description: Value that caused the error
           example: invalid@email
       required:
-        - field
-        - message
+      - field
+      - message
