@@ -173,4 +173,82 @@ describe('UserDetailPage', () => {
     expect(await screen.findByText('User deactivation failed')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Deactivate User' })).toBeInTheDocument();
   });
+
+  it('reconciles a partial deactivation and allows session revocation to be retried', async () => {
+    const user = userEvent.setup();
+    let isDeactivated = false;
+    let deactivationAttempts = 0;
+
+    server.use(
+      http.get('/api/v1/users/:id', () =>
+        HttpResponse.json({
+          id: 'usr_partial',
+          idpSub: 'auth0|partial',
+          email: 'partial@example.com',
+          displayName: 'Partial User',
+          status: isDeactivated ? 'DEACTIVATED' : 'ACTIVE',
+          roleIds: isDeactivated ? [] : ['USER'],
+          createdAt: '2026-04-01T12:00:00Z',
+          updatedAt: '2026-04-09T12:00:00Z',
+          ...(isDeactivated
+            ? {
+                deactivatedAt: '2026-04-09T12:00:00Z',
+                deactivatedBy: {
+                  id: 'usr_abc123',
+                  displayName: 'Admin User',
+                  email: 'admin@example.com',
+                },
+              }
+            : {}),
+        }),
+      ),
+      http.post('/api/v1/users/:id/deactivate', () => {
+        deactivationAttempts += 1;
+        isDeactivated = true;
+
+        if (deactivationAttempts === 1) {
+          return HttpResponse.json(
+            {
+              type: 'SERVICE_UNAVAILABLE',
+              message: 'Session revocation failed; the user was deactivated. Retry is safe.',
+            },
+            { status: 503 },
+          );
+        }
+
+        return HttpResponse.json({
+          userId: 'usr_partial',
+          status: 'DEACTIVATED',
+          rolesRemoved: 0,
+          sessionsRevoked: true,
+        });
+      }),
+    );
+
+    renderPage('/admin/users/usr_partial');
+
+    await user.click(await screen.findByRole('button', { name: 'Deactivate User' }));
+    await user.click(screen.getByRole('button', { name: 'Deactivate Account' }));
+
+    expect(
+      await screen.findByText(
+        'Session revocation failed; the user was deactivated. Retry is safe.',
+      ),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Deactivation')).toBeInTheDocument();
+    expect(screen.getAllByText('DEACTIVATED')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Deactivate User' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Retry Session Revocation' }));
+
+    await waitFor(() => {
+      expect(deactivationAttempts).toBe(2);
+      expect(
+        screen.queryByRole('button', { name: 'Retry Session Revocation' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Session revocation failed; the user was deactivated. Retry is safe.'),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

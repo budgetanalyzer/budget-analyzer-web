@@ -25,6 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ConfirmDeactivateUserDialog } from '@/features/admin/users/components/ConfirmDeactivateUserDialog';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useDeactivateUser, useUser } from '@/hooks/useUsers';
+import { ApiError } from '@/types/apiError';
 import { formatTimestamp } from '@/utils/dates';
 import { formatApiError } from '@/utils/errorMessages';
 import { getUserLabel } from '@/utils/userLabel';
@@ -36,6 +37,7 @@ export function UserDetailPage() {
   const canDeactivateUsers = usePermission('users:write');
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [deactivationRetryUserId, setDeactivationRetryUserId] = useState<string | null>(null);
 
   const clearErrorMessage = useCallback(() => {
     setErrorMessage(null);
@@ -50,7 +52,7 @@ export function UserDetailPage() {
     setIsConfirmDialogOpen(false);
   }, []);
 
-  const handleConfirmDeactivation = useCallback(() => {
+  const handleDeactivation = useCallback(() => {
     if (!user?.id) {
       return;
     }
@@ -60,9 +62,13 @@ export function UserDetailPage() {
     deactivateUser(user.id, {
       onSuccess: () => {
         setIsConfirmDialogOpen(false);
+        setDeactivationRetryUserId(null);
       },
       onError: (mutationError: Error) => {
         setIsConfirmDialogOpen(false);
+        if (mutationError instanceof ApiError && mutationError.status === 503) {
+          setDeactivationRetryUserId(user.id);
+        }
         setErrorMessage(formatApiError(mutationError, 'Failed to deactivate user'));
       },
     });
@@ -95,6 +101,8 @@ export function UserDetailPage() {
 
   const headingText = getUserLabel(user);
   const roles = user.roleIds ?? [];
+  const showSessionRevocationRetry =
+    canDeactivateUsers && user.status === 'DEACTIVATED' && deactivationRetryUserId === user.id;
   const showDeactivateAction = canDeactivateUsers && user.status === 'ACTIVE';
 
   return (
@@ -116,11 +124,15 @@ export function UserDetailPage() {
               <Badge variant="secondary">DEACTIVATED</Badge>
             )}
           </div>
-          {showDeactivateAction && (
+          {showSessionRevocationRetry ? (
+            <Button variant="destructive" onClick={handleDeactivation} disabled={isPending}>
+              {isPending ? 'Retrying...' : 'Retry Session Revocation'}
+            </Button>
+          ) : showDeactivateAction ? (
             <Button variant="destructive" onClick={handleOpenConfirmDialog} disabled={isPending}>
               {isPending ? 'Deactivating...' : 'Deactivate User'}
             </Button>
-          )}
+          ) : null}
         </div>
 
         <AnimatePresence mode="wait">
@@ -268,7 +280,7 @@ export function UserDetailPage() {
           userLabel={headingText}
           isOpen={isConfirmDialogOpen}
           isSubmitting={isPending}
-          onConfirm={handleConfirmDeactivation}
+          onConfirm={handleDeactivation}
           onCancel={handleCloseConfirmDialog}
         />
       </div>
