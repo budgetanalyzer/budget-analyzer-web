@@ -21,15 +21,27 @@ tags:
   description: Authentication status and user information
 - name: Session
   description: Session heartbeat and status
+- name: Logout
+  description: Browser logout and session invalidation
 paths:
   /logout:
     get:
       tags:
-      - logout-controller
+      - Logout
+      summary: Log out
+      description: Invalidates the browser session and redirects to the identity provider
+        logout endpoint.
       operationId: logout
       responses:
-        '200':
-          description: OK
+        '302':
+          description: Redirect to the identity provider logout endpoint
+          headers:
+            Location:
+              description: Identity provider logout URL
+              style: simple
+              schema:
+                type: string
+                format: uri
         '500':
           description: Internal Server Error
           content:
