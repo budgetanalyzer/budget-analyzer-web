@@ -54,7 +54,7 @@ paths:
       - User
       summary: Get current user info
       description: Returns the authenticated user's profile, roles, and permissions.
-        Returns 200 with user info if authenticated, or empty 401 if not.
+        Returns 200 with user info if authenticated, or a JSON 401 response if not.
       operationId: getCurrentUser
       responses:
         '200':
@@ -65,6 +65,10 @@ paths:
                 $ref: '#/components/schemas/UserInfoResponse'
         '401':
           description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
         '500':
           description: Internal Server Error
           content:
@@ -100,8 +104,16 @@ paths:
                 $ref: '#/components/schemas/SessionStatusResponse'
         '401':
           description: No valid session or active account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
         '503':
           description: Authorization refresh or Redis update unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
         '500':
           description: Internal Server Error
           content:
@@ -152,26 +164,6 @@ components:
           - transactions:read:any
           items:
             type: string
-    SessionStatusResponse:
-      type: object
-      description: Session status from heartbeat endpoint
-      properties:
-        userId:
-          type: string
-          description: User's internal ID
-          example: user123
-        roles:
-          type: array
-          description: User's roles
-          example:
-          - USER
-          items:
-            type: string
-        expiresAt:
-          type: integer
-          format: int64
-          description: Unix epoch seconds when session expires
-          example: 1711720800
     ApiErrorResponse:
       description: Standard API error response format
       properties:
@@ -230,3 +222,23 @@ components:
       required:
       - field
       - message
+    SessionStatusResponse:
+      type: object
+      description: Session status from heartbeat endpoint
+      properties:
+        userId:
+          type: string
+          description: User's internal ID
+          example: user123
+        roles:
+          type: array
+          description: User's roles
+          example:
+          - USER
+          items:
+            type: string
+        expiresAt:
+          type: integer
+          format: int64
+          description: Unix epoch seconds when session expires
+          example: 1711720800

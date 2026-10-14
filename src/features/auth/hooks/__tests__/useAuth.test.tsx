@@ -47,7 +47,14 @@ describe('useAuth', () => {
   });
 
   it('treats only HTTP 401 as an anonymous session', async () => {
-    server.use(http.get('/auth/v1/user', () => new HttpResponse(null, { status: 401 })));
+    server.use(
+      http.get('/auth/v1/user', () =>
+        HttpResponse.json(
+          { type: 'UNAUTHORIZED', message: 'Authentication is required' },
+          { status: 401 },
+        ),
+      ),
+    );
     const { result } = renderUseAuth();
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
