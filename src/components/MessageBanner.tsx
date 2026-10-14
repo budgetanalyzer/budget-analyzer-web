@@ -8,13 +8,17 @@ export interface MessageBannerProps {
   type: 'success' | 'error' | 'warning';
   message: string;
   onClose: () => void;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 /**
  * Generic reusable banner component for displaying messages
  * Can be used across the application for success, error, or warning messages
  */
-export function MessageBanner({ type, message, onClose }: MessageBannerProps) {
+export function MessageBanner({ type, message, onClose, action }: MessageBannerProps) {
   const colorClasses = {
     success: 'bg-success/15 text-success',
     warning: 'bg-warning/15 text-warning',
@@ -30,7 +34,7 @@ export function MessageBanner({ type, message, onClose }: MessageBannerProps) {
       animate="animate"
       exit="exit"
       transition={fadeTransition}
-      className={`flex items-center justify-between rounded-lg px-4 py-3 ${colorClasses[type]}`}
+      className={`flex items-center justify-between rounded-lg px-4 py-3 ${action ? 'flex-wrap gap-2' : ''} ${colorClasses[type]}`}
     >
       <div role={messageRole} aria-atomic="true" className="flex items-center gap-2">
         {type === 'success' ? (
@@ -40,16 +44,23 @@ export function MessageBanner({ type, message, onClose }: MessageBannerProps) {
         )}
         <span className="font-medium whitespace-pre-line">{message}</span>
       </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={onClose}
-        className="h-8 w-8"
-        aria-label="Dismiss message"
-      >
-        <X aria-hidden="true" className="h-4 w-4" />
-      </Button>
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        {action && (
+          <Button type="button" variant="outline" size="sm" onClick={action.onClick}>
+            {action.label}
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="h-8 w-8"
+          aria-label="Dismiss message"
+        >
+          <X aria-hidden="true" className="h-4 w-4" />
+        </Button>
+      </div>
     </motion.div>
   );
 }

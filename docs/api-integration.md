@@ -122,11 +122,16 @@ Current contextual mutation boundaries are:
   affected management row. Currency and statement-format form failures remain
   above their forms; their cross-route create/update results use destination
   flash banners.
-- User deactivation failures remain on the user detail page. A deactivation 503
-  is a partial-success outcome: user detail and search state are refreshed to
-  reflect the deactivated account, while the persistent error and an explicit
-  idempotent session-revocation retry remain available. Statement-format wizard
-  failures remain inside the active wizard.
+- User deactivation failures remain on the user detail page. An observed
+  deactivation 503 is a partial-success outcome: user detail and search state
+  are refreshed to reflect the deactivated account, while a persistent,
+  dismissible error banner provides an explicit **Retry session revocation**
+  action. The retry repeats the same idempotent request for the user currently
+  displayed and is never automatic. The action belongs only to that observed
+  failure; dismissal, navigation, or reload removes it. A `DEACTIVATED` status
+  alone never exposes the action because the API has no durable
+  `sessionRevocationPending` field. Statement-format wizard failures remain
+  inside the active wizard.
 
 A successful bulk-delete response is converged state even when some or all
 requested IDs were already absent. Full, partial, and zero-deletion responses

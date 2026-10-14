@@ -88,8 +88,8 @@ paths:
       tags:
       - Session
       summary: Session heartbeat
-      description: Validates the local session and extends its TTL. Returns 401 if
-        no valid session.
+      description: Refreshes current authorization and extends the local session only
+        after a successful permission-service lookup.
       operationId: getSessionStatus
       responses:
         '200':
@@ -99,7 +99,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionStatusResponse'
         '401':
-          description: No valid session
+          description: No valid session or active account
+        '503':
+          description: Authorization refresh or Redis update unavailable
         '500':
           description: Internal Server Error
           content:
@@ -109,15 +111,6 @@ paths:
               example:
                 type: INTERNAL_ERROR
                 message: Internal Server Error
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-              example:
-                type: SERVICE_UNAVAILABLE
-                message: Service Unavailable
 components:
   schemas:
     UserInfoResponse:

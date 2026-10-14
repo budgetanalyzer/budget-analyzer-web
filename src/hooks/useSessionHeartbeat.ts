@@ -26,7 +26,9 @@ function isNetworkError(error: unknown): boolean {
 }
 
 function isTransientError(error: unknown): boolean {
-  return axios.isAxiosError(error) && error.response?.status === 502;
+  return (
+    axios.isAxiosError(error) && (error.response?.status === 502 || error.response?.status === 503)
+  );
 }
 
 export function useSessionHeartbeat({
