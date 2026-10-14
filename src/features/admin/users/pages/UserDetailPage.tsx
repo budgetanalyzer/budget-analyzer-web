@@ -25,9 +25,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ConfirmDeactivateUserDialog } from '@/features/admin/users/components/ConfirmDeactivateUserDialog';
 import { usePermission } from '@/features/auth/hooks/usePermission';
 import { useDeactivateUser, useUser } from '@/hooks/useUsers';
+import { ApiError } from '@/types/apiError';
 import { formatTimestamp } from '@/utils/dates';
 import { formatApiError } from '@/utils/errorMessages';
 import { getUserLabel } from '@/utils/userLabel';
+
+const SESSION_REVOCATION_ERROR_MESSAGE =
+  'Session revocation could not be confirmed. It is safe to retry.';
+
+type DeactivationMessage =
+  | { kind: 'error'; message: string }
+  | { kind: 'session-revocation-error'; message: string }
+  | { kind: 'success'; message: string };
 
 export function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,14 +44,14 @@ export function UserDetailPage() {
   const { mutate: deactivateUser, isPending } = useDeactivateUser();
   const canDeactivateUsers = usePermission('users:write');
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [deactivationMessage, setDeactivationMessage] = useState<DeactivationMessage | null>(null);
 
-  const clearErrorMessage = useCallback(() => {
-    setErrorMessage(null);
+  const clearDeactivationMessage = useCallback(() => {
+    setDeactivationMessage(null);
   }, []);
 
   const handleOpenConfirmDialog = useCallback(() => {
-    setErrorMessage(null);
+    setDeactivationMessage(null);
     setIsConfirmDialogOpen(true);
   }, []);
 
@@ -50,12 +59,12 @@ export function UserDetailPage() {
     setIsConfirmDialogOpen(false);
   }, []);
 
-  const handleConfirmDeactivation = useCallback(() => {
+  const handleDeactivation = useCallback(() => {
     if (!user?.id) {
       return;
     }
 
-    setErrorMessage(null);
+    setDeactivationMessage(null);
 
     deactivateUser(user.id, {
       onSuccess: () => {
@@ -63,10 +72,48 @@ export function UserDetailPage() {
       },
       onError: (mutationError: Error) => {
         setIsConfirmDialogOpen(false);
-        setErrorMessage(formatApiError(mutationError, 'Failed to deactivate user'));
+        if (mutationError instanceof ApiError && mutationError.status === 503) {
+          setDeactivationMessage({
+            kind: 'session-revocation-error',
+            message: SESSION_REVOCATION_ERROR_MESSAGE,
+          });
+          return;
+        }
+        setDeactivationMessage({
+          kind: 'error',
+          message: formatApiError(mutationError, 'Failed to deactivate user'),
+        });
       },
     });
   }, [deactivateUser, user?.id]);
+
+  const handleSessionRevocationRetry = useCallback(() => {
+    if (isPending || !user?.id) {
+      return;
+    }
+
+    deactivateUser(user.id, {
+      onSuccess: () => {
+        setDeactivationMessage({
+          kind: 'success',
+          message: 'Session revocation completed.',
+        });
+      },
+      onError: (mutationError: Error) => {
+        if (mutationError instanceof ApiError && mutationError.status === 503) {
+          setDeactivationMessage({
+            kind: 'session-revocation-error',
+            message: SESSION_REVOCATION_ERROR_MESSAGE,
+          });
+          return;
+        }
+        setDeactivationMessage({
+          kind: 'error',
+          message: formatApiError(mutationError, 'Failed to revoke user sessions'),
+        });
+      },
+    });
+  }, [deactivateUser, isPending, user?.id]);
 
   if (isLoading) {
     return (
@@ -96,6 +143,13 @@ export function UserDetailPage() {
   const headingText = getUserLabel(user);
   const roles = user.roleIds ?? [];
   const showDeactivateAction = canDeactivateUsers && user.status === 'ACTIVE';
+  const deactivationMessageAction =
+    canDeactivateUsers && deactivationMessage?.kind === 'session-revocation-error' && !isPending
+      ? {
+          label: 'Retry session revocation',
+          onClick: handleSessionRevocationRetry,
+        }
+      : undefined;
 
   return (
     <div className="h-full bg-gradient-to-br from-background to-muted/20">
@@ -116,16 +170,21 @@ export function UserDetailPage() {
               <Badge variant="secondary">DEACTIVATED</Badge>
             )}
           </div>
-          {showDeactivateAction && (
+          {showDeactivateAction ? (
             <Button variant="destructive" onClick={handleOpenConfirmDialog} disabled={isPending}>
               {isPending ? 'Deactivating...' : 'Deactivate User'}
             </Button>
-          )}
+          ) : null}
         </div>
 
         <AnimatePresence mode="wait">
-          {errorMessage && (
-            <MessageBanner type="error" message={errorMessage} onClose={clearErrorMessage} />
+          {deactivationMessage && (
+            <MessageBanner
+              type={deactivationMessage.kind === 'success' ? 'success' : 'error'}
+              message={deactivationMessage.message}
+              onClose={clearDeactivationMessage}
+              action={deactivationMessageAction}
+            />
           )}
         </AnimatePresence>
 
@@ -268,7 +327,7 @@ export function UserDetailPage() {
           userLabel={headingText}
           isOpen={isConfirmDialogOpen}
           isSubmitting={isPending}
-          onConfirm={handleConfirmDeactivation}
+          onConfirm={handleDeactivation}
           onCancel={handleCloseConfirmDialog}
         />
       </div>

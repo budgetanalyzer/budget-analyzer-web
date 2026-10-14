@@ -7,7 +7,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { userApi } from '@/api/userApi';
-import type { ApiError } from '@/types/apiError';
+import { ApiError } from '@/types/apiError';
 import type { PagedResponse } from '@/types/transactionSearch';
 import type { UserDetail, UserSearchQuery, UserSummary } from '@/types/user';
 
@@ -25,9 +25,14 @@ export function useDeactivateUser() {
 
   return useMutation({
     mutationFn: (userId: string) => userApi.deactivateUser(userId),
-    onSuccess: async (_, userId) => {
-      await queryClient.invalidateQueries({ queryKey: userKeys.detail(userId) });
-      await queryClient.invalidateQueries({ queryKey: userKeys.searchAll });
+    onSettled: async (_, error, userId) => {
+      const shouldReconcile = !error || (error instanceof ApiError && error.status === 503);
+      if (!shouldReconcile) return;
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: userKeys.detail(userId) }),
+        queryClient.invalidateQueries({ queryKey: userKeys.searchAll }),
+      ]);
     },
   });
 }

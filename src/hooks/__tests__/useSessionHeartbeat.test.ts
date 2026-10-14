@@ -75,6 +75,16 @@ function make502Error(): AxiosError {
   });
 }
 
+function make503Error(): AxiosError {
+  return new AxiosError('Service Unavailable', 'ERR_BAD_RESPONSE', undefined, undefined, {
+    status: 503,
+    statusText: 'Service Unavailable',
+    data: {},
+    headers: {},
+    config: { headers: new AxiosHeaders() },
+  });
+}
+
 function make500Error(): AxiosError {
   return new AxiosError('Internal Server Error', 'ERR_BAD_RESPONSE', undefined, undefined, {
     status: 500,
@@ -310,6 +320,96 @@ describe('useSessionHeartbeat', () => {
     expect(mockGetSessionStatus).toHaveBeenCalledTimes(2);
     expect(result.current.connectionWarning).toBeNull();
     expect(result.current.showWarning).toBe(false);
+  });
+
+  it('retries once on repeated 503 responses then exposes a connection warning', async () => {
+    mockGetSessionStatus
+      .mockRejectedValueOnce(make503Error())
+      .mockRejectedValueOnce(make503Error());
+
+    const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
+    await advanceTimers(0);
+
+    expect(mockGetSessionStatus).toHaveBeenCalledTimes(2);
+    expect(result.current.connectionWarning).toBe(
+      'Unable to reach the server. Your session may expire.',
+    );
+  });
+
+  it('retries a 503 and applies a successful retry', async () => {
+    const refreshedExpiry = Math.floor(Date.now() / 1000) + 1800;
+    mockGetSessionStatus
+      .mockRejectedValueOnce(make503Error())
+      .mockResolvedValueOnce(makeSessionStatus({ expiresAt: refreshedExpiry }));
+
+    const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
+    await advanceTimers(0);
+
+    expect(mockGetSessionStatus).toHaveBeenCalledTimes(2);
+    expect(result.current.connectionWarning).toBeNull();
+    expect(result.current.expiresAt).toBe(refreshedExpiry);
+  });
+
+  it('redirects to logout when a 503 retry returns 401', async () => {
+    mockGetSessionStatus
+      .mockRejectedValueOnce(make503Error())
+      .mockRejectedValueOnce(make401Error());
+    const hrefSetter = vi.fn();
+    Object.defineProperty(window, 'location', {
+      value: { href: '' },
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(window.location, 'href', {
+      set: hrefSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
+    await advanceTimers(0);
+
+    expect(mockGetSessionStatus).toHaveBeenCalledTimes(2);
+    expect(hrefSetter).toHaveBeenCalledWith('/logout');
+    expect(result.current.connectionWarning).toBeNull();
+  });
+
+  it('retains the last successful expiry and countdown without broadcasting after a 503', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const lastSuccessfulExpiry = now + 600;
+    mockGetSessionStatus.mockResolvedValueOnce(
+      makeSessionStatus({ expiresAt: lastSuccessfulExpiry }),
+    );
+
+    const { result } = renderHook(() =>
+      useSessionHeartbeat({
+        enabled: true,
+        heartbeatIntervalMs: 1_000_000,
+        warningBeforeExpirySec: 300,
+      }),
+    );
+    await advanceTimers(0);
+
+    const receiver = new MockBroadcastChannel('session-heartbeat');
+    const received = vi.fn();
+    receiver.onmessage = received;
+    mockGetSessionStatus
+      .mockRejectedValueOnce(make503Error())
+      .mockRejectedValueOnce(make503Error());
+
+    await act(async () => {
+      await result.current.sendHeartbeat();
+    });
+
+    expect(result.current.expiresAt).toBe(lastSuccessfulExpiry);
+    expect(received).not.toHaveBeenCalled();
+    expect(result.current.connectionWarning).toBe(
+      'Unable to reach the server. Your session may expire.',
+    );
+
+    await advanceTimers(300 * 1000);
+    expect(result.current.showWarning).toBe(true);
+    receiver.close();
   });
 
   it('does not show a connection warning when the retry fails with another status', async () => {

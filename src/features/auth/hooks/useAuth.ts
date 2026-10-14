@@ -14,7 +14,8 @@ import { navigateToLogin } from '@/features/auth/utils/loginRedirect';
  * 2. Session Gateway handles OAuth with identity provider, stores tokens in the server-side session
  * 3. Session Gateway sets HttpOnly session cookie in browser
  * 4. Frontend checks /auth/v1/user endpoint to get current user info
- * 5. Frontend heartbeat (GET /auth/v1/session) extends the local session TTL (does not call the IdP)
+ * 5. Frontend heartbeat (GET /auth/v1/session) refreshes authorization through permission-service,
+ *    then extends the local session TTL only when that refresh succeeds (does not call the IdP)
  * 6. All API calls include session cookie automatically (credentials: 'include')
  * 7. ext_authz reads the server-side session and injects identity headers per-request
  */

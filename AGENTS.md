@@ -15,6 +15,11 @@ write only in this repository.
 Never use Agent or subagent tools for code exploration. Use Grep, Glob, and Read
 directly.
 
+## Path Portability
+
+Use repository-relative, sibling-relative, or dynamically resolved paths.
+Never hardcode machine-specific checkout locations such as `/workspace`.
+
 ## Prerequisites First
 
 Before implementing a plan or feature, check its documented prerequisites. Read

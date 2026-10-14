@@ -94,9 +94,12 @@ client error contract.
 
 `SessionHeartbeatProvider`, mounted by `src/App.tsx`, enables
 `useSessionHeartbeat` only for an authenticated user. The hook calls
-`GET /auth/v1/session`, which validates the Redis-backed session and extends its
-sliding TTL without contacting the identity provider. The deployment default
-session TTL is 15 minutes.
+`GET /auth/v1/session`, which validates the Redis-backed session, revalidates
+account status, roles, and permissions through permission-service, and only then
+atomically updates the authorization snapshot and extends the sliding TTL. It
+does not contact the identity provider. The deployment default session TTL is
+15 minutes. The shared backend behavior is defined by orchestration's
+[canonical session-edge authorization contract](https://github.com/budgetanalyzer/orchestration/blob/main/docs/architecture/session-edge-authorization-pattern.md#session-gateway---auth-layer).
 
 Frontend behavior is:
 
@@ -110,11 +113,14 @@ Frontend behavior is:
 - Publish successful expiry updates through the `session-heartbeat`
   `BroadcastChannel`, allowing other tabs to dismiss and reschedule their
   warnings.
-- Retry a network failure or HTTP 502 once immediately. If that retry fails,
-  show a persistent, dismissible application-level status warning. A later
-  successful local or cross-tab heartbeat clears that warning. Dismissing it
-  hides only the current failure; a later independently failed heartbeat may
-  show it again. A 401 navigates to `/logout`.
+- Retry a network failure, HTTP 502, or HTTP 503 once immediately. A 503 means
+  the authorization refresh or Redis update was unavailable, so the server did
+  not renew the session. If the retry also fails temporarily, preserve the last
+  successful `expiresAt` countdown without broadcasting a renewal and show a
+  persistent, dismissible application-level status warning. A later successful
+  local or cross-tab heartbeat clears that warning. Dismissing it hides only the
+  current failure; a later independently failed heartbeat may show it again. A
+  401 from either attempt navigates to `/logout`.
 
 The connectivity warning is rendered by the long-lived
 `SessionHeartbeatProvider` before the protected route tree, so it remains a
@@ -147,6 +153,12 @@ Roles decide which layout chrome surrounds a page. Permissions decide whether
 an action, feature route, tile, or navigation affordance is available. The
 values come from the current-user query; there is no separate frontend role or
 permission cache.
+
+A successful heartbeat refreshes the Redis authorization snapshot but does not
+directly rewrite the existing current-user query. Updated roles and permissions
+appear in frontend affordances on the query's next normal `/auth/v1/user` fetch;
+this does not guarantee immediate UI synchronization after grant changes.
+Backend authorization remains authoritative throughout.
 
 ## Roles and Permissions
 
