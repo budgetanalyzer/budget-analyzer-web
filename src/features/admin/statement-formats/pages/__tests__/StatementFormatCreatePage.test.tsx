@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router';
 import { http, HttpResponse } from 'msw';
 
 import { StatementFormatCreatePage } from '@/features/admin/statement-formats/pages/StatementFormatCreatePage';
@@ -118,6 +118,6 @@ function renderStatementFormatRoutes(initialPath: string) {
       <Route path="/admin/statement-formats/new" element={<StatementFormatCreatePage />} />
       <Route path="/admin/statement-formats" element={<StatementFormatsListPage />} />
     </Routes>,
-    { initialEntries: [initialPath], router: 'dom' },
+    { initialEntries: [initialPath] },
   );
 }

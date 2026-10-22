@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router';
 import { http, HttpResponse } from 'msw';
 
 import { CurrencyEditPage } from '@/features/admin/currencies/pages/CurrencyEditPage';
@@ -138,6 +138,6 @@ function renderCurrencyRoutes(initialPath: string) {
       <Route path="/admin/currencies/:id" element={<CurrencyEditPage />} />
       <Route path="/admin/currencies" element={<CurrenciesListPage />} />
     </Routes>,
-    { initialEntries: [initialPath], router: 'dom' },
+    { initialEntries: [initialPath] },
   );
 }

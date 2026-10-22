@@ -1,4 +1,4 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Plus, Pencil, Coins } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';

@@ -1,7 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
-import { MemoryRouter as DomMemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewPage } from '@/features/views/pages/ViewPage';
 import { usePermission } from '@/features/auth/hooks/usePermission';
@@ -109,10 +108,10 @@ function renderPage(initialEntry = `/views/${viewId}`) {
       <Route
         path="/views/:id"
         element={
-          <DomMemoryRouter initialEntries={[initialEntry]}>
+          <>
             <ViewPage />
             <LocationProbe />
-          </DomMemoryRouter>
+          </>
         }
       />
     </Routes>,

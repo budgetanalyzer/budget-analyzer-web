@@ -135,7 +135,6 @@ describe('StatementFormatManagementPage API behavior', () => {
 
     renderWithProviders(<StatementFormatManagementPage />, {
       initialEntries: ['/statement-formats'],
-      router: 'dom',
     });
 
     expect(await screen.findByText('System Checking CSV')).toBeInTheDocument();
@@ -156,7 +155,6 @@ describe('StatementFormatManagementPage API behavior', () => {
 
     renderWithProviders(<StatementFormatManagementPage />, {
       initialEntries: ['/statement-formats'],
-      router: 'dom',
     });
 
     expect(await screen.findByText('Custom Checking CSV')).toBeInTheDocument();
@@ -178,7 +176,6 @@ describe('StatementFormatManagementPage API behavior', () => {
 
     renderWithProviders(<StatementFormatManagementPage />, {
       initialEntries: ['/statement-formats'],
-      router: 'dom',
     });
 
     expect(await screen.findByText('Hidden System CSV')).toBeInTheDocument();
@@ -203,7 +200,6 @@ describe('StatementFormatManagementPage API behavior', () => {
 
     renderWithProviders(<StatementFormatManagementPage />, {
       initialEntries: ['/statement-formats'],
-      router: 'dom',
     });
 
     expect(await screen.findByText('System Checking CSV')).toBeInTheDocument();
@@ -244,7 +240,6 @@ describe('StatementFormatManagementPage API behavior', () => {
 
     renderWithProviders(<StatementFormatManagementPage />, {
       initialEntries: ['/statement-formats'],
-      router: 'dom',
     });
 
     expect(await screen.findByText('Hidden System CSV')).toBeInTheDocument();
@@ -285,7 +280,6 @@ describe('StatementFormatManagementPage API behavior', () => {
       </>,
       {
         initialEntries: ['/statement-formats'],
-        router: 'dom',
       },
     );
 

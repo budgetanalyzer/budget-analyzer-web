@@ -1,5 +1,5 @@
 import { useCallback, useState, type ChangeEvent, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 import { MessageBanner } from '@/components/MessageBanner';
 import {
   Dialog,

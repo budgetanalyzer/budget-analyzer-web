@@ -53,7 +53,6 @@ function mockQueryError(error: Error) {
 function renderPage() {
   return renderWithProviders(<CurrenciesListPage />, {
     initialEntries: ['/admin/currencies'],
-    router: 'dom',
   });
 }
 
