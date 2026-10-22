@@ -40,10 +40,8 @@ function useDetailReferenceHandlers() {
 
 function renderDetailPage(permissions = authenticatedUser.permissions, displayCurrency = 'USD') {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData<User | null>(['auth', 'currentUser'], {
-    ...authenticatedUser,
-    permissions,
-  });
+  const currentUser: User = { ...authenticatedUser, permissions };
+  queryClient.setQueryData(['auth', 'currentUser'], currentUser);
 
   return renderWithProviders(
     <Routes>

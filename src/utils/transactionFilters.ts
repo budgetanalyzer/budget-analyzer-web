@@ -7,13 +7,13 @@ import { filterTransactionsByTableSearch } from '@/utils/transactionSearch';
 export function hasActiveTransactionFilters(filters: TransactionFilterValues): boolean {
   return Boolean(
     filters.globalFilter ||
-      filters.dateFilter.from ||
-      filters.dateFilter.to ||
-      filters.bankNameFilter ||
-      filters.accountIdFilter ||
-      filters.typeFilter ||
-      filters.amountFilter.min !== null ||
-      filters.amountFilter.max !== null,
+    filters.dateFilter.from ||
+    filters.dateFilter.to ||
+    filters.bankNameFilter ||
+    filters.accountIdFilter ||
+    filters.typeFilter ||
+    filters.amountFilter.min !== null ||
+    filters.amountFilter.max !== null,
   );
 }
 
