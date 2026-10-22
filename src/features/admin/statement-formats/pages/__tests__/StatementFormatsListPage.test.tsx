@@ -53,7 +53,6 @@ function mockQueryError(error: Error) {
 function renderPage() {
   return renderWithProviders(<StatementFormatsListPage />, {
     initialEntries: ['/admin/statement-formats'],
-    router: 'dom',
   });
 }
 

@@ -28,7 +28,7 @@ export default defineConfig({
           dates: ['date-fns'],
           http: ['axios'],
           motion: ['motion/react'],
-          react: ['react', 'react-dom', 'react-router', 'react-router-dom'],
+          react: ['react', 'react-dom', 'react-router'],
           query: ['@tanstack/react-query'],
           state: ['@reduxjs/toolkit', 'react-redux'],
           table: ['@tanstack/react-table'],

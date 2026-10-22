@@ -59,9 +59,7 @@ Shared infrastructure:
 `createTestQueryClient()` disables query and mutation retries and disables
 refetch-on-window-focus by default. `createTestStore()` creates an isolated
 Redux store. `renderWithProviders()` returns the Testing Library result plus the
-Query Client and store it used; pass `initialEntries` for a memory router and
-`router: 'dom'` only for code that still imports router hooks from
-`react-router-dom`.
+Query Client and store it used; pass `initialEntries` for a memory router.
 
 ## Running Vitest
 

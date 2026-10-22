@@ -1,5 +1,5 @@
 import { ChevronDown, FileSpreadsheet, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useCallback } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
 import {

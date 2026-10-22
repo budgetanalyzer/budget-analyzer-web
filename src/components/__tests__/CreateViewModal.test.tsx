@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { CreateViewModal } from '@/components/CreateViewModal';
 import { server } from '@/testing/mocks/server';
@@ -76,7 +76,6 @@ function renderModal({
     </Routes>,
     {
       initialEntries: ['/transactions?q=coffee&minAmount=10&amountCurrency=USD'],
-      router: 'dom',
     },
   );
   return { onClose, ...result };
@@ -98,7 +97,6 @@ function renderCloneModal({ onClose = vi.fn() }: { onClose?: () => void } = {}) 
     </Routes>,
     {
       initialEntries: ['/views/source-view?q=coffee&minAmount=10&amountCurrency=USD'],
-      router: 'dom',
     },
   );
   return { onClose, ...result };

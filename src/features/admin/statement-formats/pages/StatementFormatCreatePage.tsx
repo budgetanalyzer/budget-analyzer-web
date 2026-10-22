@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useState, useCallback } from 'react';
 import { ArrowLeft, PlusCircle } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';

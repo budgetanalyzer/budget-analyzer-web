@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 
 vi.mock('@/features/auth/hooks/useAuth');
 
@@ -49,7 +49,6 @@ describe('UserProfileDropdown', () => {
 
     const { container } = renderWithProviders(<UserProfileDropdown />, {
       initialEntries: ['/'],
-      router: 'dom',
     });
 
     expect(container).toBeEmptyDOMElement();
@@ -59,7 +58,7 @@ describe('UserProfileDropdown', () => {
     mockAuth(namedUser);
     const user = userEvent.setup();
 
-    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'], router: 'dom' });
+    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'] });
     await user.click(screen.getByRole('button', { name: 'Pat Example' }));
 
     expect(screen.getByText('Pat Example')).toBeInTheDocument();
@@ -72,7 +71,7 @@ describe('UserProfileDropdown', () => {
     mockAuth(namedUser, logout);
     const user = userEvent.setup();
 
-    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'], router: 'dom' });
+    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'] });
     await user.click(screen.getByRole('button', { name: 'Pat Example' }));
     await user.click(screen.getByRole('menuitem', { name: /logout/i }));
 
@@ -88,7 +87,7 @@ describe('UserProfileDropdown', () => {
         <UserProfileDropdown />
         <LocationProbe />
       </>,
-      { initialEntries: ['/'], router: 'dom' },
+      { initialEntries: ['/'] },
     );
     await user.click(screen.getByRole('button', { name: 'Pat Example' }));
     await user.click(screen.getByRole('menuitem', { name: /statement formats/i }));
@@ -101,7 +100,7 @@ describe('UserProfileDropdown', () => {
     mockAuth(namedUser);
     const user = userEvent.setup();
 
-    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'], router: 'dom' });
+    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'] });
     const trigger = screen.getByRole('button', { name: 'Pat Example' });
 
     trigger.focus();
@@ -127,7 +126,7 @@ describe('UserProfileDropdown', () => {
     });
     const user = userEvent.setup();
 
-    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'], router: 'dom' });
+    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'] });
     await user.click(screen.getByRole('button', { name: 'F' }));
 
     expect(screen.getByText('fallback@example.com')).toBeInTheDocument();
@@ -138,7 +137,7 @@ describe('UserProfileDropdown', () => {
     mockAuth({ ...namedUser, permissions: [] });
     const user = userEvent.setup();
 
-    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'], router: 'dom' });
+    renderWithProviders(<UserProfileDropdown />, { initialEntries: ['/'] });
     await user.click(screen.getByRole('button', { name: 'Pat Example' }));
 
     expect(screen.queryByRole('menuitem', { name: /statement formats/i })).not.toBeInTheDocument();
