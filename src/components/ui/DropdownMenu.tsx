@@ -413,8 +413,10 @@ export const DropdownMenuContent = React.forwardRef<HTMLDivElement, DropdownMenu
 );
 DropdownMenuContent.displayName = 'DropdownMenuContent';
 
-interface DropdownMenuItemProps
-  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'> {
+interface DropdownMenuItemProps extends Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'onClick'
+> {
   asChild?: boolean;
   destructive?: boolean;
   onClick?: React.MouseEventHandler<HTMLElement>;
