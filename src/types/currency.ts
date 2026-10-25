@@ -24,7 +24,7 @@ export interface CurrencySeriesResponse {
 export interface CurrencySeriesCreateRequest {
   currencyCode: string; // ISO 4217 three-letter code
   providerSeriesId: string;
-  enabled?: boolean; // Defaults to true
+  enabled: boolean;
 }
 
 /**
