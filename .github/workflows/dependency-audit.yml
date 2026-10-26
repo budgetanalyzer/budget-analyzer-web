@@ -1,6 +1,13 @@
 name: Dependency Audit
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - package.json
+      - package-lock.json
+      - .github/workflows/dependency-audit.yml
   schedule:
     - cron: '17 6 * * 1'
   workflow_dispatch:
@@ -9,15 +16,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: dependency-audit
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('dependency-audit-pr-{0}', github.event.pull_request.number) || 'dependency-audit' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   npm-audit:
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
 
     steps:
@@ -125,7 +132,7 @@ jobs:
           fi
 
           if [[ "${full_status}" -eq 1 || "${production_status}" -eq 1 ]]; then
-            echo 'Vulnerability findings were retained as evidence and do not fail this scheduled report.' >> "${GITHUB_STEP_SUMMARY}"
+            echo 'Vulnerability findings were retained as evidence and do not fail this audit run.' >> "${GITHUB_STEP_SUMMARY}"
           fi
 
       - name: Upload short-lived audit evidence

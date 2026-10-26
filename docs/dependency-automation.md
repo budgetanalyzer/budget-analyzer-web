@@ -33,9 +33,13 @@ selected tag/digest supports the required platform before merging.
 
 ## Audit evidence
 
-`.github/workflows/dependency-audit.yml` runs weekly on `main` and supports
-manual execution on `main`. It installs exactly `package-lock.json` with
-`npm ci`, then independently captures:
+`.github/workflows/dependency-audit.yml` runs weekly on `main`, supports
+manual execution on `main`, and runs on pull requests to `main` that change
+`package.json`, `package-lock.json`, or the workflow itself. Each pull request
+has its own concurrency group, so a new push cancels the superseded run;
+scheduled and manual runs share one non-cancelling group. The workflow uses no
+secrets. It installs exactly `package-lock.json` with `npm ci`, then
+independently captures:
 
 - `npm audit --json` as `npm-audit-full.json`;
 - `npm audit --omit=dev --json` as `npm-audit-production.json`.
@@ -46,13 +50,18 @@ must include the audit status and both complete audit reports; incomplete
 successful-run evidence fails under the shared orchestration policy. The job
 summary presents severity counts for the two audit scopes.
 
-An npm audit exit status caused by findings does not fail this scheduled report;
-the backlog remains visible without blocking unrelated pull requests. Missing
-or malformed JSON, an npm-reported registry error, an unexpected command
-status, or an `npm ci` failure does fail the workflow. Installation errors
+An npm audit exit status caused by findings does not fail scheduled, manual, or
+pull-request runs; the backlog remains visible in the job summary and artifact
+without blocking unrelated pull requests. Missing or malformed JSON, an
+npm-reported registry error, an unexpected command status, or an `npm ci`
+failure does fail the workflow, including on pull requests. Installation errors
 remain separate in the named install step's log. Audit errors and any partial
 reports are still uploaded by the always-run evidence step when the report
 directory is available, while the original error keeps the workflow failed.
+
+Do not make this workflow a required status check while its pull-request
+trigger is path-filtered: pull requests outside the filter never run it, so a
+required check would wait indefinitely.
 
 Audit reports are inputs to human triage, not proof of reachability. In
 particular, development-server findings are not production-browser findings,
@@ -65,9 +74,10 @@ dropping findings from the full report.
 Every Renovate pull request targets `main` and remains non-automerged. The
 `Build` pull-request workflow runs locked installation, ESLint, the Vitest
 coverage gate, the production-smoke CSP gate, and the standard TypeScript/Vite
-bundle. Reviewers must inspect release notes, the resolved lockfile change,
-browser and SSR/RSC applicability, strict-CSP behavior, and Node/image platform
-compatibility.
+bundle. Changes to image build inputs also run the
+[image build check](#image-build-check). Reviewers must inspect release notes,
+the resolved lockfile change, browser and SSR/RSC applicability, strict-CSP
+behavior, and Node/image platform compatibility.
 
 The [development guide](development.md#repository-commands) owns local build and
 validation commands. CSP-sensitive dependency changes must also follow the
@@ -75,3 +85,34 @@ validation commands. CSP-sensitive dependency changes must also follow the
 [external browser harness](testing-guide.md#external-browser-harness); the bot
 cannot infer runtime stylesheet injection or mobile/browser compatibility from
 a successful package lookup.
+
+### Image build check
+
+`.github/workflows/image-build-check.yml` (`Image Build Check`) runs on pull
+requests to `main` that change `Dockerfile`, `Dockerfile.production`,
+`.dockerignore`, `nginx.production.conf`, `package.json`, `package-lock.json`,
+or the workflow itself, and on manual dispatch. Application source is excluded
+because the `Build` workflow already compiles and tests it on every pull
+request.
+
+A `fail-fast: false` matrix builds each image for `linux/arm64` with the
+repository root as context:
+
+- `Dockerfile.production`, the release image built by `publish-release.yml`.
+  Its `build` stage runs on BuildKit's build platform, so only the NGINX
+  runtime stage is arm64. This entry proves the arm64 NGINX base manifest, the
+  `nginx.production.conf` copy, and the coverage-gated build inside the image.
+- `Dockerfile`, the development image built by the orchestration `Tiltfile`.
+  It runs `npm ci` under arm64 emulation, so this entry is what proves the
+  arm64 Node base manifest and `npm ci` resolution of the lockfile's
+  platform-specific optional binaries.
+
+The check does not log in to a registry, tag, push, or cache images, and passes
+no secrets. It does not prove runtime behavior, the Vite development server,
+NGINX routing, or strict-CSP behavior, and it does not scan for
+vulnerabilities. Emulated builds are slow; each entry has a 30-minute timeout.
+`Dockerfile.dev` is not built because it has no known consumer.
+
+Do not make this check a required status check while it is path-filtered:
+pull requests outside the filter never run it, so a required check would wait
+indefinitely.
