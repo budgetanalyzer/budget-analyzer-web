@@ -10,6 +10,7 @@ export function SessionHeartbeatProvider() {
     isSending,
     sendHeartbeat,
     expiresAt,
+    canExtend,
     connectionWarning,
     dismissConnectionWarning,
   } = useSessionHeartbeat({ enabled: isAuthenticated });
@@ -28,6 +29,7 @@ export function SessionHeartbeatProvider() {
         isSending={isSending}
         onContinue={sendHeartbeat}
         expiresAt={expiresAt}
+        canExtend={canExtend}
       />
     </>
   );

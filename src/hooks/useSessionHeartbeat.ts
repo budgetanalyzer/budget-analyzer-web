@@ -39,6 +39,7 @@ export function useSessionHeartbeat({
   const [showWarning, setShowWarning] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [canExtend, setCanExtend] = useState(true);
   const [connectionWarning, setConnectionWarning] = useState<string | null>(null);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
@@ -55,6 +56,10 @@ export function useSessionHeartbeat({
       setExpiresAt(serverExpiresAt);
       const expiresInSeconds = serverExpiresAt - Math.floor(Date.now() / 1000);
       const delaySec = Math.max(0, expiresInSeconds - warningBeforeExpirySec);
+      // Every caller passes a fresh server expiry. A renewed session lasts the full TTL, so an
+      // expiry already inside the warning window means the Session Gateway capped it at the
+      // absolute session lifetime and another heartbeat cannot extend it.
+      setCanExtend(delaySec > 0);
 
       if (delaySec === 0) {
         setShowWarning(true);
@@ -134,6 +139,7 @@ export function useSessionHeartbeat({
     isSending,
     sendHeartbeat: performHeartbeat,
     expiresAt,
+    canExtend,
     connectionWarning,
     dismissConnectionWarning,
   };

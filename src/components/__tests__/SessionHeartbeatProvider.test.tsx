@@ -28,6 +28,7 @@ describe('SessionHeartbeatProvider', () => {
       isSending: false,
       sendHeartbeat: vi.fn(),
       expiresAt: null,
+      canExtend: true,
       connectionWarning: 'Unable to reach the server. Your session may expire.',
       dismissConnectionWarning: vi.fn(),
     });
@@ -60,6 +61,7 @@ describe('SessionHeartbeatProvider', () => {
       isSending: false,
       sendHeartbeat: vi.fn(),
       expiresAt: null,
+      canExtend: true,
       connectionWarning: null,
       dismissConnectionWarning: vi.fn(),
     });
@@ -93,6 +95,7 @@ describe('SessionHeartbeatProvider', () => {
       isSending: false,
       sendHeartbeat: vi.fn(),
       expiresAt: null,
+      canExtend: true,
       connectionWarning: 'Unable to reach the server. Your session may expire.',
       dismissConnectionWarning,
     });
@@ -127,6 +130,7 @@ describe('SessionHeartbeatProvider', () => {
       isSending: false,
       sendHeartbeat: vi.fn(),
       expiresAt: null,
+      canExtend: true,
       connectionWarning: null,
       dismissConnectionWarning: vi.fn(),
     });

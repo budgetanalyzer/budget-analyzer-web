@@ -18,6 +18,7 @@ describe('InactivityWarningModal', () => {
         isSending={false}
         onContinue={vi.fn()}
         expiresAt={null}
+        canExtend
       />,
     );
     expect(screen.queryByText('Session Expiring')).not.toBeInTheDocument();
@@ -30,6 +31,7 @@ describe('InactivityWarningModal', () => {
         isSending={false}
         onContinue={vi.fn()}
         expiresAt={null}
+        canExtend
       />,
     );
     expect(screen.getByText('Session Expiring')).toBeInTheDocument();
@@ -48,6 +50,7 @@ describe('InactivityWarningModal', () => {
         isSending={false}
         onContinue={vi.fn()}
         expiresAt={now + 105}
+        canExtend
       />,
     );
     expect(screen.getByText(/1:45/)).toBeInTheDocument();
@@ -73,6 +76,7 @@ describe('InactivityWarningModal', () => {
         isSending={false}
         onContinue={vi.fn()}
         expiresAt={now + 2}
+        canExtend
       />,
     );
 
@@ -103,6 +107,7 @@ describe('InactivityWarningModal', () => {
         isSending={false}
         onContinue={vi.fn()}
         expiresAt={now + 60}
+        canExtend
       />,
     );
 
@@ -129,6 +134,7 @@ describe('InactivityWarningModal', () => {
         isSending={true}
         onContinue={vi.fn()}
         expiresAt={now + 2}
+        canExtend
       />,
     );
 
@@ -147,6 +153,7 @@ describe('InactivityWarningModal', () => {
         isSending={false}
         onContinue={onContinue}
         expiresAt={null}
+        canExtend
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: /continue/i }));
@@ -155,9 +162,81 @@ describe('InactivityWarningModal', () => {
 
   it('disables Continue button when isSending is true', () => {
     render(
-      <InactivityWarningModal open={true} isSending={true} onContinue={vi.fn()} expiresAt={null} />,
+      <InactivityWarningModal
+        open={true}
+        isSending={true}
+        onContinue={vi.fn()}
+        expiresAt={null}
+        canExtend
+      />,
     );
     expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
+  });
+
+  it('replaces Continue with a sign-out action when the session cannot be extended', () => {
+    const hrefSetter = vi.fn();
+    Object.defineProperty(window, 'location', {
+      value: { href: '' },
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(window.location, 'href', {
+      set: hrefSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    const now = Math.floor(Date.now() / 1000);
+    render(
+      <InactivityWarningModal
+        open={true}
+        isSending={false}
+        onContinue={vi.fn()}
+        expiresAt={now + 105}
+        canExtend={false}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        'Your session has reached its maximum length and will end in 1:45. Sign in again to keep working.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continue/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out now' }));
+    expect(hrefSetter).toHaveBeenCalledWith('/logout');
+  });
+
+  it('redirects to /logout when a session that cannot be extended reaches 0', () => {
+    const hrefSetter = vi.fn();
+    Object.defineProperty(window, 'location', {
+      value: { href: '' },
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(window.location, 'href', {
+      set: hrefSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    const now = Math.floor(Date.now() / 1000);
+    render(
+      <InactivityWarningModal
+        open={true}
+        isSending={false}
+        onContinue={vi.fn()}
+        expiresAt={now + 2}
+        canExtend={false}
+      />,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(hrefSetter).toHaveBeenCalledWith('/logout');
   });
 
   it('is not dismissable via Escape key', () => {
@@ -167,6 +246,7 @@ describe('InactivityWarningModal', () => {
         isSending={false}
         onContinue={vi.fn()}
         expiresAt={null}
+        canExtend
       />,
     );
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -180,6 +260,7 @@ describe('InactivityWarningModal', () => {
         isSending={false}
         onContinue={vi.fn()}
         expiresAt={null}
+        canExtend
       />,
     );
     // Click the backdrop (the element with aria-hidden)
