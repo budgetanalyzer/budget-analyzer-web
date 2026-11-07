@@ -4,6 +4,7 @@ import axios from 'axios';
 import type { User } from '@/types/auth';
 import * as authApi from '@/api/auth';
 import { navigateToLogin } from '@/features/auth/utils/loginRedirect';
+import { submitLogoutForm } from '@/utils/logout';
 
 /**
  * Authentication hook
@@ -14,7 +15,7 @@ import { navigateToLogin } from '@/features/auth/utils/loginRedirect';
  * 2. Session Gateway handles OAuth with identity provider, stores tokens in the server-side session
  * 3. Session Gateway sets HttpOnly session cookie in browser
  * 4. Frontend checks /auth/v1/user endpoint to get current user info
- * 5. Frontend heartbeat (GET /auth/v1/session) refreshes authorization through permission-service,
+ * 5. Frontend heartbeat (POST /auth/v1/session) refreshes authorization through permission-service,
  *    then extends the local session TTL only when that refresh succeeds (does not call the IdP)
  * 6. All API calls include session cookie automatically (credentials: 'include')
  * 7. ext_authz reads the server-side session and injects identity headers per-request
@@ -60,14 +61,14 @@ export function useAuth() {
     navigateToLogin(returnUrl);
   }, []);
 
-  // Logout - navigate to Session Gateway logout endpoint
+  // Logout - submit to the Session Gateway logout endpoint
   // This allows the browser to follow the full redirect chain:
   // /logout → Session Gateway clears session → IdP logout → back to app
   const logout = useCallback(() => {
     // Clear cached data before navigating
     queryClient.clear();
-    // Navigate to logout endpoint (browser follows redirects)
-    window.location.assign('/logout');
+    // Submit to the logout endpoint (browser follows redirects)
+    submitLogoutForm();
   }, [queryClient]);
 
   return {

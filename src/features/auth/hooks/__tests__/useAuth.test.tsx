@@ -5,11 +5,15 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { navigateToLogin } from '@/features/auth/utils/loginRedirect';
 import { createTestQueryClient } from '@/testing/test-utils';
 import { server } from '@/testing/mocks/server';
+import { submitLogoutForm } from '@/utils/logout';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 vi.mock('@/features/auth/utils/loginRedirect', () => ({
   navigateToLogin: vi.fn(),
+}));
+vi.mock('@/utils/logout', () => ({
+  submitLogoutForm: vi.fn(),
 }));
 
 const authenticatedUser = {
@@ -33,6 +37,7 @@ function renderUseAuth() {
 describe('useAuth', () => {
   beforeEach(() => {
     vi.mocked(navigateToLogin).mockReset();
+    vi.mocked(submitLogoutForm).mockReset();
   });
 
   it('exposes an authenticated user after bootstrap succeeds', async () => {
@@ -109,18 +114,22 @@ describe('useAuth', () => {
     expect(result.current.isAuthenticated).toBe(true);
   });
 
-  it('memoizes login and logout and routes login through the navigation utility', async () => {
+  it('memoizes login and logout and routes both operations through shared utilities', async () => {
     server.use(http.get('/auth/v1/user', () => HttpResponse.json(authenticatedUser)));
-    const { result, rerender } = renderUseAuth();
+    const { queryClient, result, rerender } = renderUseAuth();
     await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
     const firstLogin = result.current.login;
     const firstLogout = result.current.logout;
+    const clearSpy = vi.spyOn(queryClient, 'clear');
 
     rerender();
     result.current.login('/analytics?range=month#chart');
+    result.current.logout();
 
     expect(result.current.login).toBe(firstLogin);
     expect(result.current.logout).toBe(firstLogout);
     expect(navigateToLogin).toHaveBeenCalledWith('/analytics?range=month#chart');
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+    expect(submitLogoutForm).toHaveBeenCalledTimes(1);
   });
 });

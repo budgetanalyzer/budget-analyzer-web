@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { getSessionStatus } from '@/api/auth';
 import { useActivityTracking } from '@/hooks/useActivityTracking';
+import { submitLogoutForm } from '@/utils/logout';
 
-const LOGOUT_PATH = '/logout';
 const CONNECTION_WARNING = 'Unable to reach the server. Your session may expire.';
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS =
@@ -19,6 +19,15 @@ interface UseSessionHeartbeatOptions {
 
 function isStatus401(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 401;
+}
+
+function submitLogoutIfUnauthorized(error: unknown): boolean {
+  if (!isStatus401(error)) {
+    return false;
+  }
+
+  submitLogoutForm();
+  return true;
 }
 
 function isNetworkError(error: unknown): boolean {
@@ -81,8 +90,7 @@ export function useSessionHeartbeat({
       scheduleWarning(status.expiresAt);
       channelRef.current?.postMessage({ expiresAt: status.expiresAt });
     } catch (error) {
-      if (isStatus401(error)) {
-        window.location.href = LOGOUT_PATH;
+      if (submitLogoutIfUnauthorized(error)) {
         return;
       }
       if (isNetworkError(error) || isTransientError(error)) {
@@ -93,8 +101,7 @@ export function useSessionHeartbeat({
           scheduleWarning(status.expiresAt);
           channelRef.current?.postMessage({ expiresAt: status.expiresAt });
         } catch (retryError) {
-          if (isStatus401(retryError)) {
-            window.location.href = LOGOUT_PATH;
+          if (submitLogoutIfUnauthorized(retryError)) {
             return;
           }
           if (isNetworkError(retryError) || isTransientError(retryError)) {

@@ -152,7 +152,7 @@ export const handlers = [
       },
     });
   }),
-  http.get('/auth/v1/session', () => {
+  http.post('/auth/v1/session', () => {
     return HttpResponse.json({
       userId: 'mock-user-id',
       roles: ['ADMIN'],
