@@ -22,10 +22,10 @@ API requests:
 
 The Session Gateway owns the OAuth2/OIDC lifecycle, stores identity-provider
 tokens server-side, and gives the browser only an opaque session cookie. The
-public cookie defaults to `BA_SESSION` and is `HttpOnly`, `Secure`, and
-`SameSite=Strict`; deployments can configure the cookie name and SameSite
-policy. Frontend code cannot and must not inspect the cookie or store tokens in
-`localStorage` or `sessionStorage`.
+public cookie defaults to `__Host-BA_SESSION` and is `HttpOnly`, `Secure`,
+`SameSite=Strict`, and host-only (`Path=/`, no `Domain`); deployments can
+configure the cookie name and SameSite policy. Frontend code cannot and must
+not inspect the cookie or store tokens in `localStorage` or `sessionStorage`.
 
 For `/api/*`, ext_authz validates the Redis-backed session and injects identity
 headers before NGINX routes the request. Backend services remain authoritative
@@ -78,10 +78,14 @@ callback, server-side session creation, cookie issuance, and return to the SPA.
 `isSafeReturnUrl` accepts it; otherwise it navigates to the role-aware default
 path (`/admin` for administrators, `/` otherwise).
 
-`logout()` clears the frontend Query cache and navigates to `/logout`. The
-Session Gateway clears the server session and browser cookie and completes the
-identity-provider logout redirect chain. Session-expiry paths also use
-`/logout`, so cleanup stays centralized.
+`logout()` clears the frontend Query cache and uses the shared logout helper to
+submit a same-origin, top-level form `POST` to `/logout`. The Session Gateway
+clears the server session and browser cookie, then returns a redirect that
+completes the identity-provider logout chain. Session-expiry paths use the same
+helper, so cleanup stays centralized and no caller changes state through a GET.
+The form keeps the deployed `strict-origin-when-cross-origin` referrer policy;
+it must not opt into `no-referrer`, which can give a form POST a `null` Origin
+that ingress rejects.
 
 ### API 401 after bootstrap
 
@@ -99,7 +103,7 @@ client error contract.
 
 `SessionHeartbeatProvider`, mounted by `src/App.tsx`, enables
 `useSessionHeartbeat` only for an authenticated user. The hook calls
-`GET /auth/v1/session`, which validates the Redis-backed session, revalidates
+`POST /auth/v1/session`, which validates the Redis-backed session, revalidates
 account status, roles, and permissions through permission-service, and only then
 atomically updates the authorization snapshot and extends the sliding TTL. It
 does not contact the identity provider. The deployment default session TTL is
@@ -113,9 +117,10 @@ Frontend behavior is:
   or captured scroll activity occurred since the previous check. API requests
   alone do not extend the session.
 - Schedule a non-dismissable warning from the response's Unix-seconds
-  `expiresAt`. Continue sends another heartbeat; reaching zero navigates to
-  `/logout`. A session at its absolute lifetime cap gets a sign-out action
-  instead of Continue; see [Absolute session lifetime](#absolute-session-lifetime).
+  `expiresAt`. Continue sends another heartbeat; reaching zero submits the
+  shared logout form. A session at its absolute lifetime cap gets a sign-out
+  action instead of Continue; see
+  [Absolute session lifetime](#absolute-session-lifetime).
 - Publish successful expiry updates through the `session-heartbeat`
   `BroadcastChannel`, allowing other tabs to dismiss and reschedule their
   warnings.
@@ -126,7 +131,7 @@ Frontend behavior is:
   persistent, dismissible application-level status warning. A later successful
   local or cross-tab heartbeat clears that warning. Dismissing it hides only the
   current failure; a later independently failed heartbeat may show it again. A
-  401 from either attempt navigates to `/logout`.
+  401 from either attempt submits the shared logout form.
 
 The connectivity warning is rendered by the long-lived
 `SessionHeartbeatProvider` before the protected route tree, so it remains a
@@ -156,12 +161,12 @@ another heartbeat cannot extend the session. This depends on
 it is not, every warning looks capped.
 
 When the countdown reaches zero, when the user chooses Sign out now, or when a
-heartbeat returns 401 at the cap, the browser goes to `/logout`. The Session
-Gateway then signs out of the identity provider, and the SPA's `/peace` page
-offers Sign in again. Re-login does not force re-authentication. The Auth0 idle
-lifetime is shorter than the cap, and heartbeats never reach Auth0, so by the
-time the cap is reached the Auth0 session has expired and login asks for
-credentials.
+heartbeat returns 401 at the cap, the browser submits the shared form POST to
+`/logout`. The Session Gateway then signs out of the identity provider, and the
+SPA's `/peace` page offers Sign in again. Re-login does not force
+re-authentication. The Auth0 idle lifetime is shorter than the cap, and
+heartbeats never reach Auth0, so by the time the cap is reached the Auth0
+session has expired and login asks for credentials.
 
 ## Current User Contract
 

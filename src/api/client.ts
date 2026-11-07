@@ -74,7 +74,7 @@ apiClient.interceptors.response.use(
 
     if (error.request) {
       // Request made but no response received
-      // Note: BA_SESSION cookie is HttpOnly so document.cookie cannot detect it.
+      // Note: the __Host-BA_SESSION cookie is HttpOnly so document.cookie cannot detect it.
       // A missing document.cookie does NOT mean the user is unauthenticated.
       throw new ApiError(503, {
         type: 'SERVICE_UNAVAILABLE',

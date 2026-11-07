@@ -268,7 +268,7 @@ snapshot-accepted merely to make the command pass.
 
 Typed fixtures under `e2e/fixtures/` install the CSP monitor and browser mocks
 before navigation. Mocks fulfill only exact `GET /auth/v1/user`,
-`GET /auth/v1/session`, and scenario-registered `/api/*` requests. Any other
+`POST /auth/v1/session`, and scenario-registered `/api/*` requests. Any other
 protected auth/API request is fulfilled with the harness failure status,
 recorded, and reported during fixture teardown rather than reaching a backend
 service. Shared fixture data uses deterministic IDs and timestamps and never

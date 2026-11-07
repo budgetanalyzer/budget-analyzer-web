@@ -118,7 +118,7 @@ export async function installBrowserMocks(
   });
   await page.route('**/auth/v1/session', async (route) => {
     const url = new URL(route.request().url());
-    if (route.request().method() !== 'GET' || canonicalUrl(url) !== '/auth/v1/session') {
+    if (route.request().method() !== 'POST' || canonicalUrl(url) !== '/auth/v1/session') {
       await recordAndBlock(route);
       return;
     }

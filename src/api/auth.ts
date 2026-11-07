@@ -12,7 +12,7 @@ import type { SessionStatus } from '@/types/session';
  * - OAuth2/OIDC flows with identity provider
  * - Session cookies (HttpOnly, Secure, SameSite)
  * - Session data stored server-side
- * - Frontend heartbeat (GET /auth/v1/session) refreshes authorization through permission-service
+ * - Frontend heartbeat (POST /auth/v1/session) refreshes authorization through permission-service
  *   and extends the local session TTL only after that refresh succeeds (does not call the IdP)
  *
  * Frontend never sees tokens - they're managed server-side by Session Gateway.
@@ -40,11 +40,11 @@ export async function getCurrentUser(): Promise<User> {
 }
 
 /**
- * Get session status for heartbeat
+ * Refresh and get session status for heartbeat
  * Calls Session Gateway /auth/v1/session, which revalidates authorization through
  * permission-service before extending the local session TTL (does not call the IdP)
  */
 export async function getSessionStatus(): Promise<SessionStatus> {
-  const response = await authClient.get<SessionStatus>('/auth/v1/session');
+  const response = await authClient.post<SessionStatus>('/auth/v1/session');
   return response.data;
 }

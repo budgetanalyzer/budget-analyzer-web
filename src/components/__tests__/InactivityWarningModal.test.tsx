@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { InactivityWarningModal } from '@/components/InactivityWarningModal';
+import { submitLogoutForm } from '@/utils/logout';
+
+vi.mock('@/utils/logout', () => ({
+  submitLogoutForm: vi.fn(),
+}));
 
 describe('InactivityWarningModal', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.mocked(submitLogoutForm).mockReset();
   });
 
   afterEach(() => {
@@ -56,19 +62,7 @@ describe('InactivityWarningModal', () => {
     expect(screen.getByText(/1:45/)).toBeInTheDocument();
   });
 
-  it('redirects to /logout when countdown reaches 0', () => {
-    const hrefSetter = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
-      configurable: true,
-    });
-    Object.defineProperty(window.location, 'href', {
-      set: hrefSetter,
-      get: () => '',
-      configurable: true,
-    });
-
+  it('submits logout when countdown reaches 0', () => {
     const now = Math.floor(Date.now() / 1000);
     render(
       <InactivityWarningModal
@@ -84,22 +78,10 @@ describe('InactivityWarningModal', () => {
       vi.advanceTimersByTime(3000);
     });
 
-    expect(hrefSetter).toHaveBeenCalledWith('/logout');
+    expect(submitLogoutForm).toHaveBeenCalledTimes(1);
   });
 
-  it('does not redirect on initial render before countdown initializes', () => {
-    const hrefSetter = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
-      configurable: true,
-    });
-    Object.defineProperty(window.location, 'href', {
-      set: hrefSetter,
-      get: () => '',
-      configurable: true,
-    });
-
+  it('does not submit logout on initial render before countdown initializes', () => {
     const now = Math.floor(Date.now() / 1000);
     render(
       <InactivityWarningModal
@@ -111,22 +93,10 @@ describe('InactivityWarningModal', () => {
       />,
     );
 
-    expect(hrefSetter).not.toHaveBeenCalled();
+    expect(submitLogoutForm).not.toHaveBeenCalled();
   });
 
-  it('does not redirect while heartbeat is in flight', () => {
-    const hrefSetter = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
-      configurable: true,
-    });
-    Object.defineProperty(window.location, 'href', {
-      set: hrefSetter,
-      get: () => '',
-      configurable: true,
-    });
-
+  it('does not submit logout while heartbeat is in flight', () => {
     const now = Math.floor(Date.now() / 1000);
     render(
       <InactivityWarningModal
@@ -142,7 +112,7 @@ describe('InactivityWarningModal', () => {
       vi.advanceTimersByTime(3000);
     });
 
-    expect(hrefSetter).not.toHaveBeenCalled();
+    expect(submitLogoutForm).not.toHaveBeenCalled();
   });
 
   it('calls onContinue when Continue button is clicked', () => {
@@ -174,18 +144,6 @@ describe('InactivityWarningModal', () => {
   });
 
   it('replaces Continue with a sign-out action when the session cannot be extended', () => {
-    const hrefSetter = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
-      configurable: true,
-    });
-    Object.defineProperty(window.location, 'href', {
-      set: hrefSetter,
-      get: () => '',
-      configurable: true,
-    });
-
     const now = Math.floor(Date.now() / 1000);
     render(
       <InactivityWarningModal
@@ -205,22 +163,10 @@ describe('InactivityWarningModal', () => {
     expect(screen.queryByRole('button', { name: /continue/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign out now' }));
-    expect(hrefSetter).toHaveBeenCalledWith('/logout');
+    expect(submitLogoutForm).toHaveBeenCalledTimes(1);
   });
 
-  it('redirects to /logout when a session that cannot be extended reaches 0', () => {
-    const hrefSetter = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
-      configurable: true,
-    });
-    Object.defineProperty(window.location, 'href', {
-      set: hrefSetter,
-      get: () => '',
-      configurable: true,
-    });
-
+  it('submits logout when a session that cannot be extended reaches 0', () => {
     const now = Math.floor(Date.now() / 1000);
     render(
       <InactivityWarningModal
@@ -236,7 +182,7 @@ describe('InactivityWarningModal', () => {
       vi.advanceTimersByTime(3000);
     });
 
-    expect(hrefSetter).toHaveBeenCalledWith('/logout');
+    expect(submitLogoutForm).toHaveBeenCalledTimes(1);
   });
 
   it('is not dismissable via Escape key', () => {

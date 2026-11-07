@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/Dialog';
 import { useCountdown } from '@/hooks/useCountdown';
+import { submitLogoutForm } from '@/utils/logout';
 
 interface InactivityWarningModalProps {
   open: boolean;
@@ -17,8 +18,6 @@ interface InactivityWarningModalProps {
   expiresAt: number | null;
   canExtend: boolean;
 }
-
-const LOGOUT_PATH = '/logout';
 
 function formatCountdown(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -43,12 +42,12 @@ export function InactivityWarningModal({
 
   useEffect(() => {
     if (open && countdownReady.current && secondsLeft === 0 && expiresAt != null && !isSending) {
-      window.location.href = LOGOUT_PATH;
+      submitLogoutForm();
     }
   }, [open, secondsLeft, expiresAt, isSending]);
 
   const handleSignOut = useCallback(() => {
-    window.location.href = LOGOUT_PATH;
+    submitLogoutForm();
   }, []);
 
   let description: string;

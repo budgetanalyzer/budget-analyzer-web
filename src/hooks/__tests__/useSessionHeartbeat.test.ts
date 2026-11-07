@@ -4,10 +4,14 @@ import { useSessionHeartbeat } from '@/hooks/useSessionHeartbeat';
 import * as authApi from '@/api/auth';
 import * as activityTracking from '@/hooks/useActivityTracking';
 import type { SessionStatus } from '@/types/session';
+import { submitLogoutForm } from '@/utils/logout';
 import { AxiosError, AxiosHeaders } from 'axios';
 
 vi.mock('@/api/auth');
 vi.mock('@/hooks/useActivityTracking');
+vi.mock('@/utils/logout', () => ({
+  submitLogoutForm: vi.fn(),
+}));
 
 // jsdom does not provide BroadcastChannel
 class MockBroadcastChannel {
@@ -109,6 +113,7 @@ describe('useSessionHeartbeat', () => {
     });
     mockGetSessionStatus.mockResolvedValue(makeSessionStatus());
     mockWasActive.mockReturnValue(true);
+    vi.mocked(submitLogoutForm).mockReset();
   });
 
   afterEach(() => {
@@ -184,23 +189,12 @@ describe('useSessionHeartbeat', () => {
     expect(result.current.showWarning).toBe(true);
   });
 
-  it('redirects to logout on 401 response', async () => {
+  it('submits logout on 401 response', async () => {
     mockGetSessionStatus.mockRejectedValue(make401Error());
-    const hrefSetter = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
-      configurable: true,
-    });
-    Object.defineProperty(window.location, 'href', {
-      set: hrefSetter,
-      get: () => '',
-      configurable: true,
-    });
 
     const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
     await advanceTimers(0);
-    expect(hrefSetter).toHaveBeenCalledWith('/logout');
+    expect(submitLogoutForm).toHaveBeenCalledTimes(1);
     expect(result.current.connectionWarning).toBeNull();
   });
 
@@ -281,18 +275,6 @@ describe('useSessionHeartbeat', () => {
   });
 
   it('stops offering extension once expiresAt reaches the absolute cap, then logs out on the 401', async () => {
-    const hrefSetter = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
-      configurable: true,
-    });
-    Object.defineProperty(window.location, 'href', {
-      set: hrefSetter,
-      get: () => '',
-      configurable: true,
-    });
-
     // Session Gateway model: each heartbeat renews to min(now + TTL, cap); at the cap it returns 401.
     vi.setSystemTime(new Date('2026-11-07T00:00:00Z'));
     const start = Math.floor(Date.now() / 1000);
@@ -332,14 +314,14 @@ describe('useSessionHeartbeat', () => {
     expect(result.current.expiresAt).toBe(capAt);
     expect(result.current.showWarning).toBe(true);
     expect(result.current.canExtend).toBe(false);
-    expect(hrefSetter).not.toHaveBeenCalled();
+    expect(submitLogoutForm).not.toHaveBeenCalled();
 
     // The t=960s heartbeat still returns the cap; the t=1080s heartbeat is past it and gets 401.
     await advanceTimers(80_000);
     expect(result.current.canExtend).toBe(false);
-    expect(hrefSetter).not.toHaveBeenCalled();
+    expect(submitLogoutForm).not.toHaveBeenCalled();
     await advanceTimers(120_000);
-    expect(hrefSetter).toHaveBeenCalledWith('/logout');
+    expect(submitLogoutForm).toHaveBeenCalledTimes(1);
   });
 
   it('cleans up timers on unmount', async () => {
@@ -412,27 +394,15 @@ describe('useSessionHeartbeat', () => {
     expect(result.current.expiresAt).toBe(refreshedExpiry);
   });
 
-  it('redirects to logout when a 503 retry returns 401', async () => {
+  it('submits logout when a 503 retry returns 401', async () => {
     mockGetSessionStatus
       .mockRejectedValueOnce(make503Error())
       .mockRejectedValueOnce(make401Error());
-    const hrefSetter = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
-      configurable: true,
-    });
-    Object.defineProperty(window.location, 'href', {
-      set: hrefSetter,
-      get: () => '',
-      configurable: true,
-    });
-
     const { result } = renderHook(() => useSessionHeartbeat({ enabled: true }));
     await advanceTimers(0);
 
     expect(mockGetSessionStatus).toHaveBeenCalledTimes(2);
-    expect(hrefSetter).toHaveBeenCalledWith('/logout');
+    expect(submitLogoutForm).toHaveBeenCalledTimes(1);
     expect(result.current.connectionWarning).toBeNull();
   });
 
