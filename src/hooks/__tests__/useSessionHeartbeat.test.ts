@@ -280,6 +280,68 @@ describe('useSessionHeartbeat', () => {
     expect(result.current.showWarning).toBe(false);
   });
 
+  it('stops offering extension once expiresAt reaches the absolute cap, then logs out on the 401', async () => {
+    const hrefSetter = vi.fn();
+    Object.defineProperty(window, 'location', {
+      value: { href: '' },
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(window.location, 'href', {
+      set: hrefSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    // Session Gateway model: each heartbeat renews to min(now + TTL, cap); at the cap it returns 401.
+    vi.setSystemTime(new Date('2026-11-07T00:00:00Z'));
+    const start = Math.floor(Date.now() / 1000);
+    const ttlSec = 900;
+    const capAt = start + 1000;
+    mockGetSessionStatus.mockImplementation(async () => {
+      const now = Math.floor(Date.now() / 1000);
+      if (now >= capAt) throw make401Error();
+      return makeSessionStatus({ expiresAt: Math.min(now + ttlSec, capAt) });
+    });
+
+    const { result } = renderHook(() =>
+      useSessionHeartbeat({
+        enabled: true,
+        heartbeatIntervalMs: 120_000,
+        warningBeforeExpirySec: 120,
+      }),
+    );
+    await advanceTimers(0);
+    expect(result.current.expiresAt).toBe(start + ttlSec);
+
+    // The t=120s heartbeat is clamped to the cap; later heartbeats return the same expiry.
+    await advanceTimers(120_000);
+    expect(result.current.expiresAt).toBe(capAt);
+    expect(result.current.canExtend).toBe(true);
+    expect(result.current.showWarning).toBe(false);
+
+    // The warning opens 120s before the cap even though the user stayed active.
+    await advanceTimers(760_000);
+    expect(result.current.showWarning).toBe(true);
+    expect(result.current.canExtend).toBe(true);
+
+    // Continue cannot move expiresAt, so the warning stays open and extension is withdrawn.
+    await act(async () => {
+      await result.current.sendHeartbeat();
+    });
+    expect(result.current.expiresAt).toBe(capAt);
+    expect(result.current.showWarning).toBe(true);
+    expect(result.current.canExtend).toBe(false);
+    expect(hrefSetter).not.toHaveBeenCalled();
+
+    // The t=960s heartbeat still returns the cap; the t=1080s heartbeat is past it and gets 401.
+    await advanceTimers(80_000);
+    expect(result.current.canExtend).toBe(false);
+    expect(hrefSetter).not.toHaveBeenCalled();
+    await advanceTimers(120_000);
+    expect(hrefSetter).toHaveBeenCalledWith('/logout');
+  });
+
   it('cleans up timers on unmount', async () => {
     const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
     const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');

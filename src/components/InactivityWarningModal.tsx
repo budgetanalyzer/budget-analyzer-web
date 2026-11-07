@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import {
   Dialog,
@@ -15,7 +15,10 @@ interface InactivityWarningModalProps {
   isSending: boolean;
   onContinue: () => void;
   expiresAt: number | null;
+  canExtend: boolean;
 }
+
+const LOGOUT_PATH = '/logout';
 
 function formatCountdown(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -28,6 +31,7 @@ export function InactivityWarningModal({
   isSending,
   onContinue,
   expiresAt,
+  canExtend,
 }: InactivityWarningModalProps) {
   const secondsLeft = useCountdown(expiresAt, open);
   const countdownReady = useRef(false);
@@ -39,14 +43,23 @@ export function InactivityWarningModal({
 
   useEffect(() => {
     if (open && countdownReady.current && secondsLeft === 0 && expiresAt != null && !isSending) {
-      window.location.href = '/logout';
+      window.location.href = LOGOUT_PATH;
     }
   }, [open, secondsLeft, expiresAt, isSending]);
 
-  const description =
-    expiresAt != null
-      ? `Your session will expire in ${formatCountdown(secondsLeft)} due to inactivity. Click Continue to stay signed in.`
-      : 'Your session will expire soon due to inactivity. Click Continue to stay signed in.';
+  const handleSignOut = useCallback(() => {
+    window.location.href = LOGOUT_PATH;
+  }, []);
+
+  let description: string;
+  if (!canExtend && expiresAt != null) {
+    description = `Your session has reached its maximum length and will end in ${formatCountdown(secondsLeft)}. Sign in again to keep working.`;
+  } else if (expiresAt != null) {
+    description = `Your session will expire in ${formatCountdown(secondsLeft)} due to inactivity. Click Continue to stay signed in.`;
+  } else {
+    description =
+      'Your session will expire soon due to inactivity. Click Continue to stay signed in.';
+  }
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
@@ -56,9 +69,13 @@ export function InactivityWarningModal({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button onClick={onContinue} disabled={isSending}>
-            Continue
-          </Button>
+          {canExtend ? (
+            <Button onClick={onContinue} disabled={isSending}>
+              Continue
+            </Button>
+          ) : (
+            <Button onClick={handleSignOut}>Sign out now</Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { isSafeReturnUrl } from '@/features/auth/utils/loginRedirect';
 import { isAdmin } from '@/features/auth/utils/role';
 import { useNavigate, useSearchParams } from 'react-router';
 
@@ -27,7 +28,7 @@ export function LoginPage() {
 
     // Role-aware default redirect: admin → /admin, user → /
     const defaultPath = isAdmin(user.roles) ? '/admin' : '/';
-    navigate(returnUrl || defaultPath, { replace: true });
+    navigate(returnUrl && isSafeReturnUrl(returnUrl) ? returnUrl : defaultPath, { replace: true });
   }, [isAuthenticated, user, navigate, returnUrl]);
 
   const handleLogin = useCallback(() => {

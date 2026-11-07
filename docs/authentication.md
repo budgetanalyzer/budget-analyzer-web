@@ -73,6 +73,11 @@ is established by the SPA boundary before protected application code mounts.
 `/oauth2/authorization/idp`. The gateway handles the identity-provider redirect,
 callback, server-side session creation, cookie issuance, and return to the SPA.
 
+`/login` reads `returnUrl` from its query string. It forwards that value to
+`login()` and, for an already authenticated user, navigates to it only when
+`isSafeReturnUrl` accepts it; otherwise it navigates to the role-aware default
+path (`/admin` for administrators, `/` otherwise).
+
 `logout()` clears the frontend Query cache and navigates to `/logout`. The
 Session Gateway clears the server session and browser cookie and completes the
 identity-provider logout redirect chain. Session-expiry paths also use
@@ -109,7 +114,8 @@ Frontend behavior is:
   alone do not extend the session.
 - Schedule a non-dismissable warning from the response's Unix-seconds
   `expiresAt`. Continue sends another heartbeat; reaching zero navigates to
-  `/logout`.
+  `/logout`. A session at its absolute lifetime cap gets a sign-out action
+  instead of Continue; see [Absolute session lifetime](#absolute-session-lifetime).
 - Publish successful expiry updates through the `session-heartbeat`
   `BroadcastChannel`, allowing other tabs to dismiss and reschedule their
   warnings.
@@ -132,6 +138,30 @@ expiry. `VITE_HEARTBEAT_INTERVAL_MS` and
 `VITE_WARNING_BEFORE_EXPIRY_SECONDS` override those frontend defaults; the
 environment-variable inventory belongs to
 [Development](development.md#environment-variables).
+
+### Absolute session lifetime
+
+The Session Gateway caps renewal at an absolute lifetime measured from session
+creation (`SESSION_MAX_LIFETIME_SECONDS`, default 8 hours). Near the cap a
+heartbeat still succeeds, but its `expiresAt` is clamped to the cap and stops
+advancing. Once the cap has passed, the heartbeat returns 401.
+
+A renewed session always has the full sliding TTL left, so a fresh server
+`expiresAt` that is already inside the warning window can only be a capped
+session. The hook exposes this as `canExtend: false` for a local or cross-tab
+heartbeat. The warning then says the session has reached its maximum length.
+It shows the countdown and replaces Continue with **Sign out now**, because
+another heartbeat cannot extend the session. This depends on
+`VITE_WARNING_BEFORE_EXPIRY_SECONDS` being shorter than the session TTL. If
+it is not, every warning looks capped.
+
+When the countdown reaches zero, when the user chooses Sign out now, or when a
+heartbeat returns 401 at the cap, the browser goes to `/logout`. The Session
+Gateway then signs out of the identity provider, and the SPA's `/peace` page
+offers Sign in again. Re-login does not force re-authentication. The Auth0 idle
+lifetime is shorter than the cap, and heartbeats never reach Auth0, so by the
+time the cap is reached the Auth0 session has expired and login asks for
+credentials.
 
 ## Current User Contract
 
@@ -263,7 +293,9 @@ callbacks. Use either:
   authorized. Do not turn the response into a login redirect.
 - **The session warning appears unexpectedly:** inspect activity tracking,
   heartbeat responses, `expiresAt`, and the two heartbeat environment values.
-  A heartbeat 401 deliberately takes the logout path.
+  A warning for an active user that says the session reached its maximum length
+  is the absolute lifetime cap. A heartbeat 401 deliberately takes the logout
+  path.
 
 Authentication test conventions and browser-harness prerequisites belong to
 the [Testing guide](testing-guide.md). API endpoint and payload changes must be
