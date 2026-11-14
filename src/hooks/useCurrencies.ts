@@ -46,7 +46,8 @@ export const useCurrencies = (
 /**
  * Fetch exchange rates for a target currency
  * Historical exchange rates never change, so cache indefinitely
- * If no date range is provided, fetches all available rates
+ * The API defaults an omitted startDate to the first available rate and an omitted endDate to
+ * today (UTC); an endDate after today is treated as today
  */
 export const useExchangeRates = (params: {
   targetCurrency: string;

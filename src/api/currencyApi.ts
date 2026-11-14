@@ -53,8 +53,9 @@ export const currencyApi = {
   /**
    * Get exchange rates for a target currency
    * GET /v1/exchange-rates?targetCurrency={currency}&startDate={date}&endDate={date}
-   * API guarantees a rate for every date in the range
-   * If startDate/endDate are omitted, returns all available rates
+   * API guarantees a rate for every date in the effective range
+   * An omitted startDate means the first available rate
+   * An omitted endDate means today (UTC), and an endDate after today is treated as today
    */
   getExchangeRates: async (params: {
     targetCurrency: string;

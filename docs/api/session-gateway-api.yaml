@@ -25,7 +25,7 @@ tags:
   description: Browser logout and session invalidation
 paths:
   /logout:
-    get:
+    post:
       tags:
       - Logout
       summary: Log out
@@ -33,7 +33,7 @@ paths:
         logout endpoint.
       operationId: logout
       responses:
-        '302':
+        '303':
           description: Redirect to the identity provider logout endpoint
           headers:
             Location:
@@ -42,6 +42,25 @@ paths:
               schema:
                 type: string
                 format: uri
+        '302':
+          description: Session could not be read or deleted; redirect to the app error
+            route
+          headers:
+            Location:
+              description: Frontend app error route
+              style: simple
+              schema:
+                type: string
+                example: /oops
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INVALID_REQUEST
+                message: Bad Request
         '500':
           description: Internal Server Error
           content:
@@ -60,6 +79,52 @@ paths:
               example:
                 type: SERVICE_UNAVAILABLE
                 message: Service Unavailable
+  /auth/v1/session:
+    post:
+      tags:
+      - Session
+      summary: Session heartbeat
+      description: Refreshes current authorization and extends the local session only
+        after a successful permission-service lookup, never past the absolute session
+        lifetime.
+      operationId: getSessionStatus
+      responses:
+        '200':
+          description: Session is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionStatusResponse'
+        '401':
+          description: No valid session or active account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '503':
+          description: Authorization refresh or Redis update unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INVALID_REQUEST
+                message: Bad Request
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                type: INTERNAL_ERROR
+                message: Internal Server Error
   /auth/v1/user:
     get:
       tags:
@@ -99,83 +164,28 @@ paths:
               example:
                 type: SERVICE_UNAVAILABLE
                 message: Service Unavailable
-  /auth/v1/session:
-    get:
-      tags:
-      - Session
-      summary: Session heartbeat
-      description: Refreshes current authorization and extends the local session only
-        after a successful permission-service lookup.
-      operationId: getSessionStatus
-      responses:
-        '200':
-          description: Session is valid
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SessionStatusResponse'
-        '401':
-          description: No valid session or active account
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '503':
-          description: Authorization refresh or Redis update unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-              example:
-                type: INTERNAL_ERROR
-                message: Internal Server Error
 components:
   schemas:
-    UserInfoResponse:
+    SessionStatusResponse:
       type: object
-      description: Authenticated user information
+      description: Session status from heartbeat endpoint
       properties:
-        sub:
+        userId:
           type: string
-          description: IDP subject identifier
-          example: auth0|abc123
-        name:
-          type: string
-          description: User's display name
-          example: Jane Doe
-        email:
-          type: string
-          description: User's email address
-          example: jane@example.com
-        picture:
-          type: string
-          description: Profile picture URL
-          example: https://example.com/photo.jpg
-        authenticated:
-          type: boolean
-          description: Always true when this response is returned
-          example: true
+          description: User's internal ID
+          example: user123
         roles:
           type: array
-          description: User's roles for UI visibility
+          description: User's roles
           example:
           - USER
           items:
             type: string
-        permissions:
-          type: array
-          description: User's resolved permissions for action-level UI gating
-          example:
-          - transactions:read
-          - transactions:read:any
-          items:
-            type: string
+        expiresAt:
+          type: integer
+          format: int64
+          description: Unix epoch seconds when session expires
+          example: 1711720800
     ApiErrorResponse:
       description: Standard API error response format
       properties:
@@ -234,23 +244,42 @@ components:
       required:
       - field
       - message
-    SessionStatusResponse:
+    UserInfoResponse:
       type: object
-      description: Session status from heartbeat endpoint
+      description: Authenticated user information
       properties:
-        userId:
+        sub:
           type: string
-          description: User's internal ID
-          example: user123
+          description: IDP subject identifier
+          example: auth0|abc123
+        name:
+          type: string
+          description: User's display name
+          example: Jane Doe
+        email:
+          type: string
+          description: User's email address
+          example: jane@example.com
+        picture:
+          type: string
+          description: Profile picture URL
+          example: https://example.com/photo.jpg
+        authenticated:
+          type: boolean
+          description: Always true when this response is returned
+          example: true
         roles:
           type: array
-          description: User's roles
+          description: User's roles for UI visibility
           example:
           - USER
           items:
             type: string
-        expiresAt:
-          type: integer
-          format: int64
-          description: Unix epoch seconds when session expires
-          example: 1711720800
+        permissions:
+          type: array
+          description: User's resolved permissions for action-level UI gating
+          example:
+          - transactions:read
+          - transactions:read:any
+          items:
+            type: string
