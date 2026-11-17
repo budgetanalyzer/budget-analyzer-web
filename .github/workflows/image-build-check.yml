@@ -7,7 +7,6 @@ on:
       - Dockerfile
       - Dockerfile.production
       - .dockerignore
-      - nginx.production.conf
       - package.json
       - package-lock.json
       - .github/workflows/image-build-check.yml
