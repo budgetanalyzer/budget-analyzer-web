@@ -148,7 +148,7 @@ runtime evidence and current coverage limits.
 
 `Dockerfile.production` is the release image definition:
 
-1. A Node 20 build stage installs with `npm ci` and runs the full
+1. A Node build stage installs with `npm ci` and runs the full
    coverage-gated `npm run build`.
 2. An unprivileged NGINX image serves the static bundle on port `3000` using
    `nginx.production.conf`.
