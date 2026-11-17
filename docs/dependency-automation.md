@@ -13,8 +13,8 @@ discovers:
 
 - direct npm dependencies and lockfile selections from `package.json` and
   `package-lock.json`;
-- Node and NGINX build/runtime images, tags, and digests in all three
-  Dockerfiles;
+- Node images, tags, and digests in all three Dockerfiles, and the Alpine
+  release-image base in `Dockerfile.production`;
 - pinned GitHub Actions and `actions/setup-node` runtime inputs in the workflow
   files.
 
@@ -90,18 +90,18 @@ a successful package lookup.
 
 `.github/workflows/image-build-check.yml` (`Image Build Check`) runs on pull
 requests to `main` that change `Dockerfile`, `Dockerfile.production`,
-`.dockerignore`, `nginx.production.conf`, `package.json`, `package-lock.json`,
-or the workflow itself, and on manual dispatch. Application source is excluded
-because the `Build` workflow already compiles and tests it on every pull
-request.
+`.dockerignore`, `package.json`, `package-lock.json`, or the workflow itself,
+and on manual dispatch. Application source is excluded because the `Build`
+workflow already compiles and tests it on every pull request.
 
 A `fail-fast: false` matrix builds each image for `linux/arm64` with the
 repository root as context:
 
 - `Dockerfile.production`, the release image built by `publish-release.yml`.
-  Its `build` stage runs on BuildKit's build platform, so only the NGINX
-  runtime stage is arm64. This entry proves the arm64 NGINX base manifest, the
-  `nginx.production.conf` copy, and the coverage-gated build inside the image.
+  Its `build` stage runs on BuildKit's build platform, so only the Alpine
+  asset stage is arm64. This entry proves the arm64 Alpine base manifest, the
+  bundle copy into the asset stage, and the coverage-gated build inside the
+  image.
 - `Dockerfile`, the development image built by the orchestration `Tiltfile`.
   It runs `npm ci` under arm64 emulation, so this entry is what proves the
   arm64 Node base manifest and `npm ci` resolution of the lockfile's
@@ -109,7 +109,7 @@ repository root as context:
 
 The check does not log in to a registry, tag, push, or cache images, and passes
 no secrets. It does not prove runtime behavior, the Vite development server,
-NGINX routing, or strict-CSP behavior, and it does not scan for
+gateway routing, or strict-CSP behavior, and it does not scan for
 vulnerabilities. Emulated builds are slow; each entry has a 30-minute timeout.
 `Dockerfile.dev` is not built because it has no known consumer.
 

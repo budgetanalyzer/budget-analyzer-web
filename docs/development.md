@@ -146,18 +146,31 @@ runtime evidence and current coverage limits.
 
 ### Production Container
 
-`Dockerfile.production` is the release image definition:
+`Dockerfile.production` defines the release image, an assets-only carrier for
+the built bundle:
 
-1. A Node 20 build stage installs with `npm ci` and runs the full
+1. A Node build stage installs with `npm ci` and runs the full
    coverage-gated `npm run build`.
-2. An unprivileged NGINX image serves the static bundle on port `3000` using
-   `nginx.production.conf`.
+2. A digest-pinned Alpine stage holds the root-mounted bundle. It runs no
+   server and exposes no ports.
 
-The Node stage is pinned to BuildKit's native build platform. The release
-workflow can therefore build the requested `linux/arm64` runtime image without
-running Vitest through target-architecture emulation. NGINX provides the SPA
-fallback, a `/health` endpoint, immutable caching for `/assets/`, and no-cache
-headers for application routes.
+The Node stage is pinned to BuildKit's native build platform. The asset stage
+has no `RUN` step, so the release workflow can build the requested
+`linux/arm64` image without target-architecture emulation.
+
+Orchestration's `nginx-gateway` uses this image as an init container that
+copies the bundle into the gateway, which then serves it. The gateway owns the
+SPA fallback, asset caching, and security headers; see the
+[orchestration NGINX production route](https://github.com/budgetanalyzer/orchestration/blob/main/nginx/README.md#checked-in-production-route-variant).
+
+This repository must preserve the image contract that the gateway relies on:
+
+- `index.html` and `assets/` are at `/usr/share/nginx/html`. The path name is
+  historical and changes only through a coordinated orchestration release.
+- POSIX `sh` and `cp` are on `PATH`.
+- The default user is `101:101`, and that user can copy the bundle with a
+  read-only root filesystem, all capabilities dropped, and no privilege
+  escalation.
 
 `.github/workflows/publish-release.yml` publishes the GHCR image for strict
 `vX.Y.Z` tags or an explicit manual source ref and Docker label. It does not
